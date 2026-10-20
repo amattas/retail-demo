@@ -69,3 +69,12 @@ def test_returns_python_floats():
     rng = np.random.default_rng(1)
     cost, msrp, sale = compute_pricing(10.0, rng)
     assert all(type(v) is float for v in (cost, msrp, sale))
+
+
+def test_one_cent_cost_margin_for_minimum_price():
+    rng = np.random.default_rng(19)
+    for _ in range(100):
+        cost, msrp, sale = compute_pricing(0.01, rng)
+        assert cost >= 0.01
+        assert round(sale - cost, 2) >= 0.01
+        assert sale <= msrp

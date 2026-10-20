@@ -1,0 +1,30 @@
+.execute database script with (ThrowOnErrors=true) <|
+
+.create-merge table ops_availability_signals (
+    event_ts:datetime,
+    source_as_of:datetime,
+    forecast_as_of:datetime,
+    case_id:string,
+    store_id:long,
+    product_id:long,
+    product_name:string,
+    current_inventory:long,
+    forecast_units_7d:real,
+    stockout_probability:real,
+    risk_horizon_days:long,
+    days_of_inventory:real,
+    shortage_units:long,
+    scenario:string,
+    provenance:string
+)
+
+.create-merge table ops_case_actions (
+    event_ts:datetime,
+    case_id:string,
+    action_id:string,
+    status:string,
+    details:string
+)
+
+.alter-merge table ops_availability_signals policy retention softdelete = 30d
+.alter-merge table ops_case_actions policy retention softdelete = 90d

@@ -94,6 +94,20 @@ table fact_truck_inventory
 
 		annotation SummarizationSetBy = User
 
+	/// Source event timestamp for truck cargo LOAD/UNLOAD rows.
+	column 'Event Timestamp'
+		dataType: dateTime
+		formatString: General Date
+		isHidden
+		lineageTag: c2200106-0000-0000-0000-000000000001
+		sourceLineageTag: event_ts
+		summarizeBy: none
+		sourceColumn: event_ts
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
 	partition fact_truck_inventory = entity
 		mode: directLake
 		source

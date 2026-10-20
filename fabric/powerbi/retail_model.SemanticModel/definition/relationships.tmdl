@@ -28,6 +28,7 @@ relationship 'Receipt Lines to Products'
 	toColumn: dim_products.ID
 
 relationship 'Payments to Receipts'
+	isActive: false
 	fromColumn: fact_payments.'Receipt ID'
 	toColumn: fact_receipts.'Receipt ID'
 
@@ -37,14 +38,16 @@ relationship 'Payments to Online Orders'
 	toColumn: fact_online_order_headers.'Order ID'
 
 relationship 'Payments to Stores'
-	isActive: false
 	fromColumn: fact_payments.'Store ID'
 	toColumn: dim_stores.ID
 
 relationship 'Payments to Customers'
-	isActive: false
 	fromColumn: fact_payments.'Customer ID'
 	toColumn: dim_customers.ID
+
+relationship 'Payments to Date'
+	fromColumn: fact_payments.'Event Date'
+	toColumn: dim_date.Date
 
 relationship 'Online Orders to Customers'
 	fromColumn: fact_online_order_headers.'Customer ID'
@@ -123,6 +126,10 @@ relationship 'Reorders to Products'
 	fromColumn: fact_reorders.'Product ID'
 	toColumn: dim_products.ID
 
+relationship 'Reorders to Date'
+	fromColumn: fact_reorders.'Event Date'
+	toColumn: dim_date.Date
+
 relationship 'Reorders to Distribution Centers'
 	isActive: false
 	fromColumn: fact_reorders.'DC ID'
@@ -173,6 +180,10 @@ relationship 'Zone Dwell by Minute to Date'
 relationship 'Stockouts to Products'
 	fromColumn: fact_stockouts.'Product ID'
 	toColumn: dim_products.ID
+
+relationship 'Stockouts to Date'
+	fromColumn: fact_stockouts.'Event Date'
+	toColumn: dim_date.Date
 
 relationship 'Promotions to Stores'
 	isActive: false
@@ -257,4 +268,3 @@ relationship 'Marketing Attribution to Date'
 relationship 'Campaign Performance Daily to Date'
 	fromColumn: campaign_performance_daily.Day
 	toColumn: dim_date.Date
-

@@ -6,7 +6,7 @@
 // Dependencies: None (standalone tables for pricing workflow)
 // ============================================================================
 
-.execute database script <|
+.execute database script with (ThrowOnErrors=true) <|
 
 // ============================================================================
 // TABLES
@@ -146,16 +146,51 @@
 .alter table pricing_recommendation_rejected policy caching hot = 7d
 
 // ============================================================================
-// MATERIALIZED VIEWS (Optional - for dashboard performance optimization)
+// QUERY-TIME STATE AND MATERIALIZED METRICS
 // ============================================================================
 
-// Materialized view for current pending recommendations
-// Useful for high-frequency dashboard queries
-.create-or-alter materialized-view mv_pending_recommendations on table pricing_recommendation_created
+// Current pending recommendations must account for decision events. A
+// materialized view cannot join the three event tables, so derive the latest
+// lifecycle state at query time and retain the latest recommendation payload.
+.drop materialized-view mv_pending_recommendations ifexists
+
+.create-or-alter function with (folder = "pricing") fn_pending_recommendations()
 {
-    pricing_recommendation_created
-    | where status == "PENDING"
-    | summarize arg_max(event_ts, *) by recommendation_id
+    let latest_recommendations =
+        pricing_recommendation_created
+        | summarize arg_max(event_ts, *) by recommendation_id;
+    let latest_state =
+        union
+            (
+                pricing_recommendation_created
+                | project event_ts, recommendation_id,
+                          current_status = status, state_priority = 0
+            ),
+            (
+                pricing_recommendation_approved
+                | project event_ts, recommendation_id,
+                          current_status = "APPROVED", state_priority = 1
+            ),
+            (
+                pricing_recommendation_rejected
+                | project event_ts, recommendation_id,
+                          current_status = "REJECTED", state_priority = 2
+            )
+        | extend state_sort = strcat(
+                     format_datetime(event_ts, "yyyy-MM-dd HH:mm:ss.fffffff"),
+                     "|",
+                     tostring(state_priority)
+                 )
+        | summarize arg_max(state_sort, *) by recommendation_id
+        | project recommendation_id, current_status;
+    latest_recommendations
+    | join kind=inner latest_state on recommendation_id
+    | where current_status == "PENDING"
+    | project event_ts, recommendation_id, product_id, product_name,
+              department, category, subcategory, current_price,
+              recommended_price, expected_revenue_impact, ml_confidence,
+              model_type, reason_codes, constraint_status, constraint_details,
+              status = current_status, created_by
 }
 
 // Materialized view for approval metrics
@@ -169,6 +204,8 @@
     | summarize decisions = count() by bin(event_ts, 1h), decision_type
 }
 
+.alter-merge materialized-view mv_pricing_approval_metrics policy retention softdelete = 7d recoverability = disabled
+
 // Materialized view for rejection metrics (counterpart to mv_pricing_approval_metrics)
 .create-or-alter materialized-view mv_pricing_rejection_metrics on table pricing_recommendation_rejected
 {
@@ -176,6 +213,8 @@
     | extend decision_type = "Rejected"
     | summarize decisions = count() by bin(event_ts, 1h), decision_type
 }
+
+.alter-merge materialized-view mv_pricing_rejection_metrics policy retention softdelete = 7d recoverability = disabled
 
 // ============================================================================
 // SAMPLE TEST DATA (for validation)

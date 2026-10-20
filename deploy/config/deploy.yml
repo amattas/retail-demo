@@ -1,10 +1,24 @@
 subscription_id: null
+# Native public API publication only; never included in fabric-cicd's item scope.
+# The Operations Agent deploys whenever the profile supports it (enabled defaults to
+# true for standard/full-demo); a Fabric rejection warns instead of failing.
+operations_planning:
+  # Planning needs a fixed-credential connection and starts billing that cannot be cancelled.
+  include_plan: false
+  # Shared Power BI Semantic Model connection; used only when include_plan is true.
+  plan_connection_id: null
+  # Explicit consent: Planning can start a non-cancellable 30-day billable session.
+  plan_billing_acknowledged: false
+  recipient: null
+# Connected twins publish whenever the profile includes Reporting.
+twins: {}
 auth:
   mode: azure_cli
 workspace:
   description: Microsoft Fabric retail demo workspace
   existing_id: null
   capacity_id: null
+  capacity_resource_id: null
   skip_capacity_state_validation: false
   role_assignments: []
 lakehouse:
@@ -25,8 +39,8 @@ spark:
   use_custom_pool: false
   custom_pool_name: retail_setup_pool
   node_size: Medium
-  min_node_count: 1
-  max_node_count: 10
+  min_node_count: 2
+  max_node_count: 16
 notebooks:
   default_lakehouse_name: retail_lakehouse
 powerbi:
@@ -35,7 +49,7 @@ powerbi:
   semantic_model_connection_id: null
   refresh_after_deploy: false
 deployment:
-  profile: core
+  profile: full-demo
   item_types_in_scope:
   - Lakehouse
   - Notebook

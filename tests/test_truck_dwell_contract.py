@@ -107,8 +107,10 @@ def test_silver_joins_one_completed_lifecycle_on_authoritative_keys() -> None:
     assert 'F.max("departure_time").alias("departure_time")' in source
     assert 'arrived.join(departed, join_condition, "inner")' in source
     assert 'paired.join(existing, TRUCK_LIFECYCLE_KEYS, "left_anti")' in source
-    assert 'F.col("departed.departure_time").alias("etd")' in source
-    assert 'F.col("departed.departure_time").alias("departure_time")' in source
+    assert '_event_time_expr("truck_arrived", "arrived.")' in source
+    assert '_event_time_expr("truck_departed", "departed.")' in source
+    assert 'departure_event_ts.alias("etd")' in source
+    assert 'departure_event_ts.alias("departure_time")' in source
     assert '.filter(F.col("etd") > F.col("eta"))' in source
     assert "total += process_truck_lifecycles()" in source
     assert 'process_events("truck_arrived"' not in source
@@ -168,6 +170,8 @@ def test_eventhouse_queryset_dashboard_and_rule_share_units_and_threshold() -> N
     assert threshold_match is not None
     assert float(threshold_match.group(1)) == 90.0
     assert "fn_truck_sla()" in rules
-    assert "arrival_ingest_timestamp > ago(5m)" in rules
+    assert "departure_ingest_timestamp > ago(5m)" in rules
+    assert "departure_ingest_timestamp <= now()" in rules
+    assert "departure_time <= now()" in rules
     assert "where dwell_minutes > threshold_minutes" in rules
     assert "site" in rules

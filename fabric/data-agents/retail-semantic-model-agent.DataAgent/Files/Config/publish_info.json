@@ -1,4 +1,4 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/dataAgent/definition/publishInfo/1.0.0/schema.json",
-  "description": "This agent can answer questions about store and supply chain operations. Including customer purchases, inventory, and marketing."
+  "description": "Aggregate retail operations, inventory, sales, marketing, logistics, and model insights from curated non-sensitive semantic-model tables. The agent refuses row-level identity and re-identification requests."
 }

@@ -37,9 +37,13 @@ ENGINE_MODULES = [
     "config/generation.py",
     "generation/schemas.py",
     "generation/runtime.py",
+    "generation/behavior.py",
+    "generation/traffic.py",
     "generation/dims.py",
     "generation/receipts.py",
     "generation/returns.py",
+    "generation/inventory_policy.py",
+    "generation/fulfillment.py",
     "generation/store_activity.py",
     "generation/online_orders.py",
     "generation/promotions.py",
@@ -50,6 +54,7 @@ ENGINE_MODULES = [
     "generation/inventory.py",
     "generation/gold.py",
     "generation/invariants.py",
+    "generation/handoff.py",
     "generation/engine.py",
     "generation/publication.py",
     "generation/writer.py",
@@ -71,16 +76,69 @@ ENGINE_ALIASES = [
     "inventory",
 ]
 
+# Generation notebooks share one template; each runs its slice of the engine's
+# stage graph (``STAGES``). Title and summary are injected at build time.
+STAGE_TEMPLATE = "driver-03-stage.py"
+STAGE_NOTEBOOK_TEXT = {
+    "setup-03-generate-sales": (
+        "Setup 03 — Generate sales",
+        "Builds candidate in-store receipts and resolves them against the causal "
+        "inventory policy (fulfillment). Every receipt-dependent notebook waits for "
+        "this one.",
+    ),
+    "setup-04-generate-online-orders": (
+        "Setup 04 — Generate online orders",
+        "Builds online order headers, lines, and payments. Needs only dimensions, so "
+        "it runs alongside setup-03.",
+    ),
+    "setup-05-generate-marketing": (
+        "Setup 05 — Generate marketing",
+        "Builds background ad impressions. Needs only dimensions, so it runs "
+        "alongside setup-03.",
+    ),
+    "setup-06-generate-returns-and-promotions": (
+        "Setup 06 — Generate returns and promotions",
+        "Builds refunds and promotion facts from the fulfilled sales (after setup-03).",
+    ),
+    "setup-07-generate-store-activity": (
+        "Setup 07 — Generate store activity",
+        "Builds store open/close events, foot traffic, BLE pings, and zone changes "
+        "(after setup-03).",
+    ),
+    "setup-08-generate-inventory": (
+        "Setup 08 — Generate inventory",
+        "Builds store and DC inventory ledgers, truck moves and loads, reorders, and "
+        "stockouts from the fulfillment plan (after setup-03).",
+    ),
+    "setup-09-attribute-marketing": (
+        "Setup 09 — Attribute marketing",
+        "Applies deterministic last-touch attribution across receipts, returns, online "
+        "orders, payments, promotions, and impressions (after setup-04, 05, and 06).",
+    ),
+}
+
 TEMPLATE_FOR = {
     "setup-01-seed-dictionaries": "setup-01-seed-dictionaries.ipynb.py",
     "setup-02-generate-dimensions": "driver-02-dimensions.py",
-    "setup-03-generate-facts": "driver-03-facts.py",
-    "setup-04-build-gold": "driver-04-gold.py",
+    **{name: STAGE_TEMPLATE for name in STAGE_NOTEBOOK_TEXT},
+    "setup-10-publish-silver": "driver-10-publish.py",
+    "setup-11-build-gold": "driver-11-gold.py",
     "stream-events": "driver-05-stream.py",
 }
 
 # Notebooks that do NOT embed the batch engine cell (self-contained logic).
 NO_ENGINE = {"setup-01-seed-dictionaries", "stream-events"}
+STREAM_MODULES = [
+    "dictionaries/models.py",
+    "dictionaries/loader.py",
+    "config/generation.py",
+    "generation/schemas.py",
+    "generation/runtime.py",
+    "generation/behavior.py",
+    "generation/traffic.py",
+    "generation/receipts.py",
+    "generation/stream_baskets.py",
+]
 
 _PKG_IMPORT = re.compile(r"^\s*(from retail_setup|import retail_setup)")
 
@@ -156,6 +214,9 @@ def parse_template(text: str) -> list[tuple[str, str]]:
         elif stripped == "# %% [engine]":
             current = ("engine", [])
             cells.append(current)
+        elif stripped == "# %% [behavior]":
+            current = ("behavior", [])
+            cells.append(current)
         elif stripped == "# %% [parameters]":
             current = ("parameters", [])
             cells.append(current)
@@ -181,9 +242,31 @@ def _source_lines(source: str) -> list[str]:
     return [line + "\n" for line in lines[:-1]] + [lines[-1]]
 
 
-def render_notebook(template_path: Path, engine_source: str | None) -> dict:
+def _template_text(name: str, template_path: Path) -> str:
+    text = template_path.read_text(encoding="utf-8")
+    if template_path.name != STAGE_TEMPLATE:
+        return text
+    title, summary = STAGE_NOTEBOOK_TEXT[name]
+    text = (text.replace("__SETUP_NOTEBOOK__", name)
+            .replace("__SETUP_TITLE__", title)
+            .replace("__SETUP_SUMMARY__", summary))
+    assert "__SETUP_" not in text, f"unreplaced stage placeholder in {name}"
+    return text
+
+
+def render_notebook(
+    template_path: Path, engine_source: str | None, name: str | None = None,
+) -> dict:
     cells = []
-    for index, (kind, body) in enumerate(parse_template(template_path.read_text(encoding="utf-8"))):
+    text = _template_text(name or template_path.stem, template_path)
+    for index, (kind, body) in enumerate(parse_template(text)):
+        if kind == "behavior":
+            kind = "code"
+            body = "\n\n".join(
+                strip_package_imports((SRC / rel).read_text(encoding="utf-8"))
+                for rel in STREAM_MODULES
+            )
+            compile(body, "<stream-behavior>", "exec")
         if kind == "engine":
             if engine_source is None:
                 raise ValueError(f"{template_path.name} has an engine cell but no engine source")
@@ -236,7 +319,7 @@ def build_all(output_dir: Path) -> dict[str, str]:
     built: dict[str, str] = {}
     for name, template in TEMPLATE_FOR.items():
         needs_engine = name not in NO_ENGINE
-        nb = render_notebook(TEMPLATES / template, engine_source if needs_engine else None)
+        nb = render_notebook(TEMPLATES / template, engine_source if needs_engine else None, name)
         payload = notebook_json(nb)
         (output_dir / f"{name}.ipynb").write_text(payload, encoding="utf-8", newline="\n")
         built[name] = payload
@@ -251,6 +334,9 @@ def check() -> int:
         committed = NOTEBOOKS_DIR / f"{name}.ipynb"
         if not committed.exists() or committed.read_text(encoding="utf-8") != payload:
             drifted.append(committed)
+    # A committed notebook no template builds (e.g. after a rename) is drift too.
+    drifted.extend(path for path in sorted(NOTEBOOKS_DIR.glob("*.ipynb"))
+                   if path.stem not in built)
     if drifted:
         print("notebook drift detected — re-run `python scripts/build_notebooks.py`:")
         for path in drifted:

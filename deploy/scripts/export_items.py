@@ -22,12 +22,14 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from requests.auth import AuthBase
+
 from deploy.scripts._auth import AUTH_MODES, build_credential
-from deploy.scripts.fabric_runtime import paginated_get
+from deploy.scripts.fabric_runtime import paginated_get, retry_read
 
 if TYPE_CHECKING:
     import requests
-    from azure.core.credentials import TokenCredential
+    from azure.core.credentials import AccessToken, TokenCredential
 
 FABRIC_API = "https://api.fabric.microsoft.com/v1"
 FABRIC_SCOPE = "https://api.fabric.microsoft.com/.default"
@@ -37,7 +39,7 @@ _JSON_PART_SUFFIXES = (".json",)
 _JSON_PART_NAMES = {".platform", ".schedules"}
 
 
-def _token(scope: str, credential: TokenCredential) -> str:
+def _access_token(scope: str, credential: TokenCredential) -> AccessToken:
     """Acquire a token, retrying transient operator-login failures."""
 
     from azure.core.exceptions import ClientAuthenticationError
@@ -45,9 +47,35 @@ def _token(scope: str, credential: TokenCredential) -> str:
     from deploy.scripts._retry import retry_call
 
     return retry_call(
-        lambda: credential.get_token(scope).token,
+        lambda: credential.get_token(scope),
         retry_on=(ClientAuthenticationError,),
     )
+
+
+def _token(scope: str, credential: TokenCredential) -> str:
+    """Keep the shared string-token contract for non-Fabric clients."""
+
+    return _access_token(scope, credential).token
+
+
+class _FabricTokenAuth(AuthBase):
+    """Renew tokens before requests without changing the operator credential."""
+
+    def __init__(
+        self,
+        credential: TokenCredential,
+        access_token: AccessToken,
+    ) -> None:
+        self._credential = credential
+        self._access_token = access_token
+
+    def __call__(
+        self, request: requests.PreparedRequest
+    ) -> requests.PreparedRequest:
+        if self._access_token.expires_on <= time.time() + 300:
+            self._access_token = _access_token(FABRIC_SCOPE, self._credential)
+        request.headers["Authorization"] = f"Bearer {self._access_token.token}"
+        return request
 
 
 def build_session(
@@ -59,15 +87,18 @@ def build_session(
     """Create an authenticated requests session for the Fabric REST API.
 
     Retries transient operator-login failures because the deploy can request a
-    token after a long Terraform/publish step.
+    token after a long Terraform/publish step. Expiring tokens are renewed using
+    the same configured credential before requests are sent.
     """
 
     import requests
 
     credential = credential or build_credential(auth_mode, tenant_id=tenant_id)
-    token = _token(FABRIC_SCOPE, credential)
+    access_token = _access_token(FABRIC_SCOPE, credential)
+    token = access_token.token
     session = requests.Session()
     session.headers["Authorization"] = f"Bearer {token}"
+    session.auth = _FabricTokenAuth(credential, access_token)
     return session
 
 
@@ -105,8 +136,12 @@ def get_definition(
 ) -> dict[str, Any]:
     """Fetch an item definition, transparently handling the long-running operation."""
 
-    response = session.post(
-        f"{FABRIC_API}/workspaces/{workspace_id}/items/{item_id}/getDefinition"
+    # getDefinition is a read-only POST, not an item mutation.
+    response = retry_read(
+        lambda: session.post(
+            f"{FABRIC_API}/workspaces/{workspace_id}/items/{item_id}/getDefinition",
+            timeout=30,
+        )
     )
     if response.status_code == 200:
         return response.json()["definition"]
@@ -117,11 +152,13 @@ def get_definition(
     retry_after = int(response.headers.get("Retry-After", poll_seconds))
     for _ in range(max_polls):
         time.sleep(retry_after)
-        poll = session.get(operation_url)
+        poll = retry_read(lambda: session.get(operation_url, timeout=30))
         poll.raise_for_status()
         status = poll.json().get("status")
         if status == "Succeeded":
-            result = session.get(f"{operation_url}/result")
+            result = retry_read(
+                lambda: session.get(f"{operation_url}/result", timeout=30)
+            )
             result.raise_for_status()
             return result.json()["definition"]
         if status in {"Failed", "Cancelled"}:

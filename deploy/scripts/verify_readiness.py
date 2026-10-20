@@ -15,6 +15,7 @@ import re
 import struct
 import tempfile
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
@@ -29,6 +30,8 @@ from deploy.scripts.build_artifacts import (
 )
 from deploy.scripts.deploy_config import (
     DeployConfig,
+    OperationsPlanningConfig,
+    TwinsConfig,
     load_environment,
     load_terraform_outputs,
     validate_terraform_outputs,
@@ -57,6 +60,7 @@ if TYPE_CHECKING:
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REPORT_SCHEMA_VERSION = "1.0.0"
 REPORT_NAME = "readiness-report.json"
+TWINS_REPORT_NAME = "retail-twins"
 SQL_SCOPE = "https://database.windows.net/.default"
 
 CheckStatus = Literal["PASS", "FAIL", "UNKNOWN", "SKIPPED"]
@@ -88,6 +92,11 @@ _POST_ONTOLOGY_CHECKS = frozenset(
         "taskflow.bindings",
     }
 )
+_UNOBSERVED_STREAM_MESSAGES = {
+    "freshness.watermarks": "ag._watermarks contains no source evidence",
+    "freshness.eventhouse_ingestion": "Eventhouse returned no ingestion evidence",
+    "freshness.checkpoint": "Kusto ingestion tags contain no checkpoint stream identity",
+}
 
 _TABLE_RE = re.compile(
     r"(?im)^\s*\.create-merge\s+table\s+([A-Za-z_][A-Za-z0-9_]*)"
@@ -109,9 +118,22 @@ _MAPPING_RE = re.compile(
 class CheckFailed(RuntimeError):
     """A live fact was observed and did not satisfy its contract."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        evidence: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.evidence = evidence if evidence is not None else {}
+
 
 class EvidenceUnknown(RuntimeError):
     """Required live evidence could not be obtained or correlated."""
+
+
+class EvidenceNotObserved(EvidenceUnknown):
+    """A readable optional source contains no run evidence yet."""
 
 
 class ReadinessUsageError(ValueError):
@@ -218,6 +240,8 @@ class ReadinessAdapter(Protocol):
 
     def watermark_signal(self) -> dict[str, Any] | None: ...
 
+    def data_consistency_signal(self) -> dict[str, Any] | None: ...
+
     def eventhouse_signal(
         self, expected_tables: frozenset[str]
     ) -> dict[str, Any] | None: ...
@@ -282,6 +306,11 @@ def aggregate_status(checks: list[CheckResult]) -> OverallStatus:
             if status != "SKIPPED":
                 optional_failure = True
             continue
+        if (
+            check.check_id == "freshness.setup_run_log"
+            and check.evidence.get("cleanup_required") is True
+        ):
+            optional_failure = True
         if status in {"FAIL", "UNKNOWN"}:
             if check.required:
                 required_failure = True
@@ -362,7 +391,18 @@ def readiness_report_path(repo_root: Path, environment: str) -> Path:
 def write_report_atomic(path: Path, report: dict[str, Any]) -> None:
     """Atomically write a redacted readiness report beside environment state."""
 
-    safe_report = bound_evidence(report)
+    control_collections = ("checks", "freshness_lineage")
+    safe_report = bound_evidence(
+        {key: value for key, value in report.items() if key not in control_collections}
+    )
+    for name in control_collections:
+        if name not in report:
+            continue
+        records = report[name]
+        if not isinstance(records, list) or any(not isinstance(row, dict) for row in records):
+            raise ValueError(f"Readiness {name} must contain complete object records.")
+        # Bound/redact evidence within each record, never truncate the check inventory.
+        safe_report[name] = [bound_evidence(row) for row in records]
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(
         dir=path.parent,
@@ -384,15 +424,21 @@ def write_report_atomic(path: Path, report: dict[str, Any]) -> None:
 def parse_kql_inventory(
     repo_root: Path,
     script_names: tuple[str, ...] | list[str],
+    *,
+    additional_paths: tuple[Path, ...] | list[Path] = (),
 ) -> KqlInventory:
-    """Derive exact KQL object names from the profile-selected scripts."""
+    """Derive exact KQL object names from selected scripts and opt-in DDL."""
 
     tables: set[str] = set()
     functions: set[str] = set()
     materialized_views: set[str] = set()
     mappings: set[str] = set()
-    for script_name in script_names:
-        path = repo_root / "fabric" / "kql_database" / script_name
+    paths = [
+        repo_root / "fabric" / "kql_database" / script_name
+        for script_name in script_names
+    ]
+    paths.extend(repo_root / path for path in additional_paths)
+    for path in paths:
         text = path.read_text(encoding="utf-8")
         tables.update(_TABLE_RE.findall(text))
         functions.update(_FUNCTION_RE.findall(text))
@@ -901,6 +947,31 @@ def load_readiness_context(
     )
 
 
+def _native_expected_items(config: DeployConfig) -> list[ExpectedItem]:
+    native = getattr(config, "operations_planning", OperationsPlanningConfig())
+    if not native.enabled:
+        return []
+    items = [
+        # Fabric can reject agent creation; the deploy step and readiness both warn.
+        ExpectedItem("OperationsAgent", "retail-availability-operations", required=False),
+        ExpectedItem("Notebook", "prepare-replenishment-case"),
+    ]
+    if native.include_plan:
+        items.append(ExpectedItem("Plan", "retail-replenishment"))
+    return items
+
+
+def _twins_enabled(config: DeployConfig) -> bool:
+    twins = getattr(config, "twins", TwinsConfig())
+    return bool(twins.enabled)
+
+
+def _twins_expected_items(config: DeployConfig) -> list[ExpectedItem]:
+    if not _twins_enabled(config):
+        return []
+    return [ExpectedItem("Report", TWINS_REPORT_NAME)]
+
+
 def expected_live_items(
     context: ReadinessContext,
     *,
@@ -953,6 +1024,7 @@ def expected_live_items(
         )
     if profile.selects("asset.report"):
         expected.append(ExpectedItem("Report", config.powerbi.report_name))
+    expected.extend(_twins_expected_items(config))
     if profile.selects("asset.kql-queryset"):
         expected.append(ExpectedItem("KQLQueryset", "retail_querysets"))
     if include_post_ontology and profile.selects("asset.data-agents"):
@@ -970,6 +1042,7 @@ def expected_live_items(
                 required=False,
             )
         )
+    expected.extend(_native_expected_items(config))
     return expected
 
 
@@ -1002,6 +1075,7 @@ class ReadinessRunner:
         self.item_index: dict[tuple[str, str], dict[str, Any]] = {}
         self.definitions: dict[str, dict[str, Any]] = {}
         self.kql_inventory: KqlInventory | None = None
+        self._kql_inventory_attempted = False
         self.pipeline_evidence: dict[str, dict[str, Any]] = {}
         self.trigger_error: Exception | None = None
         self._producer_pipeline_ref_cache: dict[str, str] | None = None
@@ -1162,7 +1236,12 @@ class ReadinessRunner:
         except CheckFailed as exc:
             status = "FAIL"
             summary = str(exc)
-            evidence = {}
+            evidence = exc.evidence
+            freshness = None
+        except EvidenceNotObserved as exc:
+            status = "UNKNOWN"
+            summary = str(exc)
+            evidence = {"reason": "not_observed"}
             freshness = None
         except EvidenceUnknown as exc:
             status = "UNKNOWN"
@@ -1225,9 +1304,43 @@ class ReadinessRunner:
         ):
             raise CheckFailed(
                 "Live workspace item inventory is missing, duplicated, "
-                "unidentified, or mismatched."
+                "unidentified, or mismatched.",
+                evidence=comparison,
             )
-        return Observation("Every expected live item has one matching identity.", comparison)
+        summary = "Every expected live item has one matching identity."
+        native_keys = {item.key for item in _native_expected_items(self.context.config)}
+        if native_keys.intersection(item.key for item in expected):
+            plan_selected = ("Plan", "retail-replenishment") in native_keys
+            summary += (
+                " Native item existence does not verify activated monitoring."
+            )
+            if plan_selected:
+                summary += " Interactive Plan acceptance also remains unverified."
+            comparison["operations_planning"] = {
+                "monitoring_readiness": "NOT_VERIFIED",
+                "plan_interactive_acceptance": "NOT_VERIFIED" if plan_selected else "NOT_SELECTED",
+                "manual_activation_required": True,
+                "publication_report": (
+                    f"deploy/.generated/{self.context.environment}/"
+                    "operations-planning-report.json"
+                ),
+            }
+        twins_keys = {item.key for item in _twins_expected_items(self.context.config)}
+        if twins_keys.intersection(item.key for item in expected):
+            summary += (
+                " Connected twins item existence does not verify visual runtime "
+                "or physical real-time twin state."
+            )
+            comparison["connected_twins"] = {
+                "visual_runtime": "NOT_VERIFIED",
+                "physical_realtime_twin": "NOT_CLAIMED",
+                "source_evidence": "synthetic/historical observations only",
+                "publication_report": (
+                    f"deploy/.generated/{self.context.environment}/"
+                    "twins-report.json"
+                ),
+            }
+        return Observation(summary, comparison)
 
     def _item(self, item_type: str, display_name: str) -> dict[str, Any]:
         matches = [
@@ -1251,7 +1364,15 @@ class ReadinessRunner:
 
     def _notebook_bindings(self) -> Observation:
         errors: list[str] = []
-        for name in selected_notebook_names(self.profile):
+        names = [
+            *selected_notebook_names(self.profile),
+            *(
+                item.display_name
+                for item in _native_expected_items(self.context.config)
+                if item.item_type == "Notebook"
+            ),
+        ]
+        for name in names:
             try:
                 errors.extend(
                     f"{name}: {error}"
@@ -1266,11 +1387,12 @@ class ReadinessRunner:
                 errors.append(f"{name}: {exc}")
         if errors:
             raise CheckFailed(
-                f"Notebook definitions or Lakehouse bindings failed ({len(errors)} error(s))."
+                f"Notebook definitions or Lakehouse bindings failed ({len(errors)} error(s)).",
+                evidence={"errors": errors},
             )
         return Observation(
             "Selected notebook definitions bind to the target Lakehouse.",
-            {"notebook_count": len(selected_notebook_names(self.profile))},
+            {"notebook_count": len(names)},
         )
 
     def _pipeline_bindings(self) -> Observation:
@@ -1331,14 +1453,46 @@ class ReadinessRunner:
         semantic = self._item(
             "SemanticModel", self.context.config.powerbi.semantic_model_name
         )
-        errors = report_binding_errors(
-            self._definition("Report", self.context.config.powerbi.report_name),
-            semantic_model_id=str(semantic.get("id", "")),
-            semantic_model_name=self.context.config.powerbi.semantic_model_name,
-        )
+        report_names = [self.context.config.powerbi.report_name]
+        if _twins_enabled(self.context.config):
+            if TWINS_REPORT_NAME in report_names:
+                raise CheckFailed("Connected twins require an additional Report identity.")
+            report_names.append(TWINS_REPORT_NAME)
+        report_items = {
+            report_name: self._item("Report", report_name)
+            for report_name in report_names
+        }
+        report_ids = [str(item.get("id", "")) for item in report_items.values()]
+        if len(report_ids) != len(set(report_ids)):
+            raise CheckFailed("Connected twins require a unique additional Report identity.")
+        errors: list[str] = []
+        for report_name in report_names:
+            errors.extend(
+                f"{report_name}: {error}"
+                for error in report_binding_errors(
+                    self._definition("Report", report_name),
+                    semantic_model_id=str(semantic.get("id", "")),
+                    semantic_model_name=self.context.config.powerbi.semantic_model_name,
+                )
+            )
         if errors:
             raise CheckFailed(errors[0])
-        return Observation("Report definition binds to the selected semantic model.")
+        if len(report_names) == 1:
+            return Observation("Report definition binds to the selected semantic model.")
+        evidence: dict[str, Any] = {
+            "report_count": len(report_names),
+            "reports": report_names,
+        }
+        evidence["connected_twins"] = {
+            "semantic_model": self.context.config.powerbi.semantic_model_name,
+            "visual_runtime": "NOT_VERIFIED",
+            "physical_realtime_twin": "NOT_CLAIMED",
+            "source_evidence": "synthetic/historical observations only",
+        }
+        return Observation(
+            "Report definitions bind to the selected semantic model.",
+            evidence,
+        )
 
     def _queryset_binding(self) -> Observation:
         tabs = {
@@ -1406,6 +1560,7 @@ class ReadinessRunner:
 
     def _taskflow_bindings(self) -> Observation:
         from deploy.scripts.taskflow import (
+            available_taskflow_artifacts,
             filter_portable_items,
             profile_taskflow_artifacts,
             taskflow_source_coverage_errors,
@@ -1432,7 +1587,11 @@ class ReadinessRunner:
             raise CheckFailed(
                 f"Task-flow source is incomplete ({len(coverage_errors)} error(s))."
             )
-        expected = filter_portable_items(source, required_artifacts)
+        selected_artifacts = available_taskflow_artifacts(
+            required_artifacts,
+            self.items,
+        )
+        expected = filter_portable_items(source, selected_artifacts)
         guid_to_name = {
             str(item.get("id", "")): str(item.get("displayName", ""))
             for item in self.items
@@ -1457,9 +1616,21 @@ class ReadinessRunner:
 
     def _run_kql_checks(self) -> None:
         selected = self.profile.provisions_eventhouse
+        native_selected = bool(_native_expected_items(self.context.config))
+        native_path = Path("fabric") / "operations" / "01-availability-tables.kql"
         expected = parse_kql_inventory(
             self.context.repo_root,
             self.profile.kql_scripts,
+            additional_paths=(
+                [native_path]
+                if native_selected
+                else []
+            ),
+        )
+        unselected = (
+            parse_kql_inventory(self.context.repo_root, [], additional_paths=[native_path])
+            if not native_selected and (self.context.repo_root / native_path).is_file()
+            else KqlInventory()
         )
         for check_id, attribute in (
             ("kql.tables", "tables"),
@@ -1476,6 +1647,7 @@ class ReadinessRunner:
                     attribute,
                     getattr(expected, attribute),
                     expected.tables,
+                    getattr(unselected, attribute) - getattr(expected, attribute),
                 ),
             )
 
@@ -1484,13 +1656,24 @@ class ReadinessRunner:
         attribute: str,
         expected: frozenset[str],
         expected_tables: frozenset[str],
+        unselected_objects: frozenset[str] = frozenset(),
     ) -> Observation:
         if self.kql_inventory is None:
+            if self._kql_inventory_attempted:
+                raise EvidenceUnknown(
+                    "No complete KQL inventory was obtained for this readiness run."
+                )
+            self._kql_inventory_attempted = True
             self.kql_inventory = self.adapter.get_kql_inventory(expected_tables)
         observed = getattr(self.kql_inventory, attribute)
-        comparison = compare_sets(expected, observed)
+        comparison = compare_sets(expected, observed - unselected_objects)
+        if observed & unselected_objects:
+            comparison["unselected_owned_objects"] = sorted(observed & unselected_objects)
         if comparison["missing"] or comparison["unexpected"]:
-            raise CheckFailed(f"Live KQL {attribute} inventory differs from source.")
+            raise CheckFailed(
+                f"Live KQL {attribute} inventory differs from source.",
+                evidence=comparison,
+            )
         return Observation(f"Live KQL {attribute} inventory matches source.", comparison)
 
     def _source_schedule_paths(self) -> list[Path]:
@@ -1752,8 +1935,12 @@ class ReadinessRunner:
         if not signal:
             raise EvidenceUnknown("setup_run_log has no terminal run evidence")
         status = str(signal.get("status", ""))
-        if status != "COMPLETED":
+        if status not in {"COMPLETED", "COMPLETED_CLEANUP_FAILED"}:
             raise CheckFailed(f"Latest setup_run_log run is {status!r}.")
+        cleanup_required = (
+            status == "COMPLETED_CLEANUP_FAILED"
+            or int(signal.get("staging_table_count") or 0) > 0
+        )
         setup_name = (
             Path(self.profile.post_deploy_pipeline_ref).stem
             if self.profile.post_deploy_pipeline_ref
@@ -1772,9 +1959,14 @@ class ReadinessRunner:
             lineage="ag.setup_run_log latest __run__ terminal row",
         )
         return Observation(
-            "Latest setup publication is terminal-successful and correlated.",
+            (
+                "Setup data publication succeeded; staging cleanup requires attention."
+                if cleanup_required
+                else "Latest setup publication is terminal-successful and correlated."
+            ),
             {
                 "status": status,
+                "cleanup_required": cleanup_required,
                 "run_id_hash": _hash_identifier(signal.get("run_id")),
             },
             freshness,
@@ -1783,16 +1975,34 @@ class ReadinessRunner:
     def _watermark_freshness(self) -> Observation:
         signal = self.adapter.watermark_signal()
         if not signal or int(signal.get("source_count") or 0) < 1:
-            raise EvidenceUnknown("ag._watermarks contains no source evidence")
+            raise EvidenceNotObserved(_UNOBSERVED_STREAM_MESSAGES["freshness.watermarks"])
         freshness = evaluate_freshness(
             signal.get("updated_at"),
             observed_at=self.context.observed_at,
             max_age=_STREAM_MAX_AGE,
             lineage="ag._watermarks maximum updated_at",
         )
+        from deploy.scripts.data_consistency import (
+            CONSISTENCY_FIELDS,
+            SAMPLE_FIELDS,
+            consistency_counts,
+        )
+
+        consistency = self.adapter.data_consistency_signal()
+        if consistency is None:
+            raise EvidenceUnknown("No bounded Eventhouse/Silver/Gold consistency evidence")
+        counts = consistency_counts(consistency)
+        defects = {key: counts[key] for key in CONSISTENCY_FIELDS if counts[key]}
+        if defects:
+            raise CheckFailed(f"Settled streaming data failed reconciliation: {defects}")
+        if any(counts[key] == 0 for key in SAMPLE_FIELDS):
+            raise EvidenceUnknown(
+                "The settled reconciliation window has insufficient receipt, "
+                "inventory or sales observations; retry after OneLake data settles."
+            )
         return Observation(
-            "Silver watermark evidence is recent.",
-            {"source_count": int(signal["source_count"])},
+            "Silver watermarks are recent and settled receipt/inventory/sales samples reconcile.",
+            {"source_count": int(signal["source_count"]), "consistency": counts},
             freshness,
         )
 
@@ -1800,7 +2010,7 @@ class ReadinessRunner:
         tables = _stream_event_tables(self.context.manifest)
         signal = self.adapter.eventhouse_signal(tables)
         if not signal:
-            raise EvidenceUnknown("Eventhouse returned no ingestion evidence")
+            raise EvidenceNotObserved(_UNOBSERVED_STREAM_MESSAGES["freshness.eventhouse_ingestion"])
         observed_tables = frozenset(str(name) for name in signal.get("tables", []))
         comparison = compare_sets(tables, observed_tables)
         if comparison["missing"]:
@@ -1821,9 +2031,7 @@ class ReadinessRunner:
         tables = _stream_event_tables(self.context.manifest)
         signal = self.adapter.checkpoint_signal(tables)
         if not signal or not signal.get("stream_id_hash"):
-            raise EvidenceUnknown(
-                "Kusto ingestion tags contain no checkpoint stream identity"
-            )
+            raise EvidenceNotObserved(_UNOBSERVED_STREAM_MESSAGES["freshness.checkpoint"])
         freshness = evaluate_freshness(
             signal.get("latest_extent"),
             observed_at=self.context.observed_at,
@@ -2067,6 +2275,8 @@ def _hash_identifier(value: Any) -> str | None:
 
 
 def _stream_event_tables(manifest: SolutionManifest) -> frozenset[str]:
+    """Select live event tables, not scenario seed tables from KQL inventory."""
+
     for contract in manifest.data_contracts:
         if contract.kind == "event":
             return frozenset(event.event_type for event in contract.events)
@@ -2152,12 +2362,40 @@ class FabricReadinessAdapter:
                 include_post_ontology=True,
             )
         }
-        return supplement_workspace_items(
+        native_items = _native_expected_items(self.context.config)
+        native_types = {item.item_type for item in native_items} - {"Notebook"}
+        items = supplement_workspace_items(
             self.fabric,
             self.workspace_id,
             items,
-            required_types,
+            required_types - native_types,
         )
+        if native_items:
+            from deploy.scripts._native_items import COLLECTIONS
+
+            for expected in native_items:
+                if expected.item_type == "Notebook" and any(
+                    (item.get("type"), item.get("displayName")) == expected.key
+                    for item in items
+                ):
+                    continue
+                collection = COLLECTIONS[expected.item_type]
+                typed_items = paginated_get(
+                    self.fabric,
+                    f"{FABRIC_API}/workspaces/{self.workspace_id}/{collection}",
+                )
+                for item in typed_items:
+                    if item.get("type") not in (None, expected.item_type):
+                        raise EvidenceUnknown("Typed native item inventory is inconsistent.")
+                    item = {**item, "type": expected.item_type}
+                    # Keep distinct same-name items so inventory checks detect duplicates.
+                    if not item.get("id") or not any(
+                        (existing.get("type"), existing.get("id"))
+                        == (item["type"], item["id"])
+                        for existing in items
+                    ):
+                        items.append(item)
+        return items
 
     def get_definition(self, item_id: str) -> dict[str, Any]:
         return get_definition(self.fabric, self.workspace_id, item_id)
@@ -2165,11 +2403,14 @@ class FabricReadinessAdapter:
     def get_taskflow(self) -> dict[str, Any] | None:
         from deploy.scripts import taskflow
 
-        pbi = taskflow._session(
-            taskflow._token(taskflow.PBI_SCOPE, self.credential)
-        )
-        cluster = taskflow.resolve_cluster(pbi)
-        return taskflow.get_taskflow(pbi, cluster, self.workspace_id)
+        def read() -> dict[str, Any] | None:
+            pbi = taskflow._session(
+                taskflow._token(taskflow.PBI_SCOPE, self.credential)
+            )
+            cluster = taskflow.resolve_cluster(pbi)
+            return taskflow.get_taskflow(pbi, cluster, self.workspace_id)
+
+        return _retry_network_read(read)
 
     def get_kql_inventory(self, expected_tables: frozenset[str]) -> KqlInventory:
         tables = self._names(
@@ -2191,7 +2432,7 @@ class FabricReadinessAdapter:
             "name",
         )
         mappings: set[str] = set()
-        for table in sorted(expected_tables):
+        for table in sorted(expected_tables & tables):
             rows = self._execute_kql(
                 f".show table {table} ingestion json mappings",
                 management=True,
@@ -2245,11 +2486,26 @@ class FabricReadinessAdapter:
         )
         if not rows:
             return None
+        # Fabric cannot combine catalog views and distributed Lakehouse tables
+        # in the same query (SQL error 15816).
+        staging = self._execute_sql(
+            "SELECT COUNT(*) AS staging_table_count "
+            "FROM INFORMATION_SCHEMA.TABLES "
+            "WHERE TABLE_SCHEMA IN ('ag_stage', 'au_stage', 'au_staging')"
+        )
+        staging_count = staging[0].get("staging_table_count") if staging else None
+        if (
+            isinstance(staging_count, bool)
+            or not isinstance(staging_count, int)
+            or staging_count < 0
+        ):
+            raise EvidenceUnknown("Lakehouse staging inventory is unavailable or invalid")
         row = rows[0]
         return {
             "run_id": row.get("run_id"),
             "status": row.get("status"),
             "generated_at": _iso_value(row.get("generated_at")),
+            "staging_table_count": staging_count,
         }
 
     def watermark_signal(self) -> dict[str, Any] | None:
@@ -2262,7 +2518,8 @@ class FabricReadinessAdapter:
             return None
         rows = self._execute_sql(
             "SELECT COUNT(*) AS source_count, MAX(updated_at) AS updated_at "
-            "FROM [ag].[_watermarks]"
+            "FROM [ag].[_watermarks] "
+            "WHERE source_table NOT LIKE '%:reconciliation'"
         )
         if not rows:
             return None
@@ -2281,16 +2538,17 @@ class FabricReadinessAdapter:
         union = ", ".join(sorted(expected_tables))
         rows = self._execute_kql(
             f"union withsource=table_name {union} "
-            "| summarize row_count=count(), latest=max(ingest_timestamp) "
+            "| summarize row_count=count(), "
+            "latest_ingestion=max(ingestion_time()) "
             "by table_name"
         )
         if not rows:
             return None
         latest = max(
             (
-                row.get("latest")
+                row.get("latest_ingestion")
                 for row in rows
-                if row.get("latest") is not None
+                if row.get("latest_ingestion") is not None
             ),
             default=None,
         )
@@ -2298,6 +2556,12 @@ class FabricReadinessAdapter:
             "tables": [str(row.get("table_name", "")) for row in rows],
             "latest_ingestion": _iso_value(latest),
         }
+
+    def data_consistency_signal(self) -> dict[str, Any] | None:
+        from deploy.scripts.data_consistency import STREAMING_CONSISTENCY_SQL
+
+        rows = self._execute_sql(STREAMING_CONSISTENCY_SQL)
+        return rows[0] if rows else None
 
     def checkpoint_signal(
         self,
@@ -2379,10 +2643,12 @@ class FabricReadinessAdapter:
 
     def _resolve_kql(self) -> tuple[str, str]:
         if self._query_uri is None or self._database_name is None:
-            self._query_uri, self._database_name = resolve_kql_database(
-                self.workspace_id,
-                str(self.outputs["kql_database_id"]),
-                self.credential,
+            self._query_uri, self._database_name = _retry_network_read(
+                lambda: resolve_kql_database(
+                    self.workspace_id,
+                    str(self.outputs["kql_database_id"]),
+                    self.credential,
+                )
             )
         return self._query_uri, self._database_name
 
@@ -2393,21 +2659,36 @@ class FabricReadinessAdapter:
         management: bool = False,
     ) -> list[dict[str, Any]]:
         from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
+        from azure.kusto.data.exceptions import KustoNetworkError
+
+        from deploy.scripts._retry import retry_call
 
         query_uri, database_name = self._resolve_kql()
         kcsb = KustoConnectionStringBuilder.with_azure_token_credential(
             query_uri,
             self.credential,
         )
-        with KustoClient(kcsb) as client:
-            response = (
-                client.execute_mgmt(database_name, query)
-                if management
-                else client.execute(database_name, query)
-            )
-        if not response.primary_results:
-            return []
-        return [row.to_dict() for row in response.primary_results[0]]
+        def read() -> list[dict[str, Any]]:
+            with KustoClient(kcsb) as client:
+                response = (
+                    client.execute_mgmt(database_name, query)
+                    if management
+                    else client.execute(database_name, query)
+                )
+            if not response.primary_results:
+                return []
+            return [row.to_dict() for row in response.primary_results[0]]
+
+        return retry_call(
+            read,
+            attempts=3,
+            delay=5.0,
+            backoff=2.0,
+            retry_on=(KustoNetworkError,),
+            on_retry=lambda attempt, _exc: console.warn(
+                f"Kusto read attempt {attempt}/3 hit a network error; retrying..."
+            ),
+        )
 
     def _execute_sql(self, query: str) -> list[dict[str, Any]]:
         response = self.fabric.get(
@@ -2484,10 +2765,13 @@ def _connect_lakehouse_sql(
             f"Database={database};"
             "Encrypt=Yes;TrustServerCertificate=No"
         )
-        return pyodbc.connect(
-            connection,
-            attrs_before={1256: access_token},
-            timeout=60,
+        return _retry_sql_handshake(
+            lambda: pyodbc.connect(
+                connection,
+                attrs_before={1256: access_token},
+                timeout=60,
+            ),
+            pyodbc,
         )
 
     try:
@@ -2502,10 +2786,47 @@ def _connect_lakehouse_sql(
         f"Database={database};"
         "Encrypt=yes;TrustServerCertificate=no"
     )
-    return mssql_python.connect(
-        connection,
-        attrs_before={1256: access_token},
-        timeout=60,
+    return _retry_sql_handshake(
+        lambda: mssql_python.connect(
+            connection,
+            attrs_before={1256: access_token},
+            timeout=60,
+        ),
+        mssql_python,
+    )
+
+
+def _retry_network_read(read: Callable[[], Any]) -> Any:
+    """Retry an explicitly read-only call after a transient network failure."""
+
+    import requests
+
+    from deploy.scripts._retry import retry_call
+
+    return retry_call(
+        read,
+        retry_on=(requests.ConnectionError, requests.Timeout),
+        on_retry=lambda attempt, _exc: console.warn(
+            f"Read-only API request attempt {attempt}/3 hit a network error; retrying..."
+        ),
+    )
+
+
+def _retry_sql_handshake(connect: Callable[[], Any], driver_module: Any) -> Any:
+    """Retry a refused SQL connection; no query has run, so it is read-only safe."""
+
+    from deploy.scripts._retry import retry_call
+
+    operational_error = getattr(driver_module, "OperationalError", None)
+    return retry_call(
+        connect,
+        attempts=4,
+        delay=2.0,
+        backoff=2.0,
+        retry_on=(operational_error,) if operational_error else (),
+        on_retry=lambda attempt, _exc: console.warn(
+            f"SQL connection attempt {attempt}/4 failed during the handshake; retrying..."
+        ),
     )
 
 
@@ -2679,16 +3000,59 @@ def verify_environment(
 
 def _print_summary(report: dict[str, Any], path: Path) -> None:
     counts = report["counts"]
-    console.info(
+    if not isinstance(report["checks"], list) or any(
+        not isinstance(check, dict) for check in report["checks"]
+    ):
+        raise ValueError(
+            "Saved readiness check records are incomplete; rerun read-only verification."
+        )
+    required = [
+        check for check in report["checks"] if check["selected"] and check["required"]
+    ]
+    required_ready = bool(required) and all(check["status"] == "PASS" for check in required)
+    summary = (
         f"Readiness {report['status']}: {counts['pass']} passed, "
         f"{counts['fail']} failed, {counts['unknown']} unknown, "
         f"{counts['skipped']} skipped."
     )
+    if report["status"] == "DEGRADED" and required_ready:
+        console.info("Required deployment READY. Non-blocking readiness notices remain.")
+        console.detail(summary)
+    else:
+        console.info(summary)
+    unobserved_stream = {
+        check["id"]
+        for check in report["checks"]
+        if (
+            check["selected"]
+            and not check["required"]
+            and check["status"] == "UNKNOWN"
+            and check["id"] in _UNOBSERVED_STREAM_MESSAGES
+            and "error_type" not in check.get("evidence", {})
+            and (
+                check.get("evidence", {}).get("reason") == "not_observed"
+                or check["summary"] == _UNOBSERVED_STREAM_MESSAGES[check["id"]]
+            )
+        )
+    }
+    if unobserved_stream != set(_UNOBSERVED_STREAM_MESSAGES):
+        unobserved_stream = set()
+    if unobserved_stream:
+        console.info(
+            "Optional live-stream evidence is not recorded yet; expected before "
+            "stream-events is started. This does not block deployment."
+        )
     for check in report["checks"]:
         if check["status"] in {"FAIL", "UNKNOWN"}:
-            console.error(
-                f"{check['id']} [{check['status']}]: {check['summary']}"
-            )
+            message = f"{check['id']} [{check['status']}]: {check['summary']}"
+            if check["required"]:
+                console.error(message)
+            elif check["id"] in unobserved_stream:
+                console.detail(f"Optional {message}")
+            else:
+                console.warn(f"Optional {message}")
+        elif check.get("evidence", {}).get("cleanup_required") is True:
+            console.warn(f"Non-blocking cleanup: {check['summary']}")
     console.detail(f"Report: {path}")
 
 

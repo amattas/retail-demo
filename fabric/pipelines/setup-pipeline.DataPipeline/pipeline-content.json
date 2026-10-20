@@ -1,5 +1,6 @@
 {
   "properties": {
+    "concurrency": 1,
     "activities": [
       {
         "name": "setup-01-seed-dictionaries",
@@ -41,7 +42,7 @@
         }
       },
       {
-        "name": "setup-03-generate-facts",
+        "name": "setup-03-generate-sales",
         "type": "TridentNotebook",
         "dependsOn": [
           {
@@ -59,16 +60,16 @@
           "secureInput": false
         },
         "typeProperties": {
-          "notebookId": "1090f89e-10ce-59a1-81fb-6a3870af12b5",
+          "notebookId": "942a8e20-2218-51d3-900d-be4c5c6ee09a",
           "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
         }
       },
       {
-        "name": "setup-04-build-gold",
+        "name": "setup-04-generate-online-orders",
         "type": "TridentNotebook",
         "dependsOn": [
           {
-            "activity": "setup-03-generate-facts",
+            "activity": "setup-02-generate-dimensions",
             "dependencyConditions": [
               "Succeeded"
             ]
@@ -82,7 +83,216 @@
           "secureInput": false
         },
         "typeProperties": {
-          "notebookId": "977a4952-337e-567c-ba6c-37cc9abaaba4",
+          "notebookId": "ebbbfbaa-dd00-50ac-8a53-db085e11cb0e",
+          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+        }
+      },
+      {
+        "name": "setup-05-generate-marketing",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "setup-02-generate-dimensions",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 120,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "062dd2da-1b7f-5cf9-b561-700df36f0ac7",
+          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+        }
+      },
+      {
+        "name": "setup-06-generate-returns-and-promotions",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "setup-03-generate-sales",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 120,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "6be110bc-573d-5f1c-a84b-8067acffe97f",
+          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+        }
+      },
+      {
+        "name": "setup-07-generate-store-activity",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "setup-03-generate-sales",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 120,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "dfc6a3ba-8c7d-5a02-9306-e13b681bd01d",
+          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+        }
+      },
+      {
+        "name": "setup-08-generate-inventory",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "setup-03-generate-sales",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 120,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "d940ac44-8d67-5e60-81c0-ca279edd0ba4",
+          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+        }
+      },
+      {
+        "name": "setup-09-attribute-marketing",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "setup-03-generate-sales",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "setup-04-generate-online-orders",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "setup-05-generate-marketing",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "setup-06-generate-returns-and-promotions",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 120,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "c6b88153-92da-5da8-a357-2737051934e6",
+          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+        }
+      },
+      {
+        "name": "setup-10-publish-silver",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "setup-03-generate-sales",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "setup-04-generate-online-orders",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "setup-06-generate-returns-and-promotions",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "setup-07-generate-store-activity",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "setup-08-generate-inventory",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "setup-09-attribute-marketing",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 120,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "cd781cef-c687-5b6a-b029-77ccfc00520b",
+          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+        }
+      },
+      {
+        "name": "setup-11-build-gold",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "setup-10-publish-silver",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 120,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "fc82ce79-0282-5e4d-999e-692a12ee54ca",
           "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
         }
       }

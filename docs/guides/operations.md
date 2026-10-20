@@ -55,6 +55,14 @@ normally reports three optional unknowns:
 - no recent Eventhouse ingestion; and
 - no checkpoint identity attached to Eventhouse ingestion.
 
+A recent watermark alone is no longer enough for a green streaming check.
+The verifier also samples settled receipt/inventory keys and Gold sales
+against Silver, checking orphan keys and null balances. Missing or empty
+samples remain `UNKNOWN`; observed mismatches are `FAIL`. Both are optional
+streaming degradation. This bounded sample is not proof of every table or
+all historical data. See the
+[sampling contract](../design/specifications/modules/operations/runbook.md#bounded-streaming-consistency).
+
 The report contains bounded counts, timestamps, the canonical manifest
 version/hash, resolved profile support and asset boundaries, target identities,
 and freshness lineage. It never stores access tokens, item-definition payloads,
@@ -70,7 +78,7 @@ Before running the verifier:
    setup, watermark, and model evidence.
 3. Confirm the configured identity can read Fabric items, definitions, job
    history, Eventhouse metadata, and the Lakehouse SQL endpoint.
-4. For `core`, run setup notebooks 01-04 in order before verification.
+4. For `core`, run setup notebooks 01-11 in order before verification.
 5. For Reporting profiles, retain the deployment journal that correlates the
    exact setup and required-ML pipeline runs.
 6. Confirm optional ML, ontology, agent, dashboard, and rule surfaces are ready
@@ -110,7 +118,7 @@ Use these signals together:
 
 | Signal | What it tells you | Where to check |
 | --- | --- | --- |
-| Historical setup run | Whether the four setup stages published a complete historical snapshot | `ag.setup_run_log` in the Lakehouse |
+| Historical setup run | Whether the setup pipeline (setup-10) published a complete historical snapshot | `ag.setup_run_log` in the Lakehouse |
 | Streaming progress | How far the Eventhouse-to-Silver transform has processed | `ag._watermarks` in the Lakehouse |
 | Live event freshness | Whether Eventhouse is receiving recent events | Eventhouse row counts and `ingest_timestamp` |
 | Gold freshness | Whether business summaries reflect the latest selected inputs | Representative maximum business time in `au` tables |
@@ -171,9 +179,20 @@ rather than ingestion time.
 | Rendered notebooks missing | Run `retail-setup render --env <env>`. |
 | Fabric publication fails | Inspect the failing item type and generated `deploy/.generated/<env>/fabric-cicd/parameter.yml`. |
 | KQL objects missing | Inspect and rerun the generated ordered `database.kql` against the intended database. |
+| Item inventory or notebook binding check fails | Read the check's `evidence` in `readiness-report.json` for exact missing, duplicated, mismatched, or incorrectly bound items. Repair only the owning publication step; do not regenerate successful historical data. |
+| Notebook/report definition reads stall or lose their connection | Each definition/export HTTP request has a 30-second timeout and bounded read-only retries. Once Fabric accepts the export, retries poll that exact operation rather than starting another export. Exhausted reads remain `UNKNOWN`, not successful evidence. |
+| Pipeline evidence reports `ConnectionError` | Fabric collection reads retry connection resets and timeouts up to three times, within any collection deadline. If retries are exhausted, restore connectivity and rerun read-only readiness; do not rerun a successful pipeline just to recover its run evidence. |
+| Deployment exits because local pipeline monitoring timed out | Keep the pipeline evidence file and run `retail-setup deploy --env <env> --resume`. Resume polls the exact recorded `Location`; it does not submit or cancel a Fabric run. |
+| Pipeline POST response was lost | Do not retry manually until reconciliation finishes. The runner adopts only one recent exact-pipeline candidate in the request window; zero or multiple candidates fail closed and require an operator-supplied exact run ID. |
+| Late Fabric checks fail after a long verification run | The Fabric REST session renews tokens within five minutes of expiry using the same configured credential and tenant. Renewal happens before sending a request, without replaying mutations or changing identities. If renewal fails, requests fail closed rather than sending an expired token. |
+| KQL readiness reports `KustoNetworkError` | The read-only checker retries transient network errors. If retries are exhausted, restore Eventhouse connectivity and rerun readiness; this does not by itself indicate missing schema objects or require redeployment. |
+| Operations tables are missing after the native publisher failed | Retry `python -m deploy.scripts.deploy_operations_planning --environment <env> --operations-only` when the environment excludes Planning. Missing tables are reported as `FAIL` with their names; the verifier does not query their mappings or discard otherwise readable KQL inventory. |
+| Operations source freshness validation fails | The publisher retains its supporting tables and draft notebook, but does not seed invalid signals or create the agent. Inspect `operations-planning-report.json`; refresh the owning source/ML outputs before retrying monitoring publication. Do not bypass the seven-day freshness guard. |
+| `retail-twins` is missing after its publisher failed | Retry `python -m deploy.scripts.deploy_twins --environment <env>`, then rerun read-only readiness. The selected twins report must exist and bind to the existing model; a non-blocking publisher failure is not evidence that this selected surface is ready. |
 | Setup pipeline not started | Start `setup-pipeline` manually and retain its run ID. |
 | Setup pipeline failed | Resume from the first failed activity only after validating upstream tables. |
 | Required ML gate failed | Inspect producer/validator errors; Reporting is intentionally unpublished until a new exact run succeeds. |
+| `freshness.setup_run_log` reports `ProgrammingError` after deployment | Update the local verifier to query setup data and staging catalog metadata separately, then rerun read-only readiness. Fabric error 15816 rejects a mixed catalog/data query; do not regenerate setup data for this checker error. |
 | Ontology, Data Agent, or task-flow links missing | Run `retail-setup post-ontology --env <env>` to recreate any missing ontology, republish agents, and verify the exact persisted graph. |
 | Live rows absent | Verify notebook parameters, resolved Query URI, KQL permissions, connector errors, and ingestion timestamps. |
 | Silver data stale | Inspect Eventhouse shortcuts, transform run history, source timestamps, and `ag._watermarks`. |
@@ -183,6 +202,20 @@ rather than ingestion time.
 | Local validation passed but live assets fail | Treat the deploy as not ready and perform item, binding, KQL, run, and data checks. |
 | Verifier reports `UNKNOWN` | Restore the missing permission, locked dependency, output, journal, or live evidence; required unknowns are failures. |
 | Verifier reports stale evidence | Run only the owning workload, retain its exact run evidence, and rerun the read-only verifier. |
+
+### Negative stockout inventory at the required ML gate
+
+If notebook 15 rejects negative `stockout_risk.current_inventory` or
+`days_of_inventory`, update notebook 12's available-inventory calculation:
+known negative ledger balances represent zero available units, while unknown
+balances must still fail. Update notebook 15 for per-rule violation counts.
+
+Republish the corrected notebooks and regenerate `stockout_risk` with
+`12-ml-stockout-prediction`, then run `15-validate-required-ml-contract`.
+Historical setup tables do not need regeneration for this derived-output
+repair. Reporting publication still requires a successful exact
+`ml-required` pipeline run; standalone notebook results do not replace that
+pipeline evidence. Do not weaken the gate or mark its failed run successful.
 
 ## Rerun safely
 
@@ -196,9 +229,10 @@ For a normal update:
 6. rerun only affected data workloads;
 7. compare row counts, timestamps, and bindings with the prior known-good run.
 
-Each workspace environment has isolated Terraform state and backend data.
-Concurrent full publication still requires separate checkouts because artifact
-staging uses one `deploy/workspace/` tree.
+Each workspace environment has isolated generation configuration, rendered
+output, Terraform state/data, and `deploy/.generated/<env>/workspace/`
+staging, including post-ontology. Serialize runs for the same environment or
+Fabric target; local path isolation does not prevent concurrent remote writes.
 
 ## Reset and recreate
 
@@ -229,3 +263,8 @@ The required historical, Reporting, ontology, Data Agent, and task-flow paths
 have live deployment evidence. The stream remains intentionally manual. Until
 a bounded `stream-events` run completes, the three optional streaming
 freshness checks remain `UNKNOWN` and overall readiness remains `DEGRADED`.
+This does not mean deployment failed. The console says **Required deployment
+READY** and presents missing initial stream evidence as informational rather
+than `ERROR`. There is no need to redeploy to clear that notice. Run the
+optional stream only when live-event functionality is needed; genuine stream
+failures and partial evidence still produce warnings.

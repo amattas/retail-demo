@@ -7,8 +7,8 @@ Status enumerations (payment ``status``, ``attribution_status``, pricing
 Any KQL function/materialized view or DAX measure that compares against a
 lowercase literal silently matches nothing, so these tests pin the casing
 contract on both layers. They also assert that orphan ``event_date``
-technical columns (raw date columns that are not dim_date relationship keys)
-stay hidden to avoid ambiguous date slicers.
+technical date columns stay hidden so report authors use the shared dim_date
+slicers even when a direct relationship exists.
 """
 
 from __future__ import annotations
@@ -85,18 +85,17 @@ def test_payment_declined_anomaly_filter_matches_source_casing() -> None:
     assert 'status == "declined"' not in text
 
 
-def test_orphan_payment_event_date_is_hidden() -> None:
-    # fact_payments has no dim_date relationship (it inherits date context via
-    # the active Payments-to-Receipts relationship), so the raw event_date
-    # column must be hidden to avoid a duplicate/ambiguous date slicer.
+def test_payment_event_date_relationship_key_is_hidden() -> None:
+    # Payment date filtering uses a direct relationship, while the physical key
+    # stays hidden so reports continue to slice through dim_date.
     text = (TABLES_DIR / "fact_payments.tmdl").read_text(encoding="utf-8")
     block = re.search(
-        r"\tcolumn event_date\n(?P<body>(?:\t\t.+\n)+)",
+        r"\tcolumn 'Event Date'\n(?P<body>(?:\t\t.+\n)+)",
         text,
     )
-    assert block, "Missing fact_payments event_date column block."
+    assert block, "Missing fact_payments Event Date column block."
     assert "isHidden" in block.group("body"), (
-        "fact_payments.event_date must be hidden (isHidden)."
+        "fact_payments.Event Date must be hidden (isHidden)."
     )
 
 
@@ -134,7 +133,7 @@ def test_orphan_event_date_columns_are_hidden() -> None:
     # Any fact-table column sourced from raw ``event_date`` that is NOT used as
     # a dim_date relationship key duplicates the event timestamp and produces an
     # ambiguous date slicer, so it must be hidden. Relationship-key date columns
-    # (e.g. fact_receipts.'Event Date') stay visible.
+    # are checked separately by the semantic-model date-key contract.
     relationship_keys = _dim_date_relationship_keys()
     columns = _event_date_columns()
     assert columns, "Expected at least one event_date column to guard."
@@ -147,4 +146,3 @@ def test_orphan_event_date_columns_are_hidden() -> None:
         "Orphan raw event_date columns (not dim_date relationship keys) must be "
         f"hidden to avoid ambiguous date slicers; offenders: {offenders}"
     )
-

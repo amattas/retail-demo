@@ -11,6 +11,7 @@ the Kusto Python SDK.
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -24,6 +25,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 KQL_SOURCE_DIR = REPO_ROOT / "fabric" / "kql_database"
 FABRIC_SCOPE = "https://api.fabric.microsoft.com/.default"
 FABRIC_API = "https://api.fabric.microsoft.com/v1"
+_DATABASE_SCRIPT_DIRECTIVE = re.compile(
+    r"(?im)^[^\S\r\n]*\.execute\s+database\s+script\b"
+)
+_DATABASE_SCRIPT_WRAPPER = re.compile(
+    r"\.execute\s+database\s+script"
+    r"(?:\s+with\s*\([^)]*\))?\s*<\|",
+    re.IGNORECASE,
+)
+_WHITESPACE = re.compile(r"\s+")
 
 
 def collect_kql_scripts(
@@ -55,6 +65,42 @@ def collect_kql_scripts(
     return scripts
 
 
+def _first_kql_command_offset(source: str) -> int:
+    """Return the offset after leading whitespace and comments."""
+
+    offset = 0
+    while offset < len(source):
+        whitespace = _WHITESPACE.match(source, offset)
+        if whitespace:
+            offset = whitespace.end()
+            continue
+        if source.startswith("//", offset):
+            newline = source.find("\n", offset)
+            offset = len(source) if newline < 0 else newline + 1
+            continue
+        if source.startswith("/*", offset):
+            comment_end = source.find("*/", offset + 2)
+            if comment_end < 0:
+                raise ValueError("Unterminated leading KQL block comment")
+            offset = comment_end + 2
+            continue
+        return offset
+    return offset
+
+
+def _unwrap_database_script(source: str, path: Path) -> str:
+    """Remove one leading database-script wrapper and reject nested wrappers."""
+
+    source = source.removeprefix("\ufeff")
+    command_offset = _first_kql_command_offset(source)
+    wrapper = _DATABASE_SCRIPT_WRAPPER.match(source, command_offset)
+    if wrapper:
+        source = source[:command_offset] + source[wrapper.end() :]
+    if _DATABASE_SCRIPT_DIRECTIVE.search(source):
+        raise ValueError(f"{path.name} contains an embedded database-script wrapper")
+    return source.strip()
+
+
 def build_database_script(scripts: list[Path]) -> str:
     """Build one `.execute database script` payload from ordered KQL files.
 
@@ -66,7 +112,8 @@ def build_database_script(scripts: list[Path]) -> str:
     parts = [".execute database script with (ThrowOnErrors=true) <|"]
     for script in scripts:
         parts.append(f"\n// BEGIN {script.name}")
-        parts.append(script.read_text(encoding="utf-8").strip())
+        source = script.read_text(encoding="utf-8-sig")
+        parts.append(_unwrap_database_script(source, script))
         parts.append(f"// END {script.name}")
     return "\n".join(parts).rstrip() + "\n"
 
@@ -353,8 +400,7 @@ def main() -> int:
         kql_database_id=str(kql_database_id),
         kql_database_name=kql_database_name and str(kql_database_name),
         auth_mode=(
-            args.auth_mode
-            or (config.auth_mode if config is not None else "azure_cli")
+            args.auth_mode or (config.auth_mode if config is not None else "azure_cli")
         ),
         tenant_id=tenant_id and str(tenant_id),
     )

@@ -24,7 +24,12 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
-from retail_setup.generation.runtime import legacy_index, seeded_draws
+from retail_setup.generation.runtime import (
+    date_grid,
+    fixed_width_decimal,
+    legacy_index,
+    seeded_draws,
+)
 from retail_setup.generation.schemas import column_names
 
 # (archetype, channels, base impressions/day at the legacy 86-store fleet,
@@ -64,28 +69,33 @@ def generate_marketing(
     d = seeded_draws(cfg.seed)
     scale = cfg.store_count / LEGACY_FLEET_SIZE
 
-    # --- day x archetype grid (driver-side; days x 4 rows)
+    # --- Spark-native day x archetype grid
     rows = [
         (idx + 1, name, channels, base, dur)
         for idx, (name, channels, base, dur) in enumerate(ARCHETYPES)
     ]
-    grid = spark.createDataFrame(
-        [
-            (day_offset, idx, name, channels, base, dur)
-            for day_offset in range((cfg.end_date - cfg.start_date).days + 1)
-            for (idx, name, channels, base, dur) in rows
-        ],
-        "day_offset int, archetype_idx int, archetype string, "
+    archetypes = spark.createDataFrame(
+        rows,
+        "archetype_idx int, archetype string, "
         "channels array<string>, base_impressions int, duration int",
-    ).withColumn(
-        "day", F.date_add(F.lit(cfg.start_date), F.col("day_offset"))
-    ).withColumn(
-        # campaigns span their archetype duration: the day's impressions belong
-        # to the campaign window [start + k*duration, ...) it falls in.
-        "campaign_start",
-        F.date_add(F.lit(cfg.start_date),
-                   (F.col("day_offset") / F.col("duration")).cast("int")
-                   * F.col("duration")),
+    )
+    grid = (
+        date_grid(spark, cfg.start_date, cfg.end_date)
+        .withColumn(
+            "day_offset",
+            F.datediff(F.col("day"), F.lit(cfg.start_date)),
+        )
+        .crossJoin(archetypes)
+        .withColumn(
+            # Campaigns span their archetype duration: the day's impressions
+            # belong to the window [start + k*duration, ...) it falls in.
+            "campaign_start",
+            F.date_add(
+                F.lit(cfg.start_date),
+                (F.col("day_offset") / F.col("duration")).cast("int")
+                * F.col("duration"),
+            ),
+        )
     )
 
     # flash_sale runs ~1 day in 7 (uniform gate per day)
@@ -112,7 +122,9 @@ def generate_marketing(
             F.concat(
                 F.lit("CAMP"),
                 F.date_format("campaign_start", "yyyyMMdd"),
-                F.lpad(F.col("archetype_idx").cast("string"), 2, "0"),
+                fixed_width_decimal(
+                    F.col("archetype_idx"), 2, "campaign archetype index"
+                ),
             ),
         )
         .withColumn(
@@ -120,8 +132,12 @@ def generate_marketing(
             "impression_id_ext",
             F.concat(
                 F.lit("IMP"), F.date_format("day", "yyyyMMdd"),
-                F.lpad(F.col("archetype_idx").cast("string"), 2, "0"),
-                F.lpad(F.col("seq").cast("string"), 7, "0"),
+                fixed_width_decimal(
+                    F.col("archetype_idx"), 2, "impression archetype index"
+                ),
+                fixed_width_decimal(
+                    F.col("seq"), 7, "daily impression sequence"
+                ),
             ),
         )
         # drops the 'IMP' prefix: CREAT + day + archetype + seq

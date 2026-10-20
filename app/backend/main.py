@@ -27,7 +27,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import agents, config, llm_router, mcp_client, ontology_graph, proposals, replay
+from . import agents, config, dax, llm_router, mcp_client, ontology_graph, proposals, replay
 
 app = FastAPI(title="Retail Ontology Explorer")
 

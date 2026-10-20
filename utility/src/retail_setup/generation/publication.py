@@ -53,7 +53,7 @@ from typing import Any, Callable, Protocol, Sequence
 ERROR_TEXT_LIMIT = 1000
 
 # Terminal coordinator states. STAGED/VALIDATED/PROMOTING/ROLLING_BACK are
-# intermediate/log-only states; COMPLETED is success, the rest are failure.
+# intermediate/log-only states; cleanup warnings preserve data success.
 COMPLETED = "COMPLETED"
 FAILED = "FAILED"
 ROLLED_BACK = "ROLLED_BACK"
@@ -80,11 +80,14 @@ class TableTarget:
     belongs to (silver or gold). ``staging_name`` is the run-scoped staging
     identifier the backend actually writes to — it is opaque to the
     coordinator (a qualified catalog table name, a filesystem path, ...).
+    ``prestaged`` marks a staging identifier that already holds the candidate
+    (a generation handoff): the backend neither writes nor cleans it up.
     """
 
     name: str
     db: str
     staging_name: str
+    prestaged: bool = False
 
 
 @dataclass(frozen=True)
@@ -119,7 +122,8 @@ class PublicationOutcome:
 
     @property
     def ok(self) -> bool:
-        return self.state == COMPLETED
+        """Whether promotion succeeded; cleanup warnings remain explicit in state."""
+        return self.state in {COMPLETED, COMPLETED_CLEANUP_FAILED}
 
 
 class PublicationBackend(Protocol):

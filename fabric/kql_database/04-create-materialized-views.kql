@@ -5,18 +5,17 @@
 //
 // ⚠️ IMPORTANT: 7-DAY DATA RETENTION
 // ============================================================================
-// All materialized views use a 7-day rolling window (ingest_timestamp > ago(7d))
-// to prevent unbounded growth and ensure predictable memory usage.
+// All materialized views use a 7-day retention policy on their materialized
+// data to prevent unbounded growth and ensure predictable storage usage.
+// Materialized-view queries must remain deterministic and cannot use now()/ago().
 //
 // IMPLICATIONS:
-// - Historical queries beyond 7 days will NOT include materialized view data
-// - For historical analysis, query the base tables directly
-// - Month-over-month comparisons require base table queries
-// - Real-time dashboards (last 7 days) work correctly with MVs
+// - Retention is based on MV extent creation time, not the event timestamp
+// - Source-table retention remains independent from MV retention
+// - For durable historical analysis, query Lakehouse history or retained sources
 //
 // ALTERNATIVES CONSIDERED:
-// - Table retention policies: Would affect base data, not just aggregations
-// - Partitioned MVs: Not supported in KQL materialized views
+// - Source-table-only retention: Does not independently bound MV materialization
 // - Extended windows: Risk of memory/performance issues at scale
 //
 // For longer retention needs, consider:
@@ -25,7 +24,7 @@
 // 3. Create separate "archive" tables with scheduled exports
 // ============================================================================
 
-.execute database script with (ContinueOnErrors=true) <|
+.execute database script with (ThrowOnErrors=true) <|
 
 // ============================================================================
 // SALES KPIs
@@ -35,28 +34,31 @@
 {
     receipt_created
     | where isnotnull(store_id) and isnotnull(total)
-    | where ingest_timestamp > ago(7d)  // Only keep recent 7 days to bound growth
     | summarize total_sales = sum(total), receipts = count(), avg_basket = avg(total)
               by store_id, ts = bin(ingest_timestamp, 1m)
 }
+
+.alter-merge materialized-view mv_store_sales_minute policy retention softdelete = 7d recoverability = disabled
 
 .create-or-alter materialized-view mv_top_products_15m on table receipt_line_added
 {
     receipt_line_added
     | where isnotnull(product_id) and isnotnull(extended_price)
-    | where ingest_timestamp > ago(7d)  // Only keep recent 7 days to bound growth
     | summarize revenue = sum(extended_price), units = sum(quantity)
               by product_id, ts = bin(ingest_timestamp, 15m)
 }
+
+.alter-merge materialized-view mv_top_products_15m policy retention softdelete = 7d recoverability = disabled
 
 .create-or-alter materialized-view mv_sales_product_minute on table receipt_line_added
 {
     receipt_line_added
     | where isnotnull(product_id) and isnotnull(extended_price)
-    | where ingest_timestamp > ago(7d)  // Only keep recent 7 days to bound growth
     | summarize revenue = sum(extended_price), units = sum(quantity)
               by product_id, ts = bin(ingest_timestamp, 1m)
 }
+
+.alter-merge materialized-view mv_sales_product_minute policy retention softdelete = 7d recoverability = disabled
 
 // ============================================================================
 // PAYMENT KPIs
@@ -66,9 +68,10 @@
 {
     payment_processed
     | where isnotnull(payment_method) and isnotnull(amount)
-    | where ingest_timestamp > ago(7d)  // Only keep recent 7 days to bound growth
     | summarize amount = sum(amount) by payment_method, ts = bin(ingest_timestamp, 15m)
 }
+
+.alter-merge materialized-view mv_tender_mix_15m policy retention softdelete = 7d recoverability = disabled
 
 // ============================================================================
 // CUSTOMER KPIs
@@ -78,7 +81,8 @@
 {
     customer_entered
     | where isnotnull(store_id) and isnotnull(zone)
-    | where ingest_timestamp > ago(7d)  // Only keep recent 7 days to bound growth
     | summarize avg_dwell = avg(dwell_time), customers = sum(customer_count)
               by store_id, zone, ts = bin(ingest_timestamp, 1m)
 }
+
+.alter-merge materialized-view mv_zone_dwell_minute policy retention softdelete = 7d recoverability = disabled

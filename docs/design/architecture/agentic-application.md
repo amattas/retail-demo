@@ -6,6 +6,13 @@ and why it's useful, then walk the architecture left-to-right, then explain how 
 orchestrator, the two MCP servers, and the operations agents work under the hood —
 all without leaving the single Fabric workspace.
 
+The Fabric data platform and the optional local application have different
+trust boundaries. The app can run synthetic replay, uses operator credentials
+for live calls, and delivers an embed token to the browser. Its approval store
+is local and its Eventhouse telemetry is best-effort, not durable production
+audit. The current working tree has not been freshly deployed in this repair
+session. See [decision boundaries](../specifications/modules/ml-ai/decision-experience.md).
+
 > If you're looking for the data platform itself (streaming, Lakehouse medallion,
 > Eventhouse, semantic model), see [Architecture overview](overview.md). This page is the
 > **application** that consumes it.
@@ -26,12 +33,13 @@ the deployed `retail-demo` workspace. It does three things a dashboard alone can
   what should we do?"), the orchestrator hands off to a specialized **operations agent**
   that reads the real data, applies business rules, and **drafts an approvable action**
   with a human in the loop.
-- **Closed loop, governed.** Every recommendation and every human approval is written
-  back into the Fabric **Eventhouse** as real-time telemetry, so the agentic layer is
-  measurable and auditable — not a black box bolted on the side.
+- **Observable decisions.** The app attempts to send recommendations and
+  approvals to Eventhouse as telemetry; ingestion failures can be swallowed.
+  Verify delivery rather than treating the UI state as an audit guarantee.
 
-Critically, this is **one Fabric workspace** — one security boundary, one billing meter,
-one copy of the data in OneLake. The same Gold tables feed the report, the agents, and
+The data platform uses **one Fabric workspace**; the local app, browser,
+identity, and router remain additional trust and cost boundaries.
+The same Gold tables feed the report, the agents, and
 the ML models; the same Eventhouse that streams live sales also captures what the agents
 decide.
 
@@ -172,8 +180,8 @@ Both follow the same pattern: **perceive** the data → **reason** with business
 
 ### 5. The closed loop — write-back to the Eventhouse
 
-Every agent draft and every human approval is logged as an event in the Eventhouse table
-**`agent_actions`** — the same real-time store that streams live sales. That gives you a live
+The app attempts to log drafts and approvals in Eventhouse
+**`agent_actions`** — the same real-time store that streams live sales. This can provide a live
 **approval funnel** the app renders on the Agent Operations page, and the exact same data is
 plain KQL anyone can drop on a Fabric Real-Time Dashboard:
 
@@ -184,8 +192,10 @@ agent_actions
 | render timechart
 ```
 
-The AI's recommendations and your team's approvals become **first-class, governed, queryable
-telemetry inside Fabric** — auditable, measurable, and ready to drive the next dashboard.
+Successfully ingested events are queryable inside Fabric. The source
+`app/backend/eventhouse.py` logs on daemon threads and suppresses failures;
+durable audit, authenticated per-user approvals, and production actions need
+the additional controls under `THREAT-009` / `SEC-012`.
 
 ---
 

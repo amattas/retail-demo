@@ -48,8 +48,8 @@ cd retail-demo
 ```
 
 The bootstrap prepares Python, configures the target, renders notebooks, and
-offers to deploy. The shell wrappers default to the complete `full-demo`
-profile; pass `--profile core` or `--profile standard` to select a smaller
+offers to deploy. Every entry point defaults to the complete `full-demo`
+profile; pass `--profile core` or `--profile standard` only to select a smaller
 inventory. To proceed directly to deployment:
 
 ```powershell
@@ -67,14 +67,16 @@ For a manually managed Python environment:
 ```powershell
 python -m pip install --require-hashes -r .\utility\requirements-deploy.txt
 python -m pip install --no-deps -e .\utility
-retail-setup configure --workspace-name retail-demo-alice --profile core --months 3 --store-count 50 --seed 42
+retail-setup configure --workspace-name retail-demo-alice --months 18 --store-count 50 --seed 42
 retail-setup render --env alice
 retail-setup deploy --env alice --dry-run
 retail-setup deploy --env alice --yes
 ```
 
-Rendering produces five workspace-specific notebooks in `utility\out\`:
-setup 01 through 04 and `stream-events.ipynb`.
+Configuration is stored in `utility\config\environments\<env>.yaml` (legacy
+`utility\config.yaml` remains a read fallback). Rendering produces twelve
+workspace-specific notebooks in `utility\out\<env>\`:
+setup 01 through 11 and `stream-events.ipynb`.
 
 The guided `full-demo` path runs setup and required ML gates automatically,
 then publishes Reporting and runs isolated optional/experimental ML. An
@@ -112,8 +114,8 @@ For technical readers, the historical Lakehouse uses a cleaned Silver layer
 (`ag`, with seven dimensions and nineteen facts) and a business-ready Gold
 layer (`au`, with ten aggregates). Eventhouse contains eighteen emitted
 business-event tables plus an `unknown_event` safety table. Power BI uses a
-40-table Direct Lake semantic model, which reads Lakehouse tables directly
-without importing another copy.
+42-table Direct Lake semantic model: 36 historical tables plus six required ML
+outputs. It reads Lakehouse tables directly without importing another copy.
 
 The setup notebooks generate historical data directly in Fabric. The optional
 stream notebook writes small groups of typed events directly to Eventhouse

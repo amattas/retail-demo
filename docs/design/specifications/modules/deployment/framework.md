@@ -33,15 +33,51 @@ flowchart LR
 
 Local and live preflight are the first executable plan steps and precede every
 destroy, apply, publish, and KQL mutation. Local preflight validates source and
-state contracts. Live preflight uses documented Fabric APIs to validate tenant
+state contracts. The orchestrator invokes it with `--source-only` to check
+committed notebook inputs before rendering; it does not require a prior
+rendered output set. Explicit rendered-output validation resolves
+`utility/out/<env>/`, not the shared legacy output directory.
+Live preflight uses documented Fabric APIs to validate tenant
 switches and capacity state, size/tier (SKU), region, and Spark sizing.
+
+Deployment passes `--resume-capacity` to live preflight. Its active-capacity
+fast path is read-only; paused capacity may be resumed through Azure Resource
+Manager after resolving the configured capacity name. An explicit
+`workspace.capacity_resource_id` bypasses discovery. Otherwise, the configured
+subscription is searched, or all accessible subscriptions owned by the
+configured tenant are enumerated. All pages and subscription ownership must
+be validated, and exactly one capacity name match must remain. An inaccessible
+page or subscription is not silently skipped to manufacture a unique match.
+Only `Microsoft.Fabric/capacities` F-SKU resources in `Paused` or `Suspended`
+are resumed, with API version `2023-11-01`. Identity/name/subscription
+mismatches, inactive trial/Premium capacities, and ambiguous Fabric lookup
+results fail before the resume request. Fabric `Inactive` alone is not proof
+of an ARM paused state.
+
+Resume uses a separate ARM token for the configured tenant/authentication
+mode, submits at most one POST, honors asynchronous operation headers and
+`Retry-After`, and polls resource and Fabric states with a bounded wait.
+HTTP 429 GET responses honor `Retry-After` within that deadline, including
+discovery and operation polling. POST retries are not introduced by throttling.
+Lost POST responses and conflicts trigger state reads, not blind repeat
+mutations. Polling URLs must remain on the trusted HTTPS ARM host.
+Resuming restarts billing; no scale, assignment, creation, or later automatic
+pause is performed. Default wait is 600 seconds. Standalone live preflight
+without the flag, deploy dry runs, and readiness remain nonmutating.
+`deploy --resume` reexecutes live preflight even when the prior run recorded it
+as successful, while retaining completed setup/ML steps.
 Before publication, target-access validation also proves that captured
 workspace IDs match managed state and resolve to the configured live workspace
 for the deployment operator.
 
-The current CLI applies Terraform directly; it does not insert a separate
-interactive `terraform plan` step. The CLI confirmation occurs before apply;
-Terraform then prints its change preview and proceeds with `-auto-approve`.
+The CLI saves `terraform.tfplan` and validates its JSON resource changes before
+apply confirmation. Review that file with `terraform show`; the plan guard
+captures its subprocess output rather than displaying a human-readable diff.
+Apply consumes that exact saved plan
+with `-auto-approve`; it does not recalculate an unreviewed plan. Deletion or
+replacement of `fabric_workspace`, `fabric_lakehouse`, or `fabric_eventhouse`
+fails the normal plan guard. Intentional destructive changes require the
+explicit `--recreate` workflow, including its destroy confirmation.
 
 ## Command modes
 
@@ -50,11 +86,40 @@ Terraform then prints its change preview and proceeds with `-auto-approve`.
 | `--dry-run` | Validates existing configuration and the Terraform/Python authentication boundary, then prints the plan without subprocess execution or live target access. With `--skip-terraform`, it also validates captured outputs. |
 | `--yes` | Pre-confirms gated Terraform steps and existing-workspace handling; it never skips required pipeline gates. |
 | `--skip-terraform` | Omits Terraform only after captured outputs match the selected environment, workspace, resource names, and non-placeholder IDs. |
+| `--resume` | Reuses a compatible incomplete journal's contiguous `SUCCEEDED` prefix, then retries from the first other state. |
 | `--recreate` | Runs destroy, polls Fabric until the workspace name is absent (bounded at 180 seconds), then applies and publishes. |
 
 `--recreate` and `--skip-terraform` are mutually exclusive. A normal
 interactive run detects an existing workspace by display name and offers
 update-in-place or recreate. `--yes` skips that prompt.
+
+`--resume` cannot be combined with `--dry-run` or `--recreate`. The environment,
+targets, profile, manifest hash, ordered step IDs, and content/command
+fingerprint must match. The fingerprint covers deployment sources, selected
+configuration, dictionary files, and ordered commands. Legacy journals without
+the required plan/fingerprint fields are rejected rather than guessed
+compatible. Failed, degraded, skipped, or pending steps do not
+extend the reusable prefix. Completed runs cannot be resumed. An interrupted
+recreate preserves its prior recreate target identity only when every prior
+step through `deletion-wait` succeeded. An unfinished destructive phase refuses
+automatic resume; explicit operator review and restart are required.
+
+Pipeline gates persist one bounded evidence document immediately after a
+successful submission and before polling. The document contains only exact
+workspace/pipeline/run correlation, `Location`, status, and timestamps. A
+compatible `RUNNING` gate is resumed by polling that exact `Location`; the
+orchestrator never submits a replacement. Completed evidence is adopted,
+active evidence remains awaited, and terminal failure remains failure.
+Monitor timeout is a resumable local outcome and does not cancel or classify
+the remote Fabric run as failed. Ambiguous POST outcomes reconcile only one
+exact-pipeline run in the request window; zero or multiple candidates fail
+closed.
+
+Before retrying a pending apply, resume regenerates and checks the saved plan.
+Before retrying a pending item-publication phase, it rebuilds that phase's
+staging, including post-ontology artifacts. A succeeded build entry is not
+proof that ephemeral local files remain intact. Resume is not a substitute
+for live target validation or readiness evidence.
 
 ## Workspace-scoped environments
 
@@ -74,22 +139,34 @@ ID rather than resolving a potentially duplicate display name.
 | Path | Role | Tracked |
 | --- | --- | --- |
 | `deploy/config/environments/<env>.yml` | Workspace-specific target overlay | No |
+| `utility/config/environments/<env>.yaml` | Environment-specific generation settings; legacy `utility/config.yaml` is a read fallback | No |
+| `utility/out/<env>/` | Rendered notebooks and render manifest | No |
 | `deploy/.generated/<env>/terraform.tfvars` | Terraform input rendered from merged YAML | No |
+| `deploy/.generated/<env>/terraform.tfplan` | Saved, guarded Terraform plan applied after confirmation | No |
 | `deploy/.generated/<env>/terraform.tfstate` | Local Terraform backend state | No |
 | `deploy/.generated/<env>/.terraform/` | Terraform backend and provider data | No |
 | `deploy/.generated/<env>/fabric-cicd/config.yml` | Publication environment and item scope | No |
 | `deploy/.generated/<env>/fabric-cicd/parameter.yml` | Workspace, item, OneLake, KQL, and agent rewrites | No |
 | `deploy/.generated/<env>/terraform-output.json` | Captured live identifiers | No |
 | `deploy/.generated/<env>/database.kql` | Combined ordered KQL script | No |
+| `deploy/.generated/<env>/capacity-sizing.json` | Fresh, non-secret live capacity evidence and derived custom Spark pool bounds | No |
 | `deploy/.generated/<env>/deploy-run.json` | Atomic step/status journal for the latest deploy run | No |
+| `deploy/.generated/<env>/run-history/<hashed-run-id>.json` | Prior journal archived before a different new/resumed run replaces the latest journal | No |
+| `deploy/.generated/<env>/pipeline-evidence/<step-id>.json` | Bounded exact pipeline item/run/Location/status evidence used for reattachment | No |
 | `deploy/.generated/<env>/artifact-inventory-<phase>.json` | Validated manifest/profile/count/folder inventory for one publication phase | No |
 | `deploy/.generated/<env>/readiness-report.json` | Redacted profile-aware live evidence | No |
-| `deploy/workspace/` | Staged Fabric item folders | No, except `.gitkeep` |
+| `deploy/.generated/<env>/workspace/` | Staged Fabric items for every publication phase | No |
 
 Terraform receives an environment-specific `TF_DATA_DIR` and local backend
 path. Parallel Terraform operations therefore cannot select or mutate another
-workspace's state. Full publication still shares `deploy/workspace/` staging,
-so concurrent full deploy runs require separate checkouts.
+workspace's state. The orchestrator also isolates generation configuration,
+rendered output, and staging, including post-ontology staging, by environment.
+Do not run concurrent deploys against the same environment; different local
+paths are not a distributed lock on a shared Fabric target. Lower-level build
+helpers may retain legacy defaults, so use the orchestrator for isolation.
+The supported state path is a local backend; remote-backend coordination and
+distributed serialization across separate pipelines/manual writers remain
+external design and validation gates.
 
 A legacy `deploy/terraform/terraform.tfstate` with no environment-local state
 fails preflight. The operator must verify its workspace ownership and move it
@@ -101,6 +178,23 @@ evidence, missing captures, or stale identities fail closed even when the state
 currently has no managed instances. A downgrade that would remove a
 profile-controlled Eventhouse or custom Spark pool requires explicit
 `--recreate`; absent evidence never authorizes deletion.
+
+For custom-pool profiles, live preflight derives sizing from the resolved
+capacity SKU before Terraform configuration generation. Supported SKUs are
+`F<n>` and `FTL<n>`. Base Spark capacity is 2 vCores per CU; the framework
+reserves 25%, divides the remaining vCores across the root notebook producers
+in `ml-required.DataPipeline`, and uses 8-vCore Medium nodes. Per-session
+maximum nodes are
+`floor(floor(CU * 2 * 0.75) / (producer_count * 8))`, clamped to 2–16; the
+minimum is 2. A capacity that cannot provide a driver plus executor to every
+producer fails closed. Burst capacity is excluded from the calculation.
+
+Config generation validates the evidence environment, configured capacity
+identity, SKU arithmetic, producer count, integer bounds, and deployment-run
+freshness. The journal stores the stable sizing identity. A resumed run
+regenerates and replans when sizing changes before apply; sizing drift after a
+successful apply requires a new plan and cannot be adopted by resume. Starter
+pool profiles do not require or consume capacity evidence.
 
 ## Authentication boundary
 
@@ -131,24 +225,32 @@ notebook references. All profiles exclude the destructive `reset` group.
 
 | Profile | Assets | Groups | Pipelines | KQL scripts | Publication behavior |
 | --- | ---: | --- | ---: | ---: | --- |
-| `core` (manifest/direct-CLI default) | 1 | `setup` | 0 | 0 | Lakehouse shell and four rendered historical setup notebooks; no Eventhouse, Reporting, ML, stream, preview, task flow, or custom pool |
+| `core` (explicit selection) | 1 | `setup` | 0 | 0 | Lakehouse shell and eleven rendered historical setup notebooks; no Eventhouse, Reporting, ML, stream, preview, task flow, or custom pool |
 | `standard` | 8 | `setup`, `core`, `stream`, `ml-required` | 5 | 6 | Supported real-time/streaming plus fail-closed required ML/Reporting path; starter pool and no preview surfaces |
-| `full-demo` | 14 | standard groups plus `ml-optional`, `ml-experimental`, `ontology`, `utility` | 7 | 6 | Required Reporting gate plus post-Reporting extended ML and advanced/preview surfaces except reset |
+| `full-demo` (manifest default for every entry point) | 14 | standard groups plus `ml-optional`, `ml-experimental`, `ontology`, `utility` | 7 | 6 | Required Reporting gate plus post-Reporting extended ML and advanced/preview surfaces except reset |
 
-The exact initial infrastructure/Reporting counts are `5+0`, `26+2`, and `40+2`
+The exact initial infrastructure/Reporting counts are `5+0`, `30+2`, and `40+2`
 respectively. They and the workspace-folder sets are validated while staging;
 every staged `.platform` description is projected from the selected manifest
 asset. See the canonical
 [workspace inventory](../../../../guides/workspace-inventory.md).
+Checked-in Data Agent `.platform` files may retain nonempty agent-specific
+summaries distinguishing semantic-model and ontology scope. This source
+metadata exception does not change staging's manifest-description projection
+or exact description contracts for other artifact types.
 The prior `IMP-008` profile blockers are removed because the required path is
 now executable and fail-closed. Full-demo checks Ontology/Data Agent tenant
 switches with the admin tenant-settings API and validates the selected
 capacity with the capacities API. Settings changes remain administrator-owned
 because Fabric publishes no tenant-settings update API.
 
-The guided `setup.ps1` and `setup.sh` entry points default to `full-demo`.
-Direct `retail-setup` commands and the manifest retain the conservative `core`
-default.
+The manifest marks `full-demo` as the default, so the guided wrappers,
+`scripts/setup.py`, and direct `retail-setup` commands all deploy it unless
+`core` or `standard` is selected explicitly. Configuration enables the
+connected twins report and the native Operations Agent by default for any
+Reporting profile; native Planning stays excluded unless `include_plan` is
+set. The operations-only publication step is non-required, so a Fabric
+rejection of the agent degrades the deployment instead of failing it.
 
 No profile enables schedules or starts the live stream. The source
 daily-maintenance schedule remains present but disabled. Dashboard templates
@@ -160,14 +262,23 @@ them in its logical inventory.
 For `standard` and `full-demo`, the orchestrator:
 
 1. stages and publishes infrastructure, notebooks, experiments, and pipelines
-   without the `Reporting` folder;
+   without the `Reports` and `Semantic Models` folders;
 2. waits for `setup-pipeline` to complete;
-3. starts `ml-required` and polls that exact run to a bounded terminal state;
+3. starts `ml-required`; its six independent producers fan out concurrently,
+   and the validator joins all six successful producer activities before the
+   pipeline can complete;
 4. stages and publishes the semantic model and report only after status
    `Completed`;
 5. runs any selected optional/experimental pipelines after Reporting;
 6. synchronizes Lakehouse SQL endpoint metadata so newly written tables become
    visible to SQL and Power BI clients.
+
+`setup-pipeline`, `ml-required`, `ml-optional`, and `ml-experimental` each
+declare `concurrency: 1` to prevent overlapping duplicate runs. The six
+required-ML producer activities retain `retry: 0`. Only
+`15-validate-required-ml-contract` has a bounded retry of two attempts at
+120-second intervals and a one-hour timeout, so transient validation failures
+do not replay successful producers.
 
 The required pipeline's final activity is
 `15-validate-required-ml-contract`. A missing, empty, schema-incompatible,
@@ -177,6 +288,11 @@ states all fail closed and leave Reporting unpublished. Optional and
 experimental failures mark the journal `DEGRADED` but do not retract required
 Reporting.
 
+Phased Reporting profiles reject `deployment.unpublish_skip: false`.
+Unpublishing from a partial infrastructure or Reporting stage could otherwise
+delete healthy items absent from that stage. This setting is a configuration
+safety check, not permission to skip the required publication gates.
+
 SQL endpoint metadata synchronization is also optional at the step level. A
 failure marks the journal `DEGRADED`; the later readiness check still fails
 closed if any required Reporting table is unavailable.
@@ -185,14 +301,33 @@ closed if any required Reporting table is unavailable.
 
 | Asset | Workspace location |
 | --- | --- |
-| Lakehouse shell and bundled KQL queryset | Workspace root |
-| Setup notebooks and `setup-pipeline` | `Setup` |
-| Core, ML, and ontology notebooks | `Notebooks` |
-| `stream-events` | `Streaming` |
-| Semantic model and report | `Reporting` |
-| Other Data Pipelines | `Pipelines` |
-| ML experiment shells | `ML` |
+| All notebooks, including setup, stream, ML and case preparation | `Notebooks` |
+| All Data Pipelines, including `setup-pipeline` | `Pipelines` |
+| Reports, including connected twins | `Reports` |
+| Semantic models | `Semantic Models` |
+| ML experiment shells | `ML Experiments` |
 | Data Agents (post-ontology only) | `Data Agents` |
+| Lakehouses | `Lakehouses` |
+| Eventhouses | `Eventhouses` |
+| Bundled KQL querysets | `KQL Querysets` |
+| Ontologies | `Ontologies` |
+| Independently movable graph models | `Graph Models` |
+| Fabric Apps | `Fabric Apps` |
+| Independently movable SQL databases | `SQL Databases` |
+| Operations Agents and Plans, when published | `Operations Agents`, `Plans` |
+
+`deploy/scripts/workspace_folders.py` owns the shared object-type policy.
+Staging uses that policy, and the final deploy step reconciles native and
+Terraform-created items against the live folder inventory. Standalone
+publishers also reconcile after success. Moves preserve item IDs and
+task-flow bindings; they do not run notebooks or change data. Only empty
+retired `Setup`, `Streaming`, `Reporting`, and `ML` folders are removed.
+
+Fabric requires managed child items to move with their parent. SQL endpoints
+therefore remain beside their Lakehouse, SQL database, or Fabric App; KQL
+databases remain beside their Eventhouse. Any additional children returned by
+the move API stay with their parent. They are reported as managed exceptions,
+not moved independently.
 
 Terraform owns Eventhouse/KQL database resources. The staging process does not
 publish `.platform`-only Eventhouse shells. The reset notebook has a physical
@@ -294,6 +429,12 @@ that is not a stable public source-control item contract.
   gates. `--yes` suppresses prompts but never skips either gate.
 - Post-Reporting optional/experimental ML failures are recorded and execution
   continues.
+- The orchestrator executes an explicit dependency graph with separate resource
+  limits: one Spark-heavy step and up to four non-Spark/API steps by default.
+  Required failures prevent descendants from starting; optional failures do
+  not cancel independent siblings. Final task-flow publication, folder
+  reconciliation, and readiness wait for every selected branch to become
+  terminal.
 - SQL endpoint metadata synchronization failures are recorded as optional
   degradation. Required-table visibility is checked again by readiness.
 - Recreate polls every visible Fabric workspace page and fails closed on timeout
@@ -303,6 +444,11 @@ that is not a stable public source-control item contract.
   `DEGRADED`, or `FAILED`. It stores no raw command output, environment
   variables, tokens, or tenant identifiers and redacts credential-like
   exception text.
+- Before a new or resumed run replaces the latest journal, the prior journal
+  is atomically archived under `run-history/`, using the SHA-256 hash of its
+  run ID as the filename. Latest-journal replacement happens only after that
+  archive write succeeds. In-run status updates do not create history copies.
+  Archive and latest files are separately atomic, not a distributed transaction.
 - Local deployment validation checks generated files only; it does not query
   live item, binding, run, or data readiness.
 
@@ -319,9 +465,10 @@ failed/unknown evidence marks the journal and linked readiness report
 `DEGRADED`. Operators may explicitly trigger the profile's post-publish
 pipeline only with `retail-setup verify --env <env> --run-pipeline`.
 
-The verifier, report, and local contracts are implemented. Required full-demo
-execution has live evidence. Recent manually started streaming evidence remains
-the external boundary under
+The verifier, report, and local contracts are implemented. Historical
+full-demo evidence predates the current remediation; no fresh live deployment
+was performed in this repair session. Readiness consistency and remote smoke
+tests remain open, as does recent manually started streaming evidence under
 [IMP-013](../../../requirements/modules/operations/backlog.md#imp-013).
 
 ## Evidence

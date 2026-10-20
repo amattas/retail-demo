@@ -1,0 +1,32 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/plan/definition/PlanProperties/1.0.0/schema.json",
+  "properties": {
+    "workloadModeConfig": {
+      "EDIT": {
+        "showFilterPane": true,
+        "showDataPane": true,
+        "showFieldsPane": true,
+        "showElementsPane": false,
+        "showBookmarksPane": false,
+        "showPersonalizePane": false,
+        "showCommentsPane": false,
+        "showVariablesPane": false,
+        "showLumelAIPane": false
+      },
+      "READ": {
+        "showFilterPane": true,
+        "showDataPane": false,
+        "showBookmarksPane": false,
+        "showPersonalizePane": false,
+        "showVariablesPane": false,
+        "showCommentsPane": false,
+        "showLumelAIPane": false
+      }
+    },
+    "dataStreamerConfig": {
+      "enabled": false
+    },
+    "workloadLevelFilterAssignments": [],
+    "workloadLevelVariables": []
+  }
+}

@@ -147,8 +147,15 @@ def test_delivery_logic_is_chronological_calibrated_and_inference_only() -> None
     assert "FACT_TRUCK_MOVES_TABLE" not in source
     assert (
         'F.col("history.history_available_ts") < F.col("target.arrived_ts")'
-        in source
+        not in source
     )
+    assert "def build_asof_history_stats(" in source
+    assert "target_rows\n        .unionByName(history_rows)" in source
+    assert "Window.partitionBy(*key_columns)" in source
+    assert '.withColumn("_event_priority", F.lit(0))' in source
+    assert '.withColumn("_event_priority", F.lit(1))' in source
+    assert '["location_type", "location_id"]' in source
+    assert '["arrival_hour"]' in source
     assert 'Window.orderBy(F.col("label_available_ts")' in source
     assert "timedelta(hours=SPLIT_PURGE_HOURS)" in source
     assert "df_calibration_pred = model_point.transform(df_calibration)" in source

@@ -57,6 +57,20 @@ def test_lines_link_and_money(setup):
     )
 
 
+def test_lines_only_use_launched_products(setup):
+    _, dims, generated = setup
+    launches = dims["dim_products"].select(
+        F.col("ID").alias("product_id"),
+        F.to_date("LaunchDate").alias("launch_date"),
+    )
+    early = (
+        generated["fact_online_order_lines"]
+        .join(launches, "product_id")
+        .filter(F.col("event_date") < F.col("launch_date"))
+    )
+    assert early.count() == 0
+
+
 def test_fulfillment_modes_and_nodes(setup):
     _, dims, g = setup
     lines = g["fact_online_order_lines"]

@@ -9,6 +9,7 @@
 | Fabric Terraform provider | Azure CLI or explicit service-principal, OIDC, or managed identity; never Azure PowerShell session state |
 | KQL schema application | Local deploy process with Eventhouse permissions |
 | Streaming notebook | Fabric notebook runtime identity |
+| Ontology notebook | Fabric notebook runtime identity; Power BI token exchanged for a Digital Operations workload token sent only to allowlisted Fabric HTTPS hosts |
 | Report/KQL/agent consumption | Assigned Fabric/Power BI consumer identity |
 
 Every context must target the configured tenant, workspace, and data item.
@@ -56,6 +57,14 @@ generated customer-like records.
 - Data Agent datasource instructions and user descriptions may remain unset in
   the default release. Persona-specific behavior remains optional under
   `ENH-003`.
+
+The optional local app has a different identity boundary: its live embedding
+endpoint returns an operator-derived Power BI access token to the browser.
+Do not expose it as a shared authenticated service without separate hosting
+and delegated-identity controls. Approvals change local proposal records,
+not production systems; Eventhouse action logging is best-effort.
+See [decision experience](../ml-ai/decision-experience.md), `THREAT-009`, and
+`SEC-012`.
 
 ## Documentation publication boundary
 

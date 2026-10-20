@@ -8,7 +8,7 @@ The supported repository path is:
 2. `retail-setup configure`
 3. `retail-setup render`
 4. `retail-setup deploy` or manual import
-5. setup notebooks 01 through 04
+5. setup notebooks 01 through 11
 6. optional `stream-events`
 
 ## Configuration boundaries
@@ -17,13 +17,13 @@ The supported repository path is:
 | --- | --- |
 | `deploy/config/deploy.yml` | Shared deployment defaults |
 | `deploy/config/environments/<env>.yml` | Ignored workspace target overlay |
-| `utility/config.yaml` | Ignored local generation configuration |
-| `utility/out/` | Rendered notebooks |
+| `utility/config/environments/<env>.yaml` | Ignored environment-specific generation configuration; legacy `utility/config.yaml` is a read fallback |
+| `utility/out/<env>/` | Environment-specific rendered notebooks |
 | `deploy/.generated/<env>/terraform.tfvars` | Ignored Terraform input |
 | `deploy/.generated/<env>/terraform.tfstate` | Ignored isolated Terraform state |
 | `deploy/.generated/<env>/fabric-cicd/` | Ignored publication config and rewrites |
 | `deploy/.generated/<env>/` | Ignored live outputs, run journal, and combined KQL |
-| `deploy/workspace/` | Generated Fabric item staging |
+| `deploy/.generated/<env>/workspace/` | Environment-specific Fabric item staging |
 
 The environment key is derived from the workspace name. Environment selection
 must be explicit for render and deploy. Local target and generated files are

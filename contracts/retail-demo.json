@@ -227,9 +227,7 @@
           "retail-setup",
           "configure",
           "--workspace-name",
-          "retail-demo-dev",
-          "--profile",
-          "core"
+          "retail-demo-dev"
         ]
       ]
     },
@@ -872,7 +870,7 @@
       "name": "Core",
       "owner": "owner.deployment",
       "support_status": "core",
-      "description": "Default GA-safe historical deployment with no preview, live, ML, reporting, or destructive surfaces.",
+      "description": "Reduced GA-safe historical deployment with no preview, live, ML, reporting, or destructive surfaces; select explicitly.",
       "sources": [
         {
           "path": "deploy/config/deploy.yml",
@@ -891,7 +889,7 @@
       ],
       "implementation": "executable",
       "deployment_name": "core",
-      "default": true,
+      "default": false,
       "available_group_inventory_id": "inventory.deployment.notebook-groups",
       "available_pipeline_inventory_id": "inventory.assets.data-pipelines",
       "group_refs": [
@@ -905,7 +903,7 @@
       "required_acknowledgements": [],
       "blockers": [],
       "boundaries": {
-        "runtime": "Publishes the four historical setup notebooks; the operator runs them in order after deployment.",
+        "runtime": "Publishes the eleven historical setup notebooks; the operator runs them in numbered order after deployment (03-05 and 06-08 may run concurrently).",
         "capacity": "Uses the workspace starter pool and does not provision Eventhouse or a custom Spark pool.",
         "cost": "Limits automatic deployment to the workspace, Lakehouse, and historical setup notebooks; Fabric usage still incurs tenant-specific charges.",
         "manual": "Historical notebook execution and validation remain operator actions; no schedule or live stream is enabled.",
@@ -914,10 +912,11 @@
       "reporting_gate_pipeline_ref": null,
       "post_reporting_pipeline_refs": [],
       "publication": {
-        "infrastructure_item_count": 5,
+        "infrastructure_item_count": 12,
         "reporting_item_count": 0,
         "infrastructure_folders": [
-          "Setup"
+          "Notebooks",
+          "Lakehouses"
         ],
         "reporting_folders": []
       }
@@ -992,17 +991,18 @@
       "reporting_gate_pipeline_ref": "ml-required.DataPipeline",
       "post_reporting_pipeline_refs": [],
       "publication": {
-        "infrastructure_item_count": 30,
+        "infrastructure_item_count": 37,
         "reporting_item_count": 2,
         "infrastructure_folders": [
-          "Setup",
           "Notebooks",
-          "Streaming",
-          "ML",
+          "Lakehouses",
+          "KQL Querysets",
+          "ML Experiments",
           "Pipelines"
         ],
         "reporting_folders": [
-          "Reporting"
+          "Reports",
+          "Semantic Models"
         ]
       }
     },
@@ -1011,7 +1011,7 @@
       "name": "Full demo",
       "owner": "owner.deployment",
       "support_status": "preview",
-      "description": "All advanced and preview demo surfaces, with optional and experimental ML isolated from the required Reporting gate.",
+      "description": "Default deployment of every advanced and preview demo surface, with optional and experimental ML isolated from the required Reporting gate.",
       "sources": [
         {
           "path": "deploy/config/deploy.yml",
@@ -1037,7 +1037,7 @@
       ],
       "implementation": "executable",
       "deployment_name": "full-demo",
-      "default": false,
+      "default": true,
       "available_group_inventory_id": "inventory.deployment.notebook-groups",
       "available_pipeline_inventory_id": "inventory.assets.data-pipelines",
       "group_refs": [
@@ -1091,17 +1091,18 @@
         "ml-experimental.DataPipeline"
       ],
       "publication": {
-        "infrastructure_item_count": 40,
+        "infrastructure_item_count": 47,
         "reporting_item_count": 2,
         "infrastructure_folders": [
-          "Setup",
           "Notebooks",
-          "Streaming",
-          "ML",
+          "Lakehouses",
+          "KQL Querysets",
+          "ML Experiments",
           "Pipelines"
         ],
         "reporting_folders": [
-          "Reporting"
+          "Reports",
+          "Semantic Models"
         ]
       }
     }
@@ -3272,7 +3273,7 @@
       "name": "Streaming-only online order status",
       "owner": "owner.streaming",
       "support_status": "optional",
-      "description": "Picked and shipped events intentionally stop at a streaming-only Silver status table.",
+      "description": "Picked and shipped events intentionally stop at an owned streaming-only Silver status table maintained by the Delta maintenance notebook.",
       "sources": [
         {
           "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
@@ -3295,7 +3296,7 @@
         }
       ],
       "kind": "streaming-only",
-      "rationale": "The active transform records operational PICKED/SHIPPED state, but no historical schema or semantic table currently owns that status grain.",
+      "rationale": "The active transform records and maintains operational PICKED/SHIPPED state, but no historical schema or semantic table owns that status grain.",
       "verification_owner": "owner.streaming",
       "event_ids": [
         "event.online-order-picked",
@@ -5047,6 +5048,7 @@
         "dim_products",
         "fact_store_inventory_txn",
         "fact_receipt_lines",
+        "fact_receipts",
         "price_elasticity"
       ],
       "output": {
@@ -5129,6 +5131,7 @@
         "dim_products",
         "fact_store_inventory_txn",
         "fact_receipt_lines",
+        "fact_receipts",
         "price_elasticity"
       ],
       "output": {

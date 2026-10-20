@@ -32,7 +32,7 @@
 //
 // ============================================================================
 
-.execute database script with (ContinueOnErrors=true) <|
+.execute database script with (ThrowOnErrors=true) <|
 
 // ============================================================================
 // TABLE DEFINITIONS

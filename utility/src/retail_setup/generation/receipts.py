@@ -6,10 +6,8 @@ arrangement-independent, so output is deterministic for a (config, seed) pair
 regardless of cluster shape. The seed is folded into the salt delimiter inside
 `seeded_draws`, keeping generators decoupled from one another.
 
-Count distributions (store-day receipt counts, basket sizes) use a clamped
-normal approximation of Poisson — `max(1, round(N(lambda, sqrt(lambda))))` —
-a documented deviation from datagen's per-row RNG; statistically equivalent
-at demo scale and fully vectorizable.
+Visits precede purchase decisions. Negative-binomial baskets combine shopping
+missions and persistent budgets, calibrated against the eligible catalog.
 
 Money is integer cents end-to-end; tax replicates datagen's basis-point
 integer formula exactly:
@@ -24,8 +22,20 @@ from pyspark.sql.window import Window
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.models import StoreTypeProfile
-from retail_setup.generation.runtime import seeded_draws, store_day_grid
+from retail_setup.generation.behavior import (
+    calibrated_basket_mean,
+    customer_visit_tickets,
+    pick_retail_product,
+    retail_basket_size,
+    retail_catalog,
+    retail_quantity,
+)
+from retail_setup.generation.runtime import (
+    fixed_width_decimal,
+    seeded_draws,
+)
 from retail_setup.generation.schemas import column_names
+from retail_setup.generation.traffic import generate_hourly_visits
 
 # (method, mix weight, decline multiplier, processing_ms lo, processing_ms hi)
 TENDERS = [
@@ -281,17 +291,29 @@ def _assign_customers(receipts: DataFrame, dims: dict[str, DataFrame],
     """
     customers = dims["dim_customers"].select(
         F.col("ID").alias("customer_id"), F.col("GeographyID").alias("cust_geo_id"))
+    # Replicated selection tickets give persistent, long-tailed visit propensity.
+    # This dimension-sized expansion avoids receipt x customer inequality joins.
+    customers = customers.withColumn(
+        "_ticket",
+        F.explode(F.sequence(F.lit(1), customer_visit_tickets(d, F.col("customer_id")))),
+    )
     geo_sizes = customers.groupBy("cust_geo_id").agg(F.count("*").alias("geo_cust_count"))
-    rank_w = Window.partitionBy("cust_geo_id").orderBy("customer_id")
+    rank_w = Window.partitionBy("cust_geo_id").orderBy("customer_id", "_ticket")
     cust_ranked = customers.withColumn("local_rank", F.row_number().over(rank_w))
+    global_customers = customers.withColumn(
+        "_global_rank", F.row_number().over(Window.orderBy("customer_id", "_ticket"))
+    ).select("_global_rank", F.col("customer_id").alias("global_customer"))
+    global_size = customers.agg(F.count("*").alias("_global_size"))
 
     r = (
         receipts
         .join(geo_sizes, receipts["store_geo_id"] == geo_sizes["cust_geo_id"], "left")
         .drop("cust_geo_id")
         .withColumn("geo_cust_count", F.coalesce(F.col("geo_cust_count"), F.lit(0)))
-        .withColumn("global_customer", (d.h64(["receipt_id_ext"], "cust")
-                                        % F.lit(cfg.customer_count) + 1).cast("long"))
+        .crossJoin(global_size)
+        .withColumn("_global_rank", (d.h64(["receipt_id_ext"], "cust")
+                                      % F.col("_global_size") + 1).cast("int"))
+        .join(global_customers, "_global_rank")
         .withColumn("want_local",
                     (d.u(["receipt_id_ext"], "affinity") < F.lit(GEO_AFFINITY))
                     & (F.col("geo_cust_count") > 0))
@@ -310,7 +332,7 @@ def _assign_customers(receipts: DataFrame, dims: dict[str, DataFrame],
             F.col("want_local") & F.col("local_customer").isNotNull(),
             F.col("local_customer")).otherwise(F.col("global_customer")))
         .drop("_lgeo", "_lrank", "local_customer", "global_customer",
-              "want_local", "local_rank_target", "geo_cust_count")
+              "want_local", "local_rank_target", "geo_cust_count", "_global_rank", "_global_size")
     )
     return _apply_churn_lifecycle(assigned, d, cfg)
 
@@ -395,39 +417,19 @@ def generate_receipts_group(
     stores = dims["dim_stores"].select(
         F.col("ID").alias("store_id"), "tax_rate", "daily_traffic_multiplier",
         "operating_hours", F.col("GeographyID").alias("store_geo_id"))
-    store_ids = [r.store_id for r in stores.select("store_id").collect()]
-    hour_patterns = [r.operating_hours
-                     for r in stores.select("operating_hours").distinct().collect()]
-    grid = store_day_grid(
-        spark, store_ids, cfg.start_date, cfg.end_date, cfg.seed, "receipts"
-    ).join(stores, "store_id")
-
-    # --- per store-day receipt counts: base * daily * monthly * store multiplier
-    dw = profile.daily_weights
-    mw = profile.monthly_weights
-    d_mean = sum(dw) / 7.0
-    m_mean = sum(mw) / 12.0
-    # dayofweek: 1=Sunday..7=Saturday; profile lists Monday-first -> Mon=1..Sun=7
-    daily_w = F.element_at(
-        F.array(*[F.lit(w / d_mean) for w in dw]),
-        ((F.dayofweek(F.col("day")) + 5) % 7) + 1,
+    grid = generate_hourly_visits(spark, dims["dim_stores"], profile, cfg).join(
+        stores, "store_id"
     )
-    monthly_w = F.element_at(F.array(*[F.lit(w / m_mean) for w in mw]), F.month("day"))
-    lam = (F.lit(float(cfg.transactions_per_store_day)) * daily_w * monthly_w
-           * F.col("daily_traffic_multiplier")
-           * _weather_mult(d.u(["store_id", "day"], "weather"), F.month("day")))
-    n_rcpt = F.greatest(
-        F.lit(1), F.round(lam + d.gauss(["store_id", "day"], "n") * F.sqrt(lam)))
-    grid = grid.withColumn("n_receipts", n_rcpt.cast("int"))
-
-    # --- explode to receipts; hour from hourly weights (inverse CDF over 24
-    # bins), masked to each store's operating window so no sale lands while the
-    # store is closed (IMP-010 sales-while-closed invariant).
+    earlier_hours = Window.partitionBy("store_id", "day").orderBy("hour").rowsBetween(
+        Window.unboundedPreceding, -1
+    )
+    grid = grid.withColumn(
+        "_prior_receipts", F.coalesce(F.sum("n_receipts").over(earlier_hours), F.lit(0))
+    )
     receipts = (
-        grid.withColumn("seq", F.explode(F.sequence(F.lit(1), F.col("n_receipts"))))
-        .withColumn("hour", _pick_hour(
-            d.u(["store_id", "day", "seq"], "hour"), profile.hourly_weights,
-            F.col("operating_hours"), hour_patterns))
+        grid.filter(F.col("n_receipts") > 0)
+        .withColumn("_hour_seq", F.explode(F.sequence(F.lit(1), F.col("n_receipts"))))
+        .withColumn("seq", F.col("_prior_receipts") + F.col("_hour_seq"))
         .withColumn("minute", (d.h64(["store_id", "day", "seq"], "min") % 60).cast("int"))
         .withColumn("second", (d.h64(["store_id", "day", "seq"], "sec") % 60).cast("int"))
         .withColumn("event_ts", F.make_timestamp(
@@ -438,28 +440,17 @@ def generate_receipts_group(
         # construction (store_id, day, seq) is a key
         .withColumn("receipt_id_ext", F.concat(
             F.lit("RCP"), F.date_format("event_ts", "yyyyMMddHHmm"),
-            F.lpad(F.col("store_id").cast("string"), 4, "0"),
-            F.lpad(F.col("seq").cast("string"), 6, "0")))
+            fixed_width_decimal(F.col("store_id"), 4, "receipt store ID"),
+            fixed_width_decimal(F.col("seq"), 6, "daily receipt sequence")))
         .withColumn("trace_id", F.concat(F.lit("TRC"), F.col("receipt_id_ext")))
     )
 
     # geography affinity: resolve each receipt's customer (local vs network-wide)
     receipts = _assign_customers(receipts, dims, d, cfg)
 
-    # per-customer shopping segment (datagen CustomerJourney): drives basket size
-    # and price-tier preference, so a customer behaves consistently across trips.
-    seg_basket = (F.when(F.col("_seg") == "CONVENIENCE", 0.7)
-                  .when(F.col("_seg") == "QUALITY", 1.15)
-                  .when(F.col("_seg") == "BRAND_LOYAL", 1.4)
-                  .otherwise(1.0))
-    # trip archetype gives multi-modal basket sizes (quick vs bulk stock-up)
-    lam_b = (F.lit(float(profile.basket_lambda)) * seg_basket
-             * _trip_basket_mult(d.u(["receipt_id_ext"], "trip")))
     receipts = (
         receipts
-        .withColumn("_seg", d.pick_by_weights(["customer_id"], "seg", SEGMENT_WEIGHTS))
-        .withColumn("basket_n", F.greatest(F.lit(1), F.round(
-            lam_b + d.gauss(["receipt_id_ext"], "basket") * F.sqrt(lam_b))).cast("int"))
+        .withColumn("_offer", d.u(["receipt_id_ext"], "offer") < F.lit(profile.promo_rate))
         .withColumn("tender_type", d.pick_by_weights(
             ["receipt_id_ext"], "tender", [(n, w) for n, w, _, _, _ in TENDERS]))
     )
@@ -479,48 +470,68 @@ def generate_receipts_group(
             f"profile department_weights reference departments missing from the catalog: {sorted(unknown)}"
         )
 
-    # Per sale day, the eligible product set is those launched on or before that
-    # day. Rank them by price within department so the segment skew can still
-    # target a cheap/pricey tier over the *launched* catalog. Bounded by
-    # (distinct sale days x products); products broadcast into a nested-loop
-    # inequality join. dims guarantees >=1 launched product per department per
-    # day, so no basket line is ever left without a product to bind.
     sale_dates = receipts.select("event_date").distinct()
-    elig = sale_dates.join(F.broadcast(products),
-                           products["launch_date"] <= sale_dates["event_date"])
-    ew = Window.partitionBy("event_date", "department").orderBy("SalePrice", "product_id")
-    elig_ranked = elig.withColumn("dept_rank", F.row_number().over(ew)).select(
-        "event_date", "department", "dept_rank", "product_id", "SalePrice", "taxability")
-    dept_sizes = elig.groupBy("event_date", "department").agg(
-        F.count("*").alias("dept_size"))
+    catalog = retail_catalog(products, sale_dates, d)
+    department_weight = sum(
+        (
+            F.when(
+                F.col("department") == name,
+                F.lit(weight) * _seasonal_factor(name, F.month("event_date")),
+            ).otherwise(0.0)
+            for name, weight in profile.department_weights.items()
+        ),
+        F.lit(0.0),
+    )
+    calibration = catalog.withColumn("_weight", department_weight).groupBy("event_date").agg(
+        (F.sum(F.col("_weight") * F.col("_expected_line_value")) / F.sum("_weight"))
+        .alias("_line_value"),
+        (F.sum(F.col("_weight") * F.col("_expected_taxable_value")) / F.sum("_weight"))
+        .alias("_taxable_value"),
+    )
+    receipts = receipts.join(calibration, "event_date").withColumn(
+        "_basket_mean",
+        calibrated_basket_mean(
+            F.col("_line_value"), F.col("_taxable_value"), F.col("tax_rate"),
+            profile.avg_ticket_target, profile.promo_rate, profile.basket_lambda,
+        ),
+    ).withColumn(
+        "basket_n",
+        retail_basket_size(
+            d, ["receipt_id_ext"], F.col("customer_id"), F.col("_basket_mean"),
+            F.col("_offer"), profile.promo_rate,
+        ),
+    )
 
     exploded = (
         receipts.select("receipt_id_ext", "event_ts", "event_date", "store_id",
-                        "tax_rate", "basket_n", "_seg")
+                        "tax_rate", "basket_n", "_offer", "customer_id")
         .withColumn("line_num", F.explode(F.sequence(F.lit(1), F.col("basket_n"))))
     )
     exploded = _with_seasonal_department(
-        exploded, d.u(["receipt_id_ext", "line_num"], "dept"),
+        exploded,
+        F.when(
+            d.u(["receipt_id_ext", "line_num"], "mission-coherence") < 0.60,
+            F.when(
+                d.u(["receipt_id_ext"], "favorite-mission") < 0.50,
+                d.u(["customer_id"], "favorite-department"),
+            ).otherwise(d.u(["receipt_id_ext"], "mission-department")),
+        ).otherwise(d.u(["receipt_id_ext", "line_num"], "dept")),
         profile.department_weights)
 
-    # Broadcast only provably-small frames: `products` (bounded catalog) and
-    # `dept_sizes` (distinct days x departments). conftest disables auto
-    # broadcast (autoBroadcastJoinThreshold=-1); `elig_ranked` can be large in
-    # production (days x launched products) so it is left to a normal join.
     lines = (
         exploded
-        .join(F.broadcast(dept_sizes), ["event_date", "department"])
-        .withColumn("_pskew", _segment_price_skew(
-            d.u(["receipt_id_ext", "line_num"], "prod"), F.col("_seg")))
-        .withColumn("dept_rank", F.least(F.col("dept_size"), F.greatest(F.lit(1),
-            (F.floor(F.col("_pskew") * F.col("dept_size")) + 1).cast("int"))))
-        .join(elig_ranked, ["event_date", "department", "dept_rank"])
-        .withColumn("quantity", F.greatest(F.lit(1), F.least(F.lit(5), F.round(
-            d.u(["receipt_id_ext", "line_num"], "qty") * 3 + 0.7).cast("int"))))
+        .join(catalog, ["event_date", "department"])
+        .withColumn("_product", pick_retail_product(
+            F.col("_catalog"), d.u(["receipt_id_ext", "line_num"], "prod")
+        ))
+        .select("*", "_product.product_id", "_product.SalePrice", "_product.taxability")
+        .drop("_product", "_catalog", "_expected_line_value", "_expected_taxable_value")
+        .withColumn("quantity", retail_quantity(
+            d, ["receipt_id_ext", "line_num"], F.col("department")
+        ))
         .withColumn("unit_cents", F.round(F.col("SalePrice") * 100).cast("long"))
         .withColumn("ext_before", F.col("unit_cents") * F.col("quantity"))
-        .withColumn("has_promo", d.u(["receipt_id_ext", "line_num"], "promo")
-                    < F.lit(profile.promo_rate))
+        .withColumn("has_promo", F.col("_offer"))
         # named promo code + matching discount (datagen promotion_utils parity):
         # a seasonal/min-purchase/BOGO code if eligible, else an evergreen code.
         .withColumn("_pidx", (d.h64(["receipt_id_ext", "line_num"], "pcode")
@@ -627,7 +638,11 @@ def generate_receipts_group(
         .withColumn("amount_cents", F.col("total_cents"))
         .withColumn("transaction_id", F.concat(
             F.lit("TXN_"), F.unix_timestamp("event_ts").cast("string"), F.lit("_"),
-            F.lpad((d.h64(["receipt_id_ext"], "txn") % 1_000_000).cast("string"), 6, "0")))
+            fixed_width_decimal(
+                d.h64(["receipt_id_ext"], "txn") % 1_000_000,
+                6,
+                "payment transaction suffix",
+            )))
         .withColumn("status",
                     F.when(u_dec < decline_p, "DECLINED").otherwise("APPROVED"))
         .withColumn("decline_reason", F.when(

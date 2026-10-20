@@ -21,7 +21,7 @@ from pyspark.sql.window import Window
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.generation.receipts import _fmt
-from retail_setup.generation.runtime import seeded_draws
+from retail_setup.generation.runtime import fixed_width_decimal, seeded_draws
 from retail_setup.generation.schemas import column_names
 
 # CREDIT_CARD processing-time bounds (ms), matching the sales TENDERS table.
@@ -46,16 +46,19 @@ def build_return_headers(
     """
     d = seeded_draws(cfg.seed)
 
-    sales = sales_group["fact_receipts"].filter(F.col("receipt_type") == "SALE")
+    sales = sales_group["fact_receipts"].filter(
+        (F.col("receipt_type") == "SALE")
+        & (F.col("event_date") < F.lit(cfg.end_date))
+        & ~(
+            (F.month("event_date") == 12)
+            & (F.dayofmonth("event_date") == 25)
+        )
+    )
 
     # --- sample: per-day rate, 6x on Dec 26, hard-capped at 10%.
-    # Deterministic rank-based sampling (lowest seeded u first, exactly
-    # floor(day_rate * n_day) per day) rather than per-row Bernoulli
-    # `u < day_rate`: with Bernoulli the Dec-26 expectation equals the cap,
-    # which equals exactly 2x the nominal rate, so the spike contract is a
-    # coin flip on hash noise. Ranking pins other days at/below nominal and
-    # lands Dec 26 on the cap, keeping output deterministic per (config, seed).
-    # The spike is keyed on the *sale* day; returns then land 1..N days later.
+    # Accumulate fractional daily quotas before rounding so low-volume days do
+    # not each lose their fraction independently. The lowest stable hashes pick
+    # the rows within each day.
     day_rate = F.least(
         F.lit(0.10),
         F.lit(cfg.return_rate)
@@ -64,41 +67,106 @@ def build_return_headers(
             F.lit(6.0),
         ).otherwise(F.lit(1.0)),
     )
+    daily = (
+        sales.groupBy("event_date")
+        .agg(F.count("*").alias("_day_count"))
+        .withColumn("_expected", F.col("_day_count") * day_rate)
+    )
+    cumulative = (
+        Window.orderBy("event_date")
+        .rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    )
+    prior = (
+        Window.orderBy("event_date")
+        .rowsBetween(Window.unboundedPreceding, -1)
+    )
+    quotas = (
+        daily
+        .withColumn("_cumulative_expected", F.sum("_expected").over(cumulative))
+        .withColumn(
+            "_prior_expected",
+            F.coalesce(F.sum("_expected").over(prior), F.lit(0.0)),
+        )
+        .withColumn(
+            "_n_keep",
+            (
+                F.floor(F.col("_cumulative_expected") + F.lit(1e-9))
+                - F.floor(F.col("_prior_expected") + F.lit(1e-9))
+            ).cast("long"),
+        )
+        .select("event_date", "_n_keep")
+    )
     u_ret = d.u(["receipt_id_ext"], "return")
     day_w = Window.partitionBy("event_date")
     sampled = (
         sales
-        .withColumn("_n_keep", F.floor(day_rate * F.count("*").over(day_w)))
+        .join(quotas, "event_date")
         .withColumn("_ret_rank", F.row_number().over(
             day_w.orderBy(u_ret, "receipt_id_ext")))
         .filter(F.col("_ret_rank") <= F.col("_n_keep"))
         .drop("_n_keep", "_ret_rank")
     )
 
-    # --- date the return strictly after the sale: 1..RETURN_WINDOW_DAYS days
-    # later, clamped to the history end. Sales whose window can't clear their
-    # own day (only sales on end_date) are dropped so no same-day return posts.
-    ret_delay = (F.lit(1) + F.floor(
-        d.u(["orig_receipt_id_ext"], "return_delay") * F.lit(RETURN_WINDOW_DAYS))
-    ).cast("int")
-
     # --- header: new RET id (RET(3)+yyyyMMddHHmm(12)+store4+seq6 = 25 chars,
     # unique because seq is a row_number per (store_id, return day) at noon)
-    seq_w = Window.partitionBy("store_id", "event_date").orderBy("orig_receipt_id_ext")
-    return (
+    sequenced = (
         sampled
         .withColumnRenamed("receipt_id_ext", "orig_receipt_id_ext")
         .withColumnRenamed("event_date", "orig_event_date")
-        .withColumn("event_date", F.least(
-            F.lit(cfg.end_date), F.date_add("orig_event_date", ret_delay)))
-        .filter(F.col("event_date") > F.col("orig_event_date"))
+        .withColumn(
+            "_max_delay",
+            F.least(
+                F.lit(RETURN_WINDOW_DAYS),
+                F.datediff(F.lit(cfg.end_date), F.col("orig_event_date")),
+            ).cast("int"),
+        )
+        .filter(F.col("_max_delay") >= 1)
+        .withColumn(
+            "_return_delay",
+            (
+                F.lit(1)
+                + F.floor(
+                    d.u(["orig_receipt_id_ext"], "return_delay")
+                    * F.col("_max_delay")
+                )
+            ).cast("int"),
+        )
+        .withColumn(
+            "_candidate_date",
+            F.date_add("orig_event_date", F.col("_return_delay")),
+        )
+        .withColumn(
+            "_latest_return_date",
+            F.date_add("orig_event_date", F.col("_max_delay")),
+        )
+        .withColumn(
+            "event_date",
+            F.when(
+                (F.month("_candidate_date") == 12)
+                & (F.dayofmonth("_candidate_date") == 25),
+                F.when(
+                    F.date_add("_candidate_date", 1) <= F.col("_latest_return_date"),
+                    F.date_add("_candidate_date", 1),
+                ).otherwise(F.date_add("_candidate_date", -1)),
+            ).otherwise(F.col("_candidate_date")),
+        )
+        .filter(
+            (F.col("event_date") > F.col("orig_event_date"))
+            & (F.col("event_date") <= F.col("_latest_return_date"))
+        )
         .withColumn("event_ts", F.to_timestamp(
             F.concat(F.col("event_date").cast("string"), F.lit(" 12:00:00"))))
+    )
+    seq_w = Window.partitionBy("store_id", "event_date").orderBy(
+        "orig_receipt_id_ext"
+    )
+    return (
+        sequenced
         .withColumn("seq", F.row_number().over(seq_w))
         .withColumn("receipt_id_ext", F.concat(
             F.lit("RET"), F.date_format("event_ts", "yyyyMMddHHmm"),
-            F.lpad(F.col("store_id").cast("string"), 4, "0"),
-            F.lpad(F.col("seq").cast("string"), 6, "0")))
+            fixed_width_decimal(F.col("store_id"), 4, "return store ID"),
+            fixed_width_decimal(F.col("seq"), 6, "daily return sequence")))
         .withColumn("trace_id", F.concat(F.lit("TRC"), F.col("receipt_id_ext")))
         .withColumn("customer_id", F.lit(None).cast("long"))
         .withColumn("receipt_type", F.lit("RETURN"))
@@ -123,17 +191,36 @@ def generate_returns(
     sales_group: dict[str, DataFrame],
     dims: dict[str, DataFrame],
     cfg: GenerationConfig,
+    *,
+    return_headers: DataFrame | None = None,
 ) -> dict[str, DataFrame]:
-    """Generate RETURN fact_receipts / fact_receipt_lines / fact_payments."""
+    """Generate refunds, optionally retaining a pre-fulfillment sampling plan.
+
+    Planned dates/IDs survive fulfillment; financial values are refreshed from
+    accepted receipts and wholly unfulfilled purchases disappear in the join.
+    """
 
     d = seeded_draws(cfg.seed)
 
-    header = build_return_headers(sales_group, cfg)
+    header = build_return_headers(sales_group, cfg) if return_headers is None else return_headers
+    money = ["subtotal_cents", "discount_cents", "tax_cents", "total_cents"]
+    header = (
+        header.drop(*money, "gross_subtotal_cents")
+        .join(
+            sales_group["fact_receipts"].select(
+                F.col("receipt_id_ext").alias("orig_receipt_id_ext"),
+                *[(-F.col(name)).alias(name) for name in money],
+            ),
+            "orig_receipt_id_ext",
+        )
+        .withColumn("gross_subtotal_cents", F.col("subtotal_cents") + F.col("discount_cents"))
+    )
 
     fact_receipts = header.select(
         "receipt_id_ext", "trace_id", "event_ts", "event_date", "store_id",
         "customer_id", "receipt_type", "tender_type", "subtotal_cents",
-        F.lit("0.00").alias("discount_amount"), "tax_cents", "total_cents",
+        _fmt(F.col("discount_cents")).alias("discount_amount"),
+        "tax_cents", "total_cents",
         _fmt(F.col("subtotal_cents")).alias("subtotal_amount"),
         _fmt(F.col("tax_cents")).alias("tax_amount"),
         _fmt(F.col("total_cents")).alias("total_amount"), "payment_method",
@@ -170,8 +257,11 @@ def generate_returns(
         .withColumn("amount", _fmt(F.col("amount_cents")))
         .withColumn("transaction_id", F.concat(
             F.lit("TXN_"), F.unix_timestamp("event_ts").cast("string"), F.lit("_"),
-            F.lpad((d.h64(["receipt_id_ext"], "txn") % 1_000_000).cast("string"),
-                   6, "0")))
+            fixed_width_decimal(
+                d.h64(["receipt_id_ext"], "txn") % 1_000_000,
+                6,
+                "return transaction suffix",
+            )))
         .withColumn("status", F.lit("APPROVED"))
         .withColumn("decline_reason", F.lit(None).cast("string"))
         .withColumn("processing_time_ms", (

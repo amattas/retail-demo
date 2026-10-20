@@ -7,9 +7,12 @@
 # the package sources under `utility/src/retail_setup/`, never the cell.
 
 # %%
-# Fabric's Spark runtime ships an OLD typing_extensions and no pydantic, while the
-# inlined engine below imports pydantic. Install both on the driver, then make the
-# new typing_extensions actually load. Why each step:
+# The inlined engine below imports pydantic v2 on the driver. Newer Fabric runtimes
+# preinstall pydantic and may already have its compiled pydantic_core loaded; a
+# compiled module cannot be replaced inside a running process, so installing over
+# it pairs new Python files with the old binary (ImportError: validate_core_schema).
+# Reuse a working runtime pydantic v2; otherwise (older runtimes ship an OLD
+# typing_extensions and no pydantic) install pinned versions. Why each step:
 #  - subprocess pip (not %pip): a %pip kernel restart tears down the Spark session
 #    mid pipeline run and fails the activity.
 #  - pin pydantic <2.12: 2.12+ imports typing_extensions.Sentinel.
@@ -23,17 +26,34 @@ import importlib
 import subprocess
 import sys
 
-subprocess.check_call([
-    sys.executable, "-m", "pip", "install", "--quiet",
-    "annotated-types==0.7.0", "pydantic==2.11.10",
-    "pydantic-core==2.33.2", "typing-inspection==0.4.2",
-    "typing_extensions==4.15.0",
-])
-for _name in [m for m in list(sys.modules)
-              if m.split(".", 1)[0] in {"typing_extensions", "typing_inspection",
-                                        "pydantic", "pydantic_core"}]:
-    del sys.modules[_name]
-importlib.invalidate_caches()
+
+def _runtime_pydantic_v2() -> bool:
+    if "pydantic_core" in sys.modules or "pydantic" in sys.modules:
+        loaded = sys.modules.get("pydantic")
+        if loaded is not None and not str(getattr(loaded, "VERSION", "2.")).startswith("2."):
+            raise RuntimeError("The runtime loaded pydantic v1; the engine requires v2.")
+        return True
+    probe = (
+        "import pydantic, sys; from pydantic import BaseModel, Field, field_validator; "
+        "sys.exit(0 if pydantic.VERSION.startswith('2.') else 1)"
+    )
+    return subprocess.run([sys.executable, "-c", probe], capture_output=True).returncode == 0
+
+
+if _runtime_pydantic_v2():
+    print("Using the Fabric runtime's pydantic v2.")
+else:
+    subprocess.check_call([
+        sys.executable, "-m", "pip", "install", "--quiet",
+        "annotated-types==0.7.0", "pydantic==2.11.10",
+        "pydantic-core==2.33.2", "typing-inspection==0.4.2",
+        "typing_extensions==4.15.0",
+    ])
+    for _name in [m for m in list(sys.modules)
+                  if m.split(".", 1)[0] in {"typing_extensions", "typing_inspection",
+                                            "pydantic", "pydantic_core"}]:
+        del sys.modules[_name]
+    importlib.invalidate_caches()
 
 # %%
 # PARAMETERS — rendered by `retail-setup render`; defaults work unrendered
@@ -77,11 +97,8 @@ cfg = GenerationConfig(
 )
 dicts = load_dictionaries(cfg.resolved_dictionary_root, cfg.store_type)
 
-dims = generate_dimensions(spark, dicts, cfg)
-# dim_date is padded ±5 years — the semantic model's date relationships
-# need the headroom around the generated fact window.
-dims["dim_date"] = generate_dim_date(
-    spark, _shift_year(cfg.start_date, -5), _shift_year(cfg.end_date, 5))
+# The same dimensions (including the ±5-year dim_date) every later notebook uses.
+dims = generate_dimension_frames(spark, dicts, cfg)
 
 for name, df in dims.items():
     n = df.count()
@@ -90,6 +107,11 @@ for name, df in dims.items():
     print(f"validated {name}: {n:,} rows")
 
 print(
-    "Dimension validation complete. setup-03 regenerates the same deterministic "
-    "dimensions and atomically publishes the complete Silver generation."
+    "Dimension validation complete. Every later setup notebook regenerates the "
+    "same deterministic dimensions; setup-10 atomically publishes the complete "
+    "Silver generation."
 )
+
+# Create the handoff schema once, before setup-03 to 05 start in parallel and
+# write their first handoff tables, so they never race to create it.
+HandoffStore(spark, cfg, lakehouse=LAKEHOUSE_NAME).ensure_schema()

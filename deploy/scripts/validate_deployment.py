@@ -68,7 +68,7 @@ def validate_generated_files(deploy_root: Path, environment: str) -> list[str]:
     # this environment — fabric-cicd performs the substitution at publish time.
     # Only flag a placeholder that has no resolving rule, which would publish the
     # literal placeholder string.
-    workspace_dir = deploy_root / "workspace"
+    workspace_dir = environment_root / "workspace"
     if workspace_dir.exists():
         resolved = _resolved_placeholders(parameter_path, environment)
         for path in workspace_dir.rglob("*"):

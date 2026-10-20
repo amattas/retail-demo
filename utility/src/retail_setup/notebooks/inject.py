@@ -1,13 +1,14 @@
-"""Inject configuration values into copies of the committed setup notebooks.
+"""Render notebook configuration as data, never as executable Python."""
 
-Pure value substitution: the build script owns code assembly; this module
-only replaces the nine settled {{TOKEN}} placeholders. Refuses to render
-anything if any value is missing (no partial renders) or unknown keys are
-passed (typo guard).
-"""
-
+import ast
+import io
+import json
 import re
+import tokenize
+from importlib.resources import files
+from importlib.resources.abc import Traversable
 from pathlib import Path
+from typing import Any
 
 _TOKEN_RE = re.compile(r"\{\{(\w+)\}\}")
 
@@ -16,12 +17,75 @@ REQUIRED_TOKENS = [
     "END_DATE", "STORE_COUNT", "SEED", "DICTIONARY_REF",
 ]
 SETUP_NOTEBOOKS = [
-    "setup-01-seed-dictionaries", "setup-02-generate-dimensions",
-    "setup-03-generate-facts", "setup-04-build-gold",
+    "setup-01-seed-dictionaries",
+    "setup-02-generate-dimensions",
+    "setup-03-generate-sales",
+    "setup-04-generate-online-orders",
+    "setup-05-generate-marketing",
+    "setup-06-generate-returns-and-promotions",
+    "setup-07-generate-store-activity",
+    "setup-08-generate-inventory",
+    "setup-09-attribute-marketing",
+    "setup-10-publish-silver",
+    "setup-11-build-gold",
 ]
 STREAM_NOTEBOOKS = ["stream-events"]
 NOTEBOOKS = [*SETUP_NOTEBOOKS, *STREAM_NOTEBOOKS]
-_NOTEBOOK_DIR = Path(__file__).resolve().parents[3] / "notebooks"
+_SOURCE_NOTEBOOK_DIR = Path(__file__).resolve().parents[3] / "notebooks"
+
+
+def _packaged_notebook_dir() -> Traversable:
+    return files("retail_setup").joinpath("resources", "notebooks")
+
+
+def _default_notebook_dir() -> Traversable:
+    packaged = _packaged_notebook_dir()
+    return packaged if packaged.is_dir() else _SOURCE_NOTEBOOK_DIR
+
+
+def _replace_tokens(value: str, values: dict[str, str]) -> str:
+    def replace(match: re.Match[str]) -> str:
+        key = match.group(1)
+        if key not in values:
+            raise ValueError(f"unknown notebook token: {key}")
+        return values[key]
+
+    return _TOKEN_RE.sub(replace, value)
+
+
+def _render_code(source: str, values: dict[str, str]) -> str:
+    """Replace only Python string literals, retaining the surrounding source."""
+
+    offsets = [0]
+    for line in source.splitlines(keepends=True):
+        offsets.append(offsets[-1] + len(line))
+    replacements = []
+    for token in tokenize.generate_tokens(io.StringIO(source).readline):
+        if token.type != tokenize.STRING or not _TOKEN_RE.search(token.string):
+            continue
+        literal = ast.literal_eval(token.string)
+        if not isinstance(literal, str):
+            raise ValueError("notebook tokens must be in ordinary string literals")
+        rendered = repr(_replace_tokens(literal, values))
+        start = offsets[token.start[0] - 1] + token.start[1]
+        end = offsets[token.end[0] - 1] + token.end[1]
+        replacements.append((start, end, rendered))
+    for start, end, rendered in reversed(replacements):
+        source = source[:start] + rendered + source[end:]
+    if _TOKEN_RE.search(source):
+        raise ValueError("unrendered tokens remain outside supported string literals")
+    ast.parse(source)
+    return source
+
+
+def _render_metadata(value: Any, values: dict[str, str]) -> Any:
+    if isinstance(value, str):
+        return _replace_tokens(value, values)
+    if isinstance(value, list):
+        return [_render_metadata(item, values) for item in value]
+    if isinstance(value, dict):
+        return {key: _render_metadata(item, values) for key, item in value.items()}
+    return value
 
 
 def render_notebooks(
@@ -40,7 +104,9 @@ def render_notebooks(
             exactly the keys in REQUIRED_TOKENS — no more, no less.
         output_dir: Directory to write rendered notebooks into.
         notebook_dir: Source directory containing the committed notebooks.
-            Defaults to the module-relative ``utility/notebooks`` directory.
+            Defaults to packaged notebook resources, with the source-tree
+            ``utility/notebooks`` directory retained for editable installs.
+            A missing source-tree path also falls back to packaged resources.
         notebook_names: Exact managed notebook names to render. Defaults to all
             renderable notebooks.
 
@@ -58,8 +124,19 @@ def render_notebooks(
     unknown = [k for k in values if k not in REQUIRED_TOKENS]
     if unknown:
         raise ValueError(f"unknown render keys (typo?): {unknown}")
+    if any(not isinstance(value, str) for value in values.values()):
+        raise ValueError("render values must be strings")
 
-    src_dir = Path(notebook_dir) if notebook_dir is not None else _NOTEBOOK_DIR
+    if notebook_dir is None:
+        src_dir = _default_notebook_dir()
+    else:
+        requested_dir = Path(notebook_dir)
+        packaged_dir = _packaged_notebook_dir()
+        src_dir = (
+            requested_dir
+            if requested_dir.is_dir() or not packaged_dir.is_dir()
+            else packaged_dir
+        )
     selected = tuple(notebook_names) if notebook_names is not None else tuple(NOTEBOOKS)
     if len(selected) != len(set(selected)):
         raise ValueError("notebook_names contains duplicates")
@@ -70,12 +147,25 @@ def render_notebooks(
     rendered: list[tuple[Path, str]] = []
     for name in selected:
         src = (src_dir / f"{name}.ipynb").read_text(encoding="utf-8")
-        for token, value in values.items():
-            src = src.replace("{{" + token + "}}", str(value))
-        remaining = _TOKEN_RE.findall(src)
-        if remaining:
-            raise ValueError(f"{name}: unrendered tokens remain after injection: {remaining}")
-        rendered.append((Path(output_dir) / f"{name}.ipynb", src))
+        notebook = json.loads(src)
+        for cell in notebook["cells"]:
+            if cell["cell_type"] == "code":
+                source = cell["source"]
+                source = source if isinstance(source, str) else "".join(source)
+                cell["source"] = _render_code(source, values).splitlines(keepends=True)
+                # Code is already encoded. Do not substitute inside it a second time.
+                for key in cell.keys() - {"source"}:
+                    cell[key] = _render_metadata(cell[key], values)
+            else:
+                cell.update(_render_metadata(cell, values))
+        for key in notebook.keys() - {"cells"}:
+            notebook[key] = _render_metadata(notebook[key], values)
+        rendered.append(
+            (
+                Path(output_dir) / f"{name}.ipynb",
+                json.dumps(notebook, indent=1, ensure_ascii=False) + "\n",
+            )
+        )
 
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)

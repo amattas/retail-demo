@@ -20,14 +20,14 @@ table fact_online_order_headers
 		displayFolder: Core Metrics\Online
 		lineageTag: 01a1a1a3-0001-0001-0001-000000000003
 
-	/// Count of online order headers.
-	measure 'Online Order Count' = COUNTROWS('fact_online_order_headers')
+	/// Distinct online orders represented by the filtered order lines, so product and category filters reach the denominator.
+	measure 'Online Order Count' = DISTINCTCOUNT('fact_online_order_lines'[Order ID])
 		formatString: #,0
 		displayFolder: Core Metrics\Online
 		lineageTag: 01a1a1a3-0001-0001-0001-000000000004
 
-	/// Average online order value.
-	measure 'Average Online Order Value' = DIVIDE([Total Online Sales], [Online Order Count], 0)
+	/// Average online order value in the current product and category context.
+	measure 'Average Online Order Value' = DIVIDE([Online Line Revenue], [Online Order Count], 0)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Core Metrics\Online
 		lineageTag: 01a1a1a3-0001-0001-0001-000000000005
@@ -173,4 +173,3 @@ table fact_online_order_headers
 			entityName: fact_online_order_headers
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
-

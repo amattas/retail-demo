@@ -1,15 +1,16 @@
-# Dynamic Pricing Approval Dashboard
+# Dynamic Pricing Approval Dashboard Design
 
-> **Manual design template, not an automatically deployed workflow**
+> **Design-only query catalog, not an importable dashboard artifact**
 >
-> The repository includes KQL pricing tables and a dashboard template, but it
-> does not publish a production approval application or automatically apply
-> price changes. Use this document as design guidance. The supported demo
-> reports and readiness checks do not depend on this dashboard.
+> `pricing-approval.template.json` preserves proposed tile queries only. It is
+> not a Fabric `KQLDashboard` Git export and must not be imported or staged as
+> one. The repository does not publish a production approval application or
+> automatically apply price changes. The supported demo reports and readiness
+> checks do not depend on this design.
 
 ## Overview
 
-This Real-Time Dashboard template illustrates a human-in-the-loop approval
+This Real-Time Dashboard design illustrates a human-in-the-loop approval
 workflow for experimental dynamic-pricing recommendations. It shows how a
 future business user could review pending price changes, estimated impact, and
 an audit trail of approval or rejection decisions.
@@ -19,7 +20,7 @@ an audit trail of approval or rejection decisions.
 The dashboard enables:
 - **Review**: Assess pending pricing recommendations with full context
 - **Decision-making**: Understand revenue impact, confidence levels, and constraint compliance
-- **Monitoring**: Track approval rates, decision times, and realized impacts
+- **Monitoring**: Track approval rates, decision times, and expected impacts
 - **Audit**: Maintain complete history of who approved/rejected what and why
 
 ## Prerequisites
@@ -155,7 +156,9 @@ future queued-JSON integration.
 - Total expected revenue impact
 - Average ML confidence
 
-**Query Logic:** Filters `pricing_recommendation_created` for `status == 'PENDING'`
+**Query Logic:** Calls `fn_pending_recommendations()`, which selects the latest
+event across recommendation creation, approval, and rejection before returning
+only recommendations whose current state is `PENDING`.
 
 ### 2. Recommendations by Department (Pending)
 **Purpose:** Identify which departments have the most pending changes
@@ -218,11 +221,16 @@ future queued-JSON integration.
 
 **Use Case:** If high-confidence recommendations are frequently rejected, the model needs retraining
 
-### 9. Realized Revenue Impact (7d) - Approved Only
-**Purpose:** Track cumulative business impact of approved price changes
-**Visualization:** Time chart of expected revenue impact
+### 9. Expected Revenue Impact of Approvals (7d)
+**Purpose:** Sum the model-estimated revenue impact once per approved recommendation
+**Visualization:** Daily time chart of expected revenue impact
 
-**Use Case:** Measure ROI of dynamic pricing initiative
+This is not realized revenue. The current event contract records the estimate
+and the approval decision, but it has no post-change sales counterfactual from
+which realized incremental revenue could be calculated.
+
+**Use Case:** Track the estimated upside approved for implementation; do not use
+this tile as an ROI or realized-revenue measure
 
 ### 10. Approver Activity (7d)
 **Purpose:** Audit trail and workload distribution
@@ -333,19 +341,22 @@ The current experimental pricing notebook intentionally does not publish a
 numeric model-confidence claim when evidence is unavailable. A future event
 writer must preserve that limitation rather than inventing a heuristic score.
 
-### Step 5: Import Dashboard Template
-1. In Fabric, navigate to your workspace
-2. Create new Real-Time Dashboard
-3. Import `pricing-approval.template.json`
-4. Replace `<fabric-kql-database-resource-id>` with your KQL database resource ID
-5. Adjust tile layouts as needed
+### Step 5: Recreate and validate the dashboard
+1. In Fabric, create a new Real-Time Dashboard.
+2. Use `pricing-approval.template.json` only as a catalog of proposed titles and
+   KQL queries.
+3. Bind each query to the target KQL database and configure visuals in the UI.
+4. Export the resulting `<name>.KQLDashboard/` item through Fabric Git
+   integration before treating it as deployable source.
+5. Validate the exported dashboard in a disposable workspace.
 
 ### Step 6: Build Approval UI (Future Phase)
 For full human-in-the-loop workflow, build a custom Power App or Fabric app that:
 1. Reads pending recommendations from KQL
 2. Displays details and allows approve/reject actions
 3. Publishes `pricing_recommendation_approved` or `pricing_recommendation_rejected` events
-4. Updates `pricing_recommendation_created.status` (via KQL update policy or separate state table)
+4. Reads current state through `fn_pending_recommendations()`; decision events
+   remove resolved recommendations without mutating the creation event
 
 **Note:** For a design demonstration, approvals can be simulated with explicit
 test rows in a disposable workspace. The current `stream-events` notebook does
@@ -364,8 +375,8 @@ graph LR
 
 ## Design and implementation checklist
 
-- [x] Dashboard template defines pending-recommendation tiles (**Tiles 1-6**)
-- [x] Template defines pricing-change visuals (**Tiles 3-4**)
+- [x] Dashboard query catalog defines pending-recommendation tiles (**Tiles 1-6**)
+- [x] Query catalog defines pricing-change visuals (**Tiles 3-4**)
   - Current vs. suggested price (Tile 3)
   - Expected revenue impact (Tile 3)
   - Confidence level (Tile 5)
@@ -381,7 +392,7 @@ graph LR
   - Rejection reason analysis (Tile 12)
 - [ ] Pricing notebook publishes typed recommendation events
 - [ ] Approval UI writes approved/rejected decisions
-- [ ] Dashboard import, bindings, queries, and refresh are live-validated
+- [ ] A live-exported `KQLDashboard` artifact, bindings, queries, and refresh are validated
 - [ ] Approved prices are applied through a governed business process
 
 ## Future Enhancements
@@ -447,7 +458,7 @@ To test the dashboard before full integration:
 ## Related Files
 
 - **Experimental pricing notebook:** `fabric/lakehouse/14-ml-dynamic-pricing.ipynb`
-- **Dashboard Template:** `fabric/dashboards/pricing-approval.template.json`
+- **Dashboard query catalog:** `fabric/dashboards/pricing-approval.template.json`
 - **KQL Tables Script:** `fabric/kql_database/07-pricing-approval-tables.kql`
 - **Event Schemas:** `utility/notebooks/templates/driver-05-stream.py`
 

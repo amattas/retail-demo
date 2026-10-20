@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 from pyspark.sql import functions as F
@@ -52,3 +52,61 @@ def test_zone_changes_derive_from_pings(setup):
     zk = zc.select("store_id", "customer_ble_id").distinct()
     pk = pings.select("store_id", "customer_ble_id").distinct()
     assert zk.join(pk, ["store_id", "customer_ble_id"], "left_anti").count() == 0
+
+
+def test_ble_visits_stay_within_store_hours_and_history(spark):
+    cfg = GenerationConfig(
+        store_type="grocery",
+        start_date=date(2025, 7, 7),
+        end_date=date(2025, 7, 7),
+        store_count=1,
+        customer_count=5000,
+        seed=29,
+    )
+    receipt_rows = [
+        (
+            f"RCP-OPEN-{index}",
+            1,
+            datetime(2025, 7, 7, 7, 0),
+            date(2025, 7, 7),
+            1,
+            "SALE",
+        )
+        for index in range(30)
+    ] + [
+        (
+            f"RCP-CLOSE-{index}",
+            1,
+            datetime(2025, 7, 7, 21, 59),
+            date(2025, 7, 7),
+            1,
+            "SALE",
+        )
+        for index in range(30)
+    ]
+    receipts = spark.createDataFrame(
+        receipt_rows,
+        "receipt_id_ext string, store_id long, event_ts timestamp, "
+        "event_date date, customer_id long, receipt_type string",
+    )
+    dims = {
+        "dim_customers": spark.createDataFrame(
+            [(1, "BLE000001")],
+            "ID long, BLEId string",
+        ),
+        "dim_stores": spark.createDataFrame(
+            [(1, "7-22")],
+            "ID long, operating_hours string",
+        ),
+    }
+
+    pings, changes = generate_ble(spark, receipts, dims, cfg)
+
+    opens = F.to_timestamp(F.lit("2025-07-07 07:00:00"))
+    closes = F.to_timestamp(F.lit("2025-07-07 22:00:00"))
+    assert pings.filter(F.col("event_ts") < opens).count() == 0
+    assert pings.filter(F.col("event_ts") >= closes).count() == 0
+    assert pings.filter(F.col("event_date") != F.lit(cfg.start_date)).count() == 0
+    assert changes.filter(F.col("event_ts") < opens).count() == 0
+    assert changes.filter(F.col("event_ts") >= closes).count() == 0
+    assert changes.filter(F.col("event_date") != F.lit(cfg.start_date)).count() == 0

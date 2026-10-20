@@ -4,6 +4,10 @@
 task flow. `deploy.scripts.taskflow` resolves names to target item identifiers
 and creates or updates the target flow.
 
+The metadata endpoint calls a semantic model artifact type `dataset`. Its
+portable `artifactUniqueId` therefore uses the matching `dataset:<guid>` prefix;
+deployment replaces that source GUID with the target semantic-model item ID.
+
 ```powershell
 python -m deploy.scripts.taskflow export --workspace "Retail Demo" --path fabric\taskflow\taskflow.json
 python -m deploy.scripts.taskflow deploy --terraform-output deploy\.generated\<environment>\terraform-output.json --environment <environment> --profile full-demo --path fabric\taskflow\taskflow.json

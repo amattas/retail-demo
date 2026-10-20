@@ -1,0 +1,54 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/plan/definition/Sheets/Sheet/1.0.0/schema.json",
+  "properties": {
+    "pageLevelFilterAssignments": [],
+    "entityLevelVariables": [],
+    "filterPanePosition": "RIGHT",
+    "topPositionFilterExpandConfig": {
+      "isFilterPaneCollapsed": false,
+      "expandedHeight": 250
+    },
+    "canvasStyle": {
+      "dimension": {
+        "type": "DEFAULT_16_9", "width": 1600, "height": 900,
+        "elementScalingUnit": "percentage"
+      },
+      "background": {
+        "type": "color", "value": "#FFFFFF", "isEnabled": false,
+        "fillMode": "fit", "opacity": 100, "color": "#FFFFFF", "imageUrl": ""
+      },
+      "wallpaper": {
+        "value": {"type": "color", "color": "#FFFFFF", "imageUrl": ""},
+        "isEnabled": false, "opacity": 100, "fillMode": "fit"
+      },
+      "border": {"color": "#FFFFFF", "side": "all", "width": 0, "isEnabled": false},
+      "shadow": {
+        "blur": 0, "color": "#000000", "isEnabled": false,
+        "placement": "outer", "side": "all", "width": 0,
+        "opacity": 0, "distance": 0, "angle": 0
+      },
+      "cornerRadius": {
+        "isEnabled": false, "isCustomCornerRadius": false,
+        "radiusBottomLeft": 0, "radiusBottomRight": 0,
+        "radiusTopLeft": 0, "radiusTopRight": 0
+      },
+      "isLocked": false,
+      "gridLineSettings": {
+        "showGridLines": false, "snapToGrid": false,
+        "gridRows": null, "gridColumns": null, "gridLayoutType": "DEFAULT"
+      },
+      "showVisualGuide": false,
+      "showSmartGuide": false,
+      "verticalAlign": "top",
+      "scrollToZoom": false,
+      "mobileCanvas": {
+        "editModeDimension": {"width": 400, "height": 900},
+        "runtimeDimension": {"width": 400, "height": 900}
+      }
+    },
+    "assignmentColumnMap": {},
+    "visualGroupMap": {},
+    "sourceVisualsMeta": {},
+    "controlPanePosition": "right"
+  }
+}

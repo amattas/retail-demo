@@ -1,0 +1,15 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/plan/definition/Planning/DataInput/1.0.0/schema.json",
+  "columns": [
+    {
+      "measureGuid": "dc-stock",
+      "visualId": "972fa921-fe11-5ca1-bd8a-d4b9c39f30d0",
+      "name": "DC Units on Hand", "dataInputType": 6, "disableWriteAccess": true,
+      "description": "Read-only signed model balance for DC 1. Not available-to-promise stock, donor surplus or approval to allocate. Never repeat or sum this balance across store rows.",
+      "columnMeta": {
+        "id": "dc-stock", "label": "DC Units on Hand",
+        "measure_type": {"Native": {"measure_role": "ACMeasure"}}, "data_type": "Number"
+      }
+    }
+  ]
+}

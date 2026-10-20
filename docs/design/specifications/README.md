@@ -18,7 +18,7 @@ procedures from these specifications.
 | Historical generation | [Data contract](modules/generation/data-contract.md) |
 | Live streaming | [Event contract](modules/streaming/event-contract.md) |
 | Eventhouse and Lakehouse analytics | [Fabric analytics](modules/analytics/fabric-analytics.md) |
-| ML, ontology, and agents | [Model contracts](modules/ml-ai/model-contracts.md) |
+| ML, ontology, and agents | [Model contracts](modules/ml-ai/model-contracts.md); [decision experience](modules/ml-ai/decision-experience.md); [application routing](modules/ml-ai/routing.md) |
 | Power BI | [Semantic model](modules/power-bi/semantic-model.md) |
 | Operations | [Runbook](modules/operations/runbook.md) |
 | Security | [Access control](modules/security/access-control.md) |

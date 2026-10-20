@@ -65,7 +65,15 @@ ARTIFACT_TO_ITEM_TYPE = {
     "KQLQueryset": "KQLQueryset",
     "Report": "Report",
     "dataset": "SemanticModel",
+    "AppBackend": "AppBackend",
 }
+OPTIONAL_TASKFLOW_ARTIFACTS = frozenset(
+    {
+        ("Report", "retail-twins"),
+        ("AppBackend", "retail-approvals"),
+        ("SynapseNotebook", "prepare-replenishment-case"),
+    }
+)
 TERRAFORM_ITEM_OUTPUTS = {
     "Lakehouse": "lakehouse_id",
     "Eventhouse": "eventhouse_id",
@@ -624,8 +632,13 @@ def profile_taskflow_artifacts(
         )
     if profile.selects("asset.semantic-model"):
         allowed.add(("dataset", config.powerbi.semantic_model_name))
+        allowed.add(("AppBackend", "retail-approvals"))
     if profile.selects("asset.report"):
         allowed.add(("Report", config.powerbi.report_name))
+    if getattr(getattr(config, "twins", None), "enabled", False):
+        allowed.add(("Report", "retail-twins"))
+    if getattr(getattr(config, "operations_planning", None), "enabled", False):
+        allowed.add(("SynapseNotebook", "prepare-replenishment-case"))
     if profile.selects("asset.ml-notebooks"):
         allowed.update(
             ("MLExperiment", name)
@@ -642,6 +655,33 @@ def profile_taskflow_artifacts(
     if profile.selects("asset.kql-queryset"):
         allowed.add(("KQLQueryset", "retail_querysets"))
     return allowed
+
+
+def available_taskflow_artifacts(
+    allowed_artifacts: set[tuple[str, str]],
+    workspace_items: list[dict[str, Any]],
+) -> set[tuple[str, str]]:
+    """Keep optional add-on links only when their publisher created the item."""
+
+    available = {
+        (
+            next(
+                (
+                    artifact_type
+                    for artifact_type, item_type in ARTIFACT_TO_ITEM_TYPE.items()
+                    if item_type == str(item.get("type", ""))
+                ),
+                str(item.get("type", "")),
+            ),
+            str(item.get("displayName", "")),
+        )
+        for item in workspace_items
+    }
+    return {
+        artifact
+        for artifact in allowed_artifacts
+        if artifact not in OPTIONAL_TASKFLOW_ARTIFACTS or artifact in available
+    }
 
 
 def export_taskflow(
@@ -699,14 +739,6 @@ def deploy_taskflow(
     """Deploy a portable task flow to a workspace. Returns unresolved references."""
 
     portable = json.loads(input_path.read_text(encoding="utf-8"))
-    if allowed_artifacts is not None:
-        coverage_errors = taskflow_source_coverage_errors(
-            portable,
-            allowed_artifacts,
-        )
-        if coverage_errors:
-            raise ValueError("; ".join(coverage_errors))
-        portable = filter_portable_items(portable, allowed_artifacts)
     credential = _credential(
         credential,
         auth_mode=auth_mode,
@@ -725,6 +757,17 @@ def deploy_taskflow(
         list_workspace_items(fabric, workspace_id),
         _required_item_types(portable),
     )
+    if allowed_artifacts is not None:
+        coverage_errors = taskflow_source_coverage_errors(
+            portable,
+            allowed_artifacts,
+        )
+        if coverage_errors:
+            raise ValueError("; ".join(coverage_errors))
+        selected_artifacts = available_taskflow_artifacts(
+            allowed_artifacts, items
+        )
+        portable = filter_portable_items(portable, selected_artifacts)
     name_type_to_guid = {
         (str(i["type"]), str(i.get("displayName", ""))): str(i["id"]) for i in items
     }

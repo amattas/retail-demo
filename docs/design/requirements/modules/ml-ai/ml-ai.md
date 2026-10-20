@@ -24,3 +24,26 @@ metadata are outside the default demo release. Persona-specific agent
 experiences remain optional under `ENH-003`.
 
 See [the model-contract specification](../../../specifications/modules/ml-ai/model-contracts.md).
+
+### REQ-MLAI-005 - Evidence-bound decision experience (proposed)
+
+A proposed decision experience shall distinguish live and synthetic replay,
+preserve certified grains and evidence, support human review/override, and
+emit draft-only action packages. It shall not imply production execution,
+guaranteed audit delivery, or verified financial outcomes. Acceptance requires
+the complete scenario and failure paths, not merely the presence of UI or
+replay code. See the
+[decision experience](../../../specifications/modules/ml-ai/decision-experience.md).
+
+### REQ-MLAI-006 - Native availability decisions
+
+An Operations Agent and optional native Plan shall use explicit source
+evidence for bounded replenishment planning. Reporting deployments shall
+publish the Operations Agent by default; a service rejection of the agent
+shall be reported as a warning without failing the rest of the deployment.
+Native Planning shall remain excluded unless explicitly included. Publish monitoring stopped, require
+human approval for draft preparation, and prohibit real purchasing or
+historical-data mutations. Native Planning shall require a supported shared
+model connection and explicit billing acknowledgement. Source publication,
+interactive feature acceptance, and external execution shall remain distinct
+claims; unresolved tenant/connection prerequisites shall fail honestly.

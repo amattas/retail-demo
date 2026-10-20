@@ -51,7 +51,7 @@ Standard and full-demo deployment run the read-only verification after their
 existing setup and required-ML gates. Deployment never adds
 `--run-pipeline`. A failed required check fails the deployment; optional
 readiness gaps mark the deploy journal `DEGRADED`. Core remains
-operator-executed: run setup notebooks 01-04, then invoke verification.
+operator-executed: run setup notebooks 01-11, then invoke verification.
 Full-demo verification runs only after the ontology, both Data Agents, and the
 complete task flow have been created or validated in the same deploy.
 
@@ -64,7 +64,7 @@ still fails the deployment when a required table is not queryable.
 
 | Pipeline | Current scope | Current schedule state |
 | --- | --- | --- |
-| `setup-pipeline` | Setup 01-04 | On demand; mandatory for Reporting profiles |
+| `setup-pipeline` | Setup 01-11 (03-05 and 06-08 in parallel) | On demand; mandatory for Reporting profiles |
 | `historical-data-load` | Retained historical-load notebook | On demand |
 | `streaming-data-load` | Streaming Silver then Gold | Schedule file present, disabled |
 | `daily-maintenance` | Delta maintenance | Schedule file present, disabled |
@@ -74,6 +74,10 @@ still fails the deployment when a required table is not queryable.
 
 Do not describe the disabled streaming schedule as an active five-minute or
 fifteen-minute service.
+
+The streaming pipeline passes configured Lakehouse/schema parameters to its
+notebooks and sets `concurrency = 1`. This serializes that pipeline's runs,
+not arbitrary manual notebook executions.
 
 ## Freshness evidence
 
@@ -90,7 +94,7 @@ The verifier evaluates these signals together:
 | Check | Required? | Operational meaning |
 | --- | --- | --- |
 | Setup run log | Yes | Historical setup completed and published a known run. |
-| Silver watermarks | No | The manually started stream has recently reached Silver. |
+| Silver watermarks | No | Recent progress plus bounded receipt/inventory/sales consistency evidence. |
 | Eventhouse ingestion | No | Eventhouse has received recent optional events. |
 | Checkpoint identity | No | Recent Eventhouse extents can be tied to a stream and batch. |
 | Required model outputs | Yes | The six Reporting models were published by the required pipeline. |
@@ -98,14 +102,36 @@ The verifier evaluates these signals together:
 | Experimental model outputs | No | Full-demo experimental outputs are recent or have a valid empty snapshot. |
 | Alerts | No | Optional alert queries are available and recent when rows exist. |
 
+### Console severity versus report status
+
+Required failed/unknown checks are printed as errors and block deployment.
+Optional failures or unavailable evidence are warnings, not deployment
+errors. When all three optional streaming checks have no observed run
+evidence, the console groups them as an informational notice explaining that
+this is expected before `stream-events` is started. A partial stream or a
+network/permission failure is not classified as expected inactivity.
+
+The report still records `UNKNOWN` and overall `DEGRADED`; no evidence is
+invented, marked passed, or silently skipped. Standalone verification retains
+its exit code 3 for optional degradation. The deployment command treats that
+as non-blocking and prints that required deployment is ready, while its
+journal retains `DEGRADED`. Actual optional workload failures remain named
+in the completion summary.
+
+The persisted `checks` and `freshness_lineage` collections retain every
+structured record. Redaction and evidence-size limits apply inside each
+record, not to the number of checks; a truncation marker must never replace
+a check object. This keeps saved reports renderable and their check inventory
+consistent with the reported totals.
+
 Required ML evidence selects the latest `generated_at` and a nonblank
 `model_run_id` from the same Gold row. Source/business dates remain separate
 lineage and cannot make an old model generation appear fresh. Setup and model
 evidence use a seven-day maximum age. Streaming watermark,
 Eventhouse ingestion, and checkpoint evidence use a 30-minute maximum age.
 Pipeline and data evidence must match the exact triggered run or the retained
-successful deployment-journal step. Required full-demo execution has live
-evidence. Readiness correlates each model table's freshness with the pipeline
+successful deployment-journal step. Historical full-demo execution is baseline
+evidence only; current repairs require new live proof. Readiness correlates each model table's freshness with the pipeline
 that runs its producer notebook: because notebooks 07 (market-basket mining)
 and 10 (promotion/elasticity analysis) now also run inside `ml-required` to
 produce the required `product_recommendations` and `price_elasticity`
@@ -113,7 +139,39 @@ outputs, the optional/experimental `product_associations` and `promotion_lift`
 outputs they produce in the same run are correlated with the `ml-required`
 window rather than the `ml-optional`/`ml-experimental` windows. The remaining
 [IMP-013](../../../requirements/modules/operations/backlog.md#imp-013) boundary
-is a recent bounded stream that satisfies the three optional streaming checks.
+includes a recent bounded stream that satisfies the three optional streaming
+checks, plus fresh changed-path readiness and cleanup/degradation validation.
+
+### Bounded streaming consistency
+
+The existing optional `freshness.watermarks` check calls
+`adapter.data_consistency_signal()` after checking watermark freshness.
+`deploy/scripts/data_consistency.py` owns the SQL; this does not add another
+taxonomy row or make streaming a required deployment capability.
+
+- Receipt and inventory shortcut-to-Silver key anti-joins sample ingestion
+  timestamps from each source checkpoint minus 24 hours up to checkpoint
+  minus three hours. The newest overlap is excluded for OneLake visibility.
+- Receipt identity uses `receipt_id_ext`; inventory identity uses `trace_id`.
+- Recent Silver inventory rows are checked for null balances, and receipts
+  for missing store or non-null customer dimension keys. These integrity
+  scans start at the respective window's lower bound; unlike the ingestion
+  anti-joins, they do not exclude the newest three hours.
+- Gold `sales_minute_store` receipt counts and summed sales cents are compared
+  by store with Silver receipts. The comparison uses interior complete hours,
+  capped by both the settled receipt cutoff and Gold's latest timestamp;
+  receipt counts must match and a cents difference greater than one is a
+  mismatch.
+
+Missing/invalid evidence or an empty receipt, inventory, or sales sample is
+`UNKNOWN`, not a zero-defect success. An observed positive mismatch is `FAIL`.
+Both degrade overall readiness because this streaming check is optional;
+other required failures still determine `FAILED`.
+
+This is bounded receipt/inventory/sales sampling, not universal all-table or
+full-history integrity proof. `tests/deploy/test_data_consistency.py` executes
+equivalent SQL in SQLite and exercises the real adapter/runner path; live
+Fabric SQL execution and service consistency remain external gates.
 
 ## Failure handling
 
@@ -133,6 +191,45 @@ all candidate tables before promotion; partial promotion invokes compensating
 Delta restore/drop rollback. Deployment required-step outcomes persist in
 `deploy/.generated/<env>/deploy-run.json`; its readiness step links the
 separate bounded readiness report.
+
+When a different run becomes latest, the previous deploy journal is first
+archived atomically at
+`deploy/.generated/<env>/run-history/<hashed-run-id>.json`. Inspect that history
+when comparing retries; do not overwrite evidence or hand-edit fingerprints
+to make legacy journals resumable.
+
+Cleanup-only failure after successful promotion returns success with a
+warning. The setup freshness check retains `cleanup_required` evidence and
+the overall readiness result is `DEGRADED`, not `FAILED`, when no required
+check fails. Maintenance likewise distinguishes absent optional tables from
+real operation failures; the latter fail the notebook.
+
+The setup-log row and remaining staging-table count are fetched in separate
+SQL statements. Fabric rejects combining distributed Lakehouse data with
+`INFORMATION_SCHEMA` catalog metadata in one query (SQL error 15816).
+Unavailable staging metadata remains `UNKNOWN`; it is not assumed to mean
+zero leftover tables.
+
+Read-only readiness KQL requests retry `KustoNetworkError` up to three times,
+with five- and ten-second waits and a fresh client per attempt. Permission,
+query, and other service errors are not blindly retried. Exhausted reads
+remain errors, never empty success-shaped inventories. The four KQL inventory
+checks reuse one complete snapshot; if acquisition fails after retries,
+subsequent inventory checks remain `UNKNOWN` for that same run rather than
+mixing earlier failures with a later successful snapshot. Rerun read-only
+readiness after a persistent connection issue is resolved; do not rerun
+schema deployment or data generation solely to repeat these reads.
+
+Cleanup readiness considers both the latest terminal setup status and
+remaining staging-table inventory. The SQL adapter counts tables in
+`ag_stage`, `au_stage`, and `au_staging`; a later successful Gold run cannot
+hide retained Silver staging artifacts merely by becoming the latest
+`COMPLETED` log row. Cleanup remains actionable until the leftovers are
+resolved.
+
+Maintenance resolves fully qualified configured Lakehouse names. Only actual
+table absence is skippable; catalog, permission, and other real
+`AnalysisException` failures must not be treated as absent optional tables.
 
 The exact-run recovery command accepts only explicitly named, recent,
 terminal-successful Fabric job IDs, verifies setup-to-ML dependency order,
@@ -162,6 +259,11 @@ Inspect `setup_run_log` for the terminal state:
 
 Resume only after confirming the terminal state. Use a new run ID; duplicate run
 IDs are rejected.
+
+Once the Silver watermark table has been initialized, the historical writer
+refuses replacement. Stop every writer and use a coordinated Silver/checkpoint
+reset for a deliberate rebuild; never delete only checkpoint or watermark
+state to bypass this guard.
 
 ### KQL application failed
 
@@ -203,6 +305,31 @@ orchestrated by normal pipelines.
 Recreate polls for workspace-name absence after destroy. A timeout or repeated
 pagination marker fails the deploy before apply; do not bypass it with a fixed
 sleep.
+
+## CI platform coverage
+
+`.github/workflows/tests.yml` keeps the full sharded Spark and Parquet/E2E
+paths on Linux. Windows runs its non-Spark suite **and** discovers real Spark
+expression smoke tests with `-m "spark and spark_no_filesystem"`. Current
+marked examples cover inventory replay/repair, delivery keyed as-of history,
+and truck lifecycle key pairing:
+
+- `utility/tests/generation/test_streaming_inventory_runtime.py`
+- `utility/tests/generation/test_delivery_history_runtime.py`
+- `utility/tests/generation/test_streaming_truck_runtime.py`
+
+The Windows job provisions JDK 17 through the existing SHA-pinned
+`actions/setup-java` reference, sets `TMPDIR` to `${{ runner.temp }}`, and
+uses `SPARK_LOCAL_HOSTNAME=localhost`. This is non-filesystem execution;
+missing Windows `HADOOP_HOME`/`winutils` still prevents the local Parquet/E2E
+path. Do not describe Windows as excluding every Spark test.
+
+The parent reports these three examples passed locally on Windows with its
+session JDK 17. A separate generator selection passed 85 non-filesystem Spark
+tests; it is not the same selection as the representative Windows CI marker.
+The filename-discovery regression was fixed by marker selection, followed by
+18 passing workflow/pipeline tests. The changed hosted workflow, full Spark
+suite, and live Delta/Fabric execution still require their own evidence.
 
 ## Capacity
 

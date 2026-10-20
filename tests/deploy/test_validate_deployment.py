@@ -40,7 +40,10 @@ def _write_required(deploy_root: Path, parameter: dict) -> None:
 
 
 def _stage_queryset_with_placeholder(deploy_root: Path) -> None:
-    item = deploy_root / "workspace" / "retail_querysets.KQLQueryset"
+    item = (
+        deploy_root / ".generated" / ENVIRONMENT
+        / "workspace" / "retail_querysets.KQLQueryset"
+    )
     item.mkdir(parents=True)
     (item / "RealTimeQueryset.json").write_text(
         '{"queryset": {"dataSources": [{"databaseItemId": '

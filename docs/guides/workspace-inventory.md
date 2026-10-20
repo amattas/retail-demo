@@ -21,14 +21,14 @@ that this guide does not become a second, outdated schema definition.
 
 ```powershell
 python scripts/setup.py
-retail-setup configure --workspace-name retail-demo-dev --profile core
+retail-setup configure --workspace-name retail-demo-dev
 retail-setup render --env dev
 retail-setup deploy --env dev --dry-run
 retail-setup verify --env dev
 ```
 
-The guided wrappers default to `full-demo`; direct `scripts/setup.py` and
-`retail-setup` commands retain the manifest-default `core` profile. Render,
+Every entry point, including direct `scripts/setup.py` and `retail-setup`
+commands, defaults to the manifest-default `full-demo` profile. Render,
 deploy, and verify resolve the stored profile from the `--env` environment.
 
 <!-- manifest-contract:prerequisites -->
@@ -54,9 +54,9 @@ both that constraint and Terraform's constraint in
 
 | Profile | Support | Logical assets | Groups | Pipelines | KQL scripts | Infrastructure | Reporting | Total |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `core` | core/default | 1 | 1 | 0 | 0 | 5 | 0 | 5 |
-| `standard` | supported opt-in | 8 | 4 | 5 | 6 | 30 | 2 | 32 |
-| `full-demo` | preview/live-preflight | 14 | 8 | 7 | 6 | 40 | 2 | 42 |
+| `core` | core/explicit | 1 | 1 | 0 | 0 | 12 | 0 | 12 |
+| `standard` | supported/explicit | 8 | 4 | 5 | 6 | 37 | 2 | 39 |
+| `full-demo` | preview/default | 14 | 8 | 7 | 6 | 47 | 2 | 49 |
 
 The logical asset selections are:
 
@@ -86,9 +86,9 @@ count.
 
 | Profile | Infrastructure folders | Reporting folders | Root-level staged items |
 | --- | --- | --- | --- |
-| `core` | `Setup` | none | Lakehouse |
-| `standard` | `Setup`, `Notebooks`, `Streaming`, `ML`, `Pipelines` | `Reporting` | Lakehouse, KQL queryset |
-| `full-demo` | `Setup`, `Notebooks`, `Streaming`, `ML`, `Pipelines` | `Reporting`; then automatically completed `Data Agents` | Lakehouse, KQL queryset |
+| `core` | `Notebooks`, `Lakehouses` | none | none |
+| `standard` | `Notebooks`, `Lakehouses`, `KQL Querysets`, `ML Experiments`, `Pipelines` | `Reports`, `Semantic Models` | none |
+| `full-demo` | `Notebooks`, `Lakehouses`, `KQL Querysets`, `ML Experiments`, `Pipelines` | `Reports`, `Semantic Models`; then automatically completed `Data Agents` | none |
 
 Eventhouse and its default KQL database are Terraform-owned and are therefore
 not duplicated as staged shell items. Every staged `.platform` description is
@@ -96,6 +96,11 @@ validated against the selected manifest asset description. Deployment writes a
 phase-specific `artifact-inventory-<phase>.json` beside the environment state;
 it records the profile, manifest version/hash, expected and actual counts,
 folders, and core/optional/preview/manual boundaries.
+
+The final organization step also places native/optional items in object-type
+folders such as `Eventhouses`, `Ontologies`, and `Fabric Apps`. Service-managed
+children remain with their parents. See the
+[folder mapping](../design/specifications/modules/deployment/framework.md#workspace-folder-mapping).
 
 <!-- manifest-contract:data-counts -->
 ## Data, event, and model inventory

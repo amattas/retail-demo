@@ -29,13 +29,16 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
 def spark():
     """Local Spark for unit tests. Small and quiet; one JVM per test session."""
     import os
+    import tempfile
     from pathlib import Path
     from pyspark.sql import SparkSession
 
     # Redirect JVM temp dir to sandbox-writable TMPDIR (macOS sandbox blocks /var/folders).
     # `or` guards CI environments where TMPDIR is set but empty.
-    tmpdir = os.environ.get("TMPDIR") or "/tmp"
-    java_opts = f"-Djava.io.tmpdir={tmpdir}"
+    tmpdir = Path(os.environ.get("TMPDIR") or tempfile.gettempdir()).resolve()
+    # Spark parses JVM option strings as shell tokens; Windows backslashes are
+    # escapes there, so use Java's portable path spelling and retain spaces.
+    java_opts = f'-Djava.io.tmpdir="{tmpdir.as_posix()}"'
 
     # Pin worker Python to the driver's interpreter — otherwise local mode can
     # pick up a different system Python and fail with a version mismatch.
@@ -58,7 +61,7 @@ def spark():
     os.environ.setdefault("_JAVA_OPTIONS", "-Xmx3g")
 
     session = (
-        SparkSession.builder.master("local[2]")
+        SparkSession.builder.master(os.environ.get("RETAIL_TEST_SPARK_MASTER", "local[2]"))
         .appName("retail-setup-tests")
         .config("spark.sql.shuffle.partitions", "4")
         # Disable broadcast joins: the constrained local driver heap cannot build
@@ -68,7 +71,7 @@ def spark():
         .config("spark.sql.autoBroadcastJoinThreshold", "-1")
         .config("spark.ui.enabled", "false")
         .config("spark.sql.session.timeZone", "UTC")
-        .config("spark.local.dir", tmpdir)
+        .config("spark.local.dir", str(tmpdir))
         .config("spark.driver.extraJavaOptions", java_opts)
         .config("spark.executor.extraJavaOptions", java_opts)
         .getOrCreate()

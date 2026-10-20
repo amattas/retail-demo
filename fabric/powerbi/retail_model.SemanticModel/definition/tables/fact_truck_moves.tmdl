@@ -94,6 +94,62 @@ table fact_truck_moves
 
 		annotation SummarizationSetBy = User
 
+	/// Source event timestamp for truck status rows.
+	column 'Event Timestamp'
+		dataType: dateTime
+		formatString: General Date
+		isHidden
+		lineageTag: c2200105-0000-0000-0000-000000000001
+		sourceLineageTag: event_ts
+		summarizeBy: none
+		sourceColumn: event_ts
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	/// ETA recorded on truck status rows by the source generator.
+	column 'Recorded ETA'
+		dataType: dateTime
+		formatString: General Date
+		isHidden
+		lineageTag: c2200105-0000-0000-0000-000000000002
+		sourceLineageTag: eta
+		summarizeBy: none
+		sourceColumn: eta
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	/// ETD recorded on truck status rows by the source generator.
+	column 'Recorded ETD'
+		dataType: dateTime
+		formatString: General Date
+		isHidden
+		lineageTag: c2200105-0000-0000-0000-000000000003
+		sourceLineageTag: etd
+		summarizeBy: none
+		sourceColumn: etd
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Source departure_time field as recorded on completed truck rows; not used to overwrite status or ETA/ETD measures.
+	column 'Departure Time'
+		dataType: dateTime
+		formatString: General Date
+		isHidden
+		lineageTag: c2200105-0000-0000-0000-000000000004
+		sourceLineageTag: departure_time
+		summarizeBy: none
+		sourceColumn: departure_time
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
 	partition fact_truck_moves = entity
 		mode: directLake
 		source

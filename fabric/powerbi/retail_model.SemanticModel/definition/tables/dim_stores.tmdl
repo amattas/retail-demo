@@ -6,6 +6,151 @@ table dim_stores
 		formatString: #,0
 		lineageTag: 01a1a1b2-0001-0001-0001-000000000001
 
+	/// Latest recorded store open/close event timestamp at or before UTC current time for one selected store in the current filter context.
+	measure 'Twin Store State As Of' = ```
+			VAR _SelectedStoreId =
+				SELECTEDVALUE('dim_stores'[ID])
+			VAR _ObservationCutoff =
+				UTCNOW()
+			VAR _LatestEventTs =
+				IF(
+					NOT ISBLANK(_SelectedStoreId),
+					CALCULATE(
+						MAX('fact_store_ops'[Event Timestamp]),
+						KEEPFILTERS('fact_store_ops'[Event Timestamp] <= _ObservationCutoff)
+					)
+				)
+			RETURN
+				_LatestEventTs
+			```
+		formatString: General Date
+		displayFolder: Connected Twins\Store
+		lineageTag: c2200001-0000-0000-0000-000000000001
+
+	/// Latest observed opened/closed operation for one selected store. Tied latest rows return BLANK rather than an arbitrary state.
+	measure 'Twin Store State' = ```
+			VAR _SelectedStoreId =
+				SELECTEDVALUE('dim_stores'[ID])
+			VAR _AsOf =
+				[Twin Store State As Of]
+			VAR _LatestRows =
+				CALCULATETABLE(
+					SUMMARIZE(
+						'fact_store_ops',
+						'fact_store_ops'[Operation Type],
+						'fact_store_ops'[Trace ID]
+					),
+					KEEPFILTERS('fact_store_ops'[Event Timestamp] = _AsOf)
+				)
+			RETURN
+				SWITCH(
+					TRUE(),
+					ISBLANK(_SelectedStoreId), BLANK(),
+					ISBLANK(_AsOf), "not observed",
+					COUNTROWS(_LatestRows) = 1, MAXX(_LatestRows, 'fact_store_ops'[Operation Type]),
+					BLANK()
+				)
+			```
+		displayFolder: Connected Twins\Store
+		lineageTag: c2200001-0000-0000-0000-000000000002
+
+	/// Signed known store on-hand balance at the store/SKU grain. Missing positions remain BLANK.
+	measure 'Twin Store Signed Stock' = ```
+			VAR _KnownBalances =
+				ADDCOLUMNS(
+					SUMMARIZE(
+						'inventory_position_current',
+						'inventory_position_current'[Store ID],
+						'inventory_position_current'[Product ID]
+					),
+					"_KnownBalance",
+						CALCULATE(SUM('inventory_position_current'[On Hand]))
+				)
+			RETURN
+				IF(
+					ISEMPTY(_KnownBalances),
+					BLANK(),
+					SUMX(
+						_KnownBalances,
+						VAR _KnownBalance = [_KnownBalance]
+						RETURN
+							_KnownBalance
+					)
+				)
+			```
+		formatString: #,0
+		displayFolder: Connected Twins\Store\Inventory
+		lineageTag: c2200001-0000-0000-0000-000000000003
+
+	/// Available store stock from known balances only: sum max(0, balance) at store/SKU grain without fabricating missing SKU balances.
+	measure 'Twin Store Available Stock' = ```
+			VAR _KnownBalances =
+				ADDCOLUMNS(
+					SUMMARIZE(
+						'inventory_position_current',
+						'inventory_position_current'[Store ID],
+						'inventory_position_current'[Product ID]
+					),
+					"_KnownBalance",
+						CALCULATE(SUM('inventory_position_current'[On Hand]))
+				)
+			RETURN
+				IF(
+					ISEMPTY(_KnownBalances),
+					BLANK(),
+					SUMX(
+						_KnownBalances,
+						VAR _KnownBalance = [_KnownBalance]
+						RETURN
+							IF(ISBLANK(_KnownBalance), BLANK(), IF(_KnownBalance > 0, _KnownBalance, 0))
+					)
+				)
+			```
+		formatString: #,0
+		displayFolder: Connected Twins\Store\Inventory
+		lineageTag: c2200001-0000-0000-0000-000000000004
+
+	/// Conservative store inventory snapshot timestamp: oldest as-of among known in-context store/SKU balances.
+	measure 'Twin Store Inventory As Of' = ```
+			VAR _KnownPositions =
+				FILTER(
+					'inventory_position_current',
+					NOT ISBLANK('inventory_position_current'[As Of])
+						&& NOT ISBLANK('inventory_position_current'[On Hand])
+				)
+			RETURN
+				IF(
+					ISEMPTY(_KnownPositions),
+					BLANK(),
+					MINX(_KnownPositions, 'inventory_position_current'[As Of])
+				)
+			```
+		formatString: General Date
+		displayFolder: Connected Twins\Store\Inventory
+		lineageTag: c2200001-0000-0000-0000-000000000005
+
+	/// Highest recorded stockout probability in the current store/product context; no fixed forecast-horizon override is applied.
+	measure 'Twin Store Stockout Risk' = ```
+			VAR _MaxProbability =
+				MAX('stockout_risk'[Stockout Probability])
+			RETURN
+				_MaxProbability
+			```
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Connected Twins\Store\Risk
+		lineageTag: c2200001-0000-0000-0000-000000000006
+
+	/// Observed store zone activity from foot-traffic sensor counts; this is activity, not occupancy or unique people.
+	measure 'Twin Store Zone Activity' = ```
+			VAR _ObservedActivity =
+				SUM('fact_foot_traffic'[Count])
+			RETURN
+				_ObservedActivity
+			```
+		formatString: #,0
+		displayFolder: Connected Twins\Store\Activity
+		lineageTag: c2200001-0000-0000-0000-000000000007
+
 	column ID
 		dataType: int64
 		isHidden
@@ -130,4 +275,3 @@ table dim_stores
 			entityName: dim_stores
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
-

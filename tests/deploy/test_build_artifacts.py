@@ -62,7 +62,10 @@ def _seed_real_profile_sources(repo: Path) -> None:
     for item_name in ("retail_model.SemanticModel", "retail_model.Report"):
         _write_json(
             repo / "fabric" / "powerbi" / item_name / ".platform",
-            {"metadata": {"type": item_name.rsplit(".", 1)[1]}},
+            {
+                "metadata": {"type": item_name.rsplit(".", 1)[1]},
+                "config": {"logicalId": build_artifacts._logical_id("fixture", item_name)},
+            },
         )
     for source in (REPO_ROOT / "fabric" / "querysets").glob("*.kql"):
         destination = repo / "fabric" / "querysets" / source.name
@@ -171,19 +174,73 @@ def test_notebook_lakehouse_binding_matches_staged_lakehouse_logical_id(tmp_path
 def test_stage_powerbi_items_copies_item_directories(tmp_path: Path) -> None:
     semantic = tmp_path / "fabric" / "powerbi" / "retail_model.SemanticModel"
     report = tmp_path / "fabric" / "powerbi" / "retail_model.Report"
-    _write_json(semantic / ".platform", {"metadata": {"type": "SemanticModel"}})
-    _write_json(report / ".platform", {"metadata": {"type": "Report"}})
+    _write_json(semantic / ".platform", {
+        "metadata": {"type": "SemanticModel"},
+        "config": {"logicalId": "11111111-1111-4111-8111-111111111111"},
+    })
+    _write_json(report / ".platform", {
+        "metadata": {"type": "Report"},
+        "config": {"logicalId": "22222222-2222-4222-8222-222222222222"},
+    })
     _write_json(report / ".pbi" / "localSettings.json", {"secret": "ignored"})
 
     output = tmp_path / "deploy" / "workspace"
     staged = build_artifacts.stage_powerbi_items(tmp_path / "fabric" / "powerbi", output)
 
     assert staged == [
-        output / "retail_model.Report",
-        output / "retail_model.SemanticModel",
+        output / "Reports" / "retail_model.Report",
+        output / "Semantic Models" / "retail_model.SemanticModel",
     ]
-    assert (output / "retail_model.Report" / ".platform").exists()
-    assert not (output / "retail_model.Report" / ".pbi").exists()
+    assert (output / "Reports" / "retail_model.Report" / ".platform").exists()
+    assert not (output / "Reports" / "retail_model.Report" / ".pbi").exists()
+
+
+def test_stage_powerbi_items_rebinds_report_to_model_across_type_folders(
+    tmp_path: Path,
+) -> None:
+    semantic = tmp_path / "fabric" / "powerbi" / "retail_model.SemanticModel"
+    report = tmp_path / "fabric" / "powerbi" / "retail_model.Report"
+    _write_json(
+        semantic / ".platform",
+        {
+            "metadata": {"type": "SemanticModel"},
+            "config": {"logicalId": "11111111-1111-4111-8111-111111111111"},
+        },
+    )
+    _write_json(
+        report / ".platform",
+        {
+            "metadata": {"type": "Report"},
+            "config": {"logicalId": "22222222-2222-4222-8222-222222222222"},
+        },
+    )
+    _write_json(
+        report / "definition.pbir",
+        {
+            "version": "4.0",
+            "datasetReference": {
+                "byPath": {"path": "../retail_model.SemanticModel"}
+            },
+        },
+    )
+
+    output = tmp_path / "deploy" / "workspace"
+    build_artifacts.stage_powerbi_items(
+        tmp_path / "fabric" / "powerbi",
+        output,
+    )
+
+    definition = json.loads(
+        (
+            output
+            / "Reports"
+            / "retail_model.Report"
+            / "definition.pbir"
+        ).read_text(encoding="utf-8")
+    )
+    assert definition["datasetReference"]["byPath"]["path"] == (
+        "../../Semantic Models/retail_model.SemanticModel"
+    )
 
 
 def test_stage_powerbi_items_sets_date_slicers_from_setup_end_date(
@@ -206,7 +263,7 @@ def test_stage_powerbi_items_sets_date_slicers_from_setup_end_date(
 
     staged_slicers = sorted(
         output.glob(
-            "*.Report/definition/pages/*/visuals/*_date_slicer/visual.json"
+            "Reports/*.Report/definition/pages/*/visuals/*_date_slicer/visual.json"
         )
     )
     assert len(staged_slicers) == 5
@@ -275,7 +332,7 @@ def test_build_workspace_stages_core_assets(tmp_path: Path) -> None:
 
     assert result.output_dir == output
     assert result.profile == "core"
-    assert len(result.staged_items) == 5
+    assert len(result.staged_items) == len(build_artifacts.SETUP_NOTEBOOKS) + 1
     assert "setup-01-seed-dictionaries.Notebook" in result.staged_items
     assert "retail_model.SemanticModel" not in result.staged_items
     assert "retail_model.Report" not in result.staged_items
@@ -285,18 +342,19 @@ def test_build_workspace_stages_core_assets(tmp_path: Path) -> None:
     assert "retail_eventhouse.Eventhouse" not in result.staged_items
     assert "retail_kql.KQLDatabase" not in result.staged_items
 
-    assert (output / "Setup" / "setup-01-seed-dictionaries.Notebook").is_dir()
-    assert not (output / "Reporting").exists()
+    assert (output / "Notebooks" / "setup-01-seed-dictionaries.Notebook").is_dir()
+    assert not (output / "Reports").exists()
+    assert not (output / "Semantic Models").exists()
     assert not (output / "Data Agents").exists()
     assert not (output / "retail_querysets.KQLQueryset").exists()
-    assert (output / "retail_lakehouse.Lakehouse").is_dir()
+    assert (output / "Lakehouses" / "retail_lakehouse.Lakehouse").is_dir()
 
 
 @pytest.mark.parametrize(
     ("profile_name", "expected_count"),
     # standard gained 07/10 and their MLflow experiments when
     # product_recommendations and price_elasticity became required-tier.
-    [("standard", 32), ("full-demo", 42)],
+    [("standard", 39), ("full-demo", 49)],
 )
 def test_build_workspace_stages_exact_optional_profile_inventory(
     tmp_path: Path,
@@ -351,7 +409,8 @@ def test_reporting_items_are_absent_from_infrastructure_phase(
 
     assert "retail_model.SemanticModel" not in result.staged_items
     assert "retail_model.Report" not in result.staged_items
-    assert not (result.output_dir / "Reporting").exists()
+    assert not (result.output_dir / "Reports").exists()
+    assert not (result.output_dir / "Semantic Models").exists()
     assert "ml-required.DataPipeline" in result.staged_items
 
 
@@ -539,7 +598,7 @@ def test_build_workspace_stages_ml_experiments_only_with_ml_group(tmp_path: Path
     without_ml = build_artifacts.build_workspace(
         repo, tmp_path / "ws1", _profile("core")
     )
-    assert not (tmp_path / "ws1" / "ML").exists()
+    assert not (tmp_path / "ws1" / "ML Experiments").exists()
     assert "demand_forecast.MLExperiment" not in without_ml.staged_items
 
     ml_profile = replace(
@@ -551,7 +610,7 @@ def test_build_workspace_stages_ml_experiments_only_with_ml_group(tmp_path: Path
     with_ml = build_artifacts.build_workspace(
         repo, tmp_path / "ws2", ml_profile
     )
-    assert (tmp_path / "ws2" / "ML" / "demand_forecast.MLExperiment").is_dir()
+    assert (tmp_path / "ws2" / "ML Experiments" / "demand_forecast.MLExperiment").is_dir()
     assert {
         "demand_forecast.MLExperiment",
         "market_basket.MLExperiment",
@@ -588,7 +647,7 @@ def test_build_workspace_stages_querysets_when_present(tmp_path: Path) -> None:
 
     assert "retail_querysets.KQLQueryset" in result.staged_items
     definition = json.loads(
-        (output / "retail_querysets.KQLQueryset" / "RealTimeQueryset.json").read_text(
+        (output / "KQL Querysets" / "retail_querysets.KQLQueryset" / "RealTimeQueryset.json").read_text(
             encoding="utf-8"
         )
     )
@@ -638,7 +697,9 @@ def test_stage_pipelines_only_stages_when_notebooks_deployed(tmp_path: Path) -> 
     assert not (output / "Pipelines" / "machine-learning.DataPipeline").exists()
 
 
-def test_stage_pipelines_uses_native_logical_bindings(tmp_path: Path) -> None:
+def test_stage_pipelines_injects_configured_lakehouse_parameter(
+    tmp_path: Path,
+) -> None:
     repo = tmp_path / "repo"
     _write_pipeline(repo, "streaming-data-load", ["03-streaming-to-silver"])
     output = tmp_path / "workspace"
@@ -649,6 +710,7 @@ def test_stage_pipelines_uses_native_logical_bindings(tmp_path: Path) -> None:
         output,
         ["streaming-data-load.DataPipeline"],
         {"03-streaming-to-silver"},
+        lakehouse_name="tenant_lakehouse",
     )
 
     content = json.loads(
@@ -664,9 +726,71 @@ def test_stage_pipelines_uses_native_logical_bindings(tmp_path: Path) -> None:
         "Notebook", "03-streaming-to-silver"
     )
     assert type_properties["workspaceId"] == build_artifacts._CURRENT_WORKSPACE_ID
+    parameters = type_properties["parameters"]
+    assert parameters["LAKEHOUSE_NAME"] == {
+        "value": "tenant_lakehouse",
+        "type": "string",
+    }
 
 
-def test_stage_pipelines_routes_setup_pipeline_to_setup_folder(tmp_path: Path) -> None:
+def test_staged_pipelines_never_share_the_workspace_sentinel_logical_id(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _write_pipeline(repo, "streaming-data-load", ["03-streaming-to-silver"])
+    _write_pipeline(repo, "daily-maintenance", ["05-maintain-delta-tables"])
+    for name in ("streaming-data-load", "daily-maintenance"):
+        (repo / "fabric" / "pipelines" / f"{name}.DataPipeline" / ".platform").write_text(
+            json.dumps({"metadata": {"type": "DataPipeline", "displayName": name},
+                        "config": {"version": "2.0",
+                                   "logicalId": build_artifacts._CURRENT_WORKSPACE_ID}}),
+            encoding="utf-8",
+        )
+    output = tmp_path / "workspace"
+    output.mkdir()
+
+    staged = build_artifacts.stage_pipelines(
+        repo, output, ["streaming-data-load.DataPipeline", "daily-maintenance.DataPipeline"],
+        {"03-streaming-to-silver", "05-maintain-delta-tables"},
+    )
+
+    ids = [
+        json.loads((path / ".platform").read_text(encoding="utf-8"))["config"]["logicalId"]
+        for path in staged
+    ]
+    assert ids == [
+        build_artifacts._logical_id("DataPipeline", "streaming-data-load"),
+        build_artifacts._logical_id("DataPipeline", "daily-maintenance"),
+    ]
+    assert build_artifacts._CURRENT_WORKSPACE_ID not in ids
+    build_artifacts.validate_staged_logical_ids(output)
+
+
+@pytest.mark.parametrize("logical_ids", [
+    ["00000000-0000-0000-0000-000000000000"],
+    ["11111111-1111-4111-8111-111111111111", "11111111-1111-4111-8111-111111111111"],
+])
+def test_staging_rejects_zero_or_duplicate_logical_ids(tmp_path: Path, logical_ids) -> None:
+    for index, logical_id in enumerate(logical_ids):
+        item = tmp_path / f"item{index}.DataPipeline"
+        item.mkdir()
+        (item / ".platform").write_text(
+            json.dumps({"config": {"logicalId": logical_id}}), encoding="utf-8"
+        )
+    with pytest.raises(ValueError, match="logicalId"):
+        build_artifacts.validate_staged_logical_ids(tmp_path)
+
+
+def test_repository_sources_stage_unique_logical_ids() -> None:
+    sources = sorted(REPO_ROOT.joinpath("fabric").rglob(".platform"))
+    assert sources
+    for directory in ("pipelines", "data-agents"):
+        for platform in REPO_ROOT.joinpath("fabric", directory).glob("*/.platform"):
+            name, item_type = platform.parent.name.rsplit(".", 1)
+            assert build_artifacts._logical_id(item_type, name) != (
+                build_artifacts._CURRENT_WORKSPACE_ID
+            )
+
+
+def test_stage_pipelines_groups_setup_with_other_pipelines(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     _write_pipeline(repo, "setup-pipeline", ["setup-01-seed-dictionaries", "setup-02-generate-dimensions"])
     _write_pipeline(repo, "streaming-data-load", ["03-streaming-to-silver"])
@@ -684,9 +808,8 @@ def test_stage_pipelines_routes_setup_pipeline_to_setup_folder(tmp_path: Path) -
         deployed,
     )
 
-    # setup-pipeline joins the setup notebooks under "Setup"; others stay in "Pipelines".
-    assert (output / "Setup" / "setup-pipeline.DataPipeline").is_dir()
-    assert not (output / "Pipelines" / "setup-pipeline.DataPipeline").exists()
+    assert (output / "Pipelines" / "setup-pipeline.DataPipeline").is_dir()
+    assert not (output / "Setup").exists()
     assert (output / "Pipelines" / "streaming-data-load.DataPipeline").is_dir()
     assert {p.name for p in staged} == {
         "setup-pipeline.DataPipeline",
@@ -740,12 +863,7 @@ def test_setup_group_stages_rendered_notebooks(tmp_path: Path) -> None:
     out_dir = tmp_path / "workspace"
     rendered = repo / "utility" / "out"
     rendered.mkdir(parents=True)
-    for name in [
-        "setup-01-seed-dictionaries",
-        "setup-02-generate-dimensions",
-        "setup-03-generate-facts",
-        "setup-04-build-gold",
-    ]:
+    for name in build_artifacts.SETUP_NOTEBOOKS:
         _write_json(
             rendered / f"{name}.ipynb",
             {"cells": [], "metadata": {}, "nbformat": 4, "nbformat_minor": 5},
@@ -754,10 +872,33 @@ def test_setup_group_stages_rendered_notebooks(tmp_path: Path) -> None:
     staged = build_artifacts.stage_setup_notebooks(
         repo_root=repo, output_dir=out_dir, lakehouse_name="lh"
     )
-    assert len(staged) == 4
-    item = out_dir / "setup-03-generate-facts.Notebook"
+    assert len(staged) == len(build_artifacts.SETUP_NOTEBOOKS) == 11
+    item = out_dir / "setup-03-generate-sales.Notebook"
     assert (item / ".platform").exists()
     assert (item / "notebook-content.ipynb").exists()
+
+
+def test_setup_group_uses_explicit_environment_render_directory(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    out_dir = tmp_path / "workspace"
+    rendered = repo / "utility" / "out" / "dev"
+    rendered.mkdir(parents=True)
+    for name in build_artifacts.SETUP_NOTEBOOKS:
+        _write_json(
+            rendered / f"{name}.ipynb",
+            {"cells": [], "metadata": {}, "nbformat": 4, "nbformat_minor": 5},
+        )
+
+    staged = build_artifacts.stage_setup_notebooks(
+        repo_root=repo,
+        output_dir=out_dir,
+        lakehouse_name="lh",
+        rendered_dir=rendered,
+    )
+
+    assert len(staged) == len(build_artifacts.SETUP_NOTEBOOKS)
 
 
 def test_setup_group_requires_rendered_notebooks(tmp_path: Path) -> None:
@@ -836,7 +977,7 @@ def test_build_workspace_threads_custom_lakehouse_name_to_setup_notebooks(
     # Every staged setup notebook must carry the custom lakehouse name in its metadata
     for name in build_artifacts.SETUP_NOTEBOOKS:
         notebook_path = (
-            out_dir / "Setup" / f"{name}.Notebook" / "notebook-content.ipynb"
+            out_dir / "Notebooks" / f"{name}.Notebook" / "notebook-content.ipynb"
         )
         assert notebook_path.exists(), f"Missing staged notebook: {notebook_path}"
         notebook = json.loads(notebook_path.read_text(encoding="utf-8"))

@@ -19,6 +19,7 @@ from retail_setup.dictionaries.loader import default_dictionary_root, load_dicti
 from retail_setup.generation.engine import generate_all
 from retail_setup.generation.gold import (
     GOLD_TABLES,
+    _latest_inventory_position,
     generate_campaign_performance,
     generate_gold,
 )
@@ -56,7 +57,8 @@ def test_inventory_position_is_latest(setup):
     tables, gold = setup
     txn = tables["fact_store_inventory_txn"]
     latest = (txn.withColumn("rn", F.row_number().over(
-        Window.partitionBy("store_id", "product_id").orderBy(F.desc("event_ts"))))
+        Window.partitionBy("store_id", "product_id").orderBy(
+            F.desc("event_ts"), F.desc("trace_id"))))
         .filter("rn = 1"))
     pos = gold["inventory_position_current"]
     assert pos.count() == latest.count()
@@ -64,6 +66,34 @@ def test_inventory_position_is_latest(setup):
                                F.col("balance").alias("b")),
                  ["store_id", "product_id"])
     assert j.filter(F.col("on_hand") != F.col("b")).count() == 0
+
+
+@pytest.mark.parametrize(
+    ("node_column", "gold_table"),
+    [
+        ("store_id", "inventory_position_current"),
+        ("dc_id", "dc_inventory_position_current"),
+    ],
+)
+def test_inventory_position_ties_use_trace_id_desc(
+    spark, node_column, gold_table
+):
+    event_ts = datetime(2025, 10, 6, 12)
+    transactions = spark.createDataFrame(
+        [
+            (1, 10, 100, event_ts, "trace-a"),
+            (1, 10, 200, event_ts, "trace-z"),
+        ],
+        f"{node_column} long, product_id long, balance long, "
+        "event_ts timestamp, trace_id string",
+    )
+
+    row = _latest_inventory_position(
+        transactions, node_column, gold_table
+    ).first()
+
+    assert row.on_hand == 200
+    assert row.as_of == event_ts
 
 
 def test_tender_mix_partitions_receipts(setup):

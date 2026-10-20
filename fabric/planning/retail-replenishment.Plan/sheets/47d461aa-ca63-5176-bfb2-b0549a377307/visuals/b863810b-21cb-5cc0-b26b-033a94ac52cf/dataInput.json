@@ -1,0 +1,93 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/plan/definition/Planning/DataInput/1.0.0/schema.json",
+  "columns": [
+    {
+      "measureGuid": "availability-risk",
+      "visualId": "b863810b-21cb-5cc0-b26b-033a94ac52cf",
+      "name": "Avg Stockout Probability", "dataInputType": 6,
+      "disableWriteAccess": true,
+      "description": "Read-only model risk estimate for the current store/product/horizon snapshot, not a future guarantee.",
+      "columnMeta": {
+        "id": "availability-risk", "label": "Avg Stockout Probability",
+        "measure_type": {"Native": {"measure_role": "ACMeasure"}}, "data_type": "Number"
+      }
+    },
+    {
+      "measureGuid": "availability-coverage",
+      "visualId": "b863810b-21cb-5cc0-b26b-033a94ac52cf",
+      "name": "Avg Days of Inventory", "dataInputType": 6,
+      "disableWriteAccess": true,
+      "description": "Read-only coverage estimate; review source freshness and signed inventory before proposing replenishment.",
+      "columnMeta": {
+        "id": "availability-coverage", "label": "Avg Days of Inventory",
+        "measure_type": {"Native": {"measure_role": "ACMeasure"}}, "data_type": "Number"
+      }
+    },
+    {
+      "measureGuid": "availability-stock",
+      "visualId": "b863810b-21cb-5cc0-b26b-033a94ac52cf",
+      "name": "Total Units on Hand", "dataInputType": 6,
+      "disableWriteAccess": true,
+      "description": "Signed ledger balance from the model, not unreserved transferable supply. Zero, negative and missing balances are not replaced by synthetic stock.",
+      "columnMeta": {
+        "id": "availability-stock", "label": "Total Units on Hand",
+        "measure_type": {"Native": {"measure_role": "ACMeasure"}}, "data_type": "Number"
+      }
+    },
+    {
+      "measureGuid": "availability-forecast",
+      "visualId": "b863810b-21cb-5cc0-b26b-033a94ac52cf",
+      "name": "Forecasted Units Next 7 Days", "dataInputType": 6,
+      "disableWriteAccess": true,
+      "description": "Baseline model forecast summed within the selected seven-day horizon. Verify forecast dates and generation time before use.",
+      "columnMeta": {
+        "id": "availability-forecast", "label": "Forecasted Units Next 7 Days",
+        "measure_type": {"Native": {"measure_role": "ACMeasure"}}, "data_type": "Number"
+      }
+    },
+    {
+      "measureGuid": "availability-lower",
+      "visualId": "b863810b-21cb-5cc0-b26b-033a94ac52cf",
+      "name": "Forecast Lower Bound Next 7 Days", "dataInputType": 6,
+      "disableWriteAccess": true,
+      "description": "Empirical forecast lower bound; not a causal guarantee.",
+      "columnMeta": {
+        "id": "availability-lower", "label": "Forecast Lower Bound Next 7 Days",
+        "measure_type": {"Native": {"measure_role": "ACMeasure"}}, "data_type": "Number"
+      }
+    },
+    {
+      "measureGuid": "availability-upper",
+      "visualId": "b863810b-21cb-5cc0-b26b-033a94ac52cf",
+      "name": "Forecast Upper Bound Next 7 Days", "dataInputType": 6,
+      "disableWriteAccess": true,
+      "description": "Empirical forecast upper bound; not a causal guarantee.",
+      "columnMeta": {
+        "id": "availability-upper", "label": "Forecast Upper Bound Next 7 Days",
+        "measure_type": {"Native": {"measure_role": "ACMeasure"}}, "data_type": "Number"
+      }
+    },
+    {
+      "measureGuid": "availability-risk-freshness",
+      "visualId": "b863810b-21cb-5cc0-b26b-033a94ac52cf",
+      "name": "Stockout Freshness (Hours)", "dataInputType": 6,
+      "disableWriteAccess": true,
+      "description": "Hours since inventory snapshot; negative or stale values require investigation.",
+      "columnMeta": {
+        "id": "availability-risk-freshness", "label": "Stockout Freshness (Hours)",
+        "measure_type": {"Native": {"measure_role": "ACMeasure"}}, "data_type": "Number"
+      }
+    },
+    {
+      "measureGuid": "availability-forecast-freshness",
+      "visualId": "b863810b-21cb-5cc0-b26b-033a94ac52cf",
+      "name": "Forecast Freshness (Hours)", "dataInputType": 6,
+      "disableWriteAccess": true,
+      "description": "Hours since forecast generation; not evidence that its dates cover the intended weekend.",
+      "columnMeta": {
+        "id": "availability-forecast-freshness", "label": "Forecast Freshness (Hours)",
+        "measure_type": {"Native": {"measure_role": "ACMeasure"}}, "data_type": "Number"
+      }
+    }
+  ]
+}

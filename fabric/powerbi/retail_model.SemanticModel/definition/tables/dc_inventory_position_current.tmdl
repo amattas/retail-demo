@@ -56,6 +56,20 @@ table dc_inventory_position_current
 
 		annotation SummarizationSetBy = Automatic
 
+	/// Source snapshot timestamp for the distribution-center/product current inventory balance.
+	column 'As Of'
+		dataType: dateTime
+		formatString: General Date
+		isHidden
+		lineageTag: c2200104-0000-0000-0000-000000000001
+		sourceLineageTag: as_of
+		summarizeBy: none
+		sourceColumn: as_of
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
 	partition dc_inventory_position_current = entity
 		mode: directLake
 		source

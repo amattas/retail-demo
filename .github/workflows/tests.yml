@@ -148,6 +148,19 @@ jobs:
         working-directory: utility
         run: python -m pytest -q -m "not spark"
 
+      - name: Set up Java for non-filesystem Spark smoke tests
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Run Windows Spark expression smoke tests
+        working-directory: utility
+        env:
+          TMPDIR: ${{ runner.temp }}
+          SPARK_LOCAL_HOSTNAME: localhost
+        run: python -m pytest -q -m "spark and spark_no_filesystem"
+
       - name: Notebook drift check
         working-directory: utility
         run: python scripts/build_notebooks.py --check

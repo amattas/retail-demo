@@ -10,7 +10,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from retail_setup.generation.publication import TableTarget, TargetState
-from retail_setup.generation.writer import _LakehouseBackend, sanitize_identifier
+from retail_setup.generation.writer import (
+    _LakehouseBackend,
+    assert_historical_replacement_safe,
+    sanitize_identifier,
+    write_all,
+)
 
 
 def _field(name: str, type_str: str) -> MagicMock:
@@ -33,6 +38,31 @@ def test_sanitize_identifier_replaces_unsafe_characters():
         == "setup_hardware_42_20260101T000000Z_abcd1234"
     )
     assert sanitize_identifier("already_safe_123") == "already_safe_123"
+
+
+@pytest.mark.parametrize("checkpoint_exists", [False, True])
+def test_historical_replacement_cannot_silently_discard_streamed_rows(checkpoint_exists):
+    spark = MagicMock()
+    spark.catalog.tableExists.return_value = checkpoint_exists
+    if checkpoint_exists:
+        with pytest.raises(RuntimeError, match="Historical replacement is blocked"):
+            assert_historical_replacement_safe(spark, "lh", "ag")
+    else:
+        assert_historical_replacement_safe(spark, "lh", "ag")
+    spark.catalog.tableExists.assert_called_once_with("lh.ag._watermarks")
+    spark.sql.assert_not_called()
+
+
+def test_write_all_blocks_before_staging_after_streaming_initialization():
+    frame = MagicMock()
+    frame.sparkSession.catalog.tableExists.return_value = True
+    cfg = MagicMock(silver_db="ag")
+
+    with pytest.raises(RuntimeError, match="Historical replacement is blocked"):
+        write_all({"fact_receipts": frame}, {}, cfg, "rerun", lakehouse="lh")
+
+    frame.write.format.assert_not_called()
+    frame.sparkSession.sql.assert_not_called()
 
 
 def test_lakehouse_backend_stage_creates_staging_db_once_and_writes_delta():

@@ -64,7 +64,7 @@ shown independently when its bindings are valid.
 
 ## 3. Close with the Power BI outcome
 
-1. Open the **Reporting** folder.
+1. Open the **Reports** folder.
 2. Open the `retail_model` report.
 3. Start on **Executive Cockpit**.
 4. Continue to **Sales**, **Supply Chain Control Tower**, **Omnichannel

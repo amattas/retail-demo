@@ -13,8 +13,8 @@ store count, and deterministic seed.
 
 ### REQ-SETUP-003 - Rendered notebooks
 
-Rendering shall produce five environment-specific notebooks: setup notebooks
-01 through 04 plus `stream-events`. Dictionary content shall be pinned to an
+Rendering shall produce twelve environment-specific notebooks: setup notebooks
+01 through 11 plus `stream-events`. Dictionary content shall be pinned to an
 explicit Git reference.
 
 ### REQ-SETUP-004 - Observable execution

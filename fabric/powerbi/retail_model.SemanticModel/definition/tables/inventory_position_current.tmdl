@@ -8,14 +8,34 @@ table inventory_position_current
 		displayFolder: Inventory\Store
 		lineageTag: 01a1a1a5-0001-0001-0001-000000000001
 
-	/// Store inventory cost value using product standard cost.
-	measure 'Total Inventory Value' = SUMX('inventory_position_current', VAR ProductCost = LOOKUPVALUE('dim_products'[Cost], 'dim_products'[ID], 'inventory_position_current'[Product ID]) RETURN 'inventory_position_current'[On Hand] * COALESCE(ProductCost, 0))
+	/// Store inventory cost value, aggregated at product grain through the active product relationship.
+	measure 'Total Inventory Value' = ```
+			SUMX(
+				VALUES('dim_products'[ID]),
+				VAR _OnHand =
+					CALCULATE(SUM('inventory_position_current'[On Hand]))
+				VAR _UnitCost =
+					COALESCE(CALCULATE(MAX('dim_products'[Cost])), 0)
+				RETURN
+					_OnHand * _UnitCost
+			)
+			```
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Inventory\Store
 		lineageTag: 01a1a1a5-0001-0001-0001-000000000002
 
-	/// Store inventory retail value using product sale price.
-	measure 'Total Inventory Retail Value' = SUMX('inventory_position_current', VAR ProductSalePrice = LOOKUPVALUE('dim_products'[Sale Price], 'dim_products'[ID], 'inventory_position_current'[Product ID]) RETURN 'inventory_position_current'[On Hand] * COALESCE(ProductSalePrice, 0))
+	/// Store inventory retail value, aggregated at product grain through the active product relationship.
+	measure 'Total Inventory Retail Value' = ```
+			SUMX(
+				VALUES('dim_products'[ID]),
+				VAR _OnHand =
+					CALCULATE(SUM('inventory_position_current'[On Hand]))
+				VAR _UnitPrice =
+					COALESCE(CALCULATE(MAX('dim_products'[Sale Price])), 0)
+				RETURN
+					_OnHand * _UnitPrice
+			)
+			```
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Inventory\Store
 		lineageTag: 01a1a1a5-0001-0001-0001-000000000003
@@ -92,10 +112,23 @@ table inventory_position_current
 
 		annotation SummarizationSetBy = Automatic
 
+	/// Source snapshot timestamp for the store/product current inventory balance.
+	column 'As Of'
+		dataType: dateTime
+		formatString: General Date
+		isHidden
+		lineageTag: c2200103-0000-0000-0000-000000000001
+		sourceLineageTag: as_of
+		summarizeBy: none
+		sourceColumn: as_of
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
 	partition inventory_position_current = entity
 		mode: directLake
 		source
 			entityName: inventory_position_current
 			schemaName: au
 			expressionSource: 'DirectLake - retail_lakehouse'
-

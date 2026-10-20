@@ -2,26 +2,156 @@ table fact_payments
 	lineageTag: a9ee5779-cb04-439d-8691-5ae9eb849b4e
 	sourceLineageTag: [ag].[fact_payments]
 
-	/// Total payment amount, stored in cents and reported in currency.
-	measure 'Total Amounts' = DIVIDE(SUM('fact_payments'[Amount Cents]), 100, 0)
+	/// All-channel payment amount. Store filters scope the store component while online payments remain included because they have no store key.
+	measure 'Total Amounts' = ```
+			VAR _StoreAmount =
+				[Store Payment Amount]
+			VAR _OnlineAmount =
+				[Online Payment Amount]
+			RETURN
+				IF(
+					ISBLANK(_StoreAmount) && ISBLANK(_OnlineAmount),
+					BLANK(),
+					COALESCE(_StoreAmount, 0) + COALESCE(_OnlineAmount, 0)
+				)
+			```
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Payments
 		lineageTag: 79b75b7a-6c45-4df5-a579-ead43dd9e267
 
-	/// Count of payment transactions.
-	measure 'Payment Count' = COUNTROWS('fact_payments')
+	/// In-store payment amount. Date, store, and customer filters use direct payment relationships; receipt drillthrough is applied explicitly.
+	measure 'Store Payment Amount' = ```
+			VAR _ReceiptIds =
+				FILTERS('fact_receipts'[Receipt ID])
+			RETURN
+				IF(
+					ISFILTERED('fact_online_order_headers'[Order ID]),
+					BLANK(),
+					IF(
+						ISFILTERED('fact_receipts'[Receipt ID]),
+						CALCULATE(
+							DIVIDE(SUM('fact_payments'[Amount Cents]), 100, 0),
+							KEEPFILTERS('fact_payments'[Receipt ID] <> BLANK()),
+							TREATAS(_ReceiptIds, 'fact_payments'[Receipt ID])
+						),
+						CALCULATE(
+							DIVIDE(SUM('fact_payments'[Amount Cents]), 100, 0),
+							KEEPFILTERS('fact_payments'[Receipt ID] <> BLANK())
+						)
+					)
+				)
+			```
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Payments\Store
+		lineageTag: 4e9fdc07-da4c-4224-ae56-c2f543e17292
+
+	/// Online payment amount. Date and customer filters apply directly; store filters are intentionally ignored because online payments have no store key.
+	measure 'Online Payment Amount' = ```
+			VAR _OrderIds =
+				FILTERS('fact_online_order_headers'[Order ID])
+			RETURN
+				IF(
+					ISFILTERED('fact_receipts'[Receipt ID]),
+					BLANK(),
+					IF(
+						ISFILTERED('fact_online_order_headers'[Order ID]),
+						CALCULATE(
+							DIVIDE(SUM('fact_payments'[Amount Cents]), 100, 0),
+							CROSSFILTER('fact_payments'[Store ID], 'dim_stores'[ID], NONE),
+							KEEPFILTERS('fact_payments'[Order ID] <> BLANK()),
+							TREATAS(_OrderIds, 'fact_payments'[Order ID])
+						),
+						CALCULATE(
+							DIVIDE(SUM('fact_payments'[Amount Cents]), 100, 0),
+							CROSSFILTER('fact_payments'[Store ID], 'dim_stores'[ID], NONE),
+							KEEPFILTERS('fact_payments'[Order ID] <> BLANK())
+						)
+					)
+				)
+			```
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Payments\Online
+		lineageTag: 5138edd5-2bcb-4b9d-8427-4e73df9552fe
+
+	/// All-channel payment count with the same explicit store and online roles as Total Amounts.
+	measure 'Payment Count' = ```
+			VAR _StoreCount =
+				[Store Payment Count]
+			VAR _OnlineCount =
+				[Online Payment Count]
+			RETURN
+				IF(
+					ISBLANK(_StoreCount) && ISBLANK(_OnlineCount),
+					BLANK(),
+					COALESCE(_StoreCount, 0) + COALESCE(_OnlineCount, 0)
+				)
+			```
 		formatString: #,0
 		displayFolder: Payments
 		lineageTag: c1050001-0000-0000-0000-000000000001
 
+	/// Count of in-store payment transactions in the current date, store, customer, or receipt context.
+	measure 'Store Payment Count' = ```
+			VAR _ReceiptIds =
+				FILTERS('fact_receipts'[Receipt ID])
+			RETURN
+				IF(
+					ISFILTERED('fact_online_order_headers'[Order ID]),
+					BLANK(),
+					IF(
+						ISFILTERED('fact_receipts'[Receipt ID]),
+						CALCULATE(
+							COUNTROWS('fact_payments'),
+							KEEPFILTERS('fact_payments'[Receipt ID] <> BLANK()),
+							TREATAS(_ReceiptIds, 'fact_payments'[Receipt ID])
+						),
+						CALCULATE(
+							COUNTROWS('fact_payments'),
+							KEEPFILTERS('fact_payments'[Receipt ID] <> BLANK())
+						)
+					)
+				)
+			```
+		formatString: #,0
+		displayFolder: Payments\Store
+		lineageTag: 629d97f1-0532-4549-852b-ea34985fe847
+
+	/// Count of online payment transactions in the current date and customer context; store filters do not remove unassigned online payments.
+	measure 'Online Payment Count' = ```
+			VAR _OrderIds =
+				FILTERS('fact_online_order_headers'[Order ID])
+			RETURN
+				IF(
+					ISFILTERED('fact_receipts'[Receipt ID]),
+					BLANK(),
+					IF(
+						ISFILTERED('fact_online_order_headers'[Order ID]),
+						CALCULATE(
+							COUNTROWS('fact_payments'),
+							CROSSFILTER('fact_payments'[Store ID], 'dim_stores'[ID], NONE),
+							KEEPFILTERS('fact_payments'[Order ID] <> BLANK()),
+							TREATAS(_OrderIds, 'fact_payments'[Order ID])
+						),
+						CALCULATE(
+							COUNTROWS('fact_payments'),
+							CROSSFILTER('fact_payments'[Store ID], 'dim_stores'[ID], NONE),
+							KEEPFILTERS('fact_payments'[Order ID] <> BLANK())
+						)
+					)
+				)
+			```
+		formatString: #,0
+		displayFolder: Payments\Online
+		lineageTag: 8af62ead-caee-4863-b365-6affab908f01
+
 	/// Count of approved payment transactions.
-	measure 'Approved Payment Count' = CALCULATE([Payment Count], 'fact_payments'[Status] = "APPROVED")
+	measure 'Approved Payment Count' = CALCULATE([Payment Count], KEEPFILTERS('fact_payments'[Status] = "APPROVED"))
 		formatString: #,0
 		displayFolder: Payments
 		lineageTag: c1050001-0000-0000-0000-000000000002
 
 	/// Count of declined payment transactions.
-	measure 'Declined Payment Count' = CALCULATE([Payment Count], 'fact_payments'[Status] = "DECLINED")
+	measure 'Declined Payment Count' = CALCULATE([Payment Count], KEEPFILTERS('fact_payments'[Status] = "DECLINED"))
 		formatString: #,0
 		displayFolder: Payments
 		lineageTag: c1050001-0000-0000-0000-000000000003
@@ -32,8 +162,93 @@ table fact_payments
 		displayFolder: Payments
 		lineageTag: c1050001-0000-0000-0000-000000000004
 
-	/// Average payment processing latency in milliseconds.
-	measure 'Avg Payment Processing MS' = AVERAGE('fact_payments'[Processing Time MS])
+	/// In-store decline rate for store-level operations analysis.
+	measure 'Store Payment Decline Rate %' = DIVIDE(CALCULATE([Store Payment Count], KEEPFILTERS('fact_payments'[Status] = "DECLINED")), [Store Payment Count], 0)
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Payments\Store
+		lineageTag: b1162b63-54f4-432d-afe2-65911ca56164
+
+	/// Online decline rate in the current date and customer context.
+	measure 'Online Payment Decline Rate %' = DIVIDE(CALCULATE([Online Payment Count], KEEPFILTERS('fact_payments'[Status] = "DECLINED")), [Online Payment Count], 0)
+		formatString: 0.0%;-0.0%;0.0%
+		displayFolder: Payments\Online
+		lineageTag: ebb5a5ee-4070-4b93-946e-897b5f77eb4d
+
+	/// Total processing milliseconds for in-store payments (hidden weighted-average helper).
+	measure '_Store Payment Processing Total MS' = ```
+			VAR _ReceiptIds =
+				FILTERS('fact_receipts'[Receipt ID])
+			RETURN
+				IF(
+					ISFILTERED('fact_online_order_headers'[Order ID]),
+					BLANK(),
+					IF(
+						ISFILTERED('fact_receipts'[Receipt ID]),
+						CALCULATE(
+							SUM('fact_payments'[Processing Time MS]),
+							KEEPFILTERS('fact_payments'[Receipt ID] <> BLANK()),
+							TREATAS(_ReceiptIds, 'fact_payments'[Receipt ID])
+						),
+						CALCULATE(
+							SUM('fact_payments'[Processing Time MS]),
+							KEEPFILTERS('fact_payments'[Receipt ID] <> BLANK())
+						)
+					)
+				)
+			```
+		formatString: #,0
+		isHidden
+		displayFolder: Payments\Helpers
+		lineageTag: 46d1a6e5-d20a-4eee-928a-a1e1a128dd4b
+
+	/// Total processing milliseconds for online payments (hidden weighted-average helper).
+	measure '_Online Payment Processing Total MS' = ```
+			VAR _OrderIds =
+				FILTERS('fact_online_order_headers'[Order ID])
+			RETURN
+				IF(
+					ISFILTERED('fact_receipts'[Receipt ID]),
+					BLANK(),
+					IF(
+						ISFILTERED('fact_online_order_headers'[Order ID]),
+						CALCULATE(
+							SUM('fact_payments'[Processing Time MS]),
+							CROSSFILTER('fact_payments'[Store ID], 'dim_stores'[ID], NONE),
+							KEEPFILTERS('fact_payments'[Order ID] <> BLANK()),
+							TREATAS(_OrderIds, 'fact_payments'[Order ID])
+						),
+						CALCULATE(
+							SUM('fact_payments'[Processing Time MS]),
+							CROSSFILTER('fact_payments'[Store ID], 'dim_stores'[ID], NONE),
+							KEEPFILTERS('fact_payments'[Order ID] <> BLANK())
+						)
+					)
+				)
+			```
+		formatString: #,0
+		isHidden
+		displayFolder: Payments\Helpers
+		lineageTag: 5e7145ce-daa9-42a2-aa5c-52d6286fb249
+
+	/// Average payment processing latency across store and online payment roles.
+	measure 'Avg Payment Processing MS' = ```
+			VAR _StoreProcessingMS =
+				[_Store Payment Processing Total MS]
+			VAR _OnlineProcessingMS =
+				[_Online Payment Processing Total MS]
+			VAR _TotalProcessingMS =
+				IF(
+					ISBLANK(_StoreProcessingMS) && ISBLANK(_OnlineProcessingMS),
+					BLANK(),
+					COALESCE(_StoreProcessingMS, 0) + COALESCE(_OnlineProcessingMS, 0)
+				)
+			RETURN
+				IF(
+					ISBLANK(_TotalProcessingMS),
+					BLANK(),
+					DIVIDE(_TotalProcessingMS, [Payment Count], 0)
+				)
+			```
 		formatString: #,0.0
 		displayFolder: Payments
 		lineageTag: c1050001-0000-0000-0000-000000000005
@@ -173,15 +388,17 @@ table fact_payments
 
 		annotation SummarizationSetBy = Automatic
 
-	/// Raw event date carried for lineage only. Payments inherit date context via the active Payments-to-Receipts relationship, so this technical column is hidden to avoid duplicate/ambiguous date slicers.
-	column event_date
+	/// Date of the payment event. Hidden because report date slicing is provided by the direct dim_date relationship.
+	column 'Event Date'
 		dataType: dateTime
-		formatString: General Date
+		formatString: Short Date
 		isHidden
 		lineageTag: 2bb53d73-00fd-47c4-bedd-668c3f5f5eec
 		sourceLineageTag: event_date
 		summarizeBy: none
 		sourceColumn: event_date
+
+		changedProperty = Name
 
 		annotation SummarizationSetBy = Automatic
 
@@ -191,4 +408,3 @@ table fact_payments
 			entityName: fact_payments
 			schemaName: ag
 			expressionSource: 'DirectLake - retail_lakehouse'
-

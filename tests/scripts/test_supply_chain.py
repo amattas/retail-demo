@@ -21,8 +21,9 @@ LOCK_FILES = (
 )
 NOTEBOOK_TEMPLATES = (
     REPO_ROOT / "utility" / "notebooks" / "templates" / "driver-02-dimensions.py",
-    REPO_ROOT / "utility" / "notebooks" / "templates" / "driver-03-facts.py",
-    REPO_ROOT / "utility" / "notebooks" / "templates" / "driver-04-gold.py",
+    REPO_ROOT / "utility" / "notebooks" / "templates" / "driver-03-stage.py",
+    REPO_ROOT / "utility" / "notebooks" / "templates" / "driver-10-publish.py",
+    REPO_ROOT / "utility" / "notebooks" / "templates" / "driver-11-gold.py",
 )
 
 

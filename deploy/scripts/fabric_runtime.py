@@ -5,8 +5,15 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import time
+from collections.abc import Callable
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any
+
+from requests import ConnectionError, Timeout
+
+from deploy.scripts import _output as console
+from deploy.scripts._retry import retry_call
 
 if TYPE_CHECKING:
     import requests
@@ -23,12 +30,36 @@ class FabricDefinitionError(ValueError):
     """Raised when a Fabric item definition is malformed or unsafe to inspect."""
 
 
+def retry_read(
+    request: Callable[[], requests.Response],
+    *,
+    deadline: float | None = None,
+) -> requests.Response:
+    """Retry an explicitly read-only request without exceeding its deadline."""
+
+    def sleep(seconds: float) -> None:
+        if deadline is not None:
+            seconds = min(seconds, max(0.0, deadline - time.monotonic()))
+        time.sleep(seconds)
+
+    return retry_call(
+        request,
+        retry_on=(ConnectionError, Timeout),
+        sleep=sleep,
+        on_retry=lambda attempt, _exc: console.warn(
+            f"Read-only API request attempt {attempt}/3 hit a network error; retrying..."
+        ),
+    )
+
+
 def paginated_get(
     session: requests.Session,
     url: str,
     *,
     params: dict[str, Any] | None = None,
     max_pages: int = _MAX_PAGES,
+    timeout: float | None = None,
+    deadline: float | None = None,
 ) -> list[dict[str, Any]]:
     """Exhaust a Fabric ``value`` collection, failing closed on malformed loops."""
 
@@ -43,10 +74,20 @@ def paginated_get(
     values: list[dict[str, Any]] = []
 
     for _ in range(max_pages):
-        if next_params is None:
-            response = session.get(next_url)
-        else:
-            response = session.get(next_url, params=next_params)
+        def read_page() -> requests.Response:
+            request_options: dict[str, Any] = {}
+            if next_params is not None:
+                request_options["params"] = next_params
+            if timeout is not None:
+                request_options["timeout"] = timeout
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise FabricPaginationError("Fabric collection deadline expired.")
+                request_options["timeout"] = min(timeout or 30, remaining)
+            return session.get(next_url, **request_options)
+
+        response = retry_read(read_page, deadline=deadline)
         response.raise_for_status()
         payload = response.json()
         if not isinstance(payload, dict) or not isinstance(payload.get("value"), list):

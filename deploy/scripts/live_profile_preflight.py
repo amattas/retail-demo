@@ -3,15 +3,23 @@
 from __future__ import annotations
 
 import argparse
+import math
 import re
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from deploy.scripts import _output as console
+from deploy.scripts.capacity_sizing import (
+    CapacitySizingError,
+    CapacitySizingEvidence,
+    derive_capacity_sizing,
+    write_capacity_sizing_evidence,
+)
 from deploy.scripts.export_items import build_session
-from deploy.scripts.fabric_runtime import paginated_get
+from deploy.scripts.fabric_runtime import FabricPaginationError, paginated_get
 
 if TYPE_CHECKING:
     import requests
@@ -39,13 +47,6 @@ _TENANT_SETTING_TITLES = {
         "Data sent to Azure OpenAI can be stored outside your capacity's "
         "geographic region, compliance boundary, or national cloud instance"
     ),
-}
-_NODE_VCORES = {
-    "Small": 4,
-    "Medium": 8,
-    "Large": 16,
-    "XLarge": 32,
-    "XXLarge": 64,
 }
 _EU_DATA_BOUNDARY_REGIONS = {
     "austria east",
@@ -86,13 +87,7 @@ class LiveProfilePreflightReport:
     capacity_sku: str
     capacity_region: str
     checked_tenant_settings: tuple[str, ...]
-
-
-def _capacity_units(sku: str) -> int | None:
-    """Return Fabric capacity units for F/FTL SKUs."""
-
-    match = re.fullmatch(r"(?:F|FTL)(\d+)", sku, flags=re.IGNORECASE)
-    return int(match.group(1)) if match else None
+    capacity_sizing: CapacitySizingEvidence | None = None
 
 
 def _inside_us_or_eu_data_boundary(region: str) -> bool:
@@ -105,7 +100,9 @@ def _inside_us_or_eu_data_boundary(region: str) -> bool:
 def _resolve_capacity(
     capacities: list[dict[str, Any]],
     config: DeployConfig,
-) -> dict[str, Any]:
+    *,
+    allow_missing: bool = False,
+) -> dict[str, Any] | None:
     capacity_id = config.workspace.capacity_id
     capacity_name = config.workspace.capacity_name
     if capacity_id:
@@ -129,6 +126,8 @@ def _resolve_capacity(
             "`retail-setup configure` and select an active Fabric capacity."
         )
 
+    if not matches and allow_missing:
+        return None
     if len(matches) != 1:
         available = ", ".join(
             sorted(
@@ -148,11 +147,12 @@ def _resolve_capacity(
 def _validate_capacity(
     capacity: dict[str, Any],
     config: DeployConfig,
-) -> list[str]:
+    repo_root: Path,
+) -> tuple[list[str], CapacitySizingEvidence | None]:
     errors: list[str] = []
+    sizing = None
     name = str(capacity.get("displayName", ""))
     state = str(capacity.get("state", ""))
-    sku = str(capacity.get("sku", ""))
     if state != "Active":
         errors.append(
             f"Capacity {name!r} is {state or 'unknown'}, not Active. Resume it "
@@ -160,35 +160,17 @@ def _validate_capacity(
         )
 
     if not config.profile.uses_custom_pool:
-        return errors
+        return errors, sizing
 
-    units = _capacity_units(sku)
-    if units is None or units < 64:
-        alternatives = "F64 or larger (or FTL64 or larger)"
-        errors.append(
-            f"Full-demo custom Spark defaults require {alternatives}; capacity "
-            f"{name!r} uses SKU {sku or 'unknown'}. Select a suitable capacity "
-            "or use `--profile standard` for the starter Spark pool."
+    try:
+        sizing = derive_capacity_sizing(
+            environment=config.environment,
+            capacity=capacity,
+            repo_root=repo_root,
         )
-        return errors
-
-    node_vcores = _NODE_VCORES.get(config.spark.node_size)
-    if node_vcores is None:
-        errors.append(
-            f"Cannot size unsupported Spark node {config.spark.node_size!r}."
-        )
-        return errors
-    available_vcores = units * 2
-    requested_vcores = config.spark.max_node_count * node_vcores
-    if requested_vcores > available_vcores:
-        max_nodes = available_vcores // node_vcores
-        errors.append(
-            f"Spark pool requests {requested_vcores} base vCores "
-            f"({config.spark.max_node_count} {config.spark.node_size} nodes), "
-            f"but {sku} provides {available_vcores}. Set spark.max_node_count "
-            f"to {max_nodes} or less, or select a larger capacity."
-        )
-    return errors
+    except CapacitySizingError as exc:
+        errors.append(str(exc))
+    return errors, sizing
 
 
 def _required_tenant_setting_names(
@@ -261,6 +243,8 @@ def _validate_tenant_settings(
 def validate_live_profile_preflight(
     session: requests.Session,
     config: DeployConfig,
+    *,
+    repo_root: Path = Path(__file__).resolve().parents[2],
 ) -> LiveProfilePreflightReport:
     """Validate live capacity and tenant prerequisites without mutation."""
 
@@ -272,7 +256,9 @@ def validate_live_profile_preflight(
             "operator has Capacity.Read.All access."
         ) from exc
     capacity = _resolve_capacity(capacities, config)
-    errors = _validate_capacity(capacity, config)
+    if capacity is None:
+        raise LiveProfilePreflightError("The configured capacity could not be resolved.")
+    errors, capacity_sizing = _validate_capacity(capacity, config, repo_root)
     region = str(capacity.get("region", ""))
     required_settings = _required_tenant_setting_names(config, region)
 
@@ -309,12 +295,18 @@ def validate_live_profile_preflight(
         capacity_sku=str(capacity.get("sku", "")),
         capacity_region=region,
         checked_tenant_settings=required_settings,
+        capacity_sizing=capacity_sizing,
     )
 
 
 def main() -> int:
     """Run live profile preflight and optionally recheck admin changes."""
 
+    from deploy.scripts.capacity_resume import (
+        CapacityResumeError,
+        build_arm_session,
+        ensure_capacity_active,
+    )
     from deploy.scripts.deploy_config import load_environment
 
     parser = argparse.ArgumentParser(
@@ -325,24 +317,86 @@ def main() -> int:
     parser.add_argument(
         "--auth-mode",
         choices=("azure_cli", "azure_powershell"),
-        default="azure_cli",
+        default=None,
     )
     parser.add_argument("--tenant-id")
     parser.add_argument("--interactive", action="store_true")
+    parser.add_argument(
+        "--resume-capacity", action="store_true",
+        help="Resume the configured paused Azure F capacity before validation (restarts billing).",
+    )
+    parser.add_argument("--capacity-timeout-seconds", type=float, default=600)
+    parser.add_argument(
+        "--capacity-sizing-output",
+        type=Path,
+        help="Write validated custom-pool sizing evidence to this path.",
+    )
     args = parser.parse_args()
+    if not math.isfinite(args.capacity_timeout_seconds) or args.capacity_timeout_seconds <= 0:
+        parser.error("--capacity-timeout-seconds must be a positive finite number")
 
     config = load_environment(
         args.environment,
         config_path=args.repo_root / "deploy" / "config" / "deploy.yml",
         environments_root=args.repo_root / "deploy" / "config" / "environments",
     )
+    tenant_id = config.tenant_id
+    auth_mode = args.auth_mode or config.auth_mode
+    if tenant_id is None:
+        console.error("Capacity preflight requires the configured tenant_id.")
+        return 1
+    if args.tenant_id and args.tenant_id.casefold() != tenant_id.casefold():
+        console.error("Capacity preflight tenant must match the configured tenant.")
+        return 1
     session = build_session(
-        auth_mode=args.auth_mode,
-        tenant_id=args.tenant_id,
+        auth_mode=auth_mode,
+        tenant_id=tenant_id,
     )
+    if args.resume_capacity:
+        deadline = time.monotonic() + args.capacity_timeout_seconds
+
+        def get_capacity():
+            import requests
+
+            try:
+                capacities = paginated_get(
+                    session, CAPACITIES_URL, timeout=30, deadline=deadline,
+                )
+            except requests.RequestException as exc:
+                raise LiveProfilePreflightError(
+                    "Could not read the configured Fabric capacity. "
+                    "Ensure the operator has Capacity.Read.All access."
+                ) from exc
+            except FabricPaginationError as exc:
+                raise LiveProfilePreflightError(
+                    f"Configured capacity discovery is incomplete: {exc}"
+                ) from exc
+            return _resolve_capacity(
+                capacities,
+                config,
+                allow_missing=True,
+            )
+
+        try:
+            ensure_capacity_active(
+                get_capacity,
+                resource_id=config.workspace.capacity_resource_id,
+                expected_name=config.workspace.capacity_name,
+                subscription_id=config.subscription_id,
+                tenant_id=tenant_id,
+                arm_session_factory=lambda: build_arm_session(auth_mode, tenant_id),
+                timeout_seconds=args.capacity_timeout_seconds,
+            )
+        except (CapacityResumeError, LiveProfilePreflightError) as exc:
+            console.error(str(exc))
+            return 1
     while True:
         try:
-            report = validate_live_profile_preflight(session, config)
+            report = validate_live_profile_preflight(
+                session,
+                config,
+                repo_root=args.repo_root,
+            )
         except LiveProfilePreflightError as exc:
             console.error(str(exc))
             if (
@@ -358,6 +412,25 @@ def main() -> int:
             if response.strip().casefold() != "r":
                 return 1
             continue
+
+        if config.profile.uses_custom_pool:
+            if args.capacity_sizing_output is None:
+                console.error(
+                    "Custom-pool preflight requires --capacity-sizing-output."
+                )
+                return 1
+            if report.capacity_sizing is None:
+                console.error("Custom-pool capacity sizing evidence was not derived.")
+                return 1
+            output = args.capacity_sizing_output
+            if not output.is_absolute():
+                output = args.repo_root / output
+            write_capacity_sizing_evidence(output, report.capacity_sizing)
+        elif args.capacity_sizing_output is not None:
+            console.error(
+                "Starter-pool profiles must not request capacity sizing evidence."
+            )
+            return 1
 
         settings = (
             ", ".join(report.checked_tenant_settings)

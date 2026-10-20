@@ -7,7 +7,7 @@
 // Run this entire script at once using .execute database script
 // ============================================================================
 
-.execute database script with (ContinueOnErrors=true) <|
+.execute database script with (ThrowOnErrors=true) <|
 
 // ============================================================================
 // TRANSACTION EVENTS

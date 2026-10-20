@@ -37,6 +37,16 @@ def test_store_ops(spark, setup):
         {"opened", "closed"}
 
 
+def test_receipts_skip_christmas(setup):
+    _, _, sales = setup
+    assert (
+        sales["fact_receipts"]
+        .filter(F.col("event_date") == date(2025, 12, 25))
+        .count()
+        == 0
+    )
+
+
 def test_foot_traffic(spark, setup):
     cfg, dims, sales = setup
     ft = generate_foot_traffic(spark, sales["fact_receipts"], dims, cfg)

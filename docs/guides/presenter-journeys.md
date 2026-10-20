@@ -67,7 +67,7 @@ now, and what evidence shows that the feed is live?"
 
 | Required source asset | Readiness check |
 | --- | --- |
-| Rendered `utility/out/stream-events.ipynb` from `utility/notebooks/templates/driver-05-stream.py` | A bounded Eventhouse run completes without connector errors. |
+| Rendered `utility/out/<env>/stream-events.ipynb` from `utility/notebooks/templates/driver-05-stream.py` | A bounded Eventhouse run completes without connector errors. |
 | Tables `receipt_created`, `online_order_created`, `online_order_picked`, and `online_order_shipped` from `fabric/kql_database/01-create-tables.kql` | The preflight query below returns each table with a recent `latest` timestamp after streaming. |
 | Materialized view `mv_store_sales_minute` from `fabric/kql_database/04-create-materialized-views.kql` | The sales query returns recent minute buckets. |
 | Queryset tab `q_online_orders_15m` from `fabric/querysets/q_online_orders_15m.kql` | The tab opens against the intended KQL database. |

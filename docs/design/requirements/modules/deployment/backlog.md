@@ -2,6 +2,11 @@
 
 ## Open
 
+- Remote Terraform backend support/coordination and distributed
+  cross-pipeline/manual-writer serialization remain separate design and
+  validation work. Environment-local files and a pipeline's `concurrency = 1`
+  are not substitutes for those controls.
+
 ### IMP-001 - Verify alternate authentication and target selection {#imp-001}
 
 - **Priority / effort:** P2 / M
@@ -35,21 +40,34 @@
   has proven tenant/capacity preflight, required Reporting, post-ontology
   publication, and fail-closed readiness.
 - **Remaining outcome:** Live runs must still prove core completion without
-  previews and the standalone standard Reporting profile. Full-demo proof is
-  complete.
+  previews and the standalone standard Reporting profile. Prior full-demo
+  evidence is a baseline; changed isolation, resume, saved-plan safeguards,
+  staging, and readiness need fresh integrated and live proof.
 - **Acceptance:** A tenant without previews can complete the default profile,
   while optional profiles fail preflight before partial publication. Exact
   local inventory, selection, live prerequisite, blocker, and ordering clauses
-  are implemented and contract-tested; only the remaining core/standard
-  profile proof keeps this item open.
+  have local implementations and tests. Fresh changed-path validation and
+  the remaining core/standard profile proof keep this item open.
 
 ## Settled — do not reopen
 
 - `retail-setup deploy` is the supported orchestrator.
 - Each environment owns separate Terraform state, Terraform data, generated
-  target inputs, bindings, outputs, and deployment journal.
+  target inputs, generation settings, rendered notebooks, staged items
+  (including post-ontology), bindings, outputs, and deployment journal.
 - Terraform provisions resources; `fabric-cicd` publishes supported items; KQL
   scripts remain ordered source.
 - The supported Eventhouse topology uses its automatically created default KQL
   database with the same display name.
 - Destructive reset assets are never part of an automatic normal run.
+- `full-demo` is the manifest default for every entry point. Reporting
+  profiles publish the connected twins report and the native Operations Agent
+  by default; `core` and `standard` are explicit reductions. Native Planning
+  stays excluded unless explicitly included because it needs fixed credentials
+  and starts non-cancellable billing.
+- Same-workspace pipeline notebook references use deterministic logical IDs
+  and the default-workspace sentinel resolved natively by `fabric-cicd`, not
+  generated per-notebook parameter rules.
+- `fabric-cicd` bulk publish stays opt-in while its upstream API is
+  experimental and post-ontology Data Agent publication needs dynamic
+  target-item resolution.

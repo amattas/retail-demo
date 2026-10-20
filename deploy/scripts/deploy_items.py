@@ -69,6 +69,10 @@ def main() -> int:
         args.auth_mode,
         tenant_id=args.tenant_id,
     )
+    from deploy.scripts.workspace_folders import organize_after_publish
+
+    if not organize_after_publish(DEPLOY_ROOT.parent, args.environment):
+        return 1
     return 0
 
 

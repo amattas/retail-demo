@@ -20,6 +20,75 @@ table demand_forecast
 		displayFolder: ML\Demand Forecast
 		lineageTag: c5e6e000-0000-0000-0004-000000000103
 
+	/// Total predicted units in the seven dates after the model source-as-of date.
+	measure 'Forecasted Units Next 7 Days' = ```
+			VAR _SourceAsOfDateTime =
+				MAX('demand_forecast'[Source As Of])
+			RETURN
+				IF(
+					ISBLANK(_SourceAsOfDateTime),
+					BLANK(),
+					VAR _SourceAsOfDate = INT(_SourceAsOfDateTime)
+					VAR _WindowStart = _SourceAsOfDate + 1
+					VAR _WindowEndExclusive = _SourceAsOfDate + 8
+					RETURN
+						CALCULATE(
+							[Forecasted Units],
+							KEEPFILTERS('demand_forecast'[Forecast Date] >= _WindowStart),
+							KEEPFILTERS('demand_forecast'[Forecast Date] < _WindowEndExclusive)
+						)
+				)
+			```
+		formatString: #,0
+		displayFolder: ML\Demand Forecast
+		lineageTag: c5e6e000-0000-0000-0004-000000000108
+
+	/// Lower bound of the predicted units across the same seven-day window.
+	measure 'Forecast Lower Bound Next 7 Days' = ```
+			VAR _SourceAsOfDateTime =
+				MAX('demand_forecast'[Source As Of])
+			RETURN
+				IF(
+					ISBLANK(_SourceAsOfDateTime),
+					BLANK(),
+					VAR _SourceAsOfDate = INT(_SourceAsOfDateTime)
+					VAR _WindowStart = _SourceAsOfDate + 1
+					VAR _WindowEndExclusive = _SourceAsOfDate + 8
+					RETURN
+						CALCULATE(
+							[Forecast Lower Bound],
+							KEEPFILTERS('demand_forecast'[Forecast Date] >= _WindowStart),
+							KEEPFILTERS('demand_forecast'[Forecast Date] < _WindowEndExclusive)
+						)
+				)
+			```
+		formatString: #,0
+		displayFolder: ML\Demand Forecast
+		lineageTag: c5e6e000-0000-0000-0004-000000000109
+
+	/// Upper bound of the predicted units across the same seven-day window.
+	measure 'Forecast Upper Bound Next 7 Days' = ```
+			VAR _SourceAsOfDateTime =
+				MAX('demand_forecast'[Source As Of])
+			RETURN
+				IF(
+					ISBLANK(_SourceAsOfDateTime),
+					BLANK(),
+					VAR _SourceAsOfDate = INT(_SourceAsOfDateTime)
+					VAR _WindowStart = _SourceAsOfDate + 1
+					VAR _WindowEndExclusive = _SourceAsOfDate + 8
+					RETURN
+						CALCULATE(
+							[Forecast Upper Bound],
+							KEEPFILTERS('demand_forecast'[Forecast Date] >= _WindowStart),
+							KEEPFILTERS('demand_forecast'[Forecast Date] < _WindowEndExclusive)
+						)
+				)
+			```
+		formatString: #,0
+		displayFolder: ML\Demand Forecast
+		lineageTag: c5e6e000-0000-0000-0004-000000000110
+
 	/// Mean absolute percentage error reported with the forecast.
 	measure 'Forecast MAPE' = AVERAGE('demand_forecast'[Mape])
 		formatString: 0.00%;-0.00%;0.00%

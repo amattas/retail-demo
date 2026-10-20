@@ -64,6 +64,13 @@ Use the notebook header to explain the transform without scrolling through
 implementation details. Do not run the notebook until its Lakehouse binding
 and source tables have been verified.
 
+The optional Eventhouse projection is prepared during deployment when
+`streaming_shortcuts.enabled` is true. For `retail-demo`, the deployment
+provisions OneLake mirroring with historical backfill and creates or verifies
+the shortcuts under `Tables/cusn/` after KQL publication. The selected
+five-minute mirroring latency favors demo freshness but can produce smaller
+Parquet files; do not treat it as a production tuning recommendation.
+
 ## 3. Inspect durable Lakehouse history
 
 1. Open `retail_lakehouse`.

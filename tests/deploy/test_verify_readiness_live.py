@@ -63,7 +63,8 @@ def test_live_readiness_prerequisites_and_report() -> None:
     report, path = verify_environment(repo_root, environment)
 
     assert path.is_file()
-    assert report["status"] in {"SUCCEEDED", "DEGRADED", "FAILED"}
+    assert report["status"] == "SUCCEEDED", report
+    assert report["counts"]["fail"] == 0, report
     assert report["counts"]["unknown"] == 0, (
         "live scaffold reached Fabric but evidence remains UNKNOWN"
     )

@@ -34,6 +34,8 @@ def _config(profile: str = "core"):
     data["environment"] = "dev"
     data["tenant_id"] = "11111111-1111-4111-8111-111111111111"
     data["workspace"].update({"name": "dev", "capacity_name": "F64"})
+    if profile == "core":
+        data["deployment"]["profile"] = "core"
     config = _to_deploy_config(data)
     if profile == "core":
         return config
@@ -94,7 +96,7 @@ def test_core_preflight_validates_existing_queryable_sources() -> None:
     )
 
     assert report.profile.deployment_name == "core"
-    assert len(report.selected_notebooks) == 4
+    assert len(report.selected_notebooks) == 11
 
 
 def test_preflight_requires_rendered_setup_notebooks(
@@ -123,6 +125,42 @@ def test_preflight_requires_rendered_setup_notebooks(
             skip_terraform=True,
             validate_rendered=True,
         )
+
+
+def test_preflight_uses_environment_scoped_renders_not_other_environments(tmp_path):
+    profile = _config().profile
+    directory = tmp_path / "utility" / "out" / "dev"
+    directory.mkdir(parents=True)
+    for name in profile_preflight.SETUP_NOTEBOOKS:
+        (directory / f"{name}.ipynb").write_text("{}", encoding="utf-8")
+    errors = []
+    profile_preflight._validate_notebook_sources(
+        tmp_path, profile, errors, validate_rendered=True, rendered_dir=directory,
+    )
+    assert not errors
+    profile_preflight._validate_notebook_sources(
+        tmp_path, profile, errors, validate_rendered=True,
+        rendered_dir=directory.parent / "prod",
+    )
+    assert errors
+
+
+def test_preflight_before_render_checks_committed_notebooks(tmp_path):
+    profile = _config().profile
+    errors = []
+    profile_preflight._validate_notebook_sources(
+        tmp_path, profile, errors, validate_rendered=False,
+    )
+    assert errors
+    directory = tmp_path / "utility" / "notebooks"
+    directory.mkdir(parents=True)
+    for name in profile_preflight.SETUP_NOTEBOOKS:
+        (directory / f"{name}.ipynb").write_text("{}", encoding="utf-8")
+    errors = []
+    profile_preflight._validate_notebook_sources(
+        tmp_path, profile, errors, validate_rendered=False,
+    )
+    assert not errors
 
 
 def test_standard_preflight_is_internally_coherent() -> None:

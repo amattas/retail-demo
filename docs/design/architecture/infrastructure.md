@@ -15,17 +15,18 @@ flowchart TB
     end
 
     subgraph Workspace[Fabric workspace]
-        LH[Lakehouse]
-        EH[Eventhouse]
-        KDB[KQL database]
-        Setup[Setup folder]
+        LH[Lakehouses folder]
+        EH[Eventhouses folder]
+        KDB[Managed KQL databases]
         Notebooks[Notebooks folder]
-        Streaming[Streaming folder]
         Pipelines[Pipelines folder]
-        Reporting[Reporting folder]
-        ML[ML folder]
+        Reports[Reports folder]
+        Models[Semantic Models folder]
+        ML[ML Experiments folder]
         DataAgents[Data Agents folder]
-        Queryset[KQLQueryset]
+        Queryset[KQL Querysets folder]
+        Ontologies[Ontologies folder]
+        Apps[Fabric Apps folder]
     end
 
     Config --> CLI
@@ -35,14 +36,15 @@ flowchart TB
     CLI --> PostOntology --> Workspace
     Workspace --> LH
     Workspace --> EH --> KDB
-    Workspace --> Setup
     Workspace --> Notebooks
-    Workspace --> Streaming
     Workspace --> Pipelines
-    Workspace --> Reporting
+    Workspace --> Reports
+    Workspace --> Models
     Workspace --> ML
     Workspace --> DataAgents
     Workspace --> Queryset
+    Workspace --> Ontologies
+    Workspace --> Apps
 ```
 
 ## Resource ownership
@@ -57,20 +59,29 @@ separately with the operator identity.
 
 | Location | Items |
 | --- | --- |
-| Workspace root | Lakehouse shell, bundled KQL queryset |
-| `Setup` | Rendered setup notebooks, `setup-pipeline` |
-| `Notebooks` | Core, ML, ontology, and reset notebooks |
-| `Streaming` | `stream-events` |
-| `Pipelines` | Historical, streaming, maintenance, and ML pipelines |
-| `Reporting` | Semantic model and report |
-| `ML` | ML experiment shells |
+| `Notebooks` | All selected notebooks, including setup, live driver, ML and case preparation; reset excluded |
+| `Pipelines` | All pipelines, including `setup-pipeline` |
+| `Reports` | Main report and connected twins |
+| `Semantic Models` | Direct Lake semantic model |
+| `ML Experiments` | ML experiment shells |
 | `Data Agents` | Semantic-model and ontology agents, automatically published after ontology creation in full-demo |
+| `Lakehouses` | Lakehouse and its managed SQL endpoint |
+| `Eventhouses` | Eventhouses and their managed KQL databases |
+| `KQL Querysets` | Bundled KQL queryset |
+| `Ontologies` | Ontology and any service-managed children |
+| `Fabric Apps` | Approvals app and any service-managed backing items |
+
+The [deployment folder policy](../specifications/modules/deployment/framework.md#workspace-folder-mapping)
+also covers independently movable graph models, SQL databases, Operations
+Agents and Plans. Fabric moves child items with their parent rather than
+allowing separate child folders. These managed exceptions are recorded in
+`workspace-folder-report.json`.
 
 ## Pipeline topology
 
 | Pipeline | Actual scope | Schedule |
 | --- | --- | --- |
-| `setup-pipeline` | Setup 01-04 | On demand; mandatory for Reporting profiles |
+| `setup-pipeline` | Setup 01-11 (03-05 and 06-08 in parallel) | On demand; mandatory for Reporting profiles |
 | `historical-data-load` | Retained historical-load notebook | On demand |
 | `streaming-data-load` | Streaming Silver then Gold | Committed schedule disabled |
 | `daily-maintenance` | Delta maintenance | Daily schedule committed disabled |
@@ -96,20 +107,25 @@ separately with the operator identity.
 Each workspace name derives a local environment key. Its ignored environment
 overlay, Terraform input, backend state, Terraform data directory,
 `fabric-cicd` configuration, live outputs, and run journal stay under that
-key. Parallel Terraform operations therefore do not share state. Full
-publication still uses one ignored `deploy/workspace/` staging tree, so run
-concurrent full deploys from separate checkouts.
+key. Generation configuration lives at
+`utility/config/environments/<env>.yaml`, rendered notebooks at
+`utility/out/<env>/`, and every publication phase stages under
+`deploy/.generated/<env>/workspace/`. Different environments do not share
+these local paths. Operators must still serialize runs for the same Fabric
+target; path isolation is not a distributed lock.
 
 ## Current constraints
 
-- The default `core` inventory is preview-free; `full-demo` is the
-  live-preflight-validated preview/manual boundary.
+- The default `full-demo` inventory includes live-preflight-validated preview
+  surfaces; explicitly selected `core` and `standard` inventories are
+  preview-free.
 - Task-flow deployment uses metadata behavior outside a stable Fabric item
   source-control contract.
 - Offline validation does not prove live workspace readiness. The separate
   profile-aware verifier queries live Fabric, Kusto, and Lakehouse SQL
-  surfaces. Required full-demo evidence has been exercised live; optional
-  stream evidence remains environment- and run-specific.
+  surfaces. Prior full-demo evidence is a baseline, not proof of the current
+  remediation; fresh required-path and optional-stream evidence remains
+  environment- and run-specific.
 
 See [deployment requirements](../requirements/modules/deployment/deployment.md)
 and the [operations backlog](../requirements/modules/operations/backlog.md).

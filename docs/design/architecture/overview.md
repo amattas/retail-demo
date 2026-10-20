@@ -48,8 +48,10 @@ flowchart LR
 
 ## Primary historical path
 
-`setup-01` through `setup-04` seed dictionaries, generate dimensions and facts,
-and build Gold directly in the Lakehouse. This path does not require ADLS
+`setup-01` through `setup-11` seed dictionaries, generate dimensions and facts,
+publish Silver, and build Gold directly in the Lakehouse. Fact generation is
+split by domain into notebooks that run in parallel where the stage graph
+allows. This path does not require ADLS
 parquet shortcuts or the retained historical-load notebook.
 
 ## Optional live path
@@ -82,7 +84,8 @@ directly from OneLake without importing a second copy.
   outputs.
 - `fact_online_order_status` is a streaming-only Silver output outside the base
   table contract.
-- Required full-demo setup, ML, Reporting, ontology, agents, task flow, and
-  readiness have live evidence. Alternate authentication, separate
-  core/standard profile proof, and recent optional streaming evidence remain
-  in the owning module backlogs.
+- Prior full-demo setup, ML, Reporting, ontology, agents, task flow, and
+  readiness runs are baseline evidence. No fresh live deployment was performed
+  in this repair session. Current changed-path validation, alternate
+  authentication, core/standard profile proof, and recent optional streaming
+  evidence remain in the owning module backlogs.

@@ -70,12 +70,20 @@ are not part of the default release.
 - The default semantic model and agents may expose generated row-level detail
   to authorized workspace consumers.
 
-## Current gaps
+## Verification boundaries
 
-- Deployment token/target handling has open defects.
-- Live readiness controls are implemented locally; actual target execution and
-  evidence remain outstanding.
-- Required live writes can currently fail without failing the micro-batch.
+- Tenant-aware identity, bearer request handling, and target checks exist;
+  alternate-authentication and renamed-target live proof remains `IMP-001`.
+- Required Eventhouse writes now raise on failure so Spark cannot commit a
+  failed micro-batch. Replay/checkpoint and deep-reconciliation code has local
+  tests, but fresh injected-failure Fabric proof remains outstanding.
+- Environment-local configuration/render/staging and saved-plan guards do not
+  replace operator review or serialize arbitrary remote writers.
+- No fresh live deployment was performed in this repair session. Prior
+  readiness reports do not verify the current changes.
+- The optional local app uses operator identity and browser token delivery for
+  embedding; its proposal store is local and its Eventhouse telemetry is
+  best-effort. See `THREAT-009` before describing this as durable governance.
 
 See [access control](../specifications/modules/security/access-control.md) and
 the [security backlog](../requirements/modules/security/backlog.md).

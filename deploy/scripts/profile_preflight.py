@@ -32,7 +32,6 @@ _TERRAFORM_ASSETS = {
     "asset.eventhouse",
     "asset.custom-spark-pool",
 }
-_SPARK_NODE_SIZES = {"Small", "Medium", "Large", "XLarge", "XXLarge"}
 _STATE_RESOURCE_ASSETS = {
     "fabric_eventhouse": "asset.eventhouse",
     "fabric_spark_custom_pool": "asset.custom-spark-pool",
@@ -99,6 +98,7 @@ def validate_profile_preflight(
         profile,
         errors,
         validate_rendered=validate_rendered,
+        rendered_dir=repo_root / "utility" / "out" / config.environment,
     )
     _validate_pipeline_sources(
         repo_root,
@@ -128,8 +128,9 @@ def _validate_notebook_sources(
     errors: list[str],
     *,
     validate_rendered: bool,
+    rendered_dir: Path | None = None,
 ) -> None:
-    rendered_dir = repo_root / "utility" / "out"
+    rendered_dir = rendered_dir or repo_root / "utility" / "out"
     for group in profile.notebook_groups:
         if group == "setup":
             if validate_rendered:
@@ -139,6 +140,11 @@ def _validate_notebook_sources(
                     "rendered setup",
                     errors,
                 )
+            else:
+                _require_notebooks(
+                    repo_root / "utility" / "notebooks", SETUP_NOTEBOOKS,
+                    "setup source", errors,
+                )
             continue
         if group == "stream":
             if validate_rendered:
@@ -147,6 +153,11 @@ def _validate_notebook_sources(
                     STREAM_NOTEBOOKS,
                     "rendered stream",
                     errors,
+                )
+            else:
+                _require_notebooks(
+                    repo_root / "utility" / "notebooks", STREAM_NOTEBOOKS,
+                    "stream source", errors,
                 )
             continue
         source_dir = repo_root / "fabric" / "lakehouse"
@@ -255,12 +266,14 @@ def _validate_selected_assets(
 def _validate_spark_config(config: DeployConfig, errors: list[str]) -> None:
     if not config.profile.uses_custom_pool:
         return
-    if config.spark.node_size not in _SPARK_NODE_SIZES:
+    if config.spark.node_size != "Medium":
         errors.append(
-            f"unsupported custom Spark node size: {config.spark.node_size!r}"
+            "capacity-aware custom Spark pools require Medium nodes"
         )
-    if config.spark.min_node_count < 1:
-        errors.append("spark.min_node_count must be at least 1")
+    if not 2 <= config.spark.min_node_count <= 16:
+        errors.append("spark.min_node_count must be between 2 and 16")
+    if not 2 <= config.spark.max_node_count <= 16:
+        errors.append("spark.max_node_count must be between 2 and 16")
     if config.spark.max_node_count < config.spark.min_node_count:
         errors.append(
             "spark.max_node_count must be greater than or equal to min_node_count"
@@ -478,6 +491,10 @@ def main() -> int:
     parser.add_argument("--environment", required=True)
     parser.add_argument("--recreate", action="store_true")
     parser.add_argument("--skip-terraform", action="store_true")
+    parser.add_argument(
+        "--source-only", action="store_true",
+        help="Validate committed notebook inputs before the deployment render step.",
+    )
     args = parser.parse_args()
 
     config = load_environment(
@@ -491,6 +508,7 @@ def main() -> int:
             config,
             recreate=args.recreate,
             skip_terraform=args.skip_terraform,
+            validate_rendered=not args.source_only,
         )
     except ProfilePreflightError as exc:
         console.error(str(exc))

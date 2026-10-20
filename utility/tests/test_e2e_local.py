@@ -34,9 +34,14 @@ def test_full_pipeline_hardware_store(spark, tmp_path):
     assert set(fact_tables) <= set(written)
     assert set(GOLD_TABLES) <= set(written)
 
-    # read-back sanity: receipts re-load with the contract column count
-    back = spark.read.parquet(str(tmp_path / "ag" / "fact_receipts"))
-    assert back.count() == result.tables["fact_receipts"].count()
+    for database, name, expected in (
+        ("ag", "fact_receipts", result.tables["fact_receipts"]),
+        ("au", "sales_minute_store", gold["sales_minute_store"]),
+    ):
+        restored = spark.read.parquet(str(tmp_path / database / name))
+        assert restored.schema.simpleString() == expected.schema.simpleString()
+        assert restored.exceptAll(expected).isEmpty()
+        assert expected.exceptAll(restored).isEmpty()
     # hardware profile visible end-to-end: weekend traffic spike
     by_dow = {r["dow"]: r["n"] for r in
               result.tables["fact_receipts"]

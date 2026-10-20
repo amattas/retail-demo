@@ -5,7 +5,7 @@
 The deployment separates data setup, required Reporting dependencies, and
 extended ML:
 
-1. `setup-pipeline` runs setup notebooks 01 through 04.
+1. `setup-pipeline` runs setup notebooks 01 through 11.
 2. `ml-required` runs demand forecast (06), customer segmentation (08), churn
    (09), stockout (12), market-basket mining (07), and promotion/elasticity
    analysis (10) producers serially, in that order, to avoid oversubscribing
@@ -83,6 +83,23 @@ current production inference selects its cohort independently. Churn and
 stockout partition on label-availability dates and purge 90-day and three-day
 forward-label horizons, respectively.
 
+### Stockout inventory semantics
+
+The inventory ledger retains signed balances; a deficit is not a negative
+number of available units. Notebook 12 selects the latest inventory event
+per store/product/day, then derives model `current_inventory` as
+`max(balance, 0)` for known balances. Both training and current inference use
+that same snapshot function, so derived `days_of_inventory` and inventory
+ratios remain nonnegative. This does not rewrite the underlying ledger.
+
+Unknown balances remain null, and the producer rejects any null inventory
+balance before training. A null must never be converted to zero by Spark's
+`greatest` null-skipping behavior. Notebook 15 continues to reject negative
+inventory/demand/coverage, invalid classes/horizons/ranks, and inconsistent
+as-of timestamps. Its stockout error reports per-rule violation counts.
+`utility/tests/generation/test_stockout_contract_runtime.py` executes the
+producer feature functions and the downstream domain validator together.
+
 Churn retains hidden nullable `is_churned_actual` solely as a deprecated
 compatibility projection and always writes it as null. All formerly exposed
 required columns remain present, so a failed required-ML gate can leave the
@@ -145,9 +162,80 @@ API as the Fabric UI to apply descriptions to every regular and time-series
 property, then reads the entity types back and fails if any description wasn't
 persisted.
 
+Descriptions come from source metadata when available, otherwise from
+deterministic field context. The notebook identity obtains a Power BI token,
+exchanges it for a Digital Operations workload token, and sends credentials only
+to HTTPS service URLs whose hosts end in `.analysis.windows.net` or
+`.pbidedicated.windows.net`; any other Fabric-returned URL fails the run. The
+apply-and-verify sequence retries up to five times only for HTTP 404, 409,
+429, 500, 502, 503, or 504; other failures fail immediately.
+
+### New-experience (TMDL) publisher
+
+The notebook above publishes the old entity-type JSON format, which Fabric
+retires on Jan 31, 2027 (`ENH-010`). `deploy/scripts/deploy_ontology.py`
+publishes the replacement definition. Full-demo deployment runs it as the
+non-required `publish-ontology-tmdl` step, after `ensure-ontology` and before
+the Data Agents are published. A failure keeps the existing ontology and
+degrades the run instead of failing it. Once the ontology is in TMDL format,
+`ensure_ontology` no longer runs the legacy notebook, so the migration is not
+reverted. Live acceptance is still pending.
+
+`deploy/scripts/_ontology_model.py` renders the definition deterministically
+from the physical contracts, not from runtime inspection:
+
+- Silver tables come from `utility/src/retail_setup/generation/schemas.py`,
+  Gold ML outputs from `ml_contracts` in `contracts/retail-demo.json`, and
+  Bronze event tables from `fabric/kql_database/01-create-tables.kql`.
+- All tables are DirectLake partitions behind one `Sql.Database` expression
+  for the Lakehouse SQL analytics endpoint, in schemas `ag`, `au`, and `cusn`.
+  Eventhouse time series bind through the Bronze `cusn` shortcuts. The
+  publisher lists `Tables/cusn` in OneLake, and missing shortcuts drop only
+  their bindings.
+- The model has the same 12 entities and 17 relationship names as the
+  notebook; three of the relationships use junction tables. Keys and
+  properties use `snake_case` column names, and time-series properties are
+  named `<event_table>_<column>` and ordered by `ingest_timestamp`.
+- TOM relationships that `retail_model` marks inactive are also inactive
+  here. Each event table has exactly one active outgoing relationship, so
+  the TOM graph has no ambiguous active paths.
+- Descriptions are native `///` comments, so the authoring-API workaround
+  and its token exchange are unnecessary in this path.
+- Lineage tags are UUIDv5 values of stable element names, so updates replace
+  elements in place.
+- Semantic-model DAX measures are **not** published as metrics. TMDL cannot
+  express `projected` metrics, and the definition does not duplicate DAX as
+  explicit metrics.
+
+Publication behavior:
+
+| Existing item | Action |
+| --- | --- |
+| None | Create `RetailOntology_AutoGen` |
+| TMDL format (`.platform` `config.version` `2.0`) | `updateDefinition` in place |
+| Old format (`definition.json` or `EntityTypes/` parts) | Create and verify `RetailOntology_AutoGen_tmdl`, then delete the old item and rename the staged item; a failed staging readback leaves the old item intact |
+
+Readback must be in TMDL format and contain every generated table, entity,
+and rule part. The service elides defaults, so readback compares element
+sets rather than text. Evidence is written to
+`deploy/.generated/<env>/ontology-report.json`. Run
+`python -m deploy.scripts.deploy_ontology --render <dir>` to inspect the
+definition without service calls.
+
+### Business rules
+
+`deploy/scripts/_ontology_rules.py` publishes nine natural-language rules
+(`ENH-011`): minimum margin, MSRP ceiling, price-change cadence, aged-inventory
+markdown, pricing approval, return window, stockout definition and risk
+bands, replenishment policy, and churn definition. Each numeric value is
+checked against the code that enforces it by
+`tests/deploy/test_ontology_rules.py`. Rules are guidance only; ontology does
+not execute them. Agents read them with the ontology MCP `list_ontology_rules`
+tool.
+
 ## Data Agents
 
-Source-controlled Data Agent definitions reference authoring-workspace GUIDs.
+Source-controlled Data Agent definitions require target-specific rebinding.
 They are staged after ontology creation in the same `full-demo` deployment.
 That completion phase rewrites:
 
@@ -155,10 +243,14 @@ That completion phase rewrites:
 - semantic-model `artifactId`
 - ontology `artifactId`
 
-Current datasource files leave `dataSourceInstructions` and `userDescription`
-unset. Mandatory per-agent governance metadata is outside the default release.
-Persona-specific instructions and approved-question packs remain optional under
-`ENH-003`.
+Current draft and published datasource snapshots include
+`dataSourceInstructions` and `userDescription`; `.platform` descriptions
+distinguish semantic-model and ontology scope. Source schema validation and
+matching local draft/published snapshots do not prove remote publication,
+permissions, or behavior. Rebind and verify the deployed agents in Fabric.
+Mandatory per-agent governance metadata remains outside the default release;
+richer persona-specific instructions and approved-question packs remain
+optional under `ENH-003`.
 
 ## Preview and support boundary
 

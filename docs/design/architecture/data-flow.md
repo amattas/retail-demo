@@ -7,7 +7,7 @@ sequenceDiagram
     participant User
     participant CLI as retail-setup
     participant Config as Deploy and generation config
-    participant Render as utility/out
+    participant Render as utility/out/env
     participant Deploy as deploy/scripts
     participant Fabric as Fabric workspace
 
@@ -28,13 +28,23 @@ The historical range is normally derived from `months` and ends yesterday.
 flowchart LR
     D[setup-01<br/>seed dictionaries]
     M[setup-02<br/>dimensions and date]
-    F[setup-03<br/>facts and run log]
-    G[setup-04<br/>Gold]
+    S[setup-03<br/>sales and fulfillment]
+    O[setup-04<br/>online orders]
+    K[setup-05<br/>marketing]
+    R[setup-06<br/>returns and promotions]
+    A[setup-07<br/>store activity]
+    I[setup-08<br/>inventory]
+    T[setup-09<br/>attribution]
+    P[setup-10<br/>publish Silver and run log]
+    G[setup-11<br/>Gold]
     Silver[(ag Silver)]
     Gold[(au Gold)]
 
-    D --> M --> Silver
-    Silver --> F --> Silver
+    D --> M
+    M --> S & O & K
+    S --> R & A & I
+    S & O & K & R --> T
+    S & O & R & A & I & T --> P --> Silver
     Silver --> G --> Gold
 ```
 
@@ -73,8 +83,10 @@ flowchart LR
 ```
 
 This path uses `ag._watermarks`. Its committed pipeline schedule is disabled.
-It contains known contract divergence, including streaming-only
-`fact_online_order_status`.
+Its streaming-only `fact_online_order_status` output is explicitly inventoried:
+the Silver notebook owns its schema and routes, the manifest owns its terminal
+exception, and the Delta maintenance notebook includes the table.
+The same maintenance inventory owns the `ag._watermarks` control table.
 
 ## Consumption
 

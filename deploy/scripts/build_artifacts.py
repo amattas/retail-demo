@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import uuid
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ from retail_setup.contracts import (
 )
 
 from deploy.scripts import _output as console
+from deploy.scripts.workspace_folders import ITEM_FOLDERS
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "deploy" / "workspace"
@@ -66,23 +68,45 @@ def _logical_id(item_type: str, display_name: str) -> str:
 
     return str(uuid.uuid5(uuid.NAMESPACE_URL, f"retail-demo:{item_type}:{display_name}"))
 
-# Workspace folder names used to organize published items. fabric-cicd maps the
-# staged directory structure to Fabric workspace folders, so staging an item
-# under `<output>/Notebooks/<item>` places it in a "Notebooks" workspace folder.
-# Demo/pipeline notebooks go under "Notebooks"; one-time setup notebooks (and
-# other setup artifacts) go under "Setup"; the semantic model and report go under
-# "Reporting"; MLflow experiments go under "ML". The Lakehouse shell and
-# KQLQueryset stay at the workspace root.
-NOTEBOOKS_FOLDER = "Notebooks"
-SETUP_FOLDER = "Setup"
-POWERBI_FOLDER = "Reporting"
-PIPELINES_FOLDER = "Pipelines"
-ML_FOLDER = "ML"
-DATA_AGENTS_FOLDER = "Data Agents"
-# The live streaming generator notebook publishes under "Streaming". Kept out of
-# "Setup" because stream-events is the optional long-running driver, not part of
-# the ordered one-time setup pipeline.
-STREAMING_FOLDER = "Streaming"
+
+def _assign_logical_id(item_dir: Path, item_type: str, display_name: str) -> None:
+    """Give a copied source item its deterministic logicalId.
+
+    Source ``.platform`` files may carry the all-zero placeholder, which equals
+    the default-workspace sentinel in pipeline content; fabric-cicd would then
+    see every pipeline depend on every other and refuse to publish (cycle).
+    """
+
+    platform_path = item_dir / ".platform"
+    platform = json.loads(platform_path.read_text(encoding="utf-8"))
+    platform.setdefault("config", {})["logicalId"] = _logical_id(item_type, display_name)
+    platform_path.write_text(json.dumps(platform, indent=2), encoding="utf-8")
+
+
+def validate_staged_logical_ids(output_dir: Path) -> None:
+    """Fail staging when logicalIds are missing, duplicated, or the zero sentinel."""
+
+    seen: dict[str, Path] = {}
+    for platform_path in sorted(output_dir.rglob(".platform")):
+        logical_id = str(
+            json.loads(platform_path.read_text(encoding="utf-8"))
+            .get("config", {})
+            .get("logicalId", "")
+        )
+        item = platform_path.parent
+        if not logical_id or logical_id == _CURRENT_WORKSPACE_ID:
+            raise ValueError(f"Staged item {item.name} has no unique logicalId")
+        if logical_id in seen:
+            raise ValueError(
+                f"Staged items {seen[logical_id].name} and {item.name} share logicalId"
+            )
+        seen[logical_id] = item
+
+# Staged directories and native publishers use the same object-type folders.
+NOTEBOOKS_FOLDER = ITEM_FOLDERS["Notebook"]
+PIPELINES_FOLDER = ITEM_FOLDERS["DataPipeline"]
+ML_FOLDER = ITEM_FOLDERS["MLExperiment"]
+DATA_AGENTS_FOLDER = ITEM_FOLDERS["DataAgent"]
 
 # MLflow experiments the ML notebooks (group "ml") create on first run. Bootstrap
 # them as MLExperiment shell items so they exist (and are organized under the "ML"
@@ -150,21 +174,26 @@ NOTEBOOK_GROUPS = {
 SETUP_NOTEBOOKS = [
     "setup-01-seed-dictionaries",
     "setup-02-generate-dimensions",
-    "setup-03-generate-facts",
-    "setup-04-build-gold",
+    "setup-03-generate-sales",
+    "setup-04-generate-online-orders",
+    "setup-05-generate-marketing",
+    "setup-06-generate-returns-and-promotions",
+    "setup-07-generate-store-activity",
+    "setup-08-generate-inventory",
+    "setup-09-attribute-marketing",
+    "setup-10-publish-silver",
+    "setup-11-build-gold",
 ]
 
 # The live streaming generator. Rendered alongside the setup notebooks (shares
-# the same {{TOKEN}} substitution) but staged separately under "Streaming" and
+# the same {{TOKEN}} substitution) but staged under "Notebooks" and
 # deliberately NOT added to the setup pipeline — it runs continuously and is
 # started/stopped manually.
 STREAM_NOTEBOOKS = [
     "stream-events",
 ]
 
-# The one Data Pipeline that orchestrates the setup notebooks. It publishes into
-# the "Setup" workspace folder (alongside those notebooks) rather than the
-# general "Pipelines" folder.
+# The one Data Pipeline that orchestrates the setup notebooks.
 SETUP_PIPELINE = "setup-pipeline"
 
 
@@ -437,13 +466,36 @@ def stage_powerbi_items(
         item_dir = available[name]
         if not item_dir.is_dir() or item_dir.suffix not in {".Report", ".SemanticModel"}:
             continue
-        destination = output_dir / item_dir.name
+        destination = output_dir / ITEM_FOLDERS[item_dir.suffix[1:]] / item_dir.name
         if destination.exists():
             shutil.rmtree(destination)
         shutil.copytree(item_dir, destination, ignore=_ignore_powerbi_local_state)
         if item_dir.suffix == ".Report" and report_default_date is not None:
             _set_report_default_date(destination, report_default_date)
         staged.append(destination)
+    staged_by_name = {item.name: item for item in staged}
+    for report_dir in (item for item in staged if item.suffix == ".Report"):
+        definition_path = report_dir / "definition.pbir"
+        if not definition_path.exists():
+            continue
+        definition = json.loads(definition_path.read_text(encoding="utf-8"))
+        by_path = definition.get("datasetReference", {}).get("byPath")
+        if not isinstance(by_path, dict):
+            continue
+        source_path = by_path.get("path")
+        if not isinstance(source_path, str) or not source_path:
+            raise ValueError(f"{definition_path}: dataset byPath.path is required")
+        model_name = Path(source_path).name
+        model_dir = staged_by_name.get(model_name)
+        if model_dir is None or model_dir.suffix != ".SemanticModel":
+            raise ValueError(
+                f"{definition_path}: staged semantic model {model_name!r} is missing"
+            )
+        by_path["path"] = os.path.relpath(model_dir, report_dir).replace("\\", "/")
+        definition_path.write_text(
+            json.dumps(definition, indent=2),
+            encoding="utf-8",
+        )
     return staged
 
 
@@ -451,15 +503,16 @@ def stage_setup_notebooks(
     repo_root: Path,
     output_dir: Path,
     lakehouse_name: str = "retail_lakehouse",
+    rendered_dir: Path | None = None,
 ) -> list[Path]:
-    """Stage rendered setup notebooks from utility/out/ as Fabric .Notebook items.
+    """Stage rendered setup notebooks as Fabric .Notebook items.
 
     The notebooks must already have been rendered by `retail-setup render` before
     calling this function.  Raises FileNotFoundError if any expected notebook is
-    absent in utility/out/.
+    absent in the selected render directory.
     """
 
-    rendered_dir = repo_root / "utility" / "out"
+    rendered_dir = rendered_dir or repo_root / "utility" / "out"
     missing = [
         name
         for name in SETUP_NOTEBOOKS
@@ -468,7 +521,7 @@ def stage_setup_notebooks(
     if missing:
         raise FileNotFoundError(
             f"setup notebooks not rendered — run `retail-setup render` first "
-            f"(expected at utility/out/): {missing}"
+            f"(expected at {rendered_dir}): {missing}"
         )
 
     staged: list[Path] = []
@@ -488,16 +541,17 @@ def stage_stream_notebooks(
     output_dir: Path,
     lakehouse_name: str = "retail_lakehouse",
     kql_database_name: str = _DEFAULT_KQL_DATABASE_NAME,
+    rendered_dir: Path | None = None,
 ) -> list[Path]:
     """Stage the rendered streaming-generator notebook(s) as Fabric `.Notebook` items.
 
     Like the setup notebooks, ``stream-events`` is rendered to
-    ``utility/out/`` by ``retail-setup render`` before staging. It is the live
-    driver, so it publishes into the "Streaming" folder and is never added to the
+    the selected render directory by ``retail-setup render`` before staging. It is the live
+    driver, so it publishes into the "Notebooks" folder and is never added to the
     setup pipeline — it is started/stopped manually.
     """
 
-    rendered_dir = repo_root / "utility" / "out"
+    rendered_dir = rendered_dir or repo_root / "utility" / "out"
     missing = [
         name
         for name in STREAM_NOTEBOOKS
@@ -506,7 +560,7 @@ def stage_stream_notebooks(
     if missing:
         raise FileNotFoundError(
             f"stream notebooks not rendered — run `retail-setup render` first "
-            f"(expected at utility/out/): {missing}"
+            f"(expected at {rendered_dir}): {missing}"
         )
 
     staged: list[Path] = []
@@ -599,6 +653,7 @@ def stage_pipelines(
     output_dir: Path,
     selected_pipelines: tuple[str, ...] | list[str],
     deployed_notebooks: set[str],
+    lakehouse_name: str = "retail_lakehouse",
 ) -> list[Path]:
     """Stage ``fabric/pipelines/*.DataPipeline`` items into the workspace output.
 
@@ -606,9 +661,8 @@ def stage_pipelines(
     be present in ``deployed_notebooks``. Nothing is inferred from notebook
     references: the profile supplies the exact pipeline inventory.
 
-    Each pipeline publishes into the "Pipelines" workspace folder, except
-    ``setup-pipeline`` which joins the setup notebooks under "Setup". Returns an
-    empty list when no pipeline sources exist.
+    Every pipeline publishes into the "Pipelines" object-type folder. Returns
+    an empty list when no pipeline sources exist.
     """
 
     source_dir = repo_root / "fabric" / "pipelines"
@@ -636,12 +690,12 @@ def stage_pipelines(
                 f"Selected pipeline {pipeline_ref!r} references unselected "
                 f"notebooks: {missing}"
             )
-        folder = SETUP_FOLDER if item_dir.stem == SETUP_PIPELINE else PIPELINES_FOLDER
-        destination = output_dir / folder / item_dir.name
+        destination = output_dir / PIPELINES_FOLDER / item_dir.name
         if destination.exists():
             shutil.rmtree(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(item_dir, destination)
+        _assign_logical_id(destination, "DataPipeline", item_dir.stem)
         for activity in content.get("properties", {}).get("activities", []):
             if activity.get("type") != "TridentNotebook":
                 continue
@@ -656,6 +710,12 @@ def stage_pipelines(
             # workspace sentinel to target IDs before publishing the pipeline.
             type_properties["notebookId"] = _logical_id("Notebook", notebook_name)
             type_properties["workspaceId"] = _CURRENT_WORKSPACE_ID
+            if notebook_name in SETUP_NOTEBOOKS:
+                continue
+            type_properties.setdefault("parameters", {})["LAKEHOUSE_NAME"] = {
+                "value": lakehouse_name,
+                "type": "string",
+            }
         (destination / "pipeline-content.json").write_text(
             json.dumps(content, indent=2) + "\n",
             encoding="utf-8",
@@ -695,7 +755,7 @@ def stage_ml_experiments(
     fabric-cicd publishes MLExperiment shell-only (no definition), so each name
     becomes a `<name>.MLExperiment` shell. Pre-creating them lets the ML
     notebooks reuse the experiments rather than creating them on first run, and
-    groups them under the "ML" workspace folder.
+    groups them under the "ML Experiments" workspace folder.
     """
 
     return [
@@ -729,6 +789,7 @@ def stage_data_agents(repo_root: Path, output_dir: Path) -> list[Path]:
             shutil.rmtree(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(item_dir, destination)
+        _assign_logical_id(destination, "DataAgent", item_dir.stem)
         staged.append(destination)
     return staged
 
@@ -736,7 +797,7 @@ def stage_data_agents(repo_root: Path, output_dir: Path) -> list[Path]:
 def build_workspace(
     repo_root: Path = REPO_ROOT,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
-    profile: ResolvedProfile | str = "core",
+    profile: ResolvedProfile | str = "full-demo",
     lakehouse_name: str = "retail_lakehouse",
     kql_database_name: str = "retail_eventhouse",
     semantic_model_name: str = "retail_model",
@@ -748,6 +809,7 @@ def build_workspace(
         "post-ontology",
     ] = "all",
     report_default_date: date | None = None,
+    rendered_dir: Path | None = None,
 ) -> BuildResult:
     """Build a fabric-cicd workspace folder from repository source assets."""
 
@@ -773,7 +835,9 @@ def build_workspace(
     # contain the .platform file only"), and Terraform already owns it.
     if stage_infrastructure and profile.selects("asset.lakehouse"):
         staged_items.append(
-            stage_shell_item(output_dir, lakehouse_name, "Lakehouse").name
+            stage_shell_item(
+                output_dir / ITEM_FOLDERS["Lakehouse"], lakehouse_name, "Lakehouse"
+            ).name
         )
 
     # Demo/pipeline notebooks publish into a "Notebooks" workspace folder.
@@ -789,24 +853,26 @@ def build_workspace(
                 ).name
             )
 
-    # One-time setup notebooks publish into a separate "Setup" workspace folder.
+    # Setup notebooks share the object-type folder without changing execution order.
     # The Eventhouse KQL schema is applied separately by `deploy.scripts.apply_kql
     # --execute` (using the operator's credentials), not by a Fabric notebook.
     if stage_infrastructure and "setup" in notebook_groups:
-        setup_dir = output_dir / SETUP_FOLDER
+        setup_dir = notebooks_dir
         staged_items.extend(
             item.name
             for item in stage_setup_notebooks(
-                repo_root, setup_dir, lakehouse_name=lakehouse_name
+                repo_root,
+                setup_dir,
+                lakehouse_name=lakehouse_name,
+                rendered_dir=rendered_dir,
             )
         )
 
-    # The live streaming generator notebook publishes into a separate "Streaming"
-    # folder. Opt-in via the "stream" group so a default deploy is unaffected. The
+    # The live streaming generator is selected through the "stream" group. The
     # notebook writes events straight to the Eventhouse KQL tables via the Spark
     # connector (no Eventstream).
     if stage_infrastructure and "stream" in notebook_groups:
-        streaming_dir = output_dir / STREAMING_FOLDER
+        streaming_dir = notebooks_dir
         staged_items.extend(
             item.name
             for item in stage_stream_notebooks(
@@ -814,10 +880,11 @@ def build_workspace(
                 streaming_dir,
                 lakehouse_name=lakehouse_name,
                 kql_database_name=kql_database_name,
+                rendered_dir=rendered_dir,
             )
         )
 
-    # Power BI items publish into the "Reporting" workspace folder.
+    # Reports and semantic models publish into separate object-type folders.
     powerbi_items: list[str] = []
     if stage_reporting and profile.selects("asset.semantic-model"):
         powerbi_items.append(f"{semantic_model_name}.SemanticModel")
@@ -828,7 +895,7 @@ def build_workspace(
             item.name
             for item in stage_powerbi_items(
                 repo_root / "fabric" / "powerbi",
-                output_dir / POWERBI_FOLDER,
+                output_dir,
                 powerbi_items,
                 report_default_date=report_default_date,
             )
@@ -840,11 +907,12 @@ def build_workspace(
         staged_items.extend(
             item.name
             for item in stage_querysets(
-                repo_root, output_dir, kql_database_name=kql_database_name
+                repo_root,
+                output_dir / ITEM_FOLDERS["KQLQueryset"],
+                kql_database_name=kql_database_name,
             )
         )
-    # Data Pipelines publish into a "Pipelines" workspace folder (except
-    # setup-pipeline, which joins the setup notebooks under "Setup"), but only
+    # Data Pipelines publish into a "Pipelines" workspace folder, but only
     # when every notebook they orchestrate is part of this deploy. Staging writes
     # native logical IDs so fabric-cicd resolves same-workspace dependencies.
     if stage_infrastructure and profile.pipeline_refs:
@@ -855,6 +923,7 @@ def build_workspace(
                 output_dir,
                 profile.pipeline_refs,
                 _deployed_notebook_names(notebook_groups),
+                lakehouse_name=lakehouse_name,
             )
         )
     # MLflow experiments bootstrap alongside their selected ML tier notebooks.
@@ -921,6 +990,7 @@ def build_workspace(
         )
     if not canonical_profile:
         expected_item_count = len(item_dirs)
+    validate_staged_logical_ids(output_dir)
     return BuildResult(
         output_dir=output_dir,
         profile=profile.deployment_name,
@@ -1044,7 +1114,7 @@ def main() -> int:
     )
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
-    parser.add_argument("--profile", default="core")
+    parser.add_argument("--profile", default="full-demo")
     parser.add_argument(
         "--notebook-groups",
         nargs="+",
@@ -1076,6 +1146,11 @@ def main() -> int:
             "sets staged report date slicers."
         ),
     )
+    parser.add_argument(
+        "--rendered-dir",
+        type=Path,
+        help="Directory containing environment-scoped rendered notebooks.",
+    )
     args = parser.parse_args()
     if args.notebook_groups:
         parser.error(
@@ -1090,6 +1165,10 @@ def main() -> int:
             manifest_path = args.repo_root / manifest_path
         report_default_date = _load_report_default_date(manifest_path)
 
+    rendered_dir = args.rendered_dir
+    if rendered_dir is not None and not rendered_dir.is_absolute():
+        rendered_dir = args.repo_root / rendered_dir
+
     result = build_workspace(
         args.repo_root,
         args.output_dir,
@@ -1100,6 +1179,7 @@ def main() -> int:
         args.report_name,
         args.publication_phase,
         report_default_date,
+        rendered_dir,
     )
     console.info(
         f"Staged {len(result.staged_items)}/{result.expected_item_count} items "

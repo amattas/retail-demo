@@ -18,6 +18,10 @@ from retail_setup.contracts import (
 )
 
 from deploy.scripts import _output as console
+from deploy.scripts.capacity_sizing import (
+    CapacitySizingEvidence,
+    load_capacity_sizing_evidence,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEPLOY_ROOT = REPO_ROOT / "deploy"
@@ -70,6 +74,7 @@ class WorkspaceConfig:
     capacity_name: str | None
     skip_capacity_state_validation: bool
     role_assignments: list[dict[str, Any]]
+    capacity_resource_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -115,7 +120,7 @@ class SparkConfig:
 
     When ``use_custom_pool`` is true the deploy creates a workspace custom Spark
     pool and makes it the workspace default pool so the setup pipeline notebooks
-    run on it. Defaults are tuned for an F64 capacity (128 base Spark vCores).
+    run on it. Live capacity evidence supplies the effective node bounds.
     """
 
     use_custom_pool: bool
@@ -139,6 +144,36 @@ class DeploymentConfig:
 
 
 @dataclass(frozen=True)
+class OperationsPlanningConfig:
+    """Native decision experience; credentials are never stored here.
+
+    Configuration parsing enables the Operations Agent whenever the profile
+    supports it. Planning stays excluded unless explicitly included because it
+    needs a fixed-credential connection and starts non-cancellable billing.
+    """
+
+    enabled: bool = False
+    include_plan: bool = False
+    plan_connection_id: str | None = None
+    plan_billing_acknowledged: bool = False
+    recipient: str | None = None
+
+
+@dataclass(frozen=True)
+class TwinsConfig:
+    """Connected operational twins report publication; on when supported."""
+
+    enabled: bool = False
+
+
+@dataclass(frozen=True)
+class StreamingShortcutsConfig:
+    """Opt-in Eventhouse table projection through Lakehouse shortcuts."""
+
+    enabled: bool = False
+
+
+@dataclass(frozen=True)
 class DeployConfig:
     """Canonical deployment configuration for one environment."""
 
@@ -154,6 +189,9 @@ class DeployConfig:
     spark: SparkConfig
     deployment: DeploymentConfig
     profile: ResolvedProfile
+    operations_planning: OperationsPlanningConfig = OperationsPlanningConfig()
+    twins: TwinsConfig = TwinsConfig()
+    streaming_shortcuts: StreamingShortcutsConfig = StreamingShortcutsConfig()
 
 
 @dataclass(frozen=True)
@@ -197,6 +235,18 @@ def _optional_string(value: Any) -> str | None:
         return None
     value = str(value).strip()
     return value or None
+
+
+def _bounded_node_count(value: Any, field_name: str, default: int) -> int:
+    """Validate an integer custom-pool node count within Fabric-safe bounds."""
+
+    if value is None:
+        value = default
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{field_name} must be an integer")
+    if not 2 <= value <= 16:
+        raise ValueError(f"{field_name} must be between 2 and 16")
+    return value
 
 
 def load_environment(
@@ -256,6 +306,39 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
     spark = data.get("spark", {})
     deployment = data.get("deployment", {})
     auth = data.get("auth", {})
+    native = data.get("operations_planning", {})
+    twins = data.get("twins", {})
+    streaming_shortcuts = data.get("streaming_shortcuts", {})
+    if not isinstance(native, dict):
+        raise ValueError("operations_planning must be a mapping")
+    if not isinstance(twins, dict):
+        raise ValueError("twins must be a mapping")
+    if not isinstance(streaming_shortcuts, dict):
+        raise ValueError("streaming_shortcuts must be a mapping")
+    for flag in ("enabled", "include_plan", "plan_billing_acknowledged"):
+        if flag in native and not isinstance(native[flag], bool):
+            raise ValueError(f"operations_planning.{flag} must be a boolean")
+    if "enabled" in twins and not isinstance(twins["enabled"], bool):
+        raise ValueError("twins.enabled must be a boolean")
+    if "enabled" in streaming_shortcuts and not isinstance(
+        streaming_shortcuts["enabled"], bool
+    ):
+        raise ValueError("streaming_shortcuts.enabled must be a boolean")
+    connection_id = _optional_string(native.get("plan_connection_id"))
+    if connection_id is not None:
+        try:
+            if uuid.UUID(connection_id).int == 0:
+                raise ValueError("A nil connection ID cannot identify a real connection.")
+        except ValueError as exc:
+            raise ValueError(
+                "operations_planning.plan_connection_id must be a UUID"
+            ) from exc
+    recipient = native.get("recipient")
+    if recipient is not None and not isinstance(recipient, str):
+        raise ValueError("operations_planning.recipient must be a string")
+    for flag in ("publish_skip", "unpublish_skip"):
+        if flag in deployment and not isinstance(deployment[flag], bool):
+            raise ValueError(f"deployment.{flag} must be a boolean")
     if "include" in notebooks:
         raise ValueError(
             "notebooks.include is no longer supported; select deployment.profile "
@@ -280,7 +363,7 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
     profile = resolve_profile(
         manifest,
         validation,
-        str(deployment.get("profile", "core")),
+        _optional_string(deployment.get("profile")),
         available_item_types=available_item_types,
         configured_kql_scripts=configured_kql_scripts,
     )
@@ -290,18 +373,80 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
             "spark.use_custom_pool is profile-controlled; select "
             "deployment.profile: full-demo instead of using the legacy override"
         )
+    if (
+        profile.reporting_gate_pipeline_ref is not None
+        and not deployment.get("unpublish_skip", True)
+    ):
+        raise ValueError(
+            "deployment.unpublish_skip must remain true for phased profiles; "
+            "unpublishing a partial stage can delete existing Reporting items"
+        )
+    native_supported = profile.provisions_eventhouse and profile.selects(
+        "asset.semantic-model"
+    )
+    twins_supported = profile.selects("asset.semantic-model") and profile.selects(
+        "asset.report"
+    )
+    streaming_shortcuts_enabled = bool(streaming_shortcuts.get("enabled", False))
+    native_enabled = bool(native.get("enabled", native_supported))
+    twins_enabled = bool(twins.get("enabled", twins_supported))
+    if native_enabled and not native_supported:
+        raise ValueError(
+            "Operations/Planning requires Eventhouse and a selected semantic model "
+            "(standard or full-demo deployment)."
+        )
+    if twins_enabled and not twins_supported:
+        raise ValueError(
+            "Connected twins require a selected semantic model and Report "
+            "(standard or full-demo deployment)."
+        )
+    if twins_enabled and str(powerbi.get("report_name", "retail_model")).casefold() == "retail-twins":
+        raise ValueError("twins requires a report name distinct from the primary report.")
+    if streaming_shortcuts_enabled and not profile.provisions_eventhouse:
+        raise ValueError(
+            "streaming_shortcuts.enabled requires a profile that provisions Eventhouse."
+        )
+    min_node_count = _bounded_node_count(
+        spark.get("min_node_count"),
+        "spark.min_node_count",
+        2,
+    )
+    max_node_count = _bounded_node_count(
+        spark.get("max_node_count"),
+        "spark.max_node_count",
+        16,
+    )
+    if max_node_count < min_node_count:
+        raise ValueError("spark.max_node_count must be greater than or equal to spark.min_node_count")
+    node_size = str(spark.get("node_size", "Medium"))
+    if profile.uses_custom_pool and node_size != "Medium":
+        raise ValueError("Full-demo custom Spark pools require Medium nodes")
 
     return DeployConfig(
         environment=str(data["environment"]),
         tenant_id=_optional_string(data.get("tenant_id")),
         subscription_id=_optional_string(data.get("subscription_id")),
         auth_mode=str(auth.get("mode", "azure_cli")),
+        twins=TwinsConfig(enabled=twins_enabled),
+        operations_planning=OperationsPlanningConfig(
+            enabled=native_enabled,
+            include_plan=bool(native.get("include_plan", False)),
+            plan_connection_id=connection_id,
+            plan_billing_acknowledged=bool(
+                native.get("plan_billing_acknowledged", False)
+            ),
+            recipient=_optional_string(recipient),
+        ),
+        streaming_shortcuts=StreamingShortcutsConfig(
+            enabled=streaming_shortcuts_enabled,
+        ),
         workspace=WorkspaceConfig(
             name=str(workspace["name"]),
             description=str(workspace.get("description", "")),
             existing_id=_optional_string(workspace.get("existing_id")),
             capacity_id=_optional_string(workspace.get("capacity_id")),
             capacity_name=_optional_string(workspace.get("capacity_name")),
+            capacity_resource_id=_optional_string(workspace.get("capacity_resource_id")),
             skip_capacity_state_validation=bool(
                 workspace.get("skip_capacity_state_validation", False)
             ),
@@ -339,9 +484,9 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
         spark=SparkConfig(
             use_custom_pool=profile.uses_custom_pool,
             custom_pool_name=str(spark.get("custom_pool_name", "retail_setup_pool")),
-            node_size=str(spark.get("node_size", "Medium")),
-            min_node_count=int(spark.get("min_node_count", 1)),
-            max_node_count=int(spark.get("max_node_count", 10)),
+            node_size=node_size,
+            min_node_count=min_node_count,
+            max_node_count=max_node_count,
         ),
         deployment=DeploymentConfig(
             profile=profile.deployment_name,
@@ -375,7 +520,10 @@ def _hcl_value(value: Any) -> str:
     return json.dumps(value, indent=2)
 
 
-def render_tfvars(config: DeployConfig) -> str:
+def render_tfvars(
+    config: DeployConfig,
+    capacity_sizing: CapacitySizingEvidence | None = None,
+) -> str:
     """Render Terraform variable values for an environment."""
 
     if config.spark.use_custom_pool != config.profile.uses_custom_pool:
@@ -386,6 +534,12 @@ def render_tfvars(config: DeployConfig) -> str:
         raise ValueError(
             "eventhouse.enabled must be derived from deployment.profile"
         )
+    if config.spark.use_custom_pool and capacity_sizing is None:
+        raise ValueError(
+            "Custom-pool config generation requires fresh capacity sizing evidence"
+        )
+    if not config.spark.use_custom_pool and capacity_sizing is not None:
+        raise ValueError("Starter-pool profiles must not use capacity sizing evidence")
 
     values: dict[str, Any] = {
         "environment": config.environment,
@@ -408,10 +562,11 @@ def render_tfvars(config: DeployConfig) -> str:
     # Pool sizing only matters when the custom pool is enabled; emit it then so
     # the default (starter-pool) tfvars stays minimal.
     if config.spark.use_custom_pool:
+        assert capacity_sizing is not None
         values["spark_custom_pool_name"] = config.spark.custom_pool_name
-        values["spark_node_size"] = config.spark.node_size
-        values["spark_min_node_count"] = config.spark.min_node_count
-        values["spark_max_node_count"] = config.spark.max_node_count
+        values["spark_node_size"] = capacity_sizing.node_size
+        values["spark_min_node_count"] = capacity_sizing.min_node_count
+        values["spark_max_node_count"] = capacity_sizing.max_node_count
 
     optional_values = {
         "tenant_id": config.tenant_id,
@@ -644,6 +799,7 @@ def write_generated_configs(
     config: DeployConfig,
     deploy_root: Path,
     terraform_outputs: dict[str, Any] | None = None,
+    capacity_sizing: CapacitySizingEvidence | None = None,
 ) -> GeneratedConfigPaths:
     """Write generated tfvars and fabric-cicd configuration files."""
 
@@ -660,13 +816,16 @@ def write_generated_configs(
     tfvars_path.parent.mkdir(parents=True, exist_ok=True)
     fabric_config_path.parent.mkdir(parents=True, exist_ok=True)
 
-    tfvars_path.write_text(render_tfvars(config), encoding="utf-8")
+    tfvars_path.write_text(
+        render_tfvars(config, capacity_sizing),
+        encoding="utf-8",
+    )
     _write_yaml(
         fabric_config_path,
         render_fabric_cicd_config(
             config,
             terraform_outputs,
-            repository_directory="../../../workspace",
+            repository_directory="../workspace",
         ),
     )
     _write_yaml(parameter_path, render_parameter_file(config, terraform_outputs))
@@ -708,13 +867,42 @@ def main() -> int:
         type=Path,
         help="Optional path to `terraform output -json` output",
     )
+    parser.add_argument(
+        "--capacity-sizing-evidence",
+        type=Path,
+        help="Fresh live custom-pool sizing evidence from preflight.",
+    )
     args = parser.parse_args()
 
     config = load_environment(args.environment)
     outputs = (
         load_terraform_outputs(args.terraform_output) if args.terraform_output else None
     )
-    paths = write_generated_configs(config, args.deploy_root, outputs)
+    if config.profile.uses_custom_pool:
+        if args.capacity_sizing_evidence is None:
+            parser.error(
+                "--capacity-sizing-evidence is required for custom-pool profiles"
+            )
+        evidence_path = args.capacity_sizing_evidence
+        if not evidence_path.is_absolute():
+            evidence_path = REPO_ROOT / evidence_path
+        capacity_sizing = load_capacity_sizing_evidence(
+            evidence_path,
+            config=config,
+            repo_root=REPO_ROOT,
+        )
+    else:
+        if args.capacity_sizing_evidence is not None:
+            parser.error(
+                "--capacity-sizing-evidence is not valid for starter-pool profiles"
+            )
+        capacity_sizing = None
+    paths = write_generated_configs(
+        config,
+        args.deploy_root,
+        outputs,
+        capacity_sizing,
+    )
     console.info(f"Wrote {paths.tfvars}")
     console.info(f"Wrote {paths.fabric_config}")
     console.info(f"Wrote {paths.parameter}")

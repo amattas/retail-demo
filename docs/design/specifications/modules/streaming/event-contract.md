@@ -13,6 +13,13 @@ Supported sinks:
 
 The current path does not require Kafka, Event Hubs, or a Fabric Eventstream.
 
+Before emitting events, the driver requires readable, nonempty Silver
+`dim_stores`, `dim_customers`, `dim_products`,
+`dim_distribution_centers`, and `dim_trucks`. Product/store attribute reads
+provide prices and tax data. Missing/empty dimensions or failed attribute
+reads stop startup rather than substituting arbitrary ID ranges or synthetic
+attribute frames. Complete historical setup before starting the stream.
+
 ## Envelope
 
 Every event contains:
@@ -96,10 +103,16 @@ If `kusto_uri` is blank, the notebook resolves the KQL database
   inputs, so reruns do not accumulate aggregate rows.
 
 These controls make expected retries idempotent and are covered by injected
-failure/replay contracts. The readiness adapter checks live ingestion and
+failure/replay contracts. `tests/test_streaming_dedup_contract.py` executes the
+actual `foreachBatch` sink function with mocked connector operations,
+including partial table-write, unmapped-event, and credential failures;
+counting static `raise` statements is not the verification method.
+These tests do not establish live Spark/Kusto transactional behavior.
+The readiness adapter checks live ingestion and
 checkpoint tags. The remaining
 [IMP-013](../../../requirements/modules/operations/backlog.md#imp-013) evidence
-is a recent bounded run of the intentionally manual stream.
+includes a recent bounded run of the intentionally manual stream and live
+execution of the bounded receipt/inventory/sales reconciliation query.
 
 ## Cross-layer ownership
 
@@ -158,12 +171,15 @@ approved payment_cents = total_cents
 attributed_revenue_cents = net_subtotal_cents
 ```
 
-Eventhouse exposes the same logic through `fn_marketing_attribution()` and
-`fn_campaign_performance()`. Gold publishes `campaign_performance_daily`, and
-the Direct Lake model exposes both the audit fact and campaign KPIs. Contract
-tests cover batch determinism, live payload/KQL mappings, Silver/Gold wiring,
-semantic measures, and all cent equations. A live Fabric smoke run remains the
-deployment verification gate.
+Eventhouse exposes reconciliation diagnostics through
+`fn_marketing_attribution()`. Consumer-facing `fn_attribution()` and
+`fn_attribution_window()` return only reconciled `ATTRIBUTED` purchases after
+future and out-of-window touches are removed and the latest valid touch is
+selected. `fn_campaign_performance()` uses that reconciled set. Gold publishes
+`campaign_performance_daily`, and the Direct Lake model exposes both the audit
+fact and campaign KPIs. Contract tests cover batch determinism, live
+payload/KQL mappings, Silver/Gold wiring, semantic measures, and all cent
+equations. A live Fabric smoke run remains the deployment verification gate.
 
 ## Contract evidence and live boundary
 

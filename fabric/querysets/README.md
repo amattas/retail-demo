@@ -5,6 +5,9 @@ Each `*.kql` file in this directory becomes one tab in the deployed
 target KQL database and rewrites the database item identifier.
 
 The current queries cover sales, inventory, customer journey, logistics, and
-marketing investigations. Some scenarios remain constrained by known data and
-KPI gaps; see the [demo script](../../docs/guides/demo-script.md) and
-[analytics backlog](../../docs/design/requirements/modules/analytics/backlog.md).
+marketing investigations.
+
+`q_stockout_detections_by_store.kql` intentionally reports recent detection
+events rather than "open" stockouts because the event contract has no stockout
+resolution event. Zone dwell queries weight minute-level averages by customer
+count, and truck dwell queries use completed, nonfuture departures.

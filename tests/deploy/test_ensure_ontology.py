@@ -45,7 +45,9 @@ def test_existing_ontology_runs_validation_notebook(monkeypatch) -> None:
         lambda *_args, **_kwargs: {"status": "Completed"},
     )
 
-    result = ensure_ontology.ensure_ontology(lambda: session, "workspace-id")
+    result = ensure_ontology.ensure_ontology(
+        lambda: session, "workspace-id", tmdl_check=lambda *_: False
+    )
 
     assert result == ("ontology-id", False)
     assert session.posts == [
@@ -125,3 +127,29 @@ def test_duplicate_ontology_fails_closed(monkeypatch) -> None:
         match="found 2",
     ):
         ensure_ontology.ensure_ontology(lambda: _Session(), "workspace-id")
+
+
+def test_tmdl_ontology_skips_the_legacy_notebook(monkeypatch) -> None:
+    session = _Session()
+    monkeypatch.setattr(
+        ensure_ontology,
+        "list_items",
+        lambda _session, _workspace, item_type: (
+            [{"id": "ontology-id", "displayName": "RetailOntology_AutoGen"}]
+            if item_type == "Ontology"
+            else [{"id": "notebook-id", "displayName": "30-create-ontology"}]
+        ),
+    )
+    checked = []
+
+    def tmdl_check(_session, workspace_id, item_id):
+        checked.append((workspace_id, item_id))
+        return True
+
+    result = ensure_ontology.ensure_ontology(
+        lambda: session, "workspace-id", tmdl_check=tmdl_check
+    )
+
+    assert result == ("ontology-id", False)
+    assert checked == [("workspace-id", "ontology-id")]
+    assert session.posts == []

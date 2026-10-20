@@ -114,13 +114,77 @@ def test_configure_writes_both_configs(tmp_path):
     assert env["lakehouse"]["name"] == "my_lh"
     assert env["deployment"]["profile"] == "core"
     assert "spark" not in env
-    gen = yaml.safe_load((tmp_path / "utility/config.yaml").read_text())
+    gen = yaml.safe_load(
+        (tmp_path / "utility/config/environments/my-ws.yaml").read_text()
+    )
     assert gen["store_type"] == "grocery"
     assert gen["months"] == 3
     assert gen["store_count"] == 10
     assert "start_date" not in gen and "end_date" not in gen
     # The estimate is shown before writing.
     assert "Estimated records" in result.output
+
+
+def test_configure_keeps_generation_settings_isolated_by_environment(tmp_path):
+    _seed_deploy_config(tmp_path)
+    common = [
+        "configure",
+        "--repo-root",
+        str(tmp_path),
+        "--tenant-id",
+        "11111111-1111-1111-1111-111111111111",
+        "--capacity-name",
+        "F64",
+        "--eventhouse-name",
+        "retail_eventhouse",
+        "--kql-database-name",
+        "retail_eventhouse",
+        "--profile",
+        "core",
+        "--store-type",
+        "grocery",
+        "--months",
+        "3",
+    ]
+    first = runner.invoke(
+        app,
+        [
+            *common,
+            "--workspace-name",
+            "dev",
+            "--lakehouse-name",
+            "lh_dev",
+            "--store-count",
+            "5",
+            "--seed",
+            "1",
+        ],
+    )
+    second = runner.invoke(
+        app,
+        [
+            *common,
+            "--workspace-name",
+            "prod",
+            "--lakehouse-name",
+            "lh_prod",
+            "--store-count",
+            "20",
+            "--seed",
+            "2",
+        ],
+    )
+
+    assert first.exit_code == 0, first.output
+    assert second.exit_code == 0, second.output
+    dev = yaml.safe_load(
+        (tmp_path / "utility/config/environments/dev.yaml").read_text()
+    )
+    prod = yaml.safe_load(
+        (tmp_path / "utility/config/environments/prod.yaml").read_text()
+    )
+    assert (dev["store_count"], dev["seed"]) == (5, 1)
+    assert (prod["store_count"], prod["seed"]) == (20, 2)
 
 
 def test_configure_migrates_legacy_profile_controlled_overrides(tmp_path):
@@ -189,7 +253,9 @@ def test_configure_prompts_show_defaults_and_store_types(tmp_path):
     assert "Random seed [42]" in result.output
     assert "Estimated records" in result.output
 
-    gen = yaml.safe_load((tmp_path / "utility/config.yaml").read_text())
+    gen = yaml.safe_load(
+        (tmp_path / "utility/config/environments/retail-demo.yaml").read_text()
+    )
     assert gen == {
         "store_type": "supercenter",
         "months": 3,
@@ -233,7 +299,9 @@ def test_configure_selects_full_demo_custom_spark_pool(tmp_path):
     assert result.exit_code == 0, result.output
     env = yaml.safe_load((tmp_path / "deploy/config/environments/my-ws.yml").read_text())
     assert env["deployment"]["profile"] == "full-demo"
-    generation = yaml.safe_load((tmp_path / "utility/config.yaml").read_text())
+    generation = yaml.safe_load(
+        (tmp_path / "utility/config/environments/my-ws.yaml").read_text()
+    )
     assert generation["months"] == 18
     config = yaml.safe_load((tmp_path / "deploy/config/deploy.yml").read_text())
     assert config["deployment"]["profile"] == "core"
@@ -286,7 +354,9 @@ def test_configure_full_demo_lifts_saved_short_history_default(tmp_path):
 
     assert result.exit_code == 0, result.output
     assert "Months of data to generate (history ends yesterday) [18]" in result.output
-    generation = yaml.safe_load((utility / "config.yaml").read_text())
+    generation = yaml.safe_load(
+        (utility / "config" / "environments" / "retail-demo.yaml").read_text()
+    )
     assert generation["months"] == 18
 
 
@@ -325,7 +395,9 @@ def test_configure_rejects_short_history_for_reporting_profile(tmp_path):
 
     assert result.exit_code == 1
     assert "requires at least 540 days of history" in result.output
-    assert not (tmp_path / "utility/config.yaml").exists()
+    assert not (
+        tmp_path / "utility/config/environments/my-ws.yaml"
+    ).exists()
 
 
 def test_configure_rejects_legacy_custom_pool_override(tmp_path):
@@ -378,7 +450,7 @@ def test_configure_rejects_bad_generation_values(tmp_path):
     )
     assert result.exit_code != 0
     assert "bogus" in result.output
-    assert not (tmp_path / "utility/config.yaml").exists()
+    assert not (tmp_path / "utility/config/environments/w.yaml").exists()
 
 
 def test_configure_rejects_eventhouse_database_name_split(tmp_path):

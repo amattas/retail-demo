@@ -1,5 +1,7 @@
 let window = 24h;
 fn_truck_sla()
-| where isnotnull(arrival_time) and arrival_time > ago(window)
+| where departure_ingest_timestamp > ago(window)
+| where departure_ingest_timestamp <= now()
+| where departure_time <= now()
 | summarize avg_dwell_min = avg(dwell_minutes), trucks = count() by site
 | order by avg_dwell_min desc

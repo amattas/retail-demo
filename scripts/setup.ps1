@@ -38,6 +38,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $false
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $SetupPy = Join-Path $PSScriptRoot 'setup.py'
 $CondaEnvName = 'retail-demo'
@@ -85,18 +86,28 @@ function Test-PythonVersion {
 }
 
 function Resolve-Conda {
-    $conda = Get-Command conda -ErrorAction SilentlyContinue
-    if ($conda) { return $conda.Source }
+    # Activation may leave a conda alias whose Source is a module name, not a
+    # runnable path. Prefer a real executable from the active installation.
+    foreach ($candidate in @($env:CONDA_EXE, $env:_CONDA_EXE)) {
+        if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            return (Get-Item -LiteralPath $candidate).FullName
+        }
+    }
+    $conda = Get-Command conda -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($conda) { return $conda.Path }
     $candidates = @(
         (Join-Path $env:USERPROFILE 'miniforge3\Scripts\conda.exe'),
         (Join-Path $env:USERPROFILE 'miniconda3\Scripts\conda.exe'),
+        (Join-Path $env:USERPROFILE 'anaconda3\Scripts\conda.exe'),
         (Join-Path $env:LOCALAPPDATA 'miniforge3\Scripts\conda.exe'),
         (Join-Path $env:LOCALAPPDATA 'miniconda3\Scripts\conda.exe'),
+        (Join-Path $env:LOCALAPPDATA 'anaconda3\Scripts\conda.exe'),
         'C:\ProgramData\miniforge3\Scripts\conda.exe',
         'C:\ProgramData\miniconda3\Scripts\conda.exe'
     )
     foreach ($candidate in $candidates) {
-        if (Test-Path $candidate) { return $candidate }
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
     }
     return $null
 }
@@ -104,15 +115,17 @@ function Resolve-Conda {
 function Resolve-SystemPython {
     # Find a system Python (3.11+) suitable for creating a virtual environment.
     foreach ($name in @('python', 'python3')) {
-        $cmd = Get-Command $name -ErrorAction SilentlyContinue
-        if ($cmd -and (Test-PythonVersion $cmd.Source)) {
-            return $cmd.Source
+        $cmd = Get-Command $name -CommandType Application -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($cmd -and (Test-PythonVersion $cmd.Path)) {
+            return $cmd.Path
         }
     }
-    $py = Get-Command py -ErrorAction SilentlyContinue
+    $py = Get-Command py -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
     if ($py) {
         try {
-            $exe = & $py.Source '-3' '-c' 'import sys; print(sys.executable)' 2>$null
+            $exe = & $py.Path '-3' '-c' 'import sys; print(sys.executable)' 2>$null
             if ($exe -and (Test-PythonVersion $exe.Trim())) {
                 return $exe.Trim()
             }
@@ -130,7 +143,10 @@ function Install-Miniforge {
     winget install --id CondaForge.Miniforge3 -e `
         --version $MiniforgeVersion --source winget `
         --disable-interactivity --silent `
-        --accept-package-agreements --accept-source-agreements
+        --accept-package-agreements --accept-source-agreements | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "Miniforge installation failed (exit code $LASTEXITCODE)."
+    }
     $conda = Resolve-Conda
     if (-not $conda) {
         throw 'Miniforge install completed but conda was not found. Open a new shell and re-run.'
@@ -140,7 +156,14 @@ function Install-Miniforge {
 
 function Test-CondaEnvExists {
     param([string] $Conda, [string] $EnvName)
-    $list = & $Conda env list --json | ConvertFrom-Json
+    $json = & $Conda env list --json
+    if ($LASTEXITCODE -ne 0) {
+        throw "Conda environment listing failed (exit code $LASTEXITCODE)."
+    }
+    $list = $json | ConvertFrom-Json
+    if ($null -eq $list -or $list.envs -isnot [array]) {
+        throw 'Conda returned an invalid environment inventory.'
+    }
     foreach ($path in $list.envs) {
         if ((Split-Path $path -Leaf) -eq $EnvName) { return $true }
     }
@@ -155,13 +178,19 @@ function Enable-CondaEnv {
     }
     else {
         Write-Host "Creating conda environment '$EnvName' (Python $CondaPythonVersion)..."
-        & $Conda create -n $EnvName "python=$CondaPythonVersion" -y
+        & $Conda create -n $EnvName "python=$CondaPythonVersion" -y | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            throw "Conda environment creation failed (exit code $LASTEXITCODE)."
+        }
     }
-    # Load conda's PowerShell integration so 'conda activate' works in-process.
-    $hook = & $Conda 'shell.powershell' 'hook' | Out-String
-    Invoke-Expression $hook
-    conda activate $EnvName
-    if (-not $env:CONDA_PREFIX) {
+    # Apply activation directly, without importing persistent Conda aliases or
+    # replacing the caller's prompt via the full shell hook.
+    $activation = & $Conda 'shell.powershell' 'activate' $EnvName | Out-String
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($activation)) {
+        throw "Conda activation failed for '$EnvName' (exit code $LASTEXITCODE)."
+    }
+    Invoke-Expression $activation
+    if (-not $env:CONDA_PREFIX -or $env:CONDA_DEFAULT_ENV -ne $EnvName) {
         throw "Failed to activate the conda environment '$EnvName'."
     }
 }

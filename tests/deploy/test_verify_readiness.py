@@ -13,11 +13,15 @@ from types import SimpleNamespace
 import pytest
 from retail_setup.contracts import load_repository_manifest, resolve_profile
 
+from deploy.scripts.build_artifacts import SETUP_NOTEBOOKS
+from deploy.scripts.deploy_config import OperationsPlanningConfig, TwinsConfig
 from deploy.scripts.verify_readiness import (
+    CheckFailed,
     CheckResult,
     EvidenceUnknown,
     ExpectedItem,
     FabricReadinessAdapter,
+    KqlInventory,
     ReadinessContext,
     ReadinessRunner,
     _connect_lakehouse_sql,
@@ -86,6 +90,73 @@ def test_item_inventory_reports_missing_duplicates_and_id_mismatch() -> None:
     assert comparison["missing"] == ["Report:missing"]
     assert comparison["missing_ids"] == ["SemanticModel:empty-id"]
     assert comparison["mismatched_ids"][0]["expected_id"] == LAKEHOUSE_ID
+
+
+def test_failed_inventory_check_retains_the_specific_missing_items() -> None:
+    runner = object.__new__(ReadinessRunner)
+    runner._items_error = None
+    runner.items = []
+    runner.checks = []
+    expected = [
+        ExpectedItem("Report", "retail-twins"),
+        ExpectedItem("Notebook", "prepare-replenishment-case"),
+    ]
+
+    runner._check(
+        "items.required",
+        "inventory",
+        selected=True,
+        required=True,
+        function=lambda: runner._item_inventory(expected),
+    )
+
+    result = runner.checks[0].to_dict()
+    assert result["status"] == "FAIL"
+    assert result["evidence"]["missing"] == [
+        "Report:retail-twins",
+        "Notebook:prepare-replenishment-case",
+    ]
+    assert result["evidence"]["duplicates"] == []
+
+
+def test_failed_notebook_check_retains_the_binding_error(monkeypatch) -> None:
+    context = _native_context()
+    runner = ReadinessRunner(context, object())
+    definition = _definition(
+        "notebook-content.ipynb",
+        {
+            "metadata": {
+                "dependencies": {
+                    "lakehouse": {
+                        "default_lakehouse": LAKEHOUSE_ID,
+                        "default_lakehouse_name": "retail_lakehouse",
+                        "default_lakehouse_workspace_id": WORKSPACE_ID,
+                    }
+                }
+            }
+        },
+    )
+
+    def notebook_definition(_item_type, name):
+        if name == "prepare-replenishment-case":
+            raise CheckFailed(f"Expected one Notebook:{name} item; found 0.")
+        return definition
+
+    monkeypatch.setattr(runner, "_definition", notebook_definition)
+    runner._check(
+        "bindings.notebooks",
+        "binding",
+        selected=True,
+        required=True,
+        function=runner._notebook_bindings,
+    )
+
+    result = runner.checks[0].to_dict()
+    assert result["status"] == "FAIL"
+    assert result["evidence"]["errors"] == [
+        "prepare-replenishment-case: "
+        "Expected one Notebook:prepare-replenishment-case item; found 0."
+    ]
 
 
 def test_notebook_definition_requires_exact_lakehouse_binding() -> None:
@@ -380,6 +451,26 @@ def test_selected_kql_inventory_is_source_derived_and_differences_fail_closed() 
     assert difference["unexpected"] == ["three"]
 
 
+def test_kql_inventory_parses_additional_paths_with_the_same_parser(tmp_path):
+    source = tmp_path / "native.kql"
+    source.write_text(
+        ".create-merge table custom_signal (value:long)\n"
+        ".create-or-alter function custom_lookup() { custom_signal }\n"
+        ".create-or-alter materialized-view custom_view on table custom_signal {}\n"
+        ".create-or-alter table custom_signal ingestion json mapping 'CustomMap' '[]'\n",
+        encoding="utf-8",
+    )
+
+    inventory = parse_kql_inventory(
+        tmp_path, [], additional_paths=[Path("native.kql")]
+    )
+
+    assert inventory.tables == frozenset({"custom_signal"})
+    assert inventory.functions == frozenset({"custom_lookup"})
+    assert inventory.materialized_views == frozenset({"custom_view"})
+    assert inventory.mappings == frozenset({"custom_signal/CustomMap"})
+
+
 def test_freshness_rejects_missing_stale_future_and_mismatched_evidence() -> None:
     now = datetime(2026, 7, 21, 10, 0, tzinfo=UTC)
     fresh = evaluate_freshness(
@@ -450,6 +541,7 @@ def test_sql_signals_normalize_driver_datetimes_without_credentials() -> None:
                     "generated_at": timestamp,
                 }
             ],
+            [{"staging_table_count": 0}],
             [{"table_count": 1}],
             [{"source_count": 2, "updated_at": timestamp}],
         ]
@@ -463,6 +555,44 @@ def test_sql_signals_normalize_driver_datetimes_without_credentials() -> None:
     assert setup["generated_at"] == "2026-07-21T09:58:00+00:00"
     assert watermark is not None
     assert watermark["updated_at"] == "2026-07-21T09:58:00+00:00"
+
+
+def test_setup_signal_separates_distributed_data_from_catalog_metadata() -> None:
+    adapter = object.__new__(FabricReadinessAdapter)
+    queries = []
+    timestamp = datetime(2026, 9, 6, 0, 20)
+
+    def execute(query):
+        queries.append(query)
+        if "INFORMATION_SCHEMA" in query and "[ag].[setup_run_log]" in query:
+            raise RuntimeError("object is not supported in distributed processing mode")
+        if "INFORMATION_SCHEMA" in query:
+            return [{"staging_table_count": 2}]
+        return [{"run_id": "setup-run", "status": "COMPLETED", "generated_at": timestamp}]
+
+    adapter._execute_sql = execute
+    signal = adapter.setup_signal()
+
+    assert len(queries) == 2
+    assert signal["status"] == "COMPLETED"
+    assert signal["staging_table_count"] == 2
+    assert signal["generated_at"] == "2026-09-06T00:20:00+00:00"
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [[], [{}], [{"staging_table_count": None}], [{"staging_table_count": -1}]],
+)
+def test_setup_signal_does_not_treat_missing_catalog_evidence_as_zero(metadata) -> None:
+    adapter = object.__new__(FabricReadinessAdapter)
+    results = iter([
+        [{"run_id": "setup-run", "status": "COMPLETED", "generated_at": "2026-09-06T00:20:00Z"}],
+        metadata,
+    ])
+    adapter._execute_sql = lambda _: next(results)
+
+    with pytest.raises(EvidenceUnknown, match="staging"):
+        adapter.setup_signal()
 
 
 def test_checkpoint_query_coerces_extent_tags_to_dynamic() -> None:
@@ -543,6 +673,82 @@ def test_sql_connection_falls_back_to_bundled_driver(monkeypatch) -> None:
     assert "Authentication=" not in calls[0][0][0]
     assert calls[0][1]["timeout"] == 60
     assert isinstance(calls[0][1]["attrs_before"][1256], bytes)
+
+
+def test_sql_connection_retries_refused_handshake_then_connects(monkeypatch) -> None:
+    from deploy.scripts import _retry
+
+    waits: list[float] = []
+    monkeypatch.setattr(_retry.time, "sleep", waits.append)
+
+    class OperationalError(Exception):
+        pass
+
+    connection = object()
+    outcomes = [OperationalError("handshake"), OperationalError("handshake"), connection]
+
+    def connect(*_args, **_kwargs):
+        outcome = outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    monkeypatch.setitem(
+        sys.modules,
+        "pyodbc",
+        SimpleNamespace(
+            drivers=lambda: ["ODBC Driver 17 for SQL Server"],
+            connect=connect,
+            OperationalError=OperationalError,
+        ),
+    )
+    credential = SimpleNamespace(
+        get_token=lambda scope: SimpleNamespace(token="sql-token")
+    )
+
+    result = _connect_lakehouse_sql(
+        "server.fabric.microsoft.com", "retail_lakehouse", credential
+    )
+
+    assert result is connection
+    assert waits == [2.0, 4.0]
+
+
+def test_sql_connection_does_not_retry_other_driver_errors(monkeypatch) -> None:
+    from deploy.scripts import _retry
+
+    monkeypatch.setattr(_retry.time, "sleep", lambda _s: pytest.fail("must not wait"))
+
+    class OperationalError(Exception):
+        pass
+
+    class ProgrammingError(Exception):
+        pass
+
+    attempts = []
+
+    def connect(*_args, **_kwargs):
+        attempts.append(1)
+        raise ProgrammingError("bad login")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "pyodbc",
+        SimpleNamespace(
+            drivers=lambda: ["ODBC Driver 17 for SQL Server"],
+            connect=connect,
+            OperationalError=OperationalError,
+        ),
+    )
+    credential = SimpleNamespace(
+        get_token=lambda scope: SimpleNamespace(token="sql-token")
+    )
+
+    with pytest.raises(ProgrammingError):
+        _connect_lakehouse_sql(
+            "server.fabric.microsoft.com", "retail_lakehouse", credential
+        )
+    assert len(attempts) == 1
 
 
 def test_terminal_pipeline_evidence_requires_complete_ordered_timestamps() -> None:
@@ -767,14 +973,7 @@ class _CoreAdapter:
             },
         ]
         self.definitions: dict[str, dict] = {}
-        for index, name in enumerate(
-            (
-                "setup-01-seed-dictionaries",
-                "setup-02-generate-dimensions",
-                "setup-03-generate-facts",
-                "setup-04-build-gold",
-            )
-        ):
+        for index, name in enumerate(SETUP_NOTEBOOKS):
             item_id = f"notebook-{index}"
             self.items.append(
                 {"type": "Notebook", "displayName": name, "id": item_id}
@@ -837,6 +1036,7 @@ def test_core_profile_runs_fixed_taxonomy_and_skips_unselected_capabilities(
             semantic_model_name="retail_model",
             report_name="retail_model",
         ),
+        twins=TwinsConfig(),
     )
     outputs = {
         "deployment_environment": "dev",
@@ -874,9 +1074,9 @@ def test_core_profile_runs_fixed_taxonomy_and_skips_unselected_capabilities(
     assert report["profile"]["hash"] == "profile-hash"
     assert report["profile"]["support_status"] == "core"
     assert report["profile"]["expected_item_counts"] == {
-        "infrastructure": 5,
+        "infrastructure": 12,
         "reporting": 0,
-        "all": 5,
+        "all": 12,
     }
     assert report["profile"]["asset_boundaries"]["preview"] == []
     assert report["profile"]["asset_boundaries"]["manual"] == []
@@ -936,8 +1136,17 @@ def test_core_profile_runs_fixed_taxonomy_and_skips_unselected_capabilities(
         for check in cleanup_failed
         if check.check_id == "freshness.setup_run_log"
     )
-    assert setup.status == "FAIL"
-    assert aggregate_status(cleanup_failed) == "FAILED"
+    assert setup.status == "PASS"
+    assert setup.evidence["cleanup_required"] is True
+    assert aggregate_status(cleanup_failed) == "DEGRADED"
+
+    latest = adapter.setup_signal()
+    latest.update(status="COMPLETED", staging_table_count=1)
+    monkeypatch.setattr(adapter, "setup_signal", lambda: latest)
+    later_gold_success = ReadinessRunner(context, adapter).run()
+    assert aggregate_status(later_gold_success) == "DEGRADED"
+    latest["staging_table_count"] = 0
+    assert aggregate_status(ReadinessRunner(context, adapter).run()) == "SUCCEEDED"
 
 
 def _profile_context(profile_name: str, now: datetime) -> ReadinessContext:
@@ -962,6 +1171,7 @@ def _profile_context(profile_name: str, now: datetime) -> ReadinessContext:
             semantic_model_name="retail_model",
             report_name="retail_model",
         ),
+        twins=TwinsConfig(),
     )
     return ReadinessContext(
         repo_root=REPO_ROOT,
@@ -979,6 +1189,401 @@ def _profile_context(profile_name: str, now: datetime) -> ReadinessContext:
         deploy_journal=None,
         observed_at=now,
     )
+
+
+def _native_context(enabled: bool = True, include_plan: bool = True) -> ReadinessContext:
+    context = _profile_context("standard", datetime(2026, 9, 8, tzinfo=UTC))
+    context.config.operations_planning = OperationsPlanningConfig(
+        enabled=enabled, include_plan=include_plan,
+    )
+    return context
+
+
+def _twins_context(enabled: bool = True) -> ReadinessContext:
+    context = _profile_context("standard", datetime(2026, 9, 8, tzinfo=UTC))
+    context.config.twins = TwinsConfig(enabled=enabled)
+    return context
+
+
+def test_native_items_are_expected_only_when_enabled():
+    baseline = expected_live_items(_native_context(False))
+    native = expected_live_items(_native_context())
+    added = {item.key for item in native} - {item.key for item in baseline}
+
+    assert added == {
+        ("OperationsAgent", "retail-availability-operations"),
+        ("Notebook", "prepare-replenishment-case"),
+        ("Plan", "retail-replenishment"),
+    }
+    required = {item.key: item.required for item in native if item.key in added}
+    assert required == {
+        ("OperationsAgent", "retail-availability-operations"): False,
+        ("Notebook", "prepare-replenishment-case"): True,
+        ("Plan", "retail-replenishment"): True,
+    }
+
+
+def test_twins_report_is_required_only_when_explicitly_enabled():
+    baseline = expected_live_items(_twins_context(False))
+    twins = expected_live_items(_twins_context())
+    added = {item.key for item in twins} - {item.key for item in baseline}
+
+    assert added == {("Report", "retail-twins")}
+    assert all(item.required for item in twins if item.key in added)
+
+
+def test_twins_inventory_boundary_does_not_claim_visual_or_physical_runtime():
+    context = _twins_context()
+    expected = expected_live_items(context)
+    verifier = ReadinessRunner(context, object())
+    verifier._items_error = None
+    verifier.items = [
+        {
+            "type": item.item_type,
+            "displayName": item.display_name,
+            "id": item.item_id or f"item-{index}",
+        }
+        for index, item in enumerate(expected)
+    ]
+
+    observation = verifier._item_inventory(expected)
+
+    assert "visual runtime" in observation.summary
+    boundary = observation.evidence["connected_twins"]
+    assert boundary["visual_runtime"] == "NOT_VERIFIED"
+    assert boundary["physical_realtime_twin"] == "NOT_CLAIMED"
+    assert boundary["publication_report"].endswith("twins-report.json")
+
+
+def test_twins_report_binding_requires_primary_and_twins_reports():
+    context = _twins_context()
+    items = [
+        {"type": "SemanticModel", "displayName": "retail_model", "id": "model-id"},
+        {"type": "Report", "displayName": "retail_model", "id": "primary-report"},
+        {"type": "Report", "displayName": "retail-twins", "id": "twins-report"},
+    ]
+    definitions = {
+        "primary-report": _definition(
+            "definition.pbir",
+            {"datasetReference": {"byPath": {"path": "../retail_model.SemanticModel"}}},
+        ),
+        "twins-report": _definition(
+            "definition.pbir",
+            {"datasetReference": {"byConnection": {"modelId": "model-id"}}},
+        ),
+    }
+    verifier = ReadinessRunner(
+        context,
+        SimpleNamespace(get_definition=lambda item_id: definitions[item_id]),
+    )
+    verifier.items = items
+
+    observation = verifier._report_binding()
+
+    assert observation.evidence["report_count"] == 2
+    assert observation.evidence["reports"] == ["retail_model", "retail-twins"]
+    assert observation.evidence["connected_twins"]["semantic_model"] == "retail_model"
+
+    verifier.items = items[:-1]
+    with pytest.raises(CheckFailed, match="retail-twins"):
+        verifier._report_binding()
+
+    verifier.items = [*items[:2], {**items[2], "id": "primary-report"}]
+    with pytest.raises(CheckFailed, match="unique"):
+        verifier._report_binding()
+
+
+def test_default_report_binding_behavior_checks_only_primary_report():
+    context = _twins_context(False)
+    items = [
+        {"type": "SemanticModel", "displayName": "retail_model", "id": "model-id"},
+        {"type": "Report", "displayName": "retail_model", "id": "primary-report"},
+    ]
+    definitions = {
+        "primary-report": _definition(
+            "definition.pbir",
+            {"datasetReference": {"byPath": {"path": "../retail_model.SemanticModel"}}},
+        ),
+    }
+    verifier = ReadinessRunner(
+        context,
+        SimpleNamespace(get_definition=lambda item_id: definitions[item_id]),
+    )
+    verifier.items = items
+
+    observation = verifier._report_binding()
+
+    assert observation.evidence == {}
+
+
+def test_operations_only_inventory_does_not_require_native_plan():
+    context = _native_context(include_plan=False)
+    expected = expected_live_items(context)
+    keys = {item.key for item in expected}
+    assert ("OperationsAgent", "retail-availability-operations") in keys
+    assert ("Notebook", "prepare-replenishment-case") in keys
+    assert not any(item.item_type == "Plan" for item in expected)
+    verifier = ReadinessRunner(context, SimpleNamespace())
+    verifier._items_error = None
+    verifier.items = [
+        {"id": f"item-{index}", "type": item.item_type, "displayName": item.display_name}
+        for index, item in enumerate(expected)
+    ]
+    # Terraform IDs are checked separately; exercise only the native subset here.
+    selected = [item for item in expected if item.item_type in {"OperationsAgent", "Notebook"}
+                and item.display_name in {"retail-availability-operations", "prepare-replenishment-case"}]
+    observation = verifier._item_inventory(selected)
+    assert observation.evidence["operations_planning"]["plan_interactive_acceptance"] == "NOT_SELECTED"
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_native_kql_inventory_is_included_only_for_enabled_pack(enabled):
+    context = _native_context(enabled)
+    observed = parse_kql_inventory(
+        REPO_ROOT,
+        context.config.profile.kql_scripts,
+        additional_paths=[Path("fabric") / "operations" / "01-availability-tables.kql"],
+    )
+    captured = []
+
+    def get_inventory(expected_tables):
+        captured.append(expected_tables)
+        return observed
+
+    verifier = ReadinessRunner(
+        context, SimpleNamespace(get_kql_inventory=get_inventory)
+    )
+    verifier._run_kql_checks()
+
+    tables = next(check for check in verifier.checks if check.check_id == "kql.tables")
+    assert tables.status == "PASS"
+    if not enabled:
+        assert tables.evidence["unselected_owned_objects"] == [
+            "ops_availability_signals", "ops_case_actions",
+        ]
+    assert ("ops_availability_signals" in captured[0]) is enabled
+    assert ("ops_case_actions" in captured[0]) is enabled
+    assert len(captured) == 1
+
+
+def test_disabling_native_pack_does_not_allow_arbitrary_extra_kql_tables():
+    context = _native_context(False)
+    source = parse_kql_inventory(REPO_ROOT, context.config.profile.kql_scripts)
+    observed = KqlInventory(
+        tables=source.tables | {"unexpected_table"},
+        functions=source.functions,
+        materialized_views=source.materialized_views,
+        mappings=source.mappings,
+    )
+    verifier = ReadinessRunner(
+        context, SimpleNamespace(get_kql_inventory=lambda _: observed),
+    )
+    verifier._run_kql_checks()
+    assert next(check for check in verifier.checks if check.check_id == "kql.tables").status == "FAIL"
+
+
+@pytest.mark.parametrize("live_stream_observed", [False, True])
+def test_native_seed_inventory_does_not_supply_optional_stream_freshness(
+    monkeypatch, live_stream_observed
+):
+    context = _native_context()
+    stream_tables = frozenset(
+        event.event_type
+        for contract in context.manifest.data_contracts
+        if contract.kind == "event"
+        for event in contract.events
+    )
+    inventory = parse_kql_inventory(
+        REPO_ROOT,
+        context.config.profile.kql_scripts,
+        additional_paths=[Path("fabric") / "operations" / "01-availability-tables.kql"],
+    )
+    adapter = object.__new__(FabricReadinessAdapter)
+    monkeypatch.setattr(adapter, "get_kql_inventory", lambda _tables: inventory)
+    queries = []
+
+    def execute_kql(query, *, management=False):
+        queries.append(query)
+        if management:
+            # Even a seed extent with a stream-like tag is not live event evidence.
+            tables = ["ops_availability_signals"]
+            if live_stream_observed:
+                tables.append("receipt_created")
+            return [
+                {
+                    "TableName": name,
+                    "tag": f"retail-demo:stream-a:{name}:1",
+                    "MaxCreatedOn": context.observed_at,
+                }
+                for name in tables
+            ]
+        union, _, _summary = query.partition(" | summarize")
+        assert set(union.removeprefix("union withsource=table_name ").split(", ")) == (
+            stream_tables
+        )
+        assert "ops_" not in query
+        assert "ingestion_time()" in query
+        return (
+            [
+                {
+                    "table_name": name,
+                    "latest_ingestion": context.observed_at,
+                    "row_count": 1,
+                }
+                for name in stream_tables
+            ]
+            if live_stream_observed
+            else []
+        )
+
+    monkeypatch.setattr(adapter, "_execute_kql", execute_kql)
+    verifier = ReadinessRunner(context, adapter)
+    verifier._run_kql_checks()
+    assert all(check.status == "PASS" for check in verifier.checks)
+    assert "ops_availability_signals" in verifier.kql_inventory.tables
+    for check_id, function in (
+        ("freshness.eventhouse_ingestion", verifier._eventhouse_freshness),
+        ("freshness.checkpoint", verifier._checkpoint_freshness),
+    ):
+        verifier._check(
+            check_id,
+            "freshness",
+            selected=True,
+            required=False,
+            function=function,
+        )
+    assert len(queries) == 2
+    assert [check.status for check in verifier.checks[-2:]] == (
+        ["PASS", "PASS"] if live_stream_observed else ["UNKNOWN", "UNKNOWN"]
+    )
+
+
+@pytest.mark.parametrize("problem", [None, "missing-plan", "duplicate-plan"])
+def test_native_inventory_accepts_stopped_agent_without_claiming_activation(problem):
+    context = _native_context()
+    expected = expected_live_items(context)
+    verifier = ReadinessRunner(context, object())
+    verifier._items_error = None
+    verifier.items = [
+        {
+            "type": item.item_type,
+            "displayName": item.display_name,
+            "id": item.item_id or f"item-{index}",
+            "state": "STOPPED" if item.item_type == "OperationsAgent" else None,
+        }
+        for index, item in enumerate(expected)
+    ]
+    plan = next(item for item in verifier.items if item["type"] == "Plan")
+    if problem == "missing-plan":
+        verifier.items.remove(plan)
+    elif problem == "duplicate-plan":
+        verifier.items.append({**plan, "id": "duplicate-plan-id"})
+    if problem:
+        with pytest.raises(CheckFailed):
+            verifier._item_inventory(expected)
+        return
+
+    observation = verifier._item_inventory(expected)
+
+    assert "does not verify activated monitoring" in observation.summary
+    boundary = observation.evidence["operations_planning"]
+    assert boundary["monitoring_readiness"] == "NOT_VERIFIED"
+    assert boundary["plan_interactive_acceptance"] == "NOT_VERIFIED"
+    assert boundary["manual_activation_required"] is True
+    assert boundary["publication_report"].endswith("operations-planning-report.json")
+
+
+@pytest.mark.parametrize("invalid_action", [False, True])
+def test_native_action_notebook_lakehouse_binding_is_verified(
+    monkeypatch, invalid_action
+):
+    context = _native_context()
+    verifier = ReadinessRunner(context, object())
+    checked = []
+
+    def definition(item_type, name):
+        assert item_type == "Notebook"
+        checked.append(name)
+        return _definition(
+            "notebook-content.ipynb",
+            {
+                "metadata": {
+                    "dependencies": {
+                        "lakehouse": {
+                            "default_lakehouse": (
+                                "wrong"
+                                if invalid_action and name == "prepare-replenishment-case"
+                                else LAKEHOUSE_ID
+                            ),
+                            "default_lakehouse_name": "retail_lakehouse",
+                            "default_lakehouse_workspace_id": WORKSPACE_ID,
+                        }
+                    }
+                }
+            },
+        )
+
+    monkeypatch.setattr(verifier, "_definition", definition)
+    if invalid_action:
+        with pytest.raises(CheckFailed, match="Lakehouse bindings"):
+            verifier._notebook_bindings()
+    else:
+        verifier._notebook_bindings()
+    assert checked.count("prepare-replenishment-case") == 1
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_native_inventory_queries_typed_endpoints_only_when_enabled(
+    monkeypatch, enabled
+):
+    import deploy.scripts.taskflow as taskflow_module
+    import deploy.scripts.verify_readiness as readiness_module
+
+    context = _native_context(enabled)
+    adapter = object.__new__(FabricReadinessAdapter)
+    adapter.context = context
+    adapter.fabric = object()
+    adapter.workspace_id = WORKSPACE_ID
+    urls = []
+    generic = [
+        {"id": "existing-notebook", "type": "Notebook", "displayName": "other"},
+        {
+            "id": "agent-id",
+            "type": "OperationsAgent",
+            "displayName": "retail-availability-operations",
+        },
+    ]
+    typed = {
+        "operationsAgents": [
+            {"id": "agent-id", "displayName": "retail-availability-operations"}
+        ],
+        "notebooks": [
+            {"id": "action-id", "displayName": "prepare-replenishment-case"}
+        ],
+        "plans": [
+            {"id": "plan-id", "displayName": "retail-replenishment"}
+        ],
+    }
+
+    def paginated(_session, url):
+        urls.append(url)
+        return list(generic) if url.endswith("/items") else typed[url.rsplit("/", 1)[1]]
+
+    def supplement(_session, _workspace, items, required_types):
+        assert "OperationsAgent" not in required_types
+        assert "Plan" not in required_types
+        return items
+
+    monkeypatch.setattr(readiness_module, "paginated_get", paginated)
+    monkeypatch.setattr(taskflow_module, "supplement_workspace_items", supplement)
+
+    items = adapter.list_items()
+
+    assert len(urls) == (4 if enabled else 1)
+    assert len([item for item in items if item["id"] == "agent-id"]) == 1
+    if enabled:
+        assert {item["type"] for item in items} == {"Notebook", "OperationsAgent", "Plan"}
+        assert any(item["id"] == "action-id" for item in items)
 
 
 def test_live_item_inventory_supplements_preview_types(monkeypatch) -> None:

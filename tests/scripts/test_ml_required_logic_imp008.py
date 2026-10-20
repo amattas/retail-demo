@@ -243,7 +243,10 @@ def test_stockout_is_eod_future_labeled_and_calibrated() -> None:
     label_source = _function_source(path, "attach_future_stockout_labels")
     assert '"store_id", "product_id", "event_date"' in eod_source
     assert "F.row_number()" in eod_source
+    assert 'F.col("balance").isNotNull()' in eod_source
     assert 'F.greatest(F.col("balance"), F.lit(0.0))' in eod_source
+    assert 'inventory_history.filter(F.col("balance").isNull())' in code
+    assert "repair the inventory history instead of treating null as zero" in code
     assert '> F.col("snapshot.snapshot_date")' in label_source
     assert '"label_available_date"' in label_source
     assert "IsotonicRegression(" in code

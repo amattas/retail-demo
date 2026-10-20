@@ -141,6 +141,9 @@ anthropic` + `RETAIL_ANTHROPIC_API_KEY`. The actual **NL→DAX** (Data Agent) an
 
 ## Notes
 
+- `fabric-app/` is a Fabric Apps (preview) spike that moves proposals and
+  approvals into SSO-bound, append-only Fabric SQL records. See its README.
+
 - The chat **orchestrator** lives in `app/backend/main.py` (`_route` +
   `_ask_data_agent` / `_ask_ontology`): single-entity 360 phrasings (a named
   customer/store/product enriched with its ML context) try the Ontology first,
