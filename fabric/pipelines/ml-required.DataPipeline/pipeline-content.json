@@ -3,6 +3,22 @@
     "concurrency": 1,
     "activities": [
       {
+        "name": "setup-11-build-gold",
+        "type": "TridentNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "fc82ce79-0282-5e4d-999e-692a12ee54ca",
+          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+        }
+      },
+      {
         "name": "06-ml-demand-forecast",
         "type": "TridentNotebook",
         "dependsOn": [],
@@ -21,7 +37,14 @@
       {
         "name": "08-ml-customer-segmentation",
         "type": "TridentNotebook",
-        "dependsOn": [],
+        "dependsOn": [
+          {
+            "activity": "setup-11-build-gold",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
         "policy": {
           "timeout": "0.12:00:00",
           "retry": 0,
@@ -134,6 +157,12 @@
           },
           {
             "activity": "10-ml-promotion-effectiveness",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "setup-11-build-gold",
             "dependencyConditions": [
               "Succeeded"
             ]

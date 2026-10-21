@@ -142,7 +142,8 @@ reviewed and explicitly restarted, not silently resumed.
   failed/unknown checks fail deployment; optional gaps degrade it.
 - `retail-setup verify --env <env> --run-pipeline` is a separate explicit
   operator action that starts only the profile-required post-publish pipeline.
-- `setup-pipeline` runs setup 01-11, with independent notebooks in parallel. Reporting profiles then wait for the exact
+- `setup-pipeline` runs setup 01-10, with independent notebooks in parallel;
+  `ml-required` builds Gold (setup-11) alongside the required models. Reporting profiles then wait for the exact
   `ml-required` run and its validator before publishing the semantic model and
   report. A failed upgrade performs no Reporting publication or replacement;
   the prior report remains compatible because required ML schemas retain their

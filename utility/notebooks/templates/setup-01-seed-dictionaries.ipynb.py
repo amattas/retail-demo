@@ -324,3 +324,13 @@ print(
 for relative_path, metadata in sorted(manifest["files"].items()):
     print(f"{relative_path:50s} {metadata['size']:>12,} bytes {metadata['sha256']}")
 print(f"{len(manifest['files'])} verified files under {LOCAL_ROOT}")
+
+# %% [markdown]
+# ## Prepare the handoff schema
+
+# %%
+# Generation notebooks (setup-03 to 09) exchange outputs as gen__* tables in the
+# Silver staging schema (HandoffStore in the engine). Create it here, before
+# setup-02 to 05 start in parallel, so concurrent writers never race to create it.
+spark.sql(f"CREATE DATABASE IF NOT EXISTS {LAKEHOUSE_NAME}.{SILVER_DB}_stage")
+print(f"handoff schema ready: {LAKEHOUSE_NAME}.{SILVER_DB}_stage")

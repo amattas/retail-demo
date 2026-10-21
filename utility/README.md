@@ -33,7 +33,7 @@ file is absent. `render` writes twelve notebooks to `utility\out\<env>\`:
 - `setup-11-build-gold.ipynb`
 - `stream-events.ipynb`
 
-Setup 01 through 11 build the base historical Lakehouse contract. In `setup-pipeline`, 03, 04, and 05 run in parallel after 02; 06, 07, and 08 run in parallel after 03; 09 waits for 03 to 06. Each notebook runs its own stages concurrently and hands outputs to later notebooks as `gen__*` tables in the Silver staging schema. Setup 10 checks invariants and publishes Silver atomically, and setup 11 builds Gold.
+Setup 01 through 11 build the base historical Lakehouse contract. In `setup-pipeline`, 02 (dimension validation), 03, 04, and 05 run in parallel after 01; 06, 07, and 08 run in parallel after 03; 09 waits for 03 to 06. Each notebook runs its own stages concurrently and hands outputs to later notebooks as `gen__*` tables in the Silver staging schema. Setup 10 checks invariants and publishes Silver atomically once 02 to 09 succeed. Setup 11 builds Gold inside `ml-required`, alongside model training, because both read only Silver.
 The stream notebook is optional and runs separately.
 
 The realism revision calibrates baskets against profile ticket targets and

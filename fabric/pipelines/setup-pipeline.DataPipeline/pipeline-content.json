@@ -46,7 +46,7 @@
         "type": "TridentNotebook",
         "dependsOn": [
           {
-            "activity": "setup-02-generate-dimensions",
+            "activity": "setup-01-seed-dictionaries",
             "dependencyConditions": [
               "Succeeded"
             ]
@@ -69,7 +69,7 @@
         "type": "TridentNotebook",
         "dependsOn": [
           {
-            "activity": "setup-02-generate-dimensions",
+            "activity": "setup-01-seed-dictionaries",
             "dependencyConditions": [
               "Succeeded"
             ]
@@ -92,7 +92,7 @@
         "type": "TridentNotebook",
         "dependsOn": [
           {
-            "activity": "setup-02-generate-dimensions",
+            "activity": "setup-01-seed-dictionaries",
             "dependencyConditions": [
               "Succeeded"
             ]
@@ -225,6 +225,12 @@
         "type": "TridentNotebook",
         "dependsOn": [
           {
+            "activity": "setup-02-generate-dimensions",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
             "activity": "setup-03-generate-sales",
             "dependencyConditions": [
               "Succeeded"
@@ -270,29 +276,6 @@
         },
         "typeProperties": {
           "notebookId": "cd781cef-c687-5b6a-b029-77ccfc00520b",
-          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
-        }
-      },
-      {
-        "name": "setup-11-build-gold",
-        "type": "TridentNotebook",
-        "dependsOn": [
-          {
-            "activity": "setup-10-publish-silver",
-            "dependencyConditions": [
-              "Succeeded"
-            ]
-          }
-        ],
-        "policy": {
-          "timeout": "0.12:00:00",
-          "retry": 2,
-          "retryIntervalInSeconds": 120,
-          "secureOutput": false,
-          "secureInput": false
-        },
-        "typeProperties": {
-          "notebookId": "fc82ce79-0282-5e4d-999e-692a12ee54ca",
           "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
         }
       }

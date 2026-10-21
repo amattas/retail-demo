@@ -111,7 +111,3 @@ print(
     "same deterministic dimensions; setup-10 atomically publishes the complete "
     "Silver generation."
 )
-
-# Create the handoff schema once, before setup-03 to 05 start in parallel and
-# write their first handoff tables, so they never race to create it.
-HandoffStore(spark, cfg, lakehouse=LAKEHOUSE_NAME).ensure_schema()

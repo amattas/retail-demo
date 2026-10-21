@@ -152,12 +152,13 @@ def test_setup_pipeline_draws_the_stage_graph():
         activity["name"]: tuple(sorted(dep["activity"] for dep in activity["dependsOn"]))
         for activity in content["properties"]["activities"]
     }
-    assert list(graph) == SETUP_NOTEBOOKS == [n for n in TEMPLATE_FOR if n.startswith("setup-")]
+    assert SETUP_NOTEBOOKS == [n for n in TEMPLATE_FOR if n.startswith("setup-")]
+    # Gold is built by ml-required (it reads only Silver, like the models).
+    assert list(graph) == [n for n in SETUP_NOTEBOOKS if n != "setup-11-build-gold"]
     assert graph == {
         "setup-01-seed-dictionaries": (),
         "setup-02-generate-dimensions": ("setup-01-seed-dictionaries",),
         **setup_notebook_dependencies(),
-        "setup-11-build-gold": ("setup-10-publish-silver",),
     }
 
 

@@ -515,7 +515,8 @@ def test_committed_pipelines_isolate_ml_tiers_and_gate_reporting(
     setup = activities("setup-pipeline")
     from deploy.scripts.build_artifacts import SETUP_NOTEBOOKS
 
-    assert tuple(setup) == tuple(SETUP_NOTEBOOKS)
+    # Gold (setup-11) runs inside ml-required so it overlaps model training.
+    assert tuple(setup) == tuple(n for n in SETUP_NOTEBOOKS if n != "setup-11-build-gold")
 
     required = activities("ml-required")
     required_producers = {
@@ -525,9 +526,17 @@ def test_committed_pipelines_isolate_ml_tiers_and_gate_reporting(
         "12-ml-stockout-prediction",
         "07-ml-market-basket",
         "10-ml-promotion-effectiveness",
+        "setup-11-build-gold",
     }
+    # Gold reads only Silver, so it runs here alongside training. It shares a
+    # lane with the shortest producer so at most six sessions run at once.
+    lanes = {"setup-11-build-gold": [], "08-ml-customer-segmentation": ["setup-11-build-gold"]}
     validator = required["15-validate-required-ml-contract"]
-    assert all(required[name]["dependsOn"] == [] for name in required_producers)
+    assert all(
+        [dependency["activity"] for dependency in required[name]["dependsOn"]]
+        == lanes.get(name, [])
+        for name in required_producers
+    )
     assert {
         dependency["activity"] for dependency in validator["dependsOn"]
     } == required_producers

@@ -99,19 +99,24 @@ setup notebook that runs it:
 
 | Notebook | Stages | Waits for |
 | --- | --- | --- |
-| `setup-03-generate-sales` | candidate receipts, fulfillment plan | setup-02 |
-| `setup-04-generate-online-orders` | online orders | setup-02 |
-| `setup-05-generate-marketing` | background impressions | setup-02 |
+| `setup-03-generate-sales` | candidate receipts, fulfillment plan | setup-01 |
+| `setup-04-generate-online-orders` | online orders | setup-01 |
+| `setup-05-generate-marketing` | background impressions | setup-01 |
 | `setup-06-generate-returns-and-promotions` | returns, promotions | setup-03 |
 | `setup-07-generate-store-activity` | store operations, foot traffic, BLE | setup-03 |
 | `setup-08-generate-inventory` | inventory, logistics, and stockout ledgers | setup-03 |
 | `setup-09-attribute-marketing` | last-touch attribution | setup-03 to 06 |
-| `setup-10-publish-silver` | invariants and atomic Silver publication | setup-03, 04, 06 to 09 |
+| `setup-10-publish-silver` | invariants and atomic Silver publication | setup-02 to 04, 06 to 09 |
 
 `setup-pipeline` draws this graph at notebook granularity (a test keeps the
 pipeline and the stage graph identical), so independent notebooks run in their
-own Spark sessions at the same time. At most five run at once, which stays
+own Spark sessions at the same time. At most six run at once, which stays
 within the session concurrency the capacity sizing reserves for required ML.
+Setup-10 runs its invariant checks and per-table staging, validation, and
+promotion concurrently; every phase still completes for all tables before the
+next starts, and any promotion failure rolls back every table. Gold
+(`setup-11-build-gold`) runs in `ml-required` alongside model training, sharing a
+lane with customer segmentation so that pipeline also stays within six sessions.
 Inside a notebook, ready stages run concurrently (up to six); a stage writes
 its own outputs one after another so related cached plans are never built
 concurrently. Completion order and the
