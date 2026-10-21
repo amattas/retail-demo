@@ -30,6 +30,7 @@ from retail_setup.generation.publication import (
 )
 
 _UNSAFE_IDENTIFIER = re.compile(r"[^0-9A-Za-z_]")
+PUBLICATION_WORKERS = 8
 
 
 def sanitize_identifier(value: str) -> str:
@@ -369,6 +370,8 @@ def write_all(
     if lakehouse is not None:
         for db in (cfg.silver_db, cfg.gold_db):
             spark.sql(f"CREATE DATABASE IF NOT EXISTS {lakehouse}.{db}")
+            # Created up front: staging runs concurrently per table.
+            spark.sql(f"CREATE DATABASE IF NOT EXISTS {lakehouse}.{db}_stage")
         backend = _LakehouseBackend(spark, lakehouse, run_id, sources)
     else:
         assert base_path is not None  # enforced by the exactly-one-of check above
@@ -377,7 +380,10 @@ def write_all(
     def _log(table_name: str, status: str, row_count: int | None, error: str | None) -> None:
         _append_log(table_name, row_count, status, error)
 
-    coordinator = PublicationCoordinator(backend, _log)
+    # Per-table staging, validation, and promotion are independent and each is
+    # a separate Spark job; running them concurrently removes per-table
+    # overhead without changing the phase ordering or rollback guarantees.
+    coordinator = PublicationCoordinator(backend, _log, max_workers=PUBLICATION_WORKERS)
     outcome = coordinator.publish(targets)
 
     if not outcome.ok:
