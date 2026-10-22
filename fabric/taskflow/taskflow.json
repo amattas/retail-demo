@@ -4,7 +4,7 @@
       "id": "d7ce0e1e-fc0d-4749-a3a8-aec7c850017d",
       "type": "get data",
       "name": "Generate Historical Data",
-      "description": "Run setup-pipeline: seed dictionaries, validate dimensions, and generate facts in setup 03-09, with independent notebooks running in parallel and handing results to setup 10 through staged tables.",
+      "description": "Run setup-pipeline: seed dictionaries, then validate dimensions and generate facts in setup 02-09, with independent notebooks running in parallel and handing results to setup 10 through staged tables.",
       "items": [
         {
           "artifactUniqueId": "Pipeline:a53bf4eb-07ce-57ab-a1c7-255184982d62",
@@ -73,7 +73,7 @@
       "id": "56fc83da-28ce-4f0e-ab0a-531981bca41f",
       "type": "prepare data",
       "name": "Publish Historical Data",
-      "description": "Check cross-table invariants and publish the Silver contract atomically (setup-10), then build Gold aggregates (setup-11).",
+      "description": "Check cross-table invariants and publish the Silver contract atomically (setup-10); ml-required builds Gold aggregates (setup-11) alongside model training.",
       "items": [
         {
           "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120117",

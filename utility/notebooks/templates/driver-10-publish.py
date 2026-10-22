@@ -133,7 +133,9 @@ tables, prestaged = load_publication(spark, dicts, cfg, store, checkpoint_dir=ch
 # ## Check cross-table invariants
 
 # %%
-report = run_invariants(spark, tables)
+# Checks read Delta handoffs, so evaluating them concurrently is safe and
+# removes per-check job overhead; results keep declaration order.
+report = run_invariants(spark, tables, max_workers=PUBLISH_INVARIANT_WORKERS)
 print(f"invariant checks run: {len(report.checks)}")
 for name, count in sorted(report.row_counts.items()):
     print(f"  {name:40s} {count:>12,} rows")

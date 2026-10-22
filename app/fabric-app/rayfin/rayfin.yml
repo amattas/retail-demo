@@ -14,6 +14,7 @@ services:
       - https://crisp-hill-4bee4bcc42-westus3.webapp.fabricapps.net
       - https://edgy-moon-2a4ebe64f6-westus3.webapp.fabricapps.net
       - https://hefty-gulf-218b65cbb1-westus3.webapp.fabricapps.net
+      - https://quail-tree-96c76a0f75-westus3.webapp.fabricapps.net
   data:
     enabled: true
     dialect: mssql

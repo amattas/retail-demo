@@ -178,6 +178,45 @@ def test_validation_failure_leaves_targets_untouched():
     ]
 
 
+def test_concurrent_mode_publishes_with_the_same_logged_sequence():
+    backend, log = FakeBackend(), LogRecorder()
+
+    outcome = PublicationCoordinator(backend, log, max_workers=4).publish(
+        _targets("a", "b", "c"))
+
+    assert outcome.state == COMPLETED and outcome.promoted == ["a", "b", "c"]
+    sequential = LogRecorder()
+    PublicationCoordinator(FakeBackend(), sequential).publish(_targets("a", "b", "c"))
+    assert log.entries == sequential.entries
+
+
+def test_concurrent_stage_failure_promotes_nothing_and_cleans_everything_staged():
+    backend, log = FakeBackend(fail_stage=frozenset({"b"})), LogRecorder()
+
+    outcome = PublicationCoordinator(backend, log, max_workers=4).publish(
+        _targets("a", "b", "c"))
+
+    assert outcome.state == FAILED
+    assert [op for op, _ in backend.calls if op not in ("stage", "cleanup")] == []
+    # Siblings staged concurrently with the failure are cleaned up too.
+    assert set(backend.cleaned) == {"a", "c"}
+
+
+def test_concurrent_promotion_failure_rolls_back_every_target():
+    # "b" fails mid-batch while "c" promotes concurrently: all three must be
+    # undone, the pre-existing "a" restored and the new tables dropped.
+    backend = FakeBackend(existing=frozenset({"a"}), fail_promote=frozenset({"b"}))
+    log = LogRecorder()
+
+    outcome = PublicationCoordinator(backend, log, max_workers=4).publish(
+        _targets("a", "b", "c"))
+
+    assert outcome.state == ROLLED_BACK
+    assert set(backend.promoted) == {"a", "c"}
+    assert set(backend.dropped) == {"b", "c"}
+    assert backend.restored == [("a", 7)]
+
+
 def test_nth_promotion_restores_prior_existing_and_drops_new():
     # "a" pre-existed before this run; "b" and the failed target "c" are
     # both newly created by this run.

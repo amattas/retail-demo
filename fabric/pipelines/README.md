@@ -2,11 +2,11 @@
 
 | Pipeline | Actual scope | Committed schedule |
 | --- | --- | --- |
-| `setup-pipeline` | Setup 01-11 (03-05 and 06-08 in parallel) | On demand; required before ML |
+| `setup-pipeline` | Setup 01-10 (02-05 and 06-08 in parallel) | On demand; required before ML |
 | `historical-data-load` | Retained historical-load notebook | On demand |
 | `streaming-data-load` | Streaming Silver then Gold | Disabled |
 | `daily-maintenance` | Delta maintenance | Disabled |
-| `ml-required` | Required producers, then `15-validate-required-ml-contract` | Terminal Reporting gate |
+| `ml-required` | Gold (`setup-11`, then customer segmentation in the same lane) and the other required producers in parallel, then `15-validate-required-ml-contract` | Terminal Reporting gate |
 | `ml-optional` | Promoted optional outputs | Full-demo post-Reporting |
 | `ml-experimental` | Experimental outputs | Full-demo post-Reporting |
 

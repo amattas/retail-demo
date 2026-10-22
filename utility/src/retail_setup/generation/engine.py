@@ -51,6 +51,7 @@ def _shift_year(d: date, years: int) -> date:
         return date(d.year + years, d.month, 28)
 
 
+DICTIONARIES_NOTEBOOK = "setup-01-seed-dictionaries"
 DIMENSIONS_NOTEBOOK = "setup-02-generate-dimensions"
 PUBLISH_NOTEBOOK = "setup-10-publish-silver"
 # Ready stages run concurrently; Spark schedules their jobs side by side so
@@ -225,7 +226,10 @@ def setup_notebook_dependencies() -> dict[str, tuple[str, ...]]:
     """Upstream notebooks of each generation and publish notebook.
 
     The setup pipeline's activity graph must equal this mapping (tested), so
-    the pipeline is the stage graph drawn at notebook granularity.
+    the pipeline is the stage graph drawn at notebook granularity. Generation
+    regenerates dimensions in memory, so root generation notebooks need only
+    the dictionaries; setup-02's dimension validation runs alongside them and
+    gates publication instead.
     """
     graph: dict[str, tuple[str, ...]] = {}
     for notebook in STAGE_NOTEBOOKS:
@@ -234,9 +238,10 @@ def setup_notebook_dependencies() -> dict[str, tuple[str, ...]]:
             for stage in STAGES if stage.notebook == notebook
             for dep in stage.deps
         } - {notebook}
-        graph[notebook] = tuple(sorted(upstream)) or (DIMENSIONS_NOTEBOOK,)
+        graph[notebook] = tuple(sorted(upstream)) or (DICTIONARIES_NOTEBOOK,)
     graph[PUBLISH_NOTEBOOK] = tuple(sorted(
-        {_STAGE_BY_NAME[stage].notebook for stage in _PUBLISHED_STAGES}))
+        {DIMENSIONS_NOTEBOOK}
+        | {_STAGE_BY_NAME[stage].notebook for stage in _PUBLISHED_STAGES}))
     return graph
 
 

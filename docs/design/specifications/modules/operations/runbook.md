@@ -64,7 +64,7 @@ still fails the deployment when a required table is not queryable.
 
 | Pipeline | Current scope | Current schedule state |
 | --- | --- | --- |
-| `setup-pipeline` | Setup 01-11 (03-05 and 06-08 in parallel) | On demand; mandatory for Reporting profiles |
+| `setup-pipeline` | Setup 01-10 (02-05 and 06-08 in parallel) | On demand; mandatory for Reporting profiles |
 | `historical-data-load` | Retained historical-load notebook | On demand |
 | `streaming-data-load` | Streaming Silver then Gold | Schedule file present, disabled |
 | `daily-maintenance` | Delta maintenance | Schedule file present, disabled |
