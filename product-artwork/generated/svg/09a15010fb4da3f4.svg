@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="steel" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="#E3E8EA"/>
+      <stop offset=".25" stop-color="#74838A"/>
+      <stop offset=".5" stop-color="#D7DEE0"/>
+      <stop offset=".76" stop-color="#697980"/>
+      <stop offset="1" stop-color="#B8C2C5"/>
+    </linearGradient>
+    <filter id="shadow" x="-.2" y="-.2" width="1.4" height="1.5">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+      <feOffset dy="5"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".2"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="256" height="256" rx="24" fill="#F0F2F2"/>
+  <g filter="url(#shadow)">
+    <path d="M155 47c15-11 37-9 49 5l-33 33 13 13 33-32c12 18 8 42-7 56l-30-30-18 18-87 88c-9 9-22 9-31 0l-3-3c-9-9-9-22 0-31l89-86 18 18-28 28-8-8 20-20-11-11 24-24 10 10-17 17 10 10 28-28-21-21Z" fill="url(#steel)" stroke="#55636A" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M158 50q19-12 35 1l-27 28-10-10 15-15z" fill="#F0F2F2"/>
+    <path d="m88 156-43 43" stroke="#F8FAFA" stroke-width="6" stroke-linecap="round" opacity=".72"/>
+    <circle cx="53" cy="193" r="7" fill="#6C797E" stroke="#D8DEE0" stroke-width="2"/>
+  </g>
+  <rect x="50" y="176" width="156" height="68" rx="10" fill="#FFFFFF" stroke="#D9DFE1"/>
+  <path d="M50 176h156v7H50z" fill="#374C68"/>
+  <text x="128" y="194" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#34424A" font-weight="700" letter-spacing=".2">NorthPeak</text>
+  <text x="128" y="219" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="12" fill="#26333A" font-weight="bold"><tspan x="128" dy="0">Compact Adjustable</tspan><tspan x="128" dy="14">Wrench</tspan></text>
+</svg>

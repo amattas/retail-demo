@@ -1,0 +1,38 @@
+[
+  {
+    "sku": "grocery-chocolate-bar",
+    "brand": "Bluebird Farms",
+    "product_name": "Premium Milk Chocolate Bar",
+    "template": "candy-bar"
+  },
+  {
+    "sku": "supercenter-almond-milk",
+    "brand": "Meadow Farms",
+    "product_name": "Almond Milk Unsweetened",
+    "template": "carton"
+  },
+  {
+    "sku": "grocery-bananas",
+    "brand": "Harvest Crown",
+    "product_name": "Organic Bananas",
+    "template": "produce"
+  },
+  {
+    "sku": "hardware-adjustable-wrench",
+    "brand": "NorthPeak",
+    "product_name": "Compact Adjustable Wrench",
+    "template": "tool"
+  },
+  {
+    "sku": "luxury-structured-tote",
+    "brand": "Hyde & Ivory",
+    "product_name": "Hyde & Ivory Quilted Structured Tote",
+    "template": "handbag"
+  },
+  {
+    "sku": "supercenter-sparkling-water",
+    "brand": "Pure Select",
+    "product_name": "Sparkling Water Lemon",
+    "template": "bottle"
+  }
+]

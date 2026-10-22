@@ -1,0 +1,54 @@
+{
+  "width": 256,
+  "height": 256,
+  "items": [
+    {
+      "sku": "grocery-bananas",
+      "asset_key": "9bed761908ddb25c",
+      "path": "svg/9bed761908ddb25c.svg",
+      "brand": "Harvest Crown",
+      "product_name": "Organic Bananas",
+      "template": "produce"
+    },
+    {
+      "sku": "grocery-chocolate-bar",
+      "asset_key": "3214799558db115a",
+      "path": "svg/3214799558db115a.svg",
+      "brand": "Bluebird Farms",
+      "product_name": "Premium Milk Chocolate Bar",
+      "template": "candy-bar"
+    },
+    {
+      "sku": "hardware-adjustable-wrench",
+      "asset_key": "09a15010fb4da3f4",
+      "path": "svg/09a15010fb4da3f4.svg",
+      "brand": "NorthPeak",
+      "product_name": "Compact Adjustable Wrench",
+      "template": "tool"
+    },
+    {
+      "sku": "luxury-structured-tote",
+      "asset_key": "74394c246708fdbb",
+      "path": "svg/74394c246708fdbb.svg",
+      "brand": "Hyde & Ivory",
+      "product_name": "Hyde & Ivory Quilted Structured Tote",
+      "template": "handbag"
+    },
+    {
+      "sku": "supercenter-almond-milk",
+      "asset_key": "65a16e7807ec8987",
+      "path": "svg/65a16e7807ec8987.svg",
+      "brand": "Meadow Farms",
+      "product_name": "Almond Milk Unsweetened",
+      "template": "carton"
+    },
+    {
+      "sku": "supercenter-sparkling-water",
+      "asset_key": "fb6b2d51160b70b8",
+      "path": "svg/fb6b2d51160b70b8.svg",
+      "brand": "Pure Select",
+      "product_name": "Sparkling Water Lemon",
+      "template": "bottle"
+    }
+  ]
+}
