@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="leather" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="{{PRIMARY}}"/>
+      <stop offset=".55" stop-color="{{PRIMARY}}" stop-opacity=".82"/>
+      <stop offset="1" stop-color="#33281F"/>
+    </linearGradient>
+    <filter id="shadow" x="-.2" y="-.1" width="1.4" height="1.4">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="5"/>
+      <feOffset dy="6"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".18"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="256" height="256" rx="24" fill="#F4F0EB"/>
+  <ellipse cx="128" cy="205" rx="75" ry="10" fill="#352C25" opacity=".12"/>
+  <g filter="url(#shadow)">
+    <path d="M91 103V76c0-26 15-42 37-42s37 16 37 42v27" fill="none" stroke="#987A5D" stroke-width="12"/>
+    <path d="M54 106q0-12 13-12h122q13 0 13 12l-9 83q-2 13-16 13H79q-14 0-16-13z" fill="url(#leather)" stroke="#69513C" stroke-width="2"/>
+    <path d="M69 108h118l-7 62H76z" fill="#FFFFFF" opacity=".08"/>
+    <path d="M70 109h116M77 171h104" stroke="{{ACCENT}}" stroke-opacity=".62" stroke-width="2"/>
+    <path d="M79 119v42m22-42v42m22-42v42m22-42v42m22-42v42" stroke="#F2E6D6" stroke-opacity=".22" stroke-width="2"/>
+    <rect x="88" y="151" width="80" height="24" rx="3" fill="{{ACCENT}}" stroke="#E6D5B4" stroke-width="2"/>
+    <path d="M96 156h64v14H96z" fill="#FFFFFF" opacity=".46"/>
+    {{BRAND_MARK}}
+  </g>
+  <rect x="53" y="207" width="150" height="38" rx="10" fill="#FFFFFF" stroke="#E8E1D9"/>
+  {{PRODUCT_LABEL}}
+</svg>

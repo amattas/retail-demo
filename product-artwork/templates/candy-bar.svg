@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="wrapper" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="{{PRIMARY}}"/>
+      <stop offset=".48" stop-color="{{PRIMARY}}" stop-opacity=".76"/>
+      <stop offset=".72" stop-color="{{PRIMARY}}"/>
+      <stop offset="1" stop-color="#18251F"/>
+    </linearGradient>
+    <linearGradient id="foil" x2="0" y2="1">
+      <stop stop-color="#FFFFFF" stop-opacity=".46"/>
+      <stop offset=".5" stop-color="#FFFFFF" stop-opacity=".04"/>
+      <stop offset="1" stop-color="#18251F" stop-opacity=".13"/>
+    </linearGradient>
+    <filter id="shadow" x="-.2" y="-.2" width="1.4" height="1.5">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="5"/>
+      <feOffset dy="7"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".2"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="256" height="256" rx="24" fill="#F5F3EF"/>
+  <ellipse cx="128" cy="204" rx="89" ry="12" fill="#33251E" opacity=".12"/>
+  <g filter="url(#shadow)">
+    <path d="m36 93 16-19h152l16 19v73l-16 19H52l-16-19z" fill="url(#wrapper)"/>
+    <path d="m36 93 16-19v111l-16-19zm184 0-16-19v111l16-19z" fill="{{ACCENT}}"/>
+    <path d="M52 74h152v111H52z" fill="url(#foil)"/>
+    <path d="M59 86h138v88H59z" fill="#FFF9F0"/>
+    <path d="M59 105h138v27H59z" fill="{{PRIMARY}}"/>
+    <path d="M59 132h138v2H59z" fill="{{ACCENT}}"/>
+    {{BRAND_MARK}}
+    {{PRODUCT_LABEL}}
+    <g transform="translate(0 7)">
+      <rect x="104" y="163" width="22" height="13" rx="3" fill="#563425"/>
+      <rect x="128" y="163" width="22" height="13" rx="3" fill="#704632"/>
+      <path d="M104 167h22m2 0h22" stroke="#B88766" stroke-width="1.5"/>
+    </g>
+    <path d="M42 98v63m172-63v63" stroke="#FFF" stroke-opacity=".55" stroke-width="2" stroke-dasharray="3 4"/>
+  </g>
+</svg>
