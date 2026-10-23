@@ -23,13 +23,13 @@ Lakehouse and Eventhouse sources.
 
 1. Open the **Ontologies** folder.
 2. Open **RetailOntology_AutoGen**.
-3. Select the `Store` entity type.
-4. Use **Fit view** to show its connected entities.
+3. Select the `Store` entity type in **Explorer**.
+4. Select **Relationship** to show only the entities connected to Store.
 
 ![Store relationships in the Retail Ontology](../assets/screenshots/ontology-store-context.png)
 
-*The selected Store entity connects operational data to Receipt, Geography,
-and Product business concepts.*
+*The Relationship view shows Store connected to Geography, Receipt, Promotion,
+and the machine-learning StockoutRisk entity.*
 
 Explain that the ontology adds shared business meaning over existing Lakehouse
 and Eventhouse data. It does not replace the physical schema or create a second
@@ -42,21 +42,23 @@ If the semantic-model agent passed its source and permission checks:
 1. Open the **Agents** folder.
 2. Open `retail-semantic-model-agent`.
 3. Select **Test data agent**.
-4. Ask for the latest available month, total net sales, gross margin, and the
-   supporting measures.
+4. Ask a question that names a curated measure, for example: *"Using the High
+   Risk SKUs measure, which five product departments have the most high-risk
+   store-product combinations? Include the inventory as-of time."*
 
 ![Semantic-model data-agent response](../assets/screenshots/data-agent-semantic-model.png)
 
-*The data agent returns the selected period, values, and supporting semantic
-model measures so the answer can be checked against the report.*
+*The data agent answers from the `High Risk SKUs` measure and states the
+inventory as-of time, so the result can be checked against the Supply Chain
+Control Tower page.*
 
-The agent's latest available month can differ from the report's current date
-filter. The agent queries the current semantic model, while deployment saves
-the report's date filter to the month containing the configured history end
-date. State both periods before comparing values. If they differ, use the
-period written in the agent response and change the report filter to the same
-month before quoting a comparison. Treat every generated answer as a
-hypothesis to verify against measures, query output, and source timestamps.
+The semantic-model agent can only use its curated, aggregate tables (Gold
+summaries, ML outputs, and dimensions). Receipt-level fact tables such as
+`fact_receipts` are deliberately excluded, so questions about receipt-level net
+sales or gross margin are not reliably answerable; use the report for those.
+Naming the measure or table you expect it to use gives the most dependable
+answers. Treat every generated answer as a hypothesis to verify against
+measures, query output, and source timestamps.
 
 Skip an agent when it has no selected data sources, returns an error, or has
 not passed its capability and access checks. The ontology graph can still be
@@ -233,7 +235,7 @@ the token has expired — re-mint it (step 2) and **MCP: List Servers → Restar
 | Interaction | Expected result |
 | --- | --- |
 | Select the ontology `Store` entity | Related business entities and relationship names appear in the graph. |
-| Ask the semantic-model agent for latest sales | The answer includes a data period and supporting measures that can be independently checked. |
+| Ask the semantic-model agent about high-risk SKUs by department | The answer cites the `High Risk SKUs` measure and an inventory as-of time that match the Supply Chain Control Tower page. |
 | Open Executive Cockpit | Report visuals load for the selected data period without model or binding errors. |
 
 Return to the [walkthrough overview](deployed-walkthrough.md) or use a focused
