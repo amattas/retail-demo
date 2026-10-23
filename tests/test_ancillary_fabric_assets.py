@@ -18,49 +18,6 @@ SEMANTIC_TABLES = (
     ROOT / "fabric" / "powerbi" / "retail_model.SemanticModel" / "definition" / "tables"
 )
 
-SAFE_SEMANTIC_TABLES = {
-    "campaign_performance_daily",
-    "dc_inventory_position_current",
-    "demand_forecast",
-    "dim_date",
-    "dim_distribution_centers",
-    "dim_geographies",
-    "dim_products",
-    "dim_stores",
-    "inventory_position_current",
-    "marketing_cost_daily",
-    "online_sales_daily",
-    "price_elasticity",
-    "product_recommendations",
-    "sales_minute_store",
-    "stockout_risk",
-    "tender_mix_daily",
-    "top_products_15m",
-    "truck_dwell_daily",
-    "zone_dwell_minute",
-}
-DIRECT_IDENTIFIER_FIELDS = {
-    "Ad ID",
-    "Attribution ID",
-    "Attribution Journey ID",
-    "BLE ID",
-    "Beacon ID",
-    "Customer Ad ID",
-    "Customer BLE ID",
-    "Customer ID",
-    "First Name",
-    "Impression ID",
-    "Last Name",
-    "License Plate",
-    "Loyalty Card",
-    "Order ID",
-    "Phone",
-    "Receipt ID",
-    "Shipment ID",
-    "Trace ID",
-    "Transaction ID",
-    "Truck ID",
-}
 
 
 def _load_json(path: Path) -> dict[str, object]:
@@ -248,7 +205,7 @@ def test_dashboard_query_catalogs_are_explicitly_not_deployable() -> None:
     assert 'ExpectedItem("KQLDashboard"' not in readiness_source
 
 
-def test_semantic_agent_selection_matches_current_model_and_excludes_pii_tables() -> None:
+def test_semantic_agent_selects_the_whole_current_model() -> None:
     draft = _semantic_datasource("draft")
     published = _semantic_datasource("published")
     model_table_ids = _semantic_table_ids()
@@ -262,38 +219,19 @@ def test_semantic_agent_selection_matches_current_model_and_excludes_pii_tables(
 
     assert draft == published
     assert datasource_table_ids == model_table_ids
-    assert _selected_names(draft) == SAFE_SEMANTIC_TABLES
-    assert not {
-        "dim_customers",
-        "churn_predictions",
-        "customer_segments",
-        "fact_ble_pings",
-        "fact_marketing",
-        "fact_marketing_attribution",
-        "fact_online_order_headers",
-        "fact_online_order_lines",
-        "fact_payments",
-        "fact_receipts",
-    } & _selected_names(draft)
+    # The data is synthetic, so every table, column, and measure is selected;
+    # a selection gap leaves the agent unable to answer core sales questions.
+    assert _selected_names(draft) == set(model_table_ids)
     assert all(
-        child.get("is_selected") is False
+        child.get("is_selected") is True
         for table in elements
-        if isinstance(table, dict) and table.get("is_selected") is False
+        if isinstance(table, dict)
         for child in table.get("children", [])
         if isinstance(child, dict)
     )
-    exposed_fields = {
-        str(child["display_name"])
-        for table in elements
-        if isinstance(table, dict) and table.get("is_selected") is True
-        for child in table.get("children", [])
-        if isinstance(child, dict) and child.get("is_selected") is True
-    }
-    assert DIRECT_IDENTIFIER_FIELDS.isdisjoint(exposed_fields)
     instructions = str(draft["dataSourceInstructions"]).lower()
-    assert "aggregate" in instructions
-    assert "at least 10" in instructions
-    assert "refuse" in instructions
+    assert "net sales" in instructions
+    assert "do not list" in instructions
 
 
 def test_ontology_agent_selection_is_current_private_and_publish_explicit() -> None:
@@ -321,7 +259,7 @@ def test_ontology_agent_selection_is_current_private_and_publish_explicit() -> N
     assert not list(agent_root.glob("*/ontology-*/datasource.json"))
 
 
-def test_agent_stage_instructions_enforce_privacy_and_match_published_state() -> None:
+def test_agent_stage_instructions_match_published_state() -> None:
     for agent in (
         "retail-semantic-model-agent.DataAgent",
         "retail-ontology-agent.DataAgent",
@@ -332,10 +270,8 @@ def test_agent_stage_instructions_enforce_privacy_and_match_published_state() ->
         instructions = str(draft["aiInstructions"]).lower()
 
         assert draft == published
-        assert "never" in instructions
-        assert "row-level" in instructions
-        assert "at least 10" in instructions
-        assert "refuse" in instructions
+        assert "phone" in instructions
+        assert "forecast" in instructions
         assert (config_root / "publish_info.json").is_file()
 
 

@@ -247,17 +247,17 @@ That completion phase rewrites:
 - semantic-model `artifactId`
 - ontology `artifactId`
 
-Current semantic-model draft and published datasource snapshots include
+Current semantic-model draft and published datasource snapshots select every
+`retail_model` table, column, and measure (the data is synthetic) and include
 `dataSourceInstructions` and `userDescription`; `.platform` descriptions
 distinguish semantic-model and ontology scope. The ontology agent binds the
 TMDL ontology as an ontology-as-context source
 (`ontologies/RetailOntology_AutoGen/ontology.json`, schema
 `dataAgent/definition/ontology/1.0.0`). That schema has no datasource
-instructions, and Fabric doesn't yet enforce entity selection for it, so every
-ontology entity type is selected and the stage `aiInstructions` carry the
-privacy rules: aggregate answers across all entities, with no personal data,
-direct identifiers, or row-level person or transaction records, and at least
-10 records for customer-derived metrics. The legacy
+instructions, so every ontology entity type is selected and the stage
+`aiInstructions` carry the answer rules. Both agents' instructions keep
+individual customers' names, addresses, phone numbers, and loyalty-card values
+out of answers. The legacy
 `ontology-<name>/datasource.json` binding fails against TMDL ontologies.
 Source schema validation and
 matching local draft/published snapshots do not prove remote publication,
