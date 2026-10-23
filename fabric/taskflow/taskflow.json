@@ -462,14 +462,26 @@
     {
       "id": "27806690-2ae3-5a9f-bfef-ccd523c4e819",
       "type": "distribute data",
-      "name": "Fabric App Approvals",
-      "description": "Review prepared replenishment proposals in the append-only Rayfin approvals app; the app does not execute orders.",
+      "name": "Fabric Apps",
+      "description": "Retail Operations Fabric Apps: the merchandising portal and promotion studio over a synthetic sample catalog, and append-only replenishment approvals. The apps do not change prices or execute orders.",
       "items": [
         {
           "artifactUniqueId": "AppBackend:8a850c5d-7c50-5815-a786-da9f1f57af79",
           "artifactType": "AppBackend",
           "artifactObjectId": null,
           "artifactName": "retail-approvals"
+        },
+        {
+          "artifactUniqueId": "AppBackend:3e858a9a-8561-597c-a62f-02d95f721082",
+          "artifactType": "AppBackend",
+          "artifactObjectId": null,
+          "artifactName": "retail-merchandising"
+        },
+        {
+          "artifactUniqueId": "AppBackend:41d2c63f-ba6b-5fa0-8668-5f1ce8c18c28",
+          "artifactType": "AppBackend",
+          "artifactObjectId": null,
+          "artifactName": "retail-promotions"
         }
       ],
       "loc": "860 300"

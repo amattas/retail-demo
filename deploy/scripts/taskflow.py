@@ -71,6 +71,8 @@ OPTIONAL_TASKFLOW_ARTIFACTS = frozenset(
     {
         ("Report", "retail-twins"),
         ("AppBackend", "retail-approvals"),
+        ("AppBackend", "retail-merchandising"),
+        ("AppBackend", "retail-promotions"),
         ("SynapseNotebook", "prepare-replenishment-case"),
     }
 )
@@ -634,7 +636,10 @@ def profile_taskflow_artifacts(
         )
     if profile.selects("asset.semantic-model"):
         allowed.add(("dataset", config.powerbi.semantic_model_name))
-        allowed.add(("AppBackend", "retail-approvals"))
+        allowed.update(
+            ("AppBackend", name)
+            for name in ("retail-approvals", "retail-merchandising", "retail-promotions")
+        )
     if profile.selects("asset.report"):
         allowed.add(("Report", config.powerbi.report_name))
     if getattr(getattr(config, "twins", None), "enabled", False):

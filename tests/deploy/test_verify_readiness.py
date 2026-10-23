@@ -298,6 +298,24 @@ def test_powerbi_and_agent_definition_bindings() -> None:
     ) == ["data agent artifact binding mismatch"]
 
 
+def test_agent_bindings_read_ontology_context_sources() -> None:
+    agent = {
+        "parts": [
+            _part(
+                "Files/Config/published/ontologies/RetailOntology_AutoGen/ontology.json",
+                {"workspaceId": WORKSPACE_ID, "artifactId": "ontology-id"},
+            )
+        ]
+    }
+
+    assert not data_agent_binding_errors(
+        agent, workspace_id=WORKSPACE_ID, expected_artifact_ids={"ontology-id"}
+    )
+    assert data_agent_binding_errors(
+        agent, workspace_id=WORKSPACE_ID, expected_artifact_ids={"other-id"}
+    ) == ["data agent artifact binding mismatch"]
+
+
 def test_queryset_definition_requires_exact_database_and_tabs() -> None:
     definition = _definition(
         "RealTimeQueryset.json",
@@ -1657,6 +1675,8 @@ def test_required_ml_freshness_uses_generation_time_and_nonblank_run_id() -> Non
     adapter = ModelAdapter()
     readiness = ReadinessRunner(context, adapter)
     readiness.pipeline_evidence["ml-required"] = {
+        "id": "required-job",
+        "status": "Completed",
         "start_time": (now - timedelta(minutes=10)).isoformat(),
         "end_time": (now - timedelta(minutes=4)).isoformat(),
     }
@@ -1694,10 +1714,14 @@ def test_optional_ml_freshness_accepts_pipeline_correlated_empty_snapshots() -> 
 
     readiness = ReadinessRunner(context, EmptyModelAdapter())
     readiness.pipeline_evidence["ml-required"] = {
+        "id": "required-job",
+        "status": "Completed",
         "start_time": (now - timedelta(minutes=20)).isoformat(),
         "end_time": (now - timedelta(minutes=12)).isoformat(),
     }
     readiness.pipeline_evidence["ml-optional"] = {
+        "id": "optional-job",
+        "status": "Completed",
         "start_time": (now - timedelta(minutes=10)).isoformat(),
         "end_time": (now - timedelta(minutes=5)).isoformat(),
     }
@@ -1748,11 +1772,15 @@ def test_model_freshness_correlates_contracts_with_their_producer_pipeline() -> 
 
     readiness = ReadinessRunner(context, ModelAdapter())
     readiness.pipeline_evidence["ml-required"] = {
+        "id": "required-job",
+        "status": "Completed",
         "start_time": (now - timedelta(minutes=20)).isoformat(),
         "end_time": (now - timedelta(minutes=12)).isoformat(),
     }
     for name in ("ml-optional", "ml-experimental"):
         readiness.pipeline_evidence[name] = {
+            "id": f"{name}-job",
+            "status": "Completed",
             "start_time": (now - timedelta(minutes=10)).isoformat(),
             "end_time": (now - timedelta(minutes=5)).isoformat(),
         }
@@ -1776,6 +1804,124 @@ def test_model_freshness_correlates_contracts_with_their_producer_pipeline() -> 
                 if contract.tier == tier
             ]
         )
+
+
+@pytest.mark.parametrize(
+    ("optional_state", "expected_status"),
+    [("failed", "FAIL"), ("missing", "UNKNOWN"), ("unavailable", "UNKNOWN")],
+)
+def test_optional_pipeline_problem_does_not_hide_successful_sibling(
+    optional_state: str, expected_status: str
+) -> None:
+    now = datetime(2026, 7, 21, 10, 0, tzinfo=UTC)
+    context = _profile_context("full-demo", now)
+    started = (now - timedelta(minutes=10)).isoformat()
+    ended = (now - timedelta(minutes=5)).isoformat()
+    names = ("ml-optional", "ml-experimental")
+    context.deploy_journal = {
+        "environment": context.environment,
+        "manifest": {
+            "hash": context.manifest_hash,
+            "profile_id": context.config.profile.id,
+            "profile_name": context.config.profile.deployment_name,
+        },
+        "targets": {
+            "profile": context.config.profile.deployment_name,
+            "workspace_name": context.config.workspace.name,
+            "lakehouse_name": context.config.lakehouse.name,
+        },
+        "steps": [
+            {
+                "step_id": f"post-reporting-{name}",
+                "status": "FAILED" if name == "ml-optional" else "SUCCEEDED",
+                "started_at": started,
+                "ended_at": ended,
+                "evidence_id": f"{name}-job",
+            }
+            for name in names
+            if optional_state != "missing" or name != "ml-optional"
+        ],
+    }
+
+    class Adapter:
+        def __init__(self):
+            self.model_queries = []
+
+        def list_pipeline_runs(self, pipeline_id):
+            name = pipeline_id.removesuffix("-item")
+            if name == "ml-optional" and optional_state == "unavailable":
+                raise ConnectionError("pipeline history unavailable")
+            return [{
+                "id": f"{name}-job",
+                "itemId": pipeline_id,
+                "jobType": "Pipeline",
+                "status": "Failed" if name == "ml-optional" else "Completed",
+                "startTimeUtc": started,
+                "endTimeUtc": ended,
+            }]
+
+        def model_signals(self, contracts):
+            self.model_queries.append({contract["id"] for contract in contracts})
+            return [
+                {
+                    "contract_id": contract["id"],
+                    "as_of": (
+                        now - timedelta(
+                            minutes=(
+                                18
+                                if contract["pipeline_ref"] == "ml-required.DataPipeline"
+                                else 8
+                            )
+                        )
+                    ).isoformat(),
+                    "run_id_present": True,
+                    "lineage_hash": contract["id"],
+                }
+                for contract in contracts
+            ]
+
+    adapter = Adapter()
+    readiness = ReadinessRunner(context, adapter)
+    readiness.items = [
+        {"type": "DataPipeline", "displayName": name, "id": f"{name}-item"}
+        for name in names
+    ]
+    readiness.item_index = {
+        (item["type"], item["displayName"]): item for item in readiness.items
+    }
+    readiness.pipeline_evidence["ml-required"] = {
+        "id": "required-job",
+        "status": "Completed",
+        "start_time": (now - timedelta(minutes=20)).isoformat(),
+        "end_time": (now - timedelta(minutes=15)).isoformat(),
+    }
+    readiness._check(
+        "pipelines.post_reporting", "pipeline", selected=True, required=False,
+        function=readiness._post_reporting_pipeline_check,
+    )
+    for tier in ("optional", "experimental"):
+        readiness._check(
+            f"freshness.models.{tier}", "freshness", selected=True, required=False,
+            function=lambda tier=tier: readiness._model_freshness(tier),
+        )
+    checks = {check.check_id: check for check in readiness.checks}
+
+    assert checks["pipelines.post_reporting"].status == expected_status
+    assert checks["freshness.models.optional"].status == expected_status
+    assert checks["freshness.models.experimental"].status == "PASS"
+    assert adapter.model_queries == [{
+        contract.id
+        for contract in context.manifest.ml_contracts
+        if contract.tier == "experimental"
+    }]
+    if optional_state == "failed":
+        failure = checks["pipelines.post_reporting"]
+        assert "ml-optional" in failure.summary
+        assert failure.evidence["statuses"] == {
+            "ml-optional": "Failed",
+            "ml-experimental": "Completed",
+        }
+        assert "ml-optional" in checks["freshness.models.optional"].summary
 
 
 def test_full_demo_initial_inventory_defers_ontology_dependent_items() -> None:

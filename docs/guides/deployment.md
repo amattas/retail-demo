@@ -54,8 +54,9 @@ The current deploy plan:
     readiness queries can find them;
 12. for `full-demo`, runs the deployed ontology notebook to create or
     revalidate the target ontology and its derived graph;
-13. publishes both Data Agents and the complete 48-item task flow, then reads
-    the graph back and compares every task, item binding, and edge;
+13. publishes both Data Agents and the complete task flow (14 tasks, 60
+    item references, 14 edges), then reads the graph back and compares every
+    task, item binding, and edge;
 14. runs read-only readiness verification over the complete selected profile.
 
 Each live run atomically updates
@@ -250,11 +251,17 @@ degraded but continues.
   Agents are published. Fabric retires the old format on Jan 31, 2027. An
   old-format item is replaced only after a staged copy passes readback.
   Evidence: `deploy/.generated/<env>/ontology-report.json`.
-- **`deploy-fabric-app`** (standard and full-demo) deploys the
-  `app/fabric-app` replenishment approvals app with the Rayfin CLI. It needs
+- **`deploy-fabric-app`** (standard and full-demo) deploys three Fabric Apps
+  from `app/fabric-app` with the Rayfin CLI: `retail-merchandising`,
+  `retail-promotions`, and `retail-approvals`. Each is staged under
+  `deploy/.generated/<env>/fabric-apps/<app>/` with its own Rayfin identity,
+  and a new app is deployed a second time in the same run once its sign-in
+  origin is known. The apps stand alone and do not link to each other. It needs
   Node.js 20+, the **Fabric Apps (preview)** tenant setting, and a capacity
   region that supports Fabric Apps. The first run can open a browser for the
-  Rayfin sign-in. Evidence: `deploy/.generated/<env>/fabric-app-report.json`.
+  Rayfin sign-in. To deploy only the apps, run
+  `python -m deploy.scripts.deploy_fabric_app --environment <env>`.
+  Evidence: `deploy/.generated/<env>/fabric-app-report.json`.
 
 ### Store, Warehouse, and Truck twins
 
@@ -966,7 +973,7 @@ deployed `30-create-ontology` notebook to create or revalidate
 `RetailOntology_AutoGen`, waits for the item to appear, publishes both Data
 Agents, and deploys the
 source-controlled task flow. The task-flow write is read back and compared
-with all 14 tasks, 58 selected item references, and 14 edges before the command
+with all 14 tasks, 60 selected item references, and 14 edges before the command
 reports success.
 
 Use this idempotent recovery command only when that final phase was interrupted

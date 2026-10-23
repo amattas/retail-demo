@@ -38,7 +38,8 @@ Open the workspace task flow and select the **Retail Demo** flow.
 ![Retail Demo workspace task flow](../assets/screenshots/workspace-task-flow.png)
 
 *The task flow groups ingestion, transformation, storage, semantic, ontology,
-ML, and agent assets into one workspace-level map. Required ML points into the
+ML, agent, operations-case preparation, and Fabric Apps assets into
+one workspace-level map. Required ML points into the
 Semantic Model; post-Reporting optional and experimental ML points out from it
 so those extensions are not presented as Reporting prerequisites.*
 

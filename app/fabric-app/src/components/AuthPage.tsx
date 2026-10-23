@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { appTitle } from '@/config/apps';
 import { useAuth } from '@/hooks/AuthContext';
 
 const msLogo = (
@@ -51,9 +52,9 @@ export function AuthPage() {
         <div className="w-full max-w-sm">
           <div className="rounded-3xl border border-white/60 bg-white/80 p-8 shadow-xl backdrop-blur-sm">
             <div className="mb-8 text-center">
-              <h1 className="text-2xl font-bold text-gray-900">Replenishment Approvals</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{appTitle()}</h1>
               <p className="mt-2 text-sm text-gray-500">
-                Sign in to get started.
+                              Merchandising, promotion planning, and replenishment approvals.
               </p>
             </div>
 

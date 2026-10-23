@@ -194,6 +194,6 @@ These combine semantic model + ontology + ML and best showcase the platform.
 
 ## Notes for the tester
 - The **Ontology MCP** is best for *relationship / "who-is-connected-to-what"* questions and multi-hop traversal; the **Data Agent** is best for *aggregate metrics, trends, and ranked lists* backed by curated DAX measures.
-- ML questions (sections 7–14, 16) read the predictive Gold tables (`churn_predictions`, `customer_segments`, `demand_forecast`, `stockout_risk`, `product_recommendations`, `price_elasticity`, `pricing_recommendations`, `journey_patterns`, `dwell_predictions`). Confirm those notebooks have run and the tables are populated/bound before testing.
+- ML questions (sections 7–14, 16) read the predictive Gold tables. The six required outputs (`churn_predictions`, `customer_segments`, `demand_forecast`, `stockout_risk`, `product_recommendations`, `price_elasticity`) are gated by the `ml-required` pipeline. `journey_patterns` and `dwell_predictions` come from the post-Reporting `ml-optional` pipeline, and `pricing_recommendations` from `ml-experimental`; confirm those pipelines have run and the tables are populated/bound before testing questions that use them.
 - Real-time (🟠) questions require the streaming notebook to be running so the Eventhouse event tables and materialized views have fresh data.
 - Start with single-surface questions (1–65) to validate each capability, then run the cross-surface set (66–72) to demonstrate the full story.

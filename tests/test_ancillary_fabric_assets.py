@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import ast
 import json
 import re
 from pathlib import Path
+
+from deploy.scripts._ontology_model import ENTITIES, ONTOLOGY_NAME
 
 ROOT = Path(__file__).resolve().parents[1]
 DASHBOARDS = ROOT / "fabric" / "dashboards"
@@ -16,7 +17,6 @@ TASKFLOW = ROOT / "fabric" / "taskflow" / "taskflow.json"
 SEMANTIC_TABLES = (
     ROOT / "fabric" / "powerbi" / "retail_model.SemanticModel" / "definition" / "tables"
 )
-ONTOLOGY_NOTEBOOK = ROOT / "fabric" / "lakehouse" / "30-create-ontology.ipynb"
 
 SAFE_SEMANTIC_TABLES = {
     "campaign_performance_daily",
@@ -38,12 +38,6 @@ SAFE_SEMANTIC_TABLES = {
     "top_products_15m",
     "truck_dwell_daily",
     "zone_dwell_minute",
-}
-SAFE_ONTOLOGY_ENTITIES = {
-    "Geography",
-    "Store",
-    "DistributionCenter",
-    "Product",
 }
 DIRECT_IDENTIFIER_FIELDS = {
     "Ad ID",
@@ -96,8 +90,9 @@ def _ontology_datasource(stage: str) -> dict[str, object]:
         / "Files"
         / "Config"
         / stage
-        / "ontology-RetailOntology_AutoGen"
-        / "datasource.json"
+        / "ontologies"
+        / ONTOLOGY_NAME
+        / "ontology.json"
     )
 
 
@@ -122,22 +117,7 @@ def _element_names(datasource: dict[str, object]) -> set[str]:
 
 
 def _current_ontology_entities() -> set[str]:
-    notebook = _load_json(ONTOLOGY_NOTEBOOK)
-    cells = notebook["cells"]
-    assert isinstance(cells, list)
-    source = "\n".join(
-        "".join(cell["source"])
-        for cell in cells
-        if isinstance(cell, dict) and cell.get("cell_type") == "code"
-    )
-    match = re.search(
-        r"ENTITY_CONFIG = (?P<config>\{.*?\})\n\nRELATIONSHIPS =",
-        source,
-        re.DOTALL,
-    )
-    assert match is not None
-    config = ast.literal_eval(match.group("config"))
-    return {str(value["entity_name"]) for value in config.values()}
+    return {entity.name for entity in ENTITIES}
 
 
 def _semantic_table_ids() -> dict[str, str]:
@@ -323,12 +303,22 @@ def test_ontology_agent_selection_is_current_private_and_publish_explicit() -> N
 
     assert draft == published
     assert _element_names(draft) == _current_ontology_entities()
-    assert _selected_names(draft) == SAFE_ONTOLOGY_ENTITIES
+    # Fabric doesn't enforce selection for ontology sources, so every entity is
+    # selected and the stage instructions carry the personal-data guard.
+    assert _selected_names(draft) == _current_ontology_entities()
+    instructions = str(
+        _load_json(agent_root / "draft" / "stage_config.json")["aiInstructions"]
+    ).lower()
+    for identifier in ("names", "phone", "loyalty card", "customer ids", "license plates"):
+        assert identifier in instructions
+    assert "re-identify" in instructions
     assert (agent_root / "publish_info.json").is_file()
-    instructions = str(draft["dataSourceInstructions"]).lower()
-    assert "aggregate" in instructions
-    assert "at least 10" in instructions
-    assert "refuse" in instructions
+    # TMDL ontologies are only queryable through the ontology-as-context
+    # source; the legacy datasource.json binding calls an API the new
+    # ontology format rejects.
+    assert str(draft["$schema"]).endswith("/dataAgent/definition/ontology/1.0.0/schema.json")
+    assert draft["displayName"] == ONTOLOGY_NAME
+    assert not list(agent_root.glob("*/ontology-*/datasource.json"))
 
 
 def test_agent_stage_instructions_enforce_privacy_and_match_published_state() -> None:

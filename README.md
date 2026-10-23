@@ -80,7 +80,7 @@ setup 01 through 11 and `stream-events.ipynb`.
 
 The guided `full-demo` path runs setup and required ML gates automatically,
 then publishes Reporting and runs isolated optional/experimental ML. An
-explicit `--profile core` deploy leaves setup notebooks 01-04 for the operator
+explicit `--profile core` deploy leaves setup notebooks 01-11 for the operator
 to run manually. `--yes` does not skip required gates or accept full-demo
 boundaries.
 

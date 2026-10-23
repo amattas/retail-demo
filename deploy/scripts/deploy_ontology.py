@@ -35,6 +35,7 @@ from deploy.scripts._ontology_model import (
     DESCRIPTION,
     EVENT_BINDINGS,
     ONTOLOGY_NAME,
+    SourceItem,
     build_definition,
     definition_payload,
 )
@@ -66,18 +67,37 @@ def is_old_format(parts: dict[str, bytes]) -> bool:
     return str(version) != "2.0"
 
 
-def sql_endpoint(session: requests.Session, workspace_id: str, lakehouse_id: str) -> tuple[str, str]:
+def sql_endpoint(
+    session: requests.Session, workspace_id: str, lakehouse_id: str
+) -> tuple[str, str, str]:
+    """Return the SQL endpoint host, its database ID, and the Lakehouse name."""
     response = session.get(
         f"{API}/workspaces/{_guid(workspace_id)}/lakehouses/{_guid(lakehouse_id)}",
         timeout=30, allow_redirects=False,
     )
     if response.status_code != 200:
         raise NativeItemError(f"Read Lakehouse failed: HTTP {response.status_code}")
-    properties = (response.json().get("properties") or {}).get("sqlEndpointProperties") or {}
+    body = response.json()
+    properties = (body.get("properties") or {}).get("sqlEndpointProperties") or {}
     host, database = properties.get("connectionString"), properties.get("id")
     if not host or not database or properties.get("provisioningStatus", "Success") != "Success":
         raise NativeItemError("The Lakehouse SQL analytics endpoint is not provisioned.")
-    return str(host), _guid(str(database))
+    name = str(body.get("displayName") or "")
+    if not name:
+        raise NativeItemError("The Lakehouse display name is unavailable.")
+    return str(host), _guid(str(database)), name
+
+
+def workspace_name(session: requests.Session, workspace_id: str) -> str:
+    response = session.get(
+        f"{API}/workspaces/{_guid(workspace_id)}", timeout=30, allow_redirects=False
+    )
+    if response.status_code != 200:
+        raise NativeItemError(f"Read workspace failed: HTTP {response.status_code}")
+    name = str(response.json().get("displayName") or "")
+    if not name:
+        raise NativeItemError("The workspace display name is unavailable.")
+    return name
 
 
 def bronze_tables(
@@ -232,6 +252,14 @@ def _verify(expected: dict[str, str], actual: dict[str, bytes]) -> None:
             "Ontology readback is incomplete or not in the TMDL format: "
             + ", ".join(missing[:10])
         )
+    unbound = sorted(
+        path for path in wanted
+        if path.startswith("tables/") and b"annotation ONT_ItemId" not in actual[path]
+    )
+    if unbound:
+        raise NativeItemError(
+            "Ontology readback lost the data-source annotations: " + ", ".join(unbound[:10])
+        )
 
 
 def publish_ontology(
@@ -244,13 +272,20 @@ def publish_ontology(
     list_bronze: Callable[[str, str, str], Iterable[str]] = bronze_tables,
     sleep: Callable[[float], None] = time.sleep,
 ) -> dict[str, Any]:
-    host, database = sql_endpoint(session, workspace_id, lakehouse_id)
+    host, database, lakehouse_name = sql_endpoint(session, workspace_id, lakehouse_id)
+    source = SourceItem(
+        workspace_id=_guid(workspace_id),
+        workspace_name=workspace_name(session, workspace_id),
+        item_id=_guid(lakehouse_id),
+        item_name=lakehouse_name,
+        pinned_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    )
     discovered_bronze = set(
         list_bronze(workspace_id, lakehouse_id, storage_token)
     )
     available = discovered_bronze if _ENABLE_EVENT_BACKING_TABLES else set()
     parts = build_definition(
-        sql_endpoint=host, sql_database_id=database,
+        sql_endpoint=host, sql_database_id=database, source=source,
         available_bronze_tables=available, display_name=display_name,
     )
     definition = definition_payload(parts)
@@ -323,6 +358,13 @@ def render(output_dir: Path) -> list[Path]:
     parts = build_definition(
         sql_endpoint="<lakehouse-sql-endpoint>.datawarehouse.fabric.microsoft.com",
         sql_database_id="00000000-0000-0000-0000-000000000000",
+        source=SourceItem(
+            workspace_id="00000000-0000-0000-0000-000000000000",
+            workspace_name="<workspace-name>",
+            item_id="00000000-0000-0000-0000-000000000000",
+            item_name="<lakehouse-name>",
+            pinned_at="<published-at-utc>",
+        ),
         available_bronze_tables={binding.table for binding in EVENT_BINDINGS},
     )
     written = []

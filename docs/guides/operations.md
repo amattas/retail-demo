@@ -78,7 +78,10 @@ Before running the verifier:
    setup, watermark, and model evidence.
 3. Confirm the configured identity can read Fabric items, definitions, job
    history, Eventhouse metadata, and the Lakehouse SQL endpoint.
-4. For `core`, run setup notebooks 01-11 in order before verification.
+4. For `core`, which deploys no pipelines, run setup notebooks 01–11
+   manually in order before verification. Reporting profiles run setup
+   01–10 through `setup-pipeline` and `setup-11-build-gold` inside
+   `ml-required`.
 5. For Reporting profiles, retain the deployment journal that correlates the
    exact setup and required-ML pipeline runs.
 6. Confirm optional ML, ontology, agent, dashboard, and rule surfaces are ready
@@ -118,7 +121,7 @@ Use these signals together:
 
 | Signal | What it tells you | Where to check |
 | --- | --- | --- |
-| Historical setup run | Whether the setup pipeline (setup-10) published a complete historical snapshot | `ag.setup_run_log` in the Lakehouse |
+| Historical setup run | Whether the setup pipeline completed and `setup-10` published the historical Silver snapshot (Gold is built by `setup-11-build-gold`) | `ag.setup_run_log` in the Lakehouse |
 | Streaming progress | How far the Eventhouse-to-Silver transform has processed | `ag._watermarks` in the Lakehouse |
 | Live event freshness | Whether Eventhouse is receiving recent events | Eventhouse row counts and `ingest_timestamp` |
 | Gold freshness | Whether business summaries reflect the latest selected inputs | Representative maximum business time in `au` tables |
@@ -192,6 +195,8 @@ rather than ingestion time.
 | Setup pipeline not started | Start `setup-pipeline` manually and retain its run ID. |
 | Setup pipeline failed | Resume from the first failed activity only after validating upstream tables. |
 | Required ML gate failed | Inspect producer/validator errors; Reporting is intentionally unpublished until a new exact run succeeds. |
+| Optional delivery training finds no valid completed dwell records | Use the updated `13-ml-delivery-prediction` notebook, which combines completed Silver `fact_truck_moves` with Bronze lifecycle events. Empty live shortcuts do not replace historical training data, and unmatched live arrivals remain prediction candidates. Republish the affected notebook and rerun only the failed optional pipeline; do not regenerate successful setup data. |
+| A failed optional pipeline hides successful sibling ML evidence | Update the verifier and rerun read-only readiness. It correlates failed terminal runs as failures, verifies sibling pipelines independently, and checks each model's producer before querying its output. Missing producer evidence is not proof that the model SQL query or a sibling pipeline failed. |
 | `freshness.setup_run_log` reports `ProgrammingError` after deployment | Update the local verifier to query setup data and staging catalog metadata separately, then rerun read-only readiness. Fabric error 15816 rejects a mixed catalog/data query; do not regenerate setup data for this checker error. |
 | Ontology, Data Agent, or task-flow links missing | Run `retail-setup post-ontology --env <env>` to recreate any missing ontology, republish agents, and verify the exact persisted graph. |
 | Live rows absent | Verify notebook parameters, resolved Query URI, KQL permissions, connector errors, and ingestion timestamps. |

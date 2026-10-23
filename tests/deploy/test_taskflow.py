@@ -366,7 +366,7 @@ def test_committed_taskflow_covers_every_full_demo_artifact() -> None:
     task_names = {task["name"] for task in data["tasks"]}
     assert {
         "Prepare Eventhouse Shortcuts",
-        "Fabric App Approvals",
+        "Fabric Apps",
         "Operations Case Preparation",
     } <= task_names
 

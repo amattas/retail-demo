@@ -722,6 +722,10 @@ def data_agent_binding_errors(
         (path, content)
         for path, content in parts.items()
         if path.casefold().endswith("datasource.json")
+        or (
+            "/ontologies/" in path.casefold()
+            and path.casefold().endswith("/ontology.json")
+        )
     ]
     if not datasource_parts:
         return ["data agent has no datasource definition"]
@@ -761,6 +765,15 @@ def normalize_job_evidence(run: dict[str, object]) -> dict[str, Any]:
     }
 
 
+def _validate_job_identity_and_timestamps(evidence: dict[str, Any]) -> None:
+    if not evidence.get("id"):
+        raise EvidenceUnknown("pipeline job identity is missing")
+    started = _parse_time(evidence.get("start_time"))
+    ended = _parse_time(evidence.get("end_time"))
+    if ended < started:
+        raise CheckFailed("pipeline job ended before it started")
+
+
 def validate_terminal_job_evidence(evidence: dict[str, Any]) -> None:
     """Require a complete, chronologically valid terminal-success record."""
 
@@ -768,12 +781,7 @@ def validate_terminal_job_evidence(evidence: dict[str, Any]) -> None:
         raise CheckFailed(
             f"Pipeline job is not terminal-successful ({evidence.get('status')!r})."
         )
-    if not evidence.get("id"):
-        raise EvidenceUnknown("pipeline job identity is missing")
-    started = _parse_time(evidence.get("start_time"))
-    ended = _parse_time(evidence.get("end_time"))
-    if ended < started:
-        raise CheckFailed("pipeline job ended before it started")
+    _validate_job_identity_and_timestamps(evidence)
 
 
 def correlated_pipeline_run(
@@ -784,7 +792,7 @@ def correlated_pipeline_run(
     step_ended: datetime,
     expected_run_id: str | None = None,
 ) -> dict[str, Any]:
-    """Select a terminal run bounded by one successful deploy-journal step."""
+    """Correlate a run without mistaking a failed outcome for missing evidence."""
 
     candidates: list[dict[str, object]] = []
     for run in runs:
@@ -810,7 +818,7 @@ def correlated_pipeline_run(
         evidence["item_id"] = pipeline_id
     if expected_run_id and evidence["id"] != expected_run_id:
         raise CheckFailed("pipeline run identity does not match adopted evidence")
-    validate_terminal_job_evidence(evidence)
+    _validate_job_identity_and_timestamps(evidence)
     ended = _parse_time(evidence["end_time"])
     if (
         ended < step_started - _CORRELATION_SKEW
@@ -1849,16 +1857,46 @@ class ReadinessRunner:
 
     def _post_reporting_pipeline_check(self) -> Observation:
         statuses: dict[str, str] = {}
+        run_ids: dict[str, str] = {}
+        invalid: list[str] = []
+        unavailable: list[str] = []
         for reference in self.profile.post_reporting_pipeline_refs:
             name = Path(reference).stem
-            evidence = self._latest_correlated_pipeline(
-                name,
-                f"post-reporting-{name}",
-            )
+            try:
+                evidence = self._latest_correlated_pipeline(
+                    name,
+                    f"post-reporting-{name}",
+                )
+            except CheckFailed as exc:
+                invalid.append(f"{name}: {exc}")
+                continue
+            except EvidenceUnknown as exc:
+                unavailable.append(f"{name}: {exc}")
+                continue
             self.pipeline_evidence[name] = evidence
             statuses[name] = str(evidence["status"])
-        if any(status != "Completed" for status in statuses.values()):
-            raise CheckFailed("A post-Reporting pipeline did not complete successfully.")
+            run_ids[name] = str(evidence["id"])
+        failed = [
+            f"{name} ({status})"
+            for name, status in statuses.items()
+            if status != "Completed"
+        ]
+        if failed or invalid:
+            raise CheckFailed(
+                "Post-Reporting pipelines failed readiness: "
+                + "; ".join([*failed, *invalid]),
+                evidence={
+                    "statuses": statuses,
+                    "run_ids": run_ids,
+                    "invalid": invalid,
+                    "unavailable": unavailable,
+                },
+            )
+        if unavailable:
+            raise EvidenceUnknown(
+                "Post-Reporting pipeline evidence unavailable: "
+                + "; ".join(unavailable)
+            )
         return Observation(
             "All selected post-Reporting pipelines reached terminal success.",
             {"statuses": statuses},
@@ -1902,7 +1940,7 @@ class ReadinessRunner:
             if (
                 isinstance(step, dict)
                 and step.get("step_id") == step_id
-                and step.get("status") == "SUCCEEDED"
+                and step.get("status") in {"SUCCEEDED", "FAILED"}
             ):
                 try:
                     started = _parse_time(step.get("started_at"))
@@ -2141,8 +2179,22 @@ class ReadinessRunner:
             return None, None
         name = Path(reference).stem
         if name not in self.pipeline_evidence:
-            raise EvidenceUnknown(f"{tier} model pipeline correlation is missing")
+            journal_step = (
+                "required-ml-reporting-gate"
+                if reference == self.profile.reporting_gate_pipeline_ref
+                else f"post-reporting-{name}"
+            )
+            self.pipeline_evidence[name] = self._latest_correlated_pipeline(
+                name, journal_step
+            )
         evidence = self.pipeline_evidence[name]
+        try:
+            validate_terminal_job_evidence(evidence)
+        except CheckFailed as exc:
+            raise CheckFailed(
+                f"{tier} model producer pipeline {name!r}: {exc}",
+                evidence={"pipeline": name, **evidence},
+            ) from exc
         return (
             _parse_time(evidence.get("start_time")),
             _parse_time(evidence.get("end_time")),
@@ -2189,6 +2241,11 @@ class ReadinessRunner:
                     "generated_at and model_run_id: "
                     + ", ".join(sorted(invalid))
                 )
+        references = {
+            str(contract["id"]): contract["pipeline_ref"] for contract in contracts
+        }
+        for reference in dict.fromkeys(references.values()):
+            self._pipeline_window(reference, tier)
         signals = self.adapter.model_signals(contracts)
         if len(signals) != len(contracts):
             raise EvidenceUnknown(f"{tier} model evidence is incomplete")
@@ -2198,9 +2255,6 @@ class ReadinessRunner:
             raise EvidenceUnknown(
                 f"{tier} model generation evidence has a blank model_run_id"
             )
-        references = {
-            str(contract["id"]): contract["pipeline_ref"] for contract in contracts
-        }
         # Group by correlation window so each contract is judged against the
         # pipeline run that produced it, then report the worst (oldest) group.
         windows: dict[str | None, list[datetime]] = {}

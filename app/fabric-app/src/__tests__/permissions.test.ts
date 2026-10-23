@@ -22,4 +22,17 @@ describe('generated Data API Builder permissions', () => {
       },
     ]);
   });
+
+  it.each(['MerchandisingView', 'PromotionScenario'])(
+    '%s is private: every grant is bound to the owner',
+    (name) => {
+      const owner = { database: '@claims.sub eq @item.owner_id' };
+      const [grant] = config.entities[name]?.permissions ?? [];
+      expect(grant?.role).toBe('authenticated');
+      expect(grant?.actions).toEqual(expect.arrayContaining(
+        ['create', 'read', 'delete'].map((action) => ({ action, policy: owner }))
+      ));
+      expect(grant?.actions).toHaveLength(3);
+    }
+  );
 });

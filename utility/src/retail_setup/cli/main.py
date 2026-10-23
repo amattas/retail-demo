@@ -2227,7 +2227,7 @@ def _deploy_plan(
                     "--environment",
                     env,
                 ],
-                description="Deploy the Fabric Apps replenishment approvals app",
+                description="Deploy the Retail Operations Fabric Apps",
                 step_id="deploy-fabric-app",
                 required=False,
                 failure_message=(

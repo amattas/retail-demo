@@ -106,7 +106,12 @@ predictive pages as supported output.
 ## 6. Close with actions and roadmap
 
 If a validated pricing approval or alert scenario is available, show it as an
-optional governed action. Otherwise, describe it from the owning backlog:
+optional governed action. In `full-demo`, you can also open the
+`retail-approvals` Fabric App to show a different reviewer recording an
+append-only decision on a replenishment proposal; the app does not place
+orders. RTI dashboards and Activator rules are checked in as
+design and reference material, not deployed items. Otherwise, describe the
+action story from the owning backlog:
 
 - [RTI dashboards and Activator](../design/requirements/modules/analytics/backlog.md#enh-001)
 - [Closed-loop pricing](../design/requirements/modules/power-bi/backlog.md#enh-002)

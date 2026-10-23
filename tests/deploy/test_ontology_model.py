@@ -14,12 +14,20 @@ from deploy.scripts._ontology_rules import RULES
 ROOT = Path(__file__).resolve().parents[2]
 ALL_BRONZE = {binding.table for binding in model.EVENT_BINDINGS}
 DATABASE = "11111111-2222-3333-4444-555555555555"
+SOURCE = model.SourceItem(
+    workspace_id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    workspace_name="retail-demo",
+    item_id="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    item_name="retail_lakehouse",
+    pinned_at="2026-10-23T00:00:00Z",
+)
 
 
 def _build(**overrides):
     options = {
         "sql_endpoint": "abc.datawarehouse.fabric.microsoft.com",
         "sql_database_id": DATABASE,
+        "source": SOURCE,
         "available_bronze_tables": ALL_BRONZE,
     }
     options.update(overrides)
@@ -168,11 +176,31 @@ def test_indentation_uses_tabs_outside_the_m_expression(parts):
     [
         ({"sql_database_id": "not-a-guid"}, "badly formed"),
         ({"sql_endpoint": 'bad"host'}, "SQL endpoint"),
+        ({"source": replace(SOURCE, item_name="bad\nname")}, "ONT_ItemName"),
+        ({"source": replace(SOURCE, item_id="not-a-guid")}, "badly formed"),
     ],
 )
 def test_invalid_endpoint_inputs_are_rejected(overrides, message):
     with pytest.raises(ValueError, match=message):
         _build(**overrides)
+
+
+def test_every_partition_identifies_its_lakehouse_source(parts):
+    expected = {
+        "ONT_WorkspaceId": SOURCE.workspace_id,
+        "ONT_ItemId": SOURCE.item_id,
+        "ONT_ItemKind": "Lakehouse",
+        "ONT_ItemName": "retail_lakehouse",
+        "ONT_WorkspaceName": "retail-demo",
+        "ONT_SqlEndpoint": "abc.datawarehouse.fabric.microsoft.com",
+        "ONT_SqlDatabase": "retail_lakehouse",
+        "ONT_PinnedAtUtc": "2026-10-23T00:00:00Z",
+    }
+    tables = [text for path, text in parts.items() if path.startswith("tables/")]
+    assert tables
+    for text in tables:
+        partition = text.split("\tpartition ", 1)[1]
+        assert dict(re.findall(r"^\t\tannotation (\S+) = (.+)$", partition, re.M)) == expected
 
 
 def test_schema_drift_fails_closed():

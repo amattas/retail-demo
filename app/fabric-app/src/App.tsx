@@ -6,9 +6,19 @@ import {
   useLocation,
 } from 'react-router-dom';
 
+import { AppShell } from '@/components/AppShell';
 import { AuthPage } from '@/components/AuthPage';
+import { includedApps, type AppId } from '@/config/apps';
 import { useAuth } from '@/hooks/AuthContext';
-import { HomePage } from '@/pages/HomePage';
+import { ApprovalsPage } from '@/pages/ApprovalsPage';
+import { MerchandisingPage } from '@/pages/MerchandisingPage';
+import { PromotionsPage } from '@/pages/PromotionsPage';
+
+const PAGES: Record<AppId, React.ReactNode> = {
+  merchandising: <MerchandisingPage />,
+  promotions: <PromotionsPage />,
+  approvals: <ApprovalsPage />,
+};
 
 /** The route a visitor asked for before being sent to sign in. */
 interface AuthRedirectState {
@@ -86,13 +96,17 @@ function App() {
           }
         />
         <Route
-          path="/"
           element={
             <AuthGuard requireAuth={true}>
-              <HomePage />
+              <AppShell />
             </AuthGuard>
           }
-        />
+        >
+          <Route index element={<Navigate to={includedApps()[0].route} replace />} />
+          {includedApps().map((app) => (
+            <Route key={app.id} path={app.route} element={PAGES[app.id]} />
+          ))}
+        </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

@@ -1,12 +1,8 @@
 {
-  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/dataAgent/definition/dataSource/1.0.0/schema.json",
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/dataAgent/definition/ontology/1.0.0/schema.json",
   "artifactId": "573b9da8-5ba5-4b8c-9dae-7f8bde3a2fbd",
   "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471",
-  "dataSourceInstructions": "Use only selected ontology entities. The selected set is limited to non-person retail locations, facilities, and products. Do not traverse to or answer from unselected Customer, Receipt, OnlineOrder, Payment, Promotion, Truck, CustomerSegment, or ChurnPrediction entities, including through relationships or time-series bindings. Return aggregate results only, require at least 10 records for customer-derived metrics, and refuse requests for personal data, direct identifiers, row-level records, tracking, or re-identification.",
   "displayName": "RetailOntology_AutoGen",
-  "type": "ontology",
-  "userDescription": "Curated non-person subset of the retail ontology for aggregate location, store, distribution-center, and product analysis.",
-  "metadata": {},
   "elements": [
     {
       "id": "Geography",
@@ -34,7 +30,7 @@
     },
     {
       "id": "Truck",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "Truck",
       "type": "ontology.entity",
       "description": "id,license_plate,refrigeration,dcid",
@@ -42,7 +38,7 @@
     },
     {
       "id": "Customer",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "Customer",
       "type": "ontology.entity",
       "description": "id,first_name,last_name,address,geography_id,loyalty_card,phone,ble_id,ad_id",
@@ -58,7 +54,7 @@
     },
     {
       "id": "Receipt",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "Receipt",
       "type": "ontology.entity",
       "description": "customer_id,store_id,tax_cents,total_cents,payment_method,subtotal_cents,receipt_id_ext,total_amount,tax_amount,receipt_type,discount_amount,subtotal",
@@ -66,7 +62,7 @@
     },
     {
       "id": "OnlineOrder",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "OnlineOrder",
       "type": "ontology.entity",
       "description": "customer_id,subtotal_cents,order_id_ext,payment_method,total_amount,total_cents,tax_amount,subtotal_amount,tax_cents,event_date",
@@ -74,7 +70,7 @@
     },
     {
       "id": "Promotion",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "Promotion",
       "type": "ontology.entity",
       "description": "receipt_id_ext,promo_code,discount_amount,discount_cents,discount_type,product_count,product_ids,store_id,customer_id,event_date",
@@ -82,7 +78,7 @@
     },
     {
       "id": "Payment",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "Payment",
       "type": "ontology.entity",
       "description": "receipt_id_ext,order_id_ext,payment_method,amount_cents,amount,transaction_id,processing_time_ms,status,decline_reason,store_id,customer_id,event_ts,event_date",
@@ -90,7 +86,7 @@
     },
     {
       "id": "CustomerSegment",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "CustomerSegment",
       "type": "ontology.entity",
       "description": "customer_id,cluster_id,segment_label,recency_days,frequency,monetary_value,avg_order_value,first_purchase_date,last_purchase_date,segmented_at,generated_at,model_run_id,schema_version",
@@ -98,11 +94,34 @@
     },
     {
       "id": "ChurnPrediction",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "ChurnPrediction",
       "type": "ontology.entity",
       "description": "customer_id,churn_probability,churn_prediction,risk_category,is_churned_actual,prediction_date,generated_at,model_version,churn_window_days,model_run_id,schema_version",
       "children": []
+    },
+    {
+      "id": "StockoutRisk",
+      "is_selected": true,
+      "display_name": "StockoutRisk",
+      "type": "ontology.entity",
+      "description": "store_id,product_id,inventory_as_of,current_inventory,demand_velocity_daily,days_of_inventory,demand_trend,stockout_probability,stockout_predicted,risk,ranking,risk_level,predicted_at,generated_at,forecast_horizon_days,department,category,subcategory,model_run_id,schema_version",
+      "children": []
     }
+  ],
+  "entitiesWithUserAuthoredDescriptions": [
+    "Geography",
+    "Store",
+    "DistributionCenter",
+    "Truck",
+    "Customer",
+    "Product",
+    "Receipt",
+    "OnlineOrder",
+    "Promotion",
+    "Payment",
+    "CustomerSegment",
+    "ChurnPrediction",
+    "StockoutRisk"
   ]
 }
