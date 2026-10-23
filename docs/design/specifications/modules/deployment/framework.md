@@ -399,7 +399,7 @@ and exactly one stable ontology item.
 The next phase publishes both Data Agents and deploys the source-controlled
 task flow. Before mutation, source coverage must include every selected
 full-demo artifact. After mutation, the metadata service is read back and all
-14 tasks, 58 item bindings, and 14 edges must match exactly.
+14 tasks, 60 item bindings, and 14 edges must match exactly.
 
 The recovery command reruns the same idempotent phase:
 

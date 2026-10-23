@@ -1,4 +1,5 @@
 import { getRayfinClient, isLocalBackend } from './rayfinClient';
+import { isDesignPreview } from './runtimeMode';
 
 export type Decision = 'APPROVED' | 'REJECTED';
 export type ProposalStatus = 'PENDING' | Decision;
@@ -96,6 +97,21 @@ let memoryDecisions: DecisionRecord[] = [];
 export function resetLocalStore(): void {
   memoryProposals = [];
   memoryDecisions = [];
+}
+
+export function seedPreviewProposals(): void {
+  if (!isDesignPreview()) throw new Error('Sample queues are available only in the development preview.');
+  if (memoryProposals.length) return;
+  const now = Date.now();
+  memoryProposals = [
+    { store_id: 1, product_id: 103, quantity: 120, rationale: 'Lemon sparkling water has less than three days of sample cover at Downtown Market. Review a 14-day replenishment draft before the weekend.', minutes: 18 },
+    { store_id: 2, product_id: 112, quantity: 84, rationale: 'Free-range eggs are below the sample seven-day cover threshold at Riverside Market. Confirm delivery timing before approval.', minutes: 54 },
+    { store_id: 3, product_id: 107, quantity: 60, rationale: 'Dark chocolate bites have strong sample velocity at Northside Market. Review shelf space and the proposed quantity.', minutes: 125 },
+  ].map(({ minutes, ...input }) => ({
+    ...input, id: crypto.randomUUID(), evidence_mode: EVIDENCE_MODE,
+    created_by: 'preview-planner', created_by_email: 'planner@example.test',
+    created_at: new Date(now - minutes * 60_000),
+  }));
 }
 
 async function loadAll(): Promise<{ proposals: Proposal[]; decisions: DecisionRecord[] }> {

@@ -1,13 +1,15 @@
-"""Fabric App deploy wrapper: commands, failure handling, and evidence redaction."""
+"""Fabric Apps deploy wrapper: staging, standalone identity, origin redeploys, redaction."""
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
+import yaml
 
 from deploy.scripts import deploy_fabric_app as wrapper
 
@@ -18,56 +20,130 @@ def _which(name: str) -> str:
     return f"/bin/{name}"
 
 
-def test_runs_npm_ci_then_rayfin_up_and_redacts_secrets(tmp_path: Path):
-    calls = []
+def _source(tmp_path: Path) -> Path:
+    source = tmp_path / "app" / "fabric-app"
+    (source / "rayfin").mkdir(parents=True)
+    (source / "node_modules").mkdir()
+    (source / "src").mkdir()
+    (source / "src" / "main.tsx").write_text("app", encoding="utf-8")
+    (source / ".env.local").write_text("VITE_RAYFIN_API_URL=approvals", encoding="utf-8")
+    (source / "rayfin" / ".env").write_text("RAYFIN_SECRET=x", encoding="utf-8")
+    (source / "rayfin" / ".deployments.json").write_text(json.dumps({"deployments": {
+        "dev": {"fabricWorkspaceId": WS, "hostingUrl": "https://approvals.example"},
+    }}), encoding="utf-8")
+    (source / "rayfin" / "rayfin.yml").write_text(
+        "id: retail-approvals\nname: retail-approvals\nservices:\n  auth:\n"
+        "    allowedRedirectUris:\n      - http://localhost:5173\n"
+        "      - https://approvals.example\n",
+        encoding="utf-8",
+    )
+    return source
 
-    def run(command, **kwargs):
-        calls.append((command, kwargs))
-        stdout = (
-            'progress...\n{"appUrl": "https://x-app.rayfin.windows.net/", "itemId": "i1",'
-            ' "publishableKey": "pk-secret", "auth": {"accessToken": "t"}, "status": "Succeeded"}'
-            if command[1] == "rayfin" else ""
-        )
+
+class FakeRayfin:
+    """Records commands and emulates ``rayfin up`` writing its deployment registry."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[list[str], dict]] = []
+
+    def __call__(self, command, **kwargs):
+        self.calls.append((command, kwargs))
+        if command[1] != "rayfin":
+            return subprocess.CompletedProcess(command, 0, "", "")
+        cwd: Path = kwargs["cwd"]
+        host = f"https://{cwd.name}.example"
+        if "--dry-run" not in command:
+            registry = cwd / "rayfin" / ".deployments.json"
+            registry.write_text(json.dumps({"deployments": {
+                "dev": {"fabricWorkspaceId": WS, "hostingUrl": host},
+            }}), encoding="utf-8")
+        stdout = "progress...\n" + json.dumps({
+            "status": "success",
+            "publishableKey": "pk-secret",
+            "deployment": {"itemName": cwd.name, "hostingUrl": host},
+            "auth": {"accessToken": "t"},
+        })
         return subprocess.CompletedProcess(command, 0, stdout, "")
 
+    def ups(self) -> list[tuple[str, dict]]:
+        return [
+            (kwargs["cwd"].name, kwargs["env"])
+            for command, kwargs in self.calls
+            if command[1] == "rayfin"
+        ]
+
+
+def test_deploys_three_staged_apps_with_their_own_identity(tmp_path: Path):
+    source = _source(tmp_path)
+    fake = FakeRayfin()
+
     report = wrapper.deploy_app(
-        tmp_path, workspace_id=WS, tenant_id="tenant", run=run, which=_which
+        tmp_path, workspace_id=WS, tenant_id="tenant", environment="dev",
+        run=fake, which=_which,
     )
 
-    assert [command[:3] for command, _ in calls] == [
+    assert [command[:3] for command, _ in fake.calls[:2]] == [
         ["/bin/npm", "ci", "--no-audit"],
         ["/bin/npm", "run", "install"],
-        ["/bin/npx", "rayfin", "up"],
     ]
-    assert calls[1][0][3:] == [
-        "--prefix",
-        str(tmp_path / "app" / "fabric-app" / "node_modules" / "keytar"),
-    ]
-    up, options = calls[2]
+    assert fake.calls[0][1]["cwd"] == source
+    up = next(command for command, _ in fake.calls if command[1] == "rayfin")
     assert up[3:] == ["--workspace-id", WS, "--yes", "--json", "--tenant", "tenant"]
-    assert options["cwd"] == tmp_path / "app" / "fabric-app"
-    assert options["env"]["RAYFIN_TELEMETRY_OPTOUT"] == "1"
-    assert report["rayfin"] == {
-        "appUrl": "https://x-app.rayfin.windows.net/", "itemId": "i1", "status": "Succeeded",
-    }
+    # Each app builds only its own variant and never receives another app's URL.
+    assert [(cwd, env["VITE_APP_VARIANT"]) for cwd, env in fake.ups()] == [
+        ("approvals", "approvals"),
+        ("merchandising", "merchandising"),
+        ("merchandising", "merchandising"),
+        ("promotions", "promotions"),
+        ("promotions", "promotions"),
+    ]
+    assert not any(key.endswith("_APP_URL") for _, env in fake.ups() for key in env)
+    # Only the new apps redeploy, once, to allow their own sign-in origin.
+
+    staging = tmp_path / "deploy" / ".generated" / "dev" / "fabric-apps"
+    merch = staging / "merchandising"
+    identity = yaml.safe_load((merch / "rayfin" / "rayfin.yml").read_text(encoding="utf-8"))
+    assert identity["id"] == identity["name"] == "retail-merchandising"
+    assert identity["services"]["auth"]["allowedRedirectUris"] == [
+        "http://localhost:5173", "https://merchandising.example",
+    ]
+    assert (merch / "src" / "main.tsx").exists()
+    assert (merch / "node_modules").exists()
+    assert not (merch / ".env.local").exists()
+    assert not (merch / "rayfin" / ".env").exists()
+    # Approvals adopts the existing item's registry so its data is kept.
+    assert (staging / "approvals" / "rayfin" / ".env").exists()
+    assert set(report["apps"]) == {"approvals", "merchandising", "promotions"}
+    assert report["apps"]["promotions"]["item_name"] == "retail-promotions"
+    assert report["apps"]["promotions"]["rayfin"]["deployment"]["hostingUrl"] == (
+        "https://promotions.example"
+    )
     assert "secret" not in str(report) and "accessToken" not in str(report)
+
+    rerun = FakeRayfin()
+    wrapper.deploy_app(
+        tmp_path, workspace_id=WS, tenant_id=None, environment="dev",
+        run=rerun, which=_which,
+    )
+    assert [cwd for cwd, _ in rerun.ups()] == ["approvals", "merchandising", "promotions"]
 
 
 def test_dry_run_flag_and_missing_node(tmp_path: Path):
-    seen = []
-
-    def run(command, **_):
-        seen.append(command)
-        return subprocess.CompletedProcess(command, 0, "", "")
+    _source(tmp_path)
+    fake = FakeRayfin()
 
     wrapper.deploy_app(tmp_path, workspace_id=WS, tenant_id=None, dry_run=True,
-                       run=run, which=_which)
-    assert seen[-1][-1] == "--dry-run" and "--tenant" not in seen[-1]
+                       run=fake, which=_which)
+    ups = [command for command, _ in fake.calls if command[1] == "rayfin"]
+    assert len(ups) == 3
+    assert all(command[-1] == "--dry-run" and "--tenant" not in command for command in ups)
     with pytest.raises(RuntimeError, match="Node.js"):
         wrapper.deploy_app(tmp_path, workspace_id=WS, tenant_id=None, which=lambda _: None)
 
 
 def test_failed_command_stops_the_deploy(tmp_path: Path):
+    _source(tmp_path)
+
     def run(command, **_):
         return subprocess.CompletedProcess(command, 7 if command[1] == "ci" else 0, "", "")
 

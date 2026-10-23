@@ -17,7 +17,7 @@ Task-flow access uses undocumented Power BI metadata-cluster endpoints and may
 break independently of the public Fabric APIs. Any selected task whose item
 reference cannot be resolved fails deployment; selected references are never
 silently omitted. After create or update, deployment reads the graph back and
-requires all 14 tasks, 58 full-demo item references, and 14 edges to match.
+requires all 14 tasks, 60 full-demo item references, and 14 edges to match.
 Readiness later compares the same tasks, references, and edges but ignores
 node positions, so rearranging the canvas in Fabric does not fail it.
 
