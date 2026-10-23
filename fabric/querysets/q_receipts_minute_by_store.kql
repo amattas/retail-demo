@@ -1,6 +1,6 @@
 let lookback = 60m;
 mv_store_sales_minute
 | where ts > ago(lookback)
-| summarize total_sales = sum(total_sales), receipts = sum(receipts), avg_basket = toreal(total_sales) / toreal(receipts) by store_id, ts
+| summarize total_sales = sum(total_sales), receipts = sum(receipts) by store_id, ts
+| extend avg_basket = toreal(total_sales) / toreal(receipts)
 | order by ts desc
-
