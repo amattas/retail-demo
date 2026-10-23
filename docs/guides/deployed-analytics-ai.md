@@ -42,22 +42,20 @@ If the semantic-model agent passed its source and permission checks:
 1. Open the **Agents** folder.
 2. Open `retail-semantic-model-agent`.
 3. Select **Test data agent**.
-4. Ask a question that names a curated measure, for example: *"Using the High
-   Risk SKUs measure, which five product departments have the most high-risk
-   store-product combinations? Include the inventory as-of time."*
+4. Ask for net sales and gross margin for a complete month, for example:
+   *"What were total net sales and gross margin % for September 2026? Name
+   the measures used."*
 
 ![Semantic-model data-agent response](../assets/screenshots/data-agent-semantic-model.png)
 
-*The data agent answers from the `High Risk SKUs` measure and states the
-inventory as-of time, so the result can be checked against the Supply Chain
-Control Tower page.*
+*The data agent answers from the `Net Sales` and `Gross Margin %` measures and
+states the date range, so the result can be checked against the report.*
 
-The semantic-model agent can only use its curated, aggregate tables (Gold
-summaries, ML outputs, and dimensions). Receipt-level fact tables such as
-`fact_receipts` are deliberately excluded, so questions about receipt-level net
-sales or gross margin are not reliably answerable; use the report for those.
-Naming the measure or table you expect it to use gives the most dependable
-answers. Treat every generated answer as a hypothesis to verify against
+The agent can use every table in `retail_model`, including the receipt-level
+fact tables. Ask about a complete month: the latest month is usually partial,
+so month-over-month and year-over-year figures for it look artificially low.
+If you compare with the report, set the report's date filter to the same month
+first. Treat every generated answer as a hypothesis to verify against
 measures, query output, and source timestamps.
 
 Skip an agent when it has no selected data sources, returns an error, or has
@@ -235,7 +233,7 @@ the token has expired — re-mint it (step 2) and **MCP: List Servers → Restar
 | Interaction | Expected result |
 | --- | --- |
 | Select the ontology `Store` entity | Related business entities and relationship names appear in the graph. |
-| Ask the semantic-model agent about high-risk SKUs by department | The answer cites the `High Risk SKUs` measure and an inventory as-of time that match the Supply Chain Control Tower page. |
+| Ask the semantic-model agent for a complete month's net sales | The answer names the `Net Sales` and `Gross Margin %` measures and the date range, and matches the report for the same month. |
 | Open Executive Cockpit | Report visuals load for the selected data period without model or binding errors. |
 
 Return to the [walkthrough overview](deployed-walkthrough.md) or use a focused

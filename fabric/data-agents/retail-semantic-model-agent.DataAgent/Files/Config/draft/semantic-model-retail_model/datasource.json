@@ -2,10 +2,10 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/dataAgent/definition/dataSource/1.0.0/schema.json",
   "artifactId": "07e6f51e-aaac-4594-bf50-94db9c1daf89",
   "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471",
-  "dataSourceInstructions": "Use only selected tables and prefer their defined measures. The selected schema is curated for aggregate retail analysis and intentionally excludes customer-, device-, transaction-, receipt-, order-, payment-, vehicle-, and raw event-level tables that can expose direct identifiers. Never use unselected tables through relationships or return raw rows. For any customer-derived metric, aggregate at a cohort size of at least 10 and refuse narrower or re-identification requests. Treat forecasts, risk scores, recommendations, and expected impact as modeled outputs rather than realized outcomes. Treat stockout detections as events unless a selected current-state table is used.",
+  "dataSourceInstructions": "All semantic-model tables are selected; the data is fully synthetic. Prefer the defined measures (for example fact_receipts[Net Sales] and fact_receipt_lines[Gross Margin %]) over ad hoc aggregation, and use fact tables for sales, margin, basket, payment, order, and inventory questions. Use Gold summary tables when they answer the question directly. Do not list individual customers' names, addresses, phone numbers, or loyalty-card values; answer customer questions with aggregates or customer IDs. Treat forecasts, risk scores, recommendations, and expected impact as modeled outputs rather than realized outcomes.",
   "displayName": "retail_model",
   "type": "semantic_model",
-  "userDescription": "Curated semantic model for aggregate retail operations analysis. Direct customer, device, transaction, and other row-level identifier sources are intentionally not selected.",
+  "userDescription": "Retail analytics over the full retail_model semantic model (synthetic data): sales, margin, customers, inventory, fulfillment, marketing, logistics, and ML outputs.",
   "metadata": {},
   "elements": [
     {
@@ -181,14 +181,14 @@
     },
     {
       "id": "c5e6e000-0000-0000-0002-000000000000",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "churn_predictions",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "c5e6e000-0000-0000-0002-000000000101",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Customers At Risk",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -197,7 +197,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0002-000000000102",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Avg Churn Probability",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -206,7 +206,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0002-000000000103",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Predicted Churn Rate %",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -215,7 +215,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0002-000000000104",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "High Risk Customers",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -224,7 +224,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0002-000000000105",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Churn Data As Of",
           "type": "semantic_model.measure",
           "data_type": "DateTime",
@@ -233,7 +233,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0002-000000000107",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Churn Freshness (Hours)",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -242,7 +242,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0002-000000000106",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Churn Limitation",
           "type": "semantic_model.measure",
           "data_type": "String",
@@ -251,7 +251,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0002-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Customer ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -260,7 +260,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0002-000000000002",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Churn Probability",
           "type": "semantic_model.column",
           "data_type": "Double",
@@ -269,7 +269,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0002-000000000003",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Churn Prediction",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -278,7 +278,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0002-000000000004",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Risk Category",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -287,7 +287,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0002-000000000005",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Is Churned Actual",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -296,7 +296,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0002-000000000006",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Prediction Date",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -305,7 +305,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0002-00000000000b",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Generated At",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -314,7 +314,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0002-000000000007",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Model Version",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -323,7 +323,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0002-000000000008",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Churn Window Days",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -332,7 +332,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0002-000000000009",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Model Run ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -341,7 +341,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0002-00000000000a",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Schema Version",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -352,14 +352,14 @@
     },
     {
       "id": "c5e6e000-0000-0000-0001-000000000000",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "customer_segments",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "c5e6e000-0000-0000-0001-000000000101",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Segmented Customer Count",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -368,7 +368,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-000000000102",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Avg Recency (Days)",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -377,7 +377,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-000000000103",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Avg Frequency",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -386,7 +386,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-000000000104",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Segmented Monetary Value",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -395,7 +395,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-000000000105",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Segmented Avg Order Value",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -404,7 +404,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-000000000106",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Segmentation Data As Of",
           "type": "semantic_model.measure",
           "data_type": "DateTime",
@@ -413,7 +413,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-000000000108",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Segmentation Freshness (Hours)",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -422,7 +422,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-000000000107",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Segmentation Limitation",
           "type": "semantic_model.measure",
           "data_type": "String",
@@ -431,7 +431,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Customer ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -440,7 +440,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-000000000002",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Cluster ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -449,7 +449,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-000000000003",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Segment Label",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -458,7 +458,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-000000000004",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Recency Days",
           "type": "semantic_model.column",
           "data_type": "Double",
@@ -467,7 +467,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-000000000005",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Frequency",
           "type": "semantic_model.column",
           "data_type": "Double",
@@ -476,7 +476,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-000000000006",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Monetary Value",
           "type": "semantic_model.column",
           "data_type": "Double",
@@ -485,7 +485,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-000000000007",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Avg Order Value",
           "type": "semantic_model.column",
           "data_type": "Double",
@@ -494,7 +494,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-000000000008",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "First Purchase Date",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -503,7 +503,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-000000000009",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Last Purchase Date",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -512,7 +512,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-00000000000a",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Segmented At",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -521,7 +521,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-00000000000d",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Generated At",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -530,7 +530,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-00000000000b",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Model Run ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -539,7 +539,7 @@
         },
         {
           "id": "c5e6e000-0000-0000-0001-00000000000c",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Schema Version",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -793,14 +793,14 @@
     },
     {
       "id": "5531b22c-bc78-4ae9-8d9f-64dcee879bad",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "dim_customers",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "01a1a1b3-0001-0001-0001-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "# of Customers",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -809,7 +809,7 @@
         },
         {
           "id": "ad551aee-05c1-4bf7-ac53-2c998c804b5c",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -818,7 +818,7 @@
         },
         {
           "id": "29fdf2eb-f734-4dca-a4d5-57494eb37a71",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "First Name",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -827,7 +827,7 @@
         },
         {
           "id": "485d56e0-0b8f-41da-bbcd-cb500561440c",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Last Name",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -836,7 +836,7 @@
         },
         {
           "id": "5e291f37-d33f-4a56-8471-a0e21934d4f8",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Address",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -845,7 +845,7 @@
         },
         {
           "id": "1b0afb62-5a20-472d-9486-5f52b3dc74f6",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Geography ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -854,7 +854,7 @@
         },
         {
           "id": "a9c05456-300a-4430-a34b-184f017b66ae",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Loyalty Card",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -863,7 +863,7 @@
         },
         {
           "id": "bc662af4-3541-423b-895c-51e94578bfb7",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Phone",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -872,7 +872,7 @@
         },
         {
           "id": "be6bd21e-b728-46c6-b62b-5550e2abedba",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "BLE ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -881,7 +881,7 @@
         },
         {
           "id": "0d74302f-4f4b-472c-9b9b-48b57d298e6b",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Ad ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1396,14 +1396,14 @@
     },
     {
       "id": "7eb610bd-c508-404e-b04a-5cb53d07d17a",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "dim_trucks",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "01a1a1b5-0001-0001-0001-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "# of Trucks",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -1412,7 +1412,7 @@
         },
         {
           "id": "35640ffe-7578-49d2-b2e2-ceb110b05924",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -1421,7 +1421,7 @@
         },
         {
           "id": "fbf89ae1-c807-41f3-9079-a59a825406c2",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "License Plate",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1430,7 +1430,7 @@
         },
         {
           "id": "e6bfcc12-5130-4d84-97ad-a1c554e4dbef",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Refrigeration",
           "type": "semantic_model.column",
           "data_type": "Boolean",
@@ -1439,7 +1439,7 @@
         },
         {
           "id": "52e87361-f6d2-4cde-944c-1164180439b0",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "DC ID",
           "type": "semantic_model.column",
           "data_type": "Double",
@@ -1450,14 +1450,14 @@
     },
     {
       "id": "73ae8b40-2387-4123-859d-f4e85a159c5b",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_ble_pings",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "f363e067-f6a2-4489-8fb9-0a2125b808f9",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Beacon ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1466,7 +1466,7 @@
         },
         {
           "id": "8bf658c2-1719-47f2-9f60-b42529ad1ed9",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "RSSI",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -1475,7 +1475,7 @@
         },
         {
           "id": "73ee9633-eaef-41f5-b882-d083ac81b298",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Customer BLE ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1484,7 +1484,7 @@
         },
         {
           "id": "cce44947-09a5-4de8-ae38-4c39a9a32350",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Zone",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1493,7 +1493,7 @@
         },
         {
           "id": "b00319bf-5301-4ba3-951d-d5092ca7d125",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -1502,7 +1502,7 @@
         },
         {
           "id": "17cdf61c-5cf1-4033-980c-c519f645366f",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Customer ID",
           "type": "semantic_model.column",
           "data_type": "Double",
@@ -1511,7 +1511,7 @@
         },
         {
           "id": "1618bcbd-d798-4e0b-8373-9f0c35f8b84c",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "__index_level_0__",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -1522,14 +1522,14 @@
     },
     {
       "id": "edc61f90-5ee8-4618-9d9d-e496d674f557",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_customer_zone_changes",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "ca15bf52-0050-41fa-aa78-434135694b5d",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -1538,7 +1538,7 @@
         },
         {
           "id": "caa3482c-b4fa-4faa-bf95-459fdac0bbfa",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Customer BLE ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1547,7 +1547,7 @@
         },
         {
           "id": "bda49b7c-f843-4f29-be11-46ede9eac12d",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "From Zone",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1556,7 +1556,7 @@
         },
         {
           "id": "73a8db4f-652e-4273-afc2-a6e50a2e1408",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "To Zone",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1565,7 +1565,7 @@
         },
         {
           "id": "fec0f7bc-2420-4ca6-9e66-6b1e2482f51e",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "__index_level_0__",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -1576,14 +1576,14 @@
     },
     {
       "id": "1f83be55-41e6-4951-8d58-fc6f4a5cfa45",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_dc_inventory_txn",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "b8c7794a-d23b-4894-b0d0-274ab2539d08",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Transaction Type",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1592,7 +1592,7 @@
         },
         {
           "id": "8e8ce055-d5fe-4dda-9de3-85efc19e5767",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Quantity",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -1601,7 +1601,7 @@
         },
         {
           "id": "7dde12d4-b2ad-4285-8593-6084695d1c99",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "DC ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -1610,7 +1610,7 @@
         },
         {
           "id": "69936964-1b5e-4f95-aa6c-5327f4e8443e",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Balance",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -1619,7 +1619,7 @@
         },
         {
           "id": "a7168582-c6e8-4b62-89e2-de93b91dc4c9",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Product ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -1628,7 +1628,7 @@
         },
         {
           "id": "9118102a-3857-4735-bf44-cae72b23b2b6",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Source",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1637,7 +1637,7 @@
         },
         {
           "id": "61a0bb77-d928-4266-8fca-1d1ef9ef4c50",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "__index_level_0__",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -1648,14 +1648,14 @@
     },
     {
       "id": "c999b61a-43db-4db3-9783-626a4618f864",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_foot_traffic",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "01a1a1cb-0001-0001-0001-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Foot Traffic Count",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -1664,7 +1664,7 @@
         },
         {
           "id": "01a1a1cb-0001-0001-0001-000000000002",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Avg Foot Traffic Dwell Minutes",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -1673,7 +1673,7 @@
         },
         {
           "id": "c1140001-0000-0000-0000-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Traffic Conversion Proxy %",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -1682,7 +1682,7 @@
         },
         {
           "id": "13698da9-5865-4083-92e8-31aa304ddb63",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Count",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -1691,7 +1691,7 @@
         },
         {
           "id": "557ac75c-0e4d-4954-981c-67823bfdd6e0",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Zone",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1700,7 +1700,7 @@
         },
         {
           "id": "f6e707b1-08c4-41fa-ab1a-233ec061d176",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Dwell Seconds",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -1709,7 +1709,7 @@
         },
         {
           "id": "569af1b5-d33d-496c-b590-76158423c9ce",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -1718,7 +1718,7 @@
         },
         {
           "id": "347e7b41-cd79-4e79-8f79-45413192743c",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Sensor ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1727,7 +1727,7 @@
         },
         {
           "id": "347e7b41-cd79-4e79-8f79-45413192743d",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Event Date",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -1738,14 +1738,14 @@
     },
     {
       "id": "0de63cc1-c6da-4354-8a04-602a3c737aa8",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_marketing",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "b261ffc1-b0e5-4a33-ac71-797d936d6047",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Device",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1754,7 +1754,7 @@
         },
         {
           "id": "23c50c8e-33b2-47bd-aff8-9a84cad24506",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Cost",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1763,7 +1763,7 @@
         },
         {
           "id": "a75aaf0c-3276-4cb6-b82b-5dd328e875de",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Customer Ad ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1772,7 +1772,7 @@
         },
         {
           "id": "89d38797-4885-4065-9195-4b0a2120f58e",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Impression ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1781,7 +1781,7 @@
         },
         {
           "id": "aeee4a8b-9e31-4c4a-9a0f-e6d15a3d2459",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Campaign ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1790,7 +1790,7 @@
         },
         {
           "id": "b60cdc7a-5bde-4e67-a5be-f537896f9931",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Creative ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1799,7 +1799,7 @@
         },
         {
           "id": "8778e66d-7a6f-4276-bd3b-7abbc83893da",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Channel",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1808,7 +1808,7 @@
         },
         {
           "id": "af26fadf-1aa7-4813-b8f2-4b18a7d05aa7",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Customer ID",
           "type": "semantic_model.column",
           "data_type": "Double",
@@ -1817,7 +1817,7 @@
         },
         {
           "id": "e29f4b2f-b696-4df5-be7d-227c34ea126b",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Cost Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -1826,7 +1826,7 @@
         },
         {
           "id": "e8f39bc7-f231-4825-a5b9-1ee4050cf223",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "__index_level_0__",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -1837,14 +1837,14 @@
     },
     {
       "id": "1ed91da8-9ba5-4a61-b85f-99a3f3b782c2",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_marketing_attribution",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "13ad4029-c730-4d88-b3c5-6c48f7a66b0c",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Attributed Revenue",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -1853,7 +1853,7 @@
         },
         {
           "id": "117dc6a3-623d-4d6a-b4b7-8f3e19036244",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Attributed Purchases",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -1862,7 +1862,7 @@
         },
         {
           "id": "c95e7486-abb3-446c-b883-41ca183ddb58",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Unattributed Purchases",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -1871,7 +1871,7 @@
         },
         {
           "id": "5c8e3899-fe61-44ad-a9bd-06084c8321e0",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Attribution Rate %",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -1880,7 +1880,7 @@
         },
         {
           "id": "549af1d6-69c0-4f5c-8e22-700865f9a667",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Attribution Discount Amount",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -1889,7 +1889,7 @@
         },
         {
           "id": "9dd022ef-eb1d-4b65-b2d3-305d68442335",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Attributed Tax",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -1898,7 +1898,7 @@
         },
         {
           "id": "77537516-418e-467f-8097-6ebac0f628b3",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Attributed Payments",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -1907,7 +1907,7 @@
         },
         {
           "id": "da67290a-8cf2-4c7c-b95e-9d5f53a5991f",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Payment Reconciliation Variance",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -1916,7 +1916,7 @@
         },
         {
           "id": "d7b8d509-b06e-42f7-8f8c-a213fe03a96a",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Average Last-Touch Lag Hours",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -1925,7 +1925,7 @@
         },
         {
           "id": "21250241-b44a-4328-9fc1-76e702f4a89d",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Attribution ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1934,7 +1934,7 @@
         },
         {
           "id": "47b5cedf-bd72-4b6c-90ec-7e72ff26e5c8",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Attribution Journey ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1943,7 +1943,7 @@
         },
         {
           "id": "7ca75f4b-3306-4dba-b4bd-8b8ac346c428",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Attribution Status",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1952,7 +1952,7 @@
         },
         {
           "id": "4d10e560-46b3-4efd-be5b-1fe289104ef7",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Attribution Model",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1961,7 +1961,7 @@
         },
         {
           "id": "2748d3af-d595-4c5b-a309-9fa93ac1e246",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Attribution Window Days",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -1970,7 +1970,7 @@
         },
         {
           "id": "3c5aff8e-b6d9-40af-b244-a3b4cb8cb46b",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Impression ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1979,7 +1979,7 @@
         },
         {
           "id": "e184aa60-0263-494c-b046-6f7225e1a158",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Campaign ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1988,7 +1988,7 @@
         },
         {
           "id": "3f352ea8-6293-4255-a9af-01005496ea7b",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Creative ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -1997,7 +1997,7 @@
         },
         {
           "id": "b8187552-d38b-4900-abe5-bdb1934e0828",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Channel",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2006,7 +2006,7 @@
         },
         {
           "id": "fb6bac1a-aebb-4229-ae4e-de204abf2383",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Customer Ad ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2015,7 +2015,7 @@
         },
         {
           "id": "a35cd889-b393-4e80-9a27-c5886ef06007",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Customer ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2024,7 +2024,7 @@
         },
         {
           "id": "37b8dabf-2c0f-43bd-91d0-cce5a558c7e0",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Touch Timestamp",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -2033,7 +2033,7 @@
         },
         {
           "id": "b2b382f6-339a-4846-9e28-20a67adb3926",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Purchase Timestamp",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -2042,7 +2042,7 @@
         },
         {
           "id": "08aacc2f-78dc-476c-85e0-6b88957d1a16",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Lag Seconds",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2051,7 +2051,7 @@
         },
         {
           "id": "cb96971b-2c48-486e-8715-915d349ecd71",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Purchase Type",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2060,7 +2060,7 @@
         },
         {
           "id": "13f513bc-9b64-412c-82a3-6350e6a3d89f",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Receipt ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2069,7 +2069,7 @@
         },
         {
           "id": "2f266c3d-bf33-4708-87ab-2a386c9b7d08",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Order ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2078,7 +2078,7 @@
         },
         {
           "id": "954032f6-1f8f-44d1-86c2-fe59dce6e0de",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2087,7 +2087,7 @@
         },
         {
           "id": "e6b50b46-e6af-4935-adb0-40976b6881ed",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Gross Subtotal Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2096,7 +2096,7 @@
         },
         {
           "id": "e1d743d0-c2ac-4f5a-820c-635e2e4b383c",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Discount Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2105,7 +2105,7 @@
         },
         {
           "id": "0d6735c3-b37d-4b50-9eba-8331ca5b652b",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Net Subtotal Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2114,7 +2114,7 @@
         },
         {
           "id": "371ad1af-a8ea-4c12-bbad-6083a05cfc3a",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Tax Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2123,7 +2123,7 @@
         },
         {
           "id": "59a8be5f-1a27-469f-ac80-6255c46e9fec",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2132,7 +2132,7 @@
         },
         {
           "id": "0a25f880-5b7b-41bd-a42b-877c697a24cc",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Payment Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2141,7 +2141,7 @@
         },
         {
           "id": "27864edb-5530-4c17-b54b-ee62e057bd2b",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Attributed Revenue Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2150,7 +2150,7 @@
         },
         {
           "id": "13b2c9a1-7598-412f-a14f-ba2ce9b01262",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Event Date",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -2161,14 +2161,14 @@
     },
     {
       "id": "930ea7c8-e0a4-4f4a-a7df-1cf98fbeeefd",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_online_order_headers",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "01a1a1a3-0001-0001-0001-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Online Sales",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2177,7 +2177,7 @@
         },
         {
           "id": "01a1a1a3-0001-0001-0001-000000000002",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Online Tax",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2186,7 +2186,7 @@
         },
         {
           "id": "01a1a1a3-0001-0001-0001-000000000003",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Online Subtotal",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2195,7 +2195,7 @@
         },
         {
           "id": "01a1a1a3-0001-0001-0001-000000000004",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Online Order Count",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -2204,7 +2204,7 @@
         },
         {
           "id": "01a1a1a3-0001-0001-0001-000000000005",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Average Online Order Value",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2213,7 +2213,7 @@
         },
         {
           "id": "c1030001-0000-0000-0000-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Online Sales YTD",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2222,7 +2222,7 @@
         },
         {
           "id": "c1030001-0000-0000-0000-000000000002",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Online Sales PY",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2231,7 +2231,7 @@
         },
         {
           "id": "c1030001-0000-0000-0000-000000000003",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Online Sales YoY %",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2240,7 +2240,7 @@
         },
         {
           "id": "c6cd591e-21eb-4a48-82fe-be8ca75c1e34",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Customer ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2249,7 +2249,7 @@
         },
         {
           "id": "7c45861b-0559-41b0-8f45-d366dc2fc071",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Subtotal Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2258,7 +2258,7 @@
         },
         {
           "id": "549cb01f-8401-439b-94a1-03ce546d388c",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Order ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2267,7 +2267,7 @@
         },
         {
           "id": "2c6791b3-9bd0-4cb7-8e8d-172fdbb2bde6",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Payment Method",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2276,7 +2276,7 @@
         },
         {
           "id": "41239a23-abc8-447a-ace2-d14d407e989c",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Amount",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2285,7 +2285,7 @@
         },
         {
           "id": "2123d982-0ece-4589-a4cb-d2154af602cd",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2294,7 +2294,7 @@
         },
         {
           "id": "3d73f23c-7703-4673-a845-52220518b0e5",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Tax Amount",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2303,7 +2303,7 @@
         },
         {
           "id": "18653173-4d8b-4cf3-b061-7399ace2daa0",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Subtotal Amount",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2312,7 +2312,7 @@
         },
         {
           "id": "d5a18cad-980f-4839-8303-5bfde6a48bc8",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Tax Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2321,7 +2321,7 @@
         },
         {
           "id": "a2a2a2a3-0000-0000-0000-000000000002",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Event Date",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -2332,14 +2332,14 @@
     },
     {
       "id": "ead55580-9419-45ac-91ff-f5ac29096866",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_online_order_lines",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "01a1a1a4-0001-0001-0001-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Online Units",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -2348,7 +2348,7 @@
         },
         {
           "id": "01a1a1a4-0001-0001-0001-000000000002",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Online Line Revenue",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2357,7 +2357,7 @@
         },
         {
           "id": "01a1a1a4-0001-0001-0001-000000000003",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Average Online Unit Price",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2366,7 +2366,7 @@
         },
         {
           "id": "c1040001-0000-0000-0000-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Omnichannel Units",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -2375,7 +2375,7 @@
         },
         {
           "id": "c1040001-0000-0000-0000-000000000002",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Online Units % of Omnichannel",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2384,7 +2384,7 @@
         },
         {
           "id": "c1040001-0000-0000-0000-000000000003",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Online Units per Order",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2393,7 +2393,7 @@
         },
         {
           "id": "8ed9dac6-9c06-4081-9067-1862bb870d3c",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Order ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2402,7 +2402,7 @@
         },
         {
           "id": "b71747a4-7708-49b7-ac7a-e81e89e23573",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Unit Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2411,7 +2411,7 @@
         },
         {
           "id": "bf44a73e-258e-48d2-92a9-9df7f0037725",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Fulfillment Mode",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2420,7 +2420,7 @@
         },
         {
           "id": "0710082e-09b1-4ed6-9298-a29be7298c5d",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Promo Code",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2429,7 +2429,7 @@
         },
         {
           "id": "d0806b14-a539-49aa-ad23-8ae789dd08b6",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Node Type",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2438,7 +2438,7 @@
         },
         {
           "id": "7a040420-92ea-4167-a7e8-35029e01d4dd",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Product ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2447,7 +2447,7 @@
         },
         {
           "id": "2083d296-c3fa-4e6c-bcb1-a974818b7265",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Extended Price",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2456,7 +2456,7 @@
         },
         {
           "id": "5004ecb4-e6e2-4ec7-b12a-30cb9cc7a7a3",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Extended Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2465,7 +2465,7 @@
         },
         {
           "id": "6d4df010-8f4e-4a12-aae4-d74075cb4dd8",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Line Number",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2474,7 +2474,7 @@
         },
         {
           "id": "520daddd-488d-4ea5-b0f3-0bf808a6d8b7",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Fulfillment Status",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2483,7 +2483,7 @@
         },
         {
           "id": "ba2c5305-e11e-45b5-bc3e-4bdaf6e4b350",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Unit Price",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2492,7 +2492,7 @@
         },
         {
           "id": "61bc9749-947f-4815-bc67-3f0a61c0b032",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Quantity",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2501,7 +2501,7 @@
         },
         {
           "id": "46f9dba7-f1fe-421f-b5d6-5753941c2834",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Node ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2510,7 +2510,7 @@
         },
         {
           "id": "cf8ce641-935d-42f3-abb6-40101e6c746e",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "__index_level_0__",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2521,14 +2521,14 @@
     },
     {
       "id": "a9ee5779-cb04-439d-8691-5ae9eb849b4e",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_payments",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "79b75b7a-6c45-4df5-a579-ead43dd9e267",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Amounts",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2537,7 +2537,7 @@
         },
         {
           "id": "4e9fdc07-da4c-4224-ae56-c2f543e17292",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Payment Amount",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2546,7 +2546,7 @@
         },
         {
           "id": "5138edd5-2bcb-4b9d-8427-4e73df9552fe",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Online Payment Amount",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2555,7 +2555,7 @@
         },
         {
           "id": "c1050001-0000-0000-0000-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Payment Count",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -2564,7 +2564,7 @@
         },
         {
           "id": "629d97f1-0532-4549-852b-ea34985fe847",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Payment Count",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -2573,7 +2573,7 @@
         },
         {
           "id": "8af62ead-caee-4863-b365-6affab908f01",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Online Payment Count",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -2582,7 +2582,7 @@
         },
         {
           "id": "c1050001-0000-0000-0000-000000000002",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Approved Payment Count",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -2591,7 +2591,7 @@
         },
         {
           "id": "c1050001-0000-0000-0000-000000000003",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Declined Payment Count",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -2600,7 +2600,7 @@
         },
         {
           "id": "c1050001-0000-0000-0000-000000000004",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Payment Decline Rate %",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2609,7 +2609,7 @@
         },
         {
           "id": "b1162b63-54f4-432d-afe2-65911ca56164",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Payment Decline Rate %",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2618,7 +2618,7 @@
         },
         {
           "id": "ebb5a5ee-4070-4b93-946e-897b5f77eb4d",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Online Payment Decline Rate %",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2627,7 +2627,7 @@
         },
         {
           "id": "46d1a6e5-d20a-4eee-928a-a1e1a128dd4b",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "_Store Payment Processing Total MS",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -2636,7 +2636,7 @@
         },
         {
           "id": "5e7145ce-daa9-42a2-aa5c-52d6286fb249",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "_Online Payment Processing Total MS",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -2645,7 +2645,7 @@
         },
         {
           "id": "c1050001-0000-0000-0000-000000000005",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Avg Payment Processing MS",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2654,7 +2654,7 @@
         },
         {
           "id": "efbefad1-5a1b-4c7b-925f-848b4de594d5",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Receipt ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2663,7 +2663,7 @@
         },
         {
           "id": "52dc2ac3-3b91-401d-acea-49838020c2fe",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Order ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2672,7 +2672,7 @@
         },
         {
           "id": "325aa4a0-21a6-4c72-918d-7d9872000f8c",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Payment Method",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2681,7 +2681,7 @@
         },
         {
           "id": "72a5cd30-df81-4cea-8a0c-857458089bba",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Amount Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2690,7 +2690,7 @@
         },
         {
           "id": "f0c241fa-f5f0-4ab3-b743-15761fcd487b",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Amount",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2699,7 +2699,7 @@
         },
         {
           "id": "59a3a364-edd0-4bed-870d-3dafc0dfdd1a",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Transaction ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2708,7 +2708,7 @@
         },
         {
           "id": "1e22bae8-128a-41d4-bca5-d5f14abcdc70",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Processing Time MS",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2717,7 +2717,7 @@
         },
         {
           "id": "3544e80a-5367-46e2-a81d-55965f62ec8b",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Status",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2726,7 +2726,7 @@
         },
         {
           "id": "52669962-9147-40a0-a3e5-1a1df7faac53",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Decline Reason",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2735,7 +2735,7 @@
         },
         {
           "id": "d21b659a-0979-44b0-ad34-53109ed5050d",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2744,7 +2744,7 @@
         },
         {
           "id": "ae5fe31f-a97a-4799-93fb-98b992cf414d",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Customer ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2753,7 +2753,7 @@
         },
         {
           "id": "a1a1a1a3-0000-0000-0000-000000000010",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Event Timestamp",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -2762,7 +2762,7 @@
         },
         {
           "id": "2bb53d73-00fd-47c4-bedd-668c3f5f5eec",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Event Date",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -2773,14 +2773,14 @@
     },
     {
       "id": "6f0a86e5-8a4e-44c1-a568-13af0862f5ef",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_promo_lines",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "a9f8319e-9d48-47b4-a119-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Promo Line Quantity",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -2789,7 +2789,7 @@
         },
         {
           "id": "a9f8319e-9d48-47b4-a119-000000000002",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Promo Line Discount Amount",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2798,7 +2798,7 @@
         },
         {
           "id": "c6de1bfc-e7ba-4aef-834f-01871476eeb4",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Receipt ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2807,7 +2807,7 @@
         },
         {
           "id": "f9fe94ee-173b-47de-bf0c-a4c66636e228",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Promo Code",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2816,7 +2816,7 @@
         },
         {
           "id": "b5260d33-03fb-4167-ab57-3ad94caf561b",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Line Number",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2825,7 +2825,7 @@
         },
         {
           "id": "191a3e31-47de-41fa-8c7e-cdfbf9505ccf",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Product ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2834,7 +2834,7 @@
         },
         {
           "id": "281f75bf-5ba8-46a7-a33e-0cfa5adf8fbc",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Quantity",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2843,7 +2843,7 @@
         },
         {
           "id": "e2dd10cf-48f9-4972-bb14-dfa8cbdf89ac",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Discount Amount",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2852,7 +2852,7 @@
         },
         {
           "id": "f3d66be0-70a2-4008-b5bb-7a5151b15e50",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Discount Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2861,7 +2861,7 @@
         },
         {
           "id": "046e12d9-a984-4b67-81bd-5c6afeca49f4",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "__index_level_0__",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2872,14 +2872,14 @@
     },
     {
       "id": "09104865-1d77-427a-bc33-b0148839d9a5",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_promotions",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "a9f8319e-9d48-47b4-a118-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Promotion Count",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -2888,7 +2888,7 @@
         },
         {
           "id": "a9f8319e-9d48-47b4-a118-000000000002",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Promotion Discount Amount",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -2897,7 +2897,7 @@
         },
         {
           "id": "699c67ab-2aec-4718-9aa8-7205385c40ab",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Receipt ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2906,7 +2906,7 @@
         },
         {
           "id": "b0238d92-2da9-40e5-8013-e322014a887a",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Promo Code",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2915,7 +2915,7 @@
         },
         {
           "id": "19c7f4b0-852c-471c-95af-c20eaa73d0c5",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Discount Amount",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2924,7 +2924,7 @@
         },
         {
           "id": "296dc317-642c-4a09-ba33-56b9c99d8c6d",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Discount Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2933,7 +2933,7 @@
         },
         {
           "id": "65790e25-52e4-4ea4-b186-e91c8b20359d",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Discount Type",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2942,7 +2942,7 @@
         },
         {
           "id": "d9770793-f93b-410e-92bb-dbf5e4bd7b5f",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Product Count",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2951,7 +2951,7 @@
         },
         {
           "id": "76d783a3-362d-4a96-b40f-22ef3efec531",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Product IDs",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -2960,7 +2960,7 @@
         },
         {
           "id": "10e6f985-8df5-44d2-bfbf-95407d67e963",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2969,7 +2969,7 @@
         },
         {
           "id": "2fc2d368-9347-4b26-83b0-f9542c60d2df",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Customer ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -2978,7 +2978,7 @@
         },
         {
           "id": "e5bdf9a5-d264-46a2-ad65-0f11dea87b29",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "event_date",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -2989,14 +2989,14 @@
     },
     {
       "id": "aab05dc7-35b4-4318-affd-bc107c21f8f7",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_receipt_lines",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "01a1a1a2-0001-0001-0001-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Units Sold",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -3005,7 +3005,7 @@
         },
         {
           "id": "01a1a1a2-0001-0001-0001-000000000002",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Line Revenue",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3014,7 +3014,7 @@
         },
         {
           "id": "01a1a1a2-0001-0001-0001-000000000003",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Average Unit Price",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3023,7 +3023,7 @@
         },
         {
           "id": "01a1a1a2-0001-0001-0001-000000000004",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Lines",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -3032,7 +3032,7 @@
         },
         {
           "id": "c1020001-0000-0000-0000-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Line Cost",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3041,7 +3041,7 @@
         },
         {
           "id": "c1020001-0000-0000-0000-000000000002",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Gross Profit",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3050,7 +3050,7 @@
         },
         {
           "id": "c1020001-0000-0000-0000-000000000003",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Gross Margin %",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3059,7 +3059,7 @@
         },
         {
           "id": "c1020001-0000-0000-0000-000000000004",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Units per Receipt",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3068,7 +3068,7 @@
         },
         {
           "id": "9a782ca7-2110-4e68-994a-5c56e36c0200",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Receipt ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -3077,7 +3077,7 @@
         },
         {
           "id": "160f5195-0ef4-431a-9e58-e0dda60336f2",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Product ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3086,7 +3086,7 @@
         },
         {
           "id": "bd65b0d0-4508-4f61-8a08-7bc9e337892e",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Line Number",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3095,7 +3095,7 @@
         },
         {
           "id": "de505fd4-366c-410b-9a65-544528a62890",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Quantity",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3104,7 +3104,7 @@
         },
         {
           "id": "9de741c8-fe8c-43bb-b1d1-3547e0e467e4",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Unit Price",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -3113,7 +3113,7 @@
         },
         {
           "id": "a743303d-5bbe-46f7-844b-72b2a53cbd8f",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Extended Price",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -3122,7 +3122,7 @@
         },
         {
           "id": "5af8a932-d0bb-4d47-9699-705ddf5bbde0",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Unit Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3131,7 +3131,7 @@
         },
         {
           "id": "669ff8f4-2ed2-4299-9cf5-9730c3bb22e1",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Extended Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3140,7 +3140,7 @@
         },
         {
           "id": "5848e85f-4f07-40c5-9166-5364b4b7c822",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Promo Code",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -3149,7 +3149,7 @@
         },
         {
           "id": "a1a1a1a2-0000-0000-0000-000000000010",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Event Timestamp",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -3158,7 +3158,7 @@
         },
         {
           "id": "2545fc5f-7a82-428a-be86-63f077dd2334",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "event_date",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -3169,14 +3169,14 @@
     },
     {
       "id": "dbb3a597-d860-42d1-9585-a7da0fc2a2a4",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_receipts",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "01a1a1a1-0001-0001-0001-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Sales",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3185,7 +3185,7 @@
         },
         {
           "id": "01a1a1a1-0001-0001-0001-000000000002",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Tax",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3194,7 +3194,7 @@
         },
         {
           "id": "01a1a1a1-0001-0001-0001-000000000003",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Subtotal",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3203,7 +3203,7 @@
         },
         {
           "id": "01a1a1a1-0001-0001-0001-000000000004",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Receipt Count",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -3212,7 +3212,7 @@
         },
         {
           "id": "01a1a1a1-0001-0001-0001-000000000005",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Average Basket Size",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3221,7 +3221,7 @@
         },
         {
           "id": "01a1a1a1-0001-0001-0001-000000000006",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Returns",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3230,7 +3230,7 @@
         },
         {
           "id": "01a1a1a1-0001-0001-0001-000000000007",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Net Sales",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3239,7 +3239,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Sales MTD",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3248,7 +3248,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000002",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Sales QTD",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3257,7 +3257,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000003",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Sales YTD",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3266,7 +3266,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000004",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Sales PY",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3275,7 +3275,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000005",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Sales YoY %",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3284,7 +3284,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000006",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Receipt Count YTD",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -3293,7 +3293,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000007",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Sales per Store",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3302,7 +3302,7 @@
         },
         {
           "id": "a34939d7-9fcf-4a82-92ed-3a4c8a82ffae",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Purchasing Customers",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -3311,7 +3311,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000008",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Sales per Customer",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3320,7 +3320,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000009",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Return Rate %",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3329,7 +3329,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-00000000000a",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Omnichannel Revenue",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3338,7 +3338,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-00000000000b",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Omnichannel Orders",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -3347,7 +3347,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-00000000000c",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Omnichannel AOV",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3356,7 +3356,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-00000000000d",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Sales % of Omnichannel",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3365,7 +3365,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-00000000000e",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Online Sales % of Omnichannel",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3374,7 +3374,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-00000000000f",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Omnichannel Revenue YTD",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3383,7 +3383,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000010",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Omnichannel Revenue PY",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3392,7 +3392,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000011",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Omnichannel Revenue YoY %",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3401,7 +3401,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-00000000001a",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Sales PM",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3410,7 +3410,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-00000000001b",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Sales MoM %",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3419,7 +3419,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-00000000001c",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Sales PQ",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3428,7 +3428,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-00000000001d",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Sales QoQ %",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3437,7 +3437,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-00000000001e",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Sales PD",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3446,7 +3446,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-00000000001f",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Sales DoD %",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3455,7 +3455,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000020",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Sales 7D",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3464,7 +3464,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000021",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Sales 7D PW",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3473,7 +3473,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000022",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Sales WoW %",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3482,7 +3482,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000030",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "_Latest Sales Year",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -3491,7 +3491,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000031",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Net Sales (Latest Year)",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3500,7 +3500,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000032",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Net Sales (Prior Year)",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3509,7 +3509,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000033",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Omnichannel Revenue (Latest Year)",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3518,7 +3518,7 @@
         },
         {
           "id": "c1010001-0000-0000-0000-000000000034",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Omnichannel Revenue (Prior Year)",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3527,7 +3527,7 @@
         },
         {
           "id": "3c038d61-f1c4-4c76-b595-e823714c2eb0",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Customer ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3536,7 +3536,7 @@
         },
         {
           "id": "d8fdc9a6-23b4-4899-adb4-bfe4d04448eb",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Discount Amount",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -3545,7 +3545,7 @@
         },
         {
           "id": "d10cc217-8d54-4f48-9786-c2788f401552",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Subtotal Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3554,7 +3554,7 @@
         },
         {
           "id": "f8a25262-9dde-476e-b2f1-94341f833092",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Receipt Type",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -3563,7 +3563,7 @@
         },
         {
           "id": "feff8b81-9380-4f52-8965-e1c810debcc0",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Payment Method",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -3572,7 +3572,7 @@
         },
         {
           "id": "63ca03aa-3389-4a3c-a601-c8fbf8359291",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Receipt ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -3581,7 +3581,7 @@
         },
         {
           "id": "74c4603e-8ab4-487a-8d69-19de12151b9a",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Amount",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -3590,7 +3590,7 @@
         },
         {
           "id": "648ce335-e019-4757-b4bc-e88c0e005ef7",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3599,7 +3599,7 @@
         },
         {
           "id": "c4521791-db0f-4658-bb3f-9ca3197a12b7",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Tax Amount",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -3608,7 +3608,7 @@
         },
         {
           "id": "aa658e70-f275-4c6d-91c8-63d908c09403",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3617,7 +3617,7 @@
         },
         {
           "id": "c4715f0e-a9e5-4470-ac33-ec16b9f046c2",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Tax Cents",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3626,7 +3626,7 @@
         },
         {
           "id": "da77bc23-568e-4c61-ad68-49d35f133cd0",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Subtotal",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -3635,7 +3635,7 @@
         },
         {
           "id": "a1a1a1a1-0000-0000-0000-000000000010",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Event Timestamp",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -3644,7 +3644,7 @@
         },
         {
           "id": "a1a1a1a1-0000-0000-0000-000000000011",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Event Date",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -3655,14 +3655,14 @@
     },
     {
       "id": "5d56e188-c68e-4de1-a166-dba2aab94430",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_reorders",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "01a1a1a6-0001-0001-0001-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Reorder Quantity",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -3671,7 +3671,7 @@
         },
         {
           "id": "c1080001-0000-0000-0000-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Reorder Events",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -3680,7 +3680,7 @@
         },
         {
           "id": "c1080001-0000-0000-0000-000000000002",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Avg Reorder Quantity",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3689,7 +3689,7 @@
         },
         {
           "id": "c1080001-0000-0000-0000-000000000003",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "High Priority Reorder Quantity",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -3698,7 +3698,7 @@
         },
         {
           "id": "c1080001-0000-0000-0000-000000000004",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Reorder Fill Gap",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -3707,7 +3707,7 @@
         },
         {
           "id": "9ba003b4-5818-4fdf-a7cb-e746a618a80f",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3716,7 +3716,7 @@
         },
         {
           "id": "e8cc3010-af1a-40d5-b05e-2ae21f44ae39",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "DC ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3725,7 +3725,7 @@
         },
         {
           "id": "b38c131f-e4a2-4baa-b46c-144a36a860fa",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Product ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3734,7 +3734,7 @@
         },
         {
           "id": "58404047-477c-40a4-bbc3-092f7accd81f",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Current Quantity",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3743,7 +3743,7 @@
         },
         {
           "id": "439f2374-5ee5-4420-af92-32a2f9b26007",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Reorder Quantity",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3752,7 +3752,7 @@
         },
         {
           "id": "61113c82-1df7-4479-a735-2380f417e406",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Reorder Point",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3761,7 +3761,7 @@
         },
         {
           "id": "dfd389e7-46b4-4e7a-907f-1bfa0fb71f79",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Priority",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -3770,7 +3770,7 @@
         },
         {
           "id": "3b7447fc-6d3b-4a99-8f39-1d3e28d927bf",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Event Date",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -3779,7 +3779,7 @@
         },
         {
           "id": "2b449ce3-7b50-4e3e-9974-b39bb336b0b3",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "__index_level_0__",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3790,14 +3790,14 @@
     },
     {
       "id": "620b34c9-377c-44fe-bad4-8159499fc668",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_stockouts",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "01a1a1c9-0001-0001-0001-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Stockout Events",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -3806,7 +3806,7 @@
         },
         {
           "id": "c1090001-0000-0000-0000-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Avg Last Known Stockout Qty",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3815,7 +3815,7 @@
         },
         {
           "id": "60d4df49-5a17-4dd0-ba43-6c2c0cec2b4f",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store ID",
           "type": "semantic_model.column",
           "data_type": "Double",
@@ -3824,7 +3824,7 @@
         },
         {
           "id": "1eaacd0f-91e7-4ac9-8c55-b080a302b99e",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "DC ID",
           "type": "semantic_model.column",
           "data_type": "Double",
@@ -3833,7 +3833,7 @@
         },
         {
           "id": "248dacbe-d44f-4a93-beca-0443b0245698",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Product ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3842,7 +3842,7 @@
         },
         {
           "id": "6ae92787-58f4-4902-b05f-83d24d6194b8",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Last Known Quantity",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3851,7 +3851,7 @@
         },
         {
           "id": "5712c164-a103-4717-881a-c346b55c8f51",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Event Date",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -3860,7 +3860,7 @@
         },
         {
           "id": "1cfbef48-7ab8-4c5d-8969-183c8eb05a7d",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "__index_level_0__",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3871,14 +3871,14 @@
     },
     {
       "id": "069e006d-82a8-46ab-abf7-39d781c37887",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_store_inventory_txn",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "0842b7d4-e5fc-4a12-9064-a9332276a9e1",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Inventory Transactions",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -3887,7 +3887,7 @@
         },
         {
           "id": "01a1a1a6-0001-0001-0001-000000000002",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Total Quantity Delta",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -3896,7 +3896,7 @@
         },
         {
           "id": "fcdbfd4d-1ec4-422f-b7bd-a6a83e8b03c9",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Transaction Type",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -3905,7 +3905,7 @@
         },
         {
           "id": "b4460922-757f-4b4e-8fbc-5c30dd6b3740",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Quantity",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3914,7 +3914,7 @@
         },
         {
           "id": "34eee0a6-d403-445d-83a6-163c9c0da520",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Balance",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3923,7 +3923,7 @@
         },
         {
           "id": "85ecab4a-5ef0-4c6a-bcbd-2db04af2a261",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Product ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3932,7 +3932,7 @@
         },
         {
           "id": "f9411773-fe61-4cc9-bd55-1a200d71cdf8",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3941,7 +3941,7 @@
         },
         {
           "id": "4f1e13af-0613-492f-9b82-4b2c53340348",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Source",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -3950,7 +3950,7 @@
         },
         {
           "id": "8ec48b5d-e930-43ca-900a-3ffce43b7a6f",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "__index_level_0__",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -3961,14 +3961,14 @@
     },
     {
       "id": "30e435c0-c71d-474c-b807-e2f634dbf383",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_store_ops",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "01a1a1ca-0001-0001-0001-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Operation Events",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -3977,7 +3977,7 @@
         },
         {
           "id": "c1150001-0000-0000-0000-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store Operation Events per Store",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -3986,7 +3986,7 @@
         },
         {
           "id": "7c2cb6d2-a5ec-4d85-9e47-e23513bb14e2",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Trace ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -3995,7 +3995,7 @@
         },
         {
           "id": "7e3719b4-06ee-4594-87db-11bf9f3ce04c",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -4004,7 +4004,7 @@
         },
         {
           "id": "2e9a1a12-9c75-4a39-b918-4a8048b725ef",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Operation Type",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -4013,7 +4013,7 @@
         },
         {
           "id": "2e9a1a12-9c75-4a39-b918-4a8048b725f0",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Event Date",
           "type": "semantic_model.column",
           "data_type": "DateTime",
@@ -4024,14 +4024,14 @@
     },
     {
       "id": "d65dd252-405a-484b-9e2e-efc842442898",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_truck_inventory",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "abe4d6b6-e6c5-457a-8b6d-7dd3c383dcfb",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Truck ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -4040,7 +4040,7 @@
         },
         {
           "id": "b309d174-b1a9-4822-a038-d2c67cc51022",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Shipment ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -4049,7 +4049,7 @@
         },
         {
           "id": "648fcce8-4a56-44b5-91b4-ffba8a16f659",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Product ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -4058,7 +4058,7 @@
         },
         {
           "id": "83b7b762-6d37-4aa1-ba97-e65cdfa61954",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Quantity",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -4067,7 +4067,7 @@
         },
         {
           "id": "38bede37-408e-4ef4-866c-68e663962402",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Action",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -4076,7 +4076,7 @@
         },
         {
           "id": "360d161e-5905-4982-bef4-21af95d6251f",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Location ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -4085,7 +4085,7 @@
         },
         {
           "id": "7d6a6b97-2506-4985-b06d-47e16c6e8d5f",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Location Type",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -4094,7 +4094,7 @@
         },
         {
           "id": "ef937be0-d5d2-4b63-83b1-6a38f25c4bc9",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "__index_level_0__",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -4105,14 +4105,14 @@
     },
     {
       "id": "486b3beb-5e42-4766-b0d7-1147520e5a37",
-      "is_selected": false,
+      "is_selected": true,
       "display_name": "fact_truck_moves",
       "type": "semantic_model.table",
       "description": null,
       "children": [
         {
           "id": "a9f8319e-9d48-47b4-a120-000000000001",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Truck Move Count",
           "type": "semantic_model.measure",
           "data_type": "Int64",
@@ -4121,7 +4121,7 @@
         },
         {
           "id": "a9f8319e-9d48-47b4-a120-000000000002",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Avg Unload Duration",
           "type": "semantic_model.measure",
           "data_type": "Double",
@@ -4130,7 +4130,7 @@
         },
         {
           "id": "05d465cc-c274-4016-80ec-bd258e36f80c",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Status",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -4139,7 +4139,7 @@
         },
         {
           "id": "18d1a5ed-9272-4f3e-a6fb-3a01cbd4a295",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Shipment ID",
           "type": "semantic_model.column",
           "data_type": "String",
@@ -4148,7 +4148,7 @@
         },
         {
           "id": "8cc6a6be-bcbb-4e57-a42e-383babd8c30c",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "DC ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -4157,7 +4157,7 @@
         },
         {
           "id": "f91cf596-0f96-4834-b402-c55cbabbad71",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Truck ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -4166,7 +4166,7 @@
         },
         {
           "id": "54d28e85-f677-4d6c-a288-e1e48f68932e",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "Store ID",
           "type": "semantic_model.column",
           "data_type": "Int64",
@@ -4175,7 +4175,7 @@
         },
         {
           "id": "8f57805e-ee66-4e80-bb3f-832c006ec88c",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "actual_unload_duration",
           "type": "semantic_model.column",
           "data_type": "Double",
@@ -4184,7 +4184,7 @@
         },
         {
           "id": "442f04c0-247c-4c09-abe5-459a292e17ad",
-          "is_selected": false,
+          "is_selected": true,
           "display_name": "__index_level_0__",
           "type": "semantic_model.column",
           "data_type": "Int64",
