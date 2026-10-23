@@ -40,7 +40,7 @@ Planning stays excluded because it needs fixed credentials and starts billing
 that cannot be cancelled. No profile deploys the destructive reset notebook or
 starts the long-running stream automatically.
 
-`standard` (no preview surfaces) and `core` (Lakehouse and four historical
+`standard` (no preview surfaces) and `core` (Lakehouse and the eleven historical
 setup notebooks only) are reduced inventories that you must select explicitly
 with `--profile`. See the
 [canonical workspace and profile inventory](workspace-inventory.md).
@@ -125,7 +125,8 @@ The wrapper:
    connectivity package supported by the operating system. The complete pinned
    package list is in `utility/requirements-deploy.txt`;
 4. runs interactive configuration;
-5. renders five workspace-specific notebooks;
+5. renders twelve workspace-specific notebooks: setup 01–11 plus
+   `stream-events.ipynb`;
 6. offers to deploy.
 
 On Windows and Linux, the locked dependency set includes `mssql-python` for

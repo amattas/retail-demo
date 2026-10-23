@@ -22,7 +22,7 @@ deployment confirmed that the ontology exists and points to the intended
 Lakehouse and Eventhouse sources.
 
 1. Open the **Ontologies** folder.
-2. Open **Retail Ontology**.
+2. Open **RetailOntology_AutoGen**.
 3. Select the `Store` entity type.
 4. Use **Fit view** to show its connected entities.
 
@@ -115,6 +115,18 @@ underlying measures and source timestamps as evidence.
 
     *Operations and Marketing combines campaign spend, churn risk, foot
     traffic, store operations, and payment-decline context.*
+
+## 4. Optional full-demo extensions
+
+Show these surfaces only when deployment and readiness confirmed them in the
+target workspace.
+
+| Surface | Where to find it | What to say |
+| --- | --- | --- |
+| Connected operational twins | `retail-twins` report in the **Reports** folder | A separate report over the same governed data; it is not a page of `retail_model`. |
+| Post-Reporting extended ML | `ml-optional` and `ml-experimental` pipelines | Journey analysis (`journey_patterns`), delivery prediction (`dwell_predictions`), and experimental dynamic pricing (`pricing_recommendations`) run after Reporting and are not Reporting prerequisites. |
+| Replenishment case preparation | `prepare-replenishment-case` notebook | Prepares a human-reviewed replenishment draft from availability signals derived from required ML outputs. |
+| Retail Operations Fabric Apps | `retail-merchandising`, `retail-promotions`, and `retail-approvals` in the **Fabric Apps** folder | Three standalone apps for separate business functions. The merchandising portal shows item trends, in-stock rate, and days of cover over a synthetic sample catalog. The promotion studio models discount and break-even what-ifs. In replenishment approvals, a different reviewer records append-only decisions on proposals. The apps do not change prices, place orders, or execute transfers. |
 
 ## Connect from VS Code (MCP)
 
