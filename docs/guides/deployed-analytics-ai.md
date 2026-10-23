@@ -128,6 +128,33 @@ target workspace.
 | Replenishment case preparation | `prepare-replenishment-case` notebook | Prepares a human-reviewed replenishment draft from availability signals derived from required ML outputs. |
 | Retail Operations Fabric Apps | `retail-merchandising`, `retail-promotions`, and `retail-approvals` in the **Fabric Apps** folder | Three standalone apps for separate business functions. The merchandising portal shows item trends, in-stock rate, and days of cover over a synthetic sample catalog. The promotion studio models discount and break-even what-ifs. In replenishment approvals, a different reviewer records append-only decisions on proposals. The apps do not change prices, place orders, or execute transfers. |
 
+### Fabric Apps gallery
+
+Each app opens from the **Fabric Apps** folder and requires Fabric sign-in.
+These screenshots use the apps' synthetic sample data.
+
+=== "Merchandising portal"
+
+    ![Merchandising portal Fabric App](../assets/screenshots/fabric-app-merchandising.png)
+
+    *Sales, gross profit, in-stock rate, and items needing attention, with a
+    this-period versus previous-period trend and private saved views.*
+
+=== "Promotion studio"
+
+    ![Promotion studio Fabric App](../assets/screenshots/fabric-app-promotions.png)
+
+    *A discount and assumed uplift produce promoted price, revenue, gross
+    profit, and the uplift needed to break even; saved scenarios compare side
+    by side.*
+
+=== "Replenishment approvals"
+
+    ![Replenishment approvals Fabric App](../assets/screenshots/fabric-app-approvals.png)
+
+    *Pending proposals wait for a reviewer other than the submitter; decisions
+    are append-only and a rejection needs a reason.*
+
 ## Connect from VS Code (MCP)
 
 Both the Data Agent and the Ontology expose **streamable-HTTP MCP servers**, so you
