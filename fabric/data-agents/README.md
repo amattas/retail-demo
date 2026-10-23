@@ -29,6 +29,17 @@ they could expose direct identifiers. Agent and datasource instructions require
 aggregate answers, minimum cohort sizes for customer-derived metrics, and
 refusal of row-level or re-identification requests.
 
+The ontology agent binds `RetailOntology_AutoGen` as an ontology-as-context
+source (`Files/Config/<stage>/ontologies/RetailOntology_AutoGen/ontology.json`).
+The legacy `ontology-<name>/datasource.json` binding calls an ontology API that
+TMDL ontologies reject ("This API version is not supported for the specified
+Ontology item"). In this mode the agent queries the ontology's underlying
+Lakehouse with SQL. Fabric doesn't yet enforce entity selection for ontology
+context sources, so every entity type is selected and the privacy boundary for
+this agent rests on its stage `aiInstructions`: aggregates across all entities,
+never personal data, direct identifiers, or row-level person or transaction
+records.
+
 These preview assets still require workspace authorization validation. See
 [ML and AI contracts](../../docs/design/specifications/modules/ml-ai/model-contracts.md),
 [access control](../../docs/design/specifications/modules/security/access-control.md),

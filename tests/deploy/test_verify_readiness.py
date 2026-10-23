@@ -298,6 +298,24 @@ def test_powerbi_and_agent_definition_bindings() -> None:
     ) == ["data agent artifact binding mismatch"]
 
 
+def test_agent_bindings_read_ontology_context_sources() -> None:
+    agent = {
+        "parts": [
+            _part(
+                "Files/Config/published/ontologies/RetailOntology_AutoGen/ontology.json",
+                {"workspaceId": WORKSPACE_ID, "artifactId": "ontology-id"},
+            )
+        ]
+    }
+
+    assert not data_agent_binding_errors(
+        agent, workspace_id=WORKSPACE_ID, expected_artifact_ids={"ontology-id"}
+    )
+    assert data_agent_binding_errors(
+        agent, workspace_id=WORKSPACE_ID, expected_artifact_ids={"other-id"}
+    ) == ["data agent artifact binding mismatch"]
+
+
 def test_queryset_definition_requires_exact_database_and_tabs() -> None:
     definition = _definition(
         "RealTimeQueryset.json",

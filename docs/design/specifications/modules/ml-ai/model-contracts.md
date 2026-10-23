@@ -189,6 +189,10 @@ from the physical contracts, not from runtime inspection:
   Bronze event tables from `fabric/kql_database/01-create-tables.kql`.
 - All tables are DirectLake partitions behind one `Sql.Database` expression
   for the Lakehouse SQL analytics endpoint, in schemas `ag`, `au`, and `cusn`.
+  Each partition also carries the `ONT_*` annotations (workspace, Lakehouse
+  item ID/name/kind, SQL endpoint, pin time) that Fabric uses to identify the
+  backing item. Without them Data Agents can't resolve the ontology's
+  underlying source. The publisher fails if readback drops them.
   Eventhouse time series bind through the Bronze `cusn` shortcuts. The
   publisher lists `Tables/cusn` in OneLake, and missing shortcuts drop only
   their bindings.
@@ -243,9 +247,19 @@ That completion phase rewrites:
 - semantic-model `artifactId`
 - ontology `artifactId`
 
-Current draft and published datasource snapshots include
+Current semantic-model draft and published datasource snapshots include
 `dataSourceInstructions` and `userDescription`; `.platform` descriptions
-distinguish semantic-model and ontology scope. Source schema validation and
+distinguish semantic-model and ontology scope. The ontology agent binds the
+TMDL ontology as an ontology-as-context source
+(`ontologies/RetailOntology_AutoGen/ontology.json`, schema
+`dataAgent/definition/ontology/1.0.0`). That schema has no datasource
+instructions, and Fabric doesn't yet enforce entity selection for it, so every
+ontology entity type is selected and the stage `aiInstructions` carry the
+privacy rules: aggregate answers across all entities, with no personal data,
+direct identifiers, or row-level person or transaction records, and at least
+10 records for customer-derived metrics. The legacy
+`ontology-<name>/datasource.json` binding fails against TMDL ontologies.
+Source schema validation and
 matching local draft/published snapshots do not prove remote publication,
 permissions, or behavior. Rebind and verify the deployed agents in Fabric.
 Mandatory per-agent governance metadata remains outside the default release;

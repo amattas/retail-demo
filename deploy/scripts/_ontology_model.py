@@ -326,10 +326,46 @@ class Layers:
     bronze: str = "cusn"
 
 
+@dataclass(frozen=True)
+class SourceItem:
+    """The Lakehouse item that backs every table partition.
+
+    Fabric identifies a partition's data source from ``ONT_*`` annotations, not
+    from the ``Sql.Database`` expression. Without them the ontology cannot
+    resolve its underlying source, so a Data Agent using the ontology as
+    context has nothing to query and graph materialization marks every entity
+    ineligible.
+    """
+
+    workspace_id: str
+    workspace_name: str
+    item_id: str
+    item_name: str
+    pinned_at: str
+    item_kind: str = "Lakehouse"
+
+    def annotations(self, sql_endpoint: str) -> tuple[tuple[str, str], ...]:
+        values = (
+            ("ONT_WorkspaceId", str(uuid.UUID(self.workspace_id))),
+            ("ONT_ItemId", str(uuid.UUID(self.item_id))),
+            ("ONT_ItemKind", self.item_kind),
+            ("ONT_ItemName", self.item_name),
+            ("ONT_WorkspaceName", self.workspace_name),
+            ("ONT_SqlEndpoint", sql_endpoint),
+            ("ONT_SqlDatabase", self.item_name),
+            ("ONT_PinnedAtUtc", self.pinned_at),
+        )
+        for name, value in values:
+            if not value.strip() or any(ch in value for ch in "\r\n"):
+                raise OntologyModelError(f"Partition annotation {name} needs a one-line value.")
+        return values
+
+
 def build_definition(
     *,
     sql_endpoint: str,
     sql_database_id: str,
+    source: SourceItem,
     available_bronze_tables: Iterable[str],
     schemas: Schemas | None = None,
     display_name: str = ONTOLOGY_NAME,
@@ -340,6 +376,7 @@ def build_definition(
     if not sql_endpoint or any(ch in sql_endpoint for ch in '"\r\n'):
         raise OntologyModelError("A Lakehouse SQL endpoint host is required.")
     sql_database_id = str(uuid.UUID(sql_database_id))
+    annotations = source.annotations(sql_endpoint)
     schemas = schemas or load_schemas()
     available = set(available_bronze_tables)
     layer_tables = {"silver": schemas.silver, "gold": schemas.gold}
@@ -482,6 +519,8 @@ def build_definition(
             f"\t\t\texpressionSource: {EXPRESSION_NAME}",
             "",
         ]
+        for name, value in annotations:
+            lines += [f"\t\tannotation {name} = {value}", ""]
         parts[f"tables/{table.name}.tmdl"] = "\n".join(lines)
 
     parts["relationships.tmdl"] = "\n".join(

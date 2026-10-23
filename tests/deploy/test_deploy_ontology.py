@@ -52,15 +52,19 @@ class FakeFabric:
         self.sql_status = sql_status
         self.readback_ok = readback_ok
         self.update_merge_failure = update_merge_failure
+        self.strip_annotations = False
         self.calls: list[tuple[str, str]] = []
         self.created: list[str] = []
 
     def get(self, url, **_):
         self.calls.append(("GET", url))
         if url.endswith(f"/lakehouses/{LH}"):
-            return Response(body={"properties": {"sqlEndpointProperties": {
-                "connectionString": "abc.datawarehouse.fabric.microsoft.com",
-                "id": SQL, "provisioningStatus": self.sql_status}}})
+            return Response(body={"displayName": "retail_lakehouse", "properties": {
+                "sqlEndpointProperties": {
+                    "connectionString": "abc.datawarehouse.fabric.microsoft.com",
+                    "id": SQL, "provisioningStatus": self.sql_status}}})
+        if url.endswith(f"/workspaces/{WS}"):
+            return Response(body={"id": WS, "displayName": "retail-demo"})
         if url.endswith("/ontologies"):
             return Response(body={"value": [
                 {"id": item_id, "displayName": name} for item_id, (name, _) in self.items.items()
@@ -75,6 +79,12 @@ class FakeFabric:
             if not self.readback_ok and item_id in self.created:
                 definition = {"parts": [p for p in definition["parts"]
                                         if not p["path"].startswith("rules/")]}
+            if self.strip_annotations:
+                definition = {"parts": [
+                    _part(p["path"], base64.b64decode(p["payload"]).decode().split(
+                        "\n\t\tannotation ")[0])
+                    for p in definition["parts"]
+                ]}
             return Response(body={"definition": definition})
         if url.endswith("/ontologies"):
             item_id = NEW if not self.created else f"{len(self.created):08d}-0000-4000-8000-000000000000"
@@ -145,6 +155,21 @@ def test_creates_when_absent_and_reports_skipped_bronze_tables():
     paths = {part["path"] for part in definition["parts"]}
     assert name == ONTOLOGY_NAME
     assert "tables/receipt_created.tmdl" not in paths
+    stores = next(
+        base64.b64decode(part["payload"]).decode()
+        for part in definition["parts"] if part["path"] == "tables/dim_stores.tmdl"
+    )
+    assert f"\t\tannotation ONT_ItemId = {LH}\n" in stores
+    assert f"\t\tannotation ONT_WorkspaceId = {WS}\n" in stores
+    assert "\t\tannotation ONT_ItemName = retail_lakehouse\n" in stores
+    assert "\t\tannotation ONT_WorkspaceName = retail-demo\n" in stores
+
+
+def test_readback_without_source_annotations_fails():
+    fake = FakeFabric()
+    fake.strip_annotations = True
+    with pytest.raises(NativeItemError, match="data-source annotations"):
+        _publish(fake)
 
 
 def test_migrates_an_old_format_item_through_a_verified_staging_item():

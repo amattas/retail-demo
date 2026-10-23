@@ -722,6 +722,10 @@ def data_agent_binding_errors(
         (path, content)
         for path, content in parts.items()
         if path.casefold().endswith("datasource.json")
+        or (
+            "/ontologies/" in path.casefold()
+            and path.casefold().endswith("/ontology.json")
+        )
     ]
     if not datasource_parts:
         return ["data agent has no datasource definition"]
