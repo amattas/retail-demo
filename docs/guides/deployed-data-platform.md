@@ -37,13 +37,12 @@ notebooks are grouped into repeatable operations:
 
     ![Machine-learning pipeline](../assets/screenshots/pipeline-machine-learning.png)
 
-    *This legacy screenshot shows the former combined canvas. Current
-    deployments separate required, optional, and experimental ML pipelines so
-    extended-model failures cannot block Reporting.*
+    *`ml-required` builds Gold with `setup-11-build-gold`, runs the six
+    Reporting producers in parallel, and finishes with
+    `15-validate-required-ml-contract`.*
 
-    In a current workspace, `ml-required`, `ml-optional`, and `ml-experimental`
-    appear as separate pipelines. Use the screenshot only to explain the general
-    notebook sequence.
+    `ml-optional` and `ml-experimental` are separate pipelines, so
+    extended-model failures cannot block Reporting.
 
 The pipeline canvas shows orchestration order. Use the **Run** history and
 activity output, not the presence of a green dependency arrow, as execution
@@ -96,16 +95,22 @@ when explaining table ownership and columns.
 
 ## 4. Inspect the Eventhouse hot path
 
-1. Open the KQL (Kusto Query Language) queryset or **KQL Workbench**.
-2. Confirm that the Eventhouse database appears in **Explorer**.
-3. Review the numbered table, mapping, function, and materialized-view tabs.
-4. Select `04-create-materialized-views` to explain bounded hot-path
-   aggregations.
+1. Open the `retail_querysets` KQL (Kusto Query Language) queryset.
+2. Confirm that `retail_eventhouse` appears in **Explorer** with the typed
+   event tables.
+3. Select the `q_receipts_minute_by_store` tab. It reads the
+   `mv_store_sales_minute` materialized view, a bounded hot-path aggregation.
+4. Select **Run**. If no stream has run in the last hour, widen `lookback`
+   (for example to `7d`) to show the most recent results.
 
-![KQL tables and materialized views](../assets/screenshots/kql-materialized-views.png)
+![KQL queryset over a materialized view](../assets/screenshots/kql-materialized-views.png)
 
-*The KQL explorer lists typed event tables while the selected script defines
-materialized views for recent operational KPIs.*
+*The queryset reads per-minute store sales from the `mv_store_sales_minute`
+materialized view. This capture uses a seven-day lookback.*
+
+The materialized views are created by the numbered scripts in
+`fabric/kql_database/` during deployment; the queryset holds the saved
+operational queries.
 
 For live evidence, run a read-only query against a recent window:
 
@@ -130,5 +135,6 @@ Do not run the numbered deployment scripts during a presentation.
 | Open `03-streaming-to-silver` | The notebook identifies Eventhouse sources, Silver targets, and watermark-based processing. |
 | Select `ag.fact_receipts` | The Lakehouse explorer shows the table schema and a row preview after historical setup. |
 | Run the recent receipt query | Rows have recent `ingest_timestamp` values when the optional stream is active. |
+| Run `q_receipts_minute_by_store` | Per-minute store sales from `mv_store_sales_minute` return without errors (widen `lookback` if no recent stream ran). |
 
 Continue with [Analytics and AI](deployed-analytics-ai.md).

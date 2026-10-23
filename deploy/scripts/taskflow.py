@@ -14,6 +14,11 @@ endpoints (discovered by capturing the Fabric UI):
               body = {"tasks": [...], "edges": [...]}
 
 A task references workspace artifacts by ``artifactUniqueId = "<artifactType>:<guid>"``.
+Power BI items are the exception: the portal only lists a semantic model bound
+as ``"3:<numeric model id>"`` (``artifactType`` ``dataset``, no object ID) and a
+report bound as ``"2:<guid>"`` (``artifactType`` ``report``). Other encodings are
+stored but render as "No items". The numeric model ID comes from
+``GET {cluster}/metadata/gallery/SharedDatasets`` (``model.id`` by ``model.dbName``).
 Because those GUIDs are workspace-specific, ``export_taskflow`` resolves each GUID
 to the artifact's display name (a portable form), and ``deploy_taskflow`` resolves
 the names back to the **target** workspace's GUIDs before saving.
@@ -64,8 +69,16 @@ ARTIFACT_TO_ITEM_TYPE = {
     "MLExperiment": "MLExperiment",
     "KQLQueryset": "KQLQueryset",
     "Report": "Report",
+    "report": "Report",
     "dataset": "SemanticModel",
     "AppBackend": "AppBackend",
+}
+# Portal encodings for Power BI items: portable type -> (stored type, ID prefix).
+PBI_DATASET_CODE = "3"
+PBI_REPORT_CODE = "2"
+PBI_PORTAL_TYPES = {
+    ("dataset", PBI_DATASET_CODE): "dataset",
+    ("report", PBI_REPORT_CODE): "Report",
 }
 OPTIONAL_TASKFLOW_ARTIFACTS = frozenset(
     {
@@ -296,17 +309,43 @@ def _guid_name_map(items: list[dict[str, Any]]) -> dict[str, str]:
     return {str(i["id"]): str(i.get("displayName", "")) for i in items}
 
 
+def dataset_numeric_ids(
+    pbi_session: requests.Session, cluster: str, workspace_id: str
+) -> dict[str, str]:
+    """Map each semantic model GUID in the workspace to its numeric model ID."""
+
+    response = pbi_session.get(f"{cluster}/metadata/gallery/SharedDatasets")
+    response.raise_for_status()
+    ids: dict[str, str] = {}
+    for entry in response.json():
+        if not isinstance(entry, dict):
+            continue
+        if str(entry.get("workspaceObjectId", "")).casefold() != workspace_id.casefold():
+            continue
+        model = entry.get("model")
+        if isinstance(model, dict) and model.get("id") and model.get("dbName"):
+            ids[str(model["dbName"]).casefold()] = str(model["id"])
+    return ids
+
+
 def to_portable(
-    task_flow: dict[str, Any], guid_to_name: dict[str, str]
+    task_flow: dict[str, Any],
+    guid_to_name: dict[str, str],
+    dataset_ids: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Replace each item's GUID with its display name so the flow is workspace-agnostic.
 
     Items whose GUID can't be resolved to a name (deleted/stale references, or ids
     not present in the workspace item listing) are dropped rather than emitted with
     ``artifactName: null`` — a null name can never bind on deploy and only adds
-    noise to the unresolved-reference report.
+    noise to the unresolved-reference report. ``dataset_ids`` maps semantic model
+    GUIDs to the numeric IDs used by the portal's Power BI encoding.
     """
 
+    numeric_to_guid = {
+        numeric: guid for guid, numeric in (dataset_ids or {}).items()
+    }
+    names = {guid.casefold(): name for guid, name in guid_to_name.items()}
     portable = json.loads(json.dumps(task_flow))  # deep copy
     for task in portable.get("tasks", []):
         kept: list[dict[str, Any]] = []
@@ -314,11 +353,18 @@ def to_portable(
             artifact_type, _, guid = str(item.get("artifactUniqueId", "")).partition(
                 ":"
             )
-            name = guid_to_name.get(item.get("artifactObjectId") or guid)
+            stored_type = str(item.get("artifactType", artifact_type))
+            portable_type = PBI_PORTAL_TYPES.get((stored_type, artifact_type))
+            if portable_type and artifact_type == PBI_DATASET_CODE:
+                guid = numeric_to_guid.get(guid, "")
+            object_id = (
+                "" if portable_type == "dataset" else item.get("artifactObjectId")
+            )
+            name = names.get(str(object_id or guid).casefold())
             if name is None:
                 continue
             item["artifactName"] = name
-            item["artifactType"] = item.get("artifactType", artifact_type)
+            item["artifactType"] = portable_type or stored_type
             kept.append(item)
         task["items"] = kept
     return portable
@@ -328,16 +374,20 @@ def to_workspace(
     portable: dict[str, Any],
     name_type_to_guid: dict[tuple[str, str], str],
     item_type_to_guid: dict[str, str] | None = None,
+    dataset_ids: dict[str, str] | None = None,
 ) -> tuple[dict[str, Any], list[str]]:
     """Resolve portable items to target GUIDs. Returns (task_flow, unresolved).
 
     Terraform-owned item types use their supplied IDs without a name lookup.
-    Other items resolve by type and display name. Unresolved items are dropped
-    because the server rejects references to non-existent artifacts.
+    Other items resolve by type and display name. Semantic models and reports
+    use the portal's Power BI encoding; a semantic model without a known numeric
+    ID is unresolved. Unresolved items are dropped because the server rejects
+    references to non-existent artifacts.
     """
 
     resolved = json.loads(json.dumps(portable))
     item_type_to_guid = item_type_to_guid or {}
+    dataset_ids = dataset_ids or {}
     unresolved: list[str] = []
     for task in resolved.get("tasks", []):
         kept_items: list[dict[str, Any]] = []
@@ -348,13 +398,30 @@ def to_workspace(
             guid = item_type_to_guid.get(item_type)
             if not guid and name:
                 guid = name_type_to_guid.get((item_type, name))
-            if guid:
+            if guid and item_type == "SemanticModel":
+                numeric = dataset_ids.get(guid.casefold())
+                if not numeric:
+                    unresolved.append(f"{artifact_type}:{name}")
+                    continue
+                item.update(
+                    artifactUniqueId=f"{PBI_DATASET_CODE}:{numeric}",
+                    artifactType="dataset",
+                    artifactObjectId=None,
+                )
+            elif guid and item_type == "Report":
+                item.update(
+                    artifactUniqueId=f"{PBI_REPORT_CODE}:{guid}",
+                    artifactType="report",
+                    artifactObjectId=guid,
+                )
+            elif guid:
                 item["artifactUniqueId"] = f"{artifact_type}:{guid}"
                 item["artifactObjectId"] = guid
-                item.pop("artifactName", None)
-                kept_items.append(item)
             else:
                 unresolved.append(f"{artifact_type}:{name}")
+                continue
+            item.pop("artifactName", None)
+            kept_items.append(item)
         task["items"] = kept_items
     return resolved, unresolved
 
@@ -544,7 +611,9 @@ def _taskflow_item_bindings(
         if not artifact_type or not separator or not unique_id:
             errors.append(f"{context} item {index} has no canonical unique ID")
             continue
-        if unique_type != artifact_type:
+        if unique_type != artifact_type and (
+            artifact_type, unique_type
+        ) not in PBI_PORTAL_TYPES:
             errors.append(
                 f"{context} item {index} artifact type disagrees with its unique ID"
             )
@@ -725,7 +794,9 @@ def export_taskflow(
         _required_item_types(task_flow),
     )
     guid_to_name = _guid_name_map(items)
-    portable = to_portable(task_flow, guid_to_name)
+    portable = to_portable(
+        task_flow, guid_to_name, dataset_numeric_ids(pbi, cluster, workspace_id)
+    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
         json.dumps(portable, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
@@ -778,17 +849,25 @@ def deploy_taskflow(
     name_type_to_guid = {
         (str(i["type"]), str(i.get("displayName", ""))): str(i["id"]) for i in items
     }
+    has_datasets = any(
+        isinstance(item, dict) and item.get("artifactType") == "dataset"
+        for task in portable.get("tasks", [])
+        if isinstance(task, dict)
+        for item in task.get("items", [])
+    )
+    cluster = resolve_cluster(pbi) if has_datasets else None
     task_flow, unresolved = to_workspace(
         portable,
         name_type_to_guid,
         item_type_to_guid,
+        dataset_numeric_ids(pbi, cluster, workspace_id) if cluster else None,
     )
     if unresolved:
         raise ValueError(
             "Selected task-flow references are unresolved: "
             + ", ".join(sorted(unresolved))
         )
-    cluster = resolve_cluster(pbi)
+    cluster = cluster or resolve_cluster(pbi)
     record = get_taskflow(pbi, cluster, workspace_id)
     if record is None:
         # Fresh workspace with no task flow yet — create one.

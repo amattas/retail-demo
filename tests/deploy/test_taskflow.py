@@ -485,6 +485,74 @@ def test_to_workspace_resolves_names_to_target_guids_and_reports_unresolved() ->
     assert unresolved == ["Pipeline:missing-pipeline"]
 
 
+def test_to_workspace_uses_the_portal_power_bi_encoding() -> None:
+    portable = {
+        "tasks": [
+            {
+                "id": "t1",
+                "items": [
+                    {"artifactType": "dataset", "artifactName": "retail_model"},
+                    {"artifactType": "Report", "artifactName": "retail_model"},
+                    {"artifactType": "dataset", "artifactName": "unpublished"},
+                ],
+            }
+        ],
+        "edges": [],
+    }
+    names = {
+        ("SemanticModel", "retail_model"): "MODEL-GUID",
+        ("SemanticModel", "unpublished"): "other-guid",
+        ("Report", "retail_model"): "report-guid",
+    }
+
+    resolved, unresolved = taskflow.to_workspace(
+        portable, names, dataset_ids={"model-guid": "5160544"}
+    )
+
+    # The portal lists Power BI items only in this form; GUID forms render empty.
+    assert resolved["tasks"][0]["items"] == [
+        {"artifactType": "dataset", "artifactUniqueId": "3:5160544",
+         "artifactObjectId": None},
+        {"artifactType": "report", "artifactUniqueId": "2:report-guid",
+         "artifactObjectId": "report-guid"},
+    ]
+    assert unresolved == ["dataset:unpublished"]
+    assert taskflow.taskflow_item_binding_errors(resolved) == []
+
+    portable_again = taskflow.to_portable(
+        resolved,
+        {"model-guid": "retail_model", "report-guid": "retail_model"},
+        {"MODEL-GUID".casefold(): "5160544"},
+    )
+    assert [
+        (item["artifactType"], item["artifactName"])
+        for item in portable_again["tasks"][0]["items"]
+    ] == [("dataset", "retail_model"), ("Report", "retail_model")]
+
+
+def test_dataset_numeric_ids_are_scoped_to_the_workspace() -> None:
+    class Response:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> list[dict[str, object]]:
+            return [
+                {"workspaceObjectId": "WS-1",
+                 "model": {"id": 7, "dbName": "Model-A"}},
+                {"workspaceObjectId": "ws-2",
+                 "model": {"id": 8, "dbName": "model-b"}},
+            ]
+
+    class Session:
+        def get(self, url: str) -> Response:
+            assert url == "https://c/metadata/gallery/SharedDatasets"
+            return Response()
+
+    assert taskflow.dataset_numeric_ids(Session(), "https://c", "ws-1") == {
+        "model-a": "7"
+    }
+
+
 def test_to_workspace_prefers_terraform_owned_ids_over_ambiguous_names() -> None:
     portable = {
         "tasks": [
