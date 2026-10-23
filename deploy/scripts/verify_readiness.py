@@ -1652,7 +1652,9 @@ class ReadinessRunner:
             str(item.get("id", "")): str(item.get("displayName", ""))
             for item in self.items
         }
-        actual = to_portable(record["taskFlow"], guid_to_name)
+        actual = to_portable(
+            record["taskFlow"], guid_to_name, record.get("datasetIds")
+        )
         expected_refs = _taskflow_references(expected)
         expected_edges = _taskflow_edges(expected)
         errors = taskflow_binding_errors(
@@ -2520,7 +2522,16 @@ class FabricReadinessAdapter:
                 taskflow._token(taskflow.PBI_SCOPE, self.credential)
             )
             cluster = taskflow.resolve_cluster(pbi)
-            return taskflow.get_taskflow(pbi, cluster, self.workspace_id)
+            record = taskflow.get_taskflow(pbi, cluster, self.workspace_id)
+            if record is not None:
+                # Semantic models are bound by numeric model ID in the portal.
+                record = {
+                    **record,
+                    "datasetIds": taskflow.dataset_numeric_ids(
+                        pbi, cluster, self.workspace_id
+                    ),
+                }
+            return record
 
         return _retry_network_read(read)
 
