@@ -1,6 +1,71 @@
 # Status: Local Remediation and Native Decision Pack
 
-**Updated**: 2026-10-15 | **Wave**: E — pipeline retry/rerun safeguards implemented and targeted verification passing
+**Updated**: 2026-10-23 | **Wave**: E — ontology agent fixed, three standalone Fabric Apps live, user guides reconciled
+
+## Ontology agent, Fabric Apps, and guides (2026-10-23)
+
+The ontology Data Agent never queried data. TMDL ontology partitions now carry
+the `ONT_*` Lakehouse source annotations, and the agent binds through
+`ontologies/RetailOntology_AutoGen/ontology.json` (the legacy
+`datasource.json` binding is rejected by TMDL ontologies). All 13 entity types
+are selected; the stage instructions allow aggregates and refuse personal data
+and row-level person or transaction records. Republished with
+`retail-setup post-ontology`; live readback shows 13/13 selected, an
+aggregate customer question answers, and a names/phones request returns
+nothing.
+
+`app/fabric-app` now ships as three standalone Fabric Apps built from one
+codebase by `VITE_APP_VARIANT`: `retail-merchandising`, `retail-promotions`,
+and `retail-approvals` (existing item and data kept). `deploy_fabric_app.py`
+stages each under `deploy/.generated/<env>/fabric-apps/<variant>/`; all three
+are live in `retail-demo`, and the task flow lists them (60 item references).
+
+User guides were audited against the code and corrected (notebook counts, the
+`core` profile, setup/Gold pipeline split, ontology name, ML tiers, task-flow
+size, and the Fabric Apps).
+
+Readiness remains `DEGRADED` only by optional live-stream evidence (no stream
+running). Browser sign-in to the three apps has not been exercised.
+
+## Optional delivery and readiness repair (2026-10-22)
+
+The delivery notebook previously preferred existing Bronze lifecycle tables even
+when those shortcuts were empty, hiding the completed Silver history. It now
+combines normalized completed `fact_truck_moves` with live lifecycle events.
+Existing shipment deduplication, chronological evaluation, and unmatched-arrival
+inference are retained; unfinished historical moves cannot become training labels.
+
+Readiness now correlates failed terminal journal steps as observed failures
+instead of missing evidence. Post-Reporting sibling outcomes are collected
+independently, model checks can resolve their own producer runs, and producer
+success is checked before querying model outputs. A failed optional producer
+therefore no longer causes an opaque output-query error or hides successful
+experimental execution.
+
+Focused verification passed: 115 repository tests, four real Spark delivery
+tests, 16 documentation contracts, and Ruff. The six new regression cases fail
+against the original code.
+
+Live recovery completed after the operator requested capacity resume. F512 is
+`Active` and remains running. The delivery notebook was updated in place with
+only its three changed source cells; Lakehouse, Spark, experiment, and other
+definition metadata were preserved and verified by readback. The live Silver
+table contains 1,967,833 usable completed dwell records.
+
+Only `ml-optional` was rerun. Recovery instance
+`e47e52ed-a04a-4f16-bb5c-cc4a575ba7d6` completed successfully, and SQL endpoint
+metadata synchronized 69 tables. `au.dwell_predictions` is readable with an
+empty, contract-valid snapshot because there are no open live shipments.
+Setup, required ML, the successful experimental run, and streaming were not
+restarted; their protected journal records are unchanged.
+
+Refreshed readiness is `DEGRADED`: 23 passed, zero failed, and three expected
+unknowns for initial streaming watermarks, Eventhouse ingestion, and checkpoint
+identity. Post-Reporting pipelines and both optional/experimental model checks
+now pass. Original failure evidence is retained. Recovery publication hashes,
+exact-run identity, protected-step comparisons, and before/after evidence are
+linked from `deploy/.generated/retail-demo/optional-ml-recovery-20261022.json`.
+The source fixes are committed; the live publication audit pins their SHA-256.
 
 ## Pipeline retry and rerun safeguards (2026-10-15)
 
