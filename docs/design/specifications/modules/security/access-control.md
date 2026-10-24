@@ -24,12 +24,12 @@ Apply least privilege:
 - readers should receive Viewer/Database Viewer or narrower model access;
 - administrative roles should not be used for routine consumption.
 
-Exact role assignment varies by tenant policy and deployment mode. Validate it
-in the target environment rather than relying on an illustrative command.
+Role assignments depend on tenant policy and deployment mode. Validate them
+in the target environment; an example command does not prove access.
 
 ## Secrets
 
-Allowed sources:
+Load secrets only from:
 
 - Azure sign-in;
 - GitHub Actions secrets;
@@ -58,7 +58,7 @@ generated customer-like records.
   the default release. Persona-specific behavior remains optional under
   `ENH-003`.
 
-The optional local app has a different identity boundary: its live embedding
+The optional local app handles identity separately: its live embedding
 endpoint returns an operator-derived Power BI access token to the browser.
 Do not expose it as a shared authenticated service without separate hosting
 and delegated-identity controls. Approvals change local proposal records,

@@ -1,8 +1,7 @@
-"""Export and deploy Fabric workspace Task Flows.
+"""Export and deploy Fabric workspace task flows.
 
-Task Flows are not exposed by the public Fabric REST API. They live on the
-Power BI **metadata cluster** and are read/written with these undocumented
-endpoints (discovered by capturing the Fabric UI):
+This script uses the Power BI metadata cluster's undocumented endpoints,
+captured from the Fabric UI:
 
     cluster = PUT https://api.powerbi.com/spglobalservice/GetOrInsertClusterUrisByTenantLocation
               -> {"FixedClusterUri": "https://wabi-<region>.analysis.windows.net/"}
@@ -21,7 +20,7 @@ stored but render as "No items". The numeric model ID comes from
 ``GET {cluster}/metadata/gallery/SharedDatasets`` (``model.id`` by ``model.dbName``).
 Because those GUIDs are workspace-specific, ``export_taskflow`` resolves each GUID
 to the artifact's display name (a portable form), and ``deploy_taskflow`` resolves
-the names back to the **target** workspace's GUIDs before saving.
+the names back to the target workspace's GUIDs before saving.
 
 Auth uses the configured operator login: the metadata cluster needs a Power BI
 token and item listing needs a Fabric token.
@@ -254,9 +253,8 @@ def put_taskflow(
 ) -> int:
     """Update an existing task flow in the workspace.
 
-    The body must carry the existing task-flow identity (``id``/``name``/
-    ``description``) — the server rejects an empty ``taskflow.Id`` — plus the new
-    ``tasks`` and ``edges``.
+    Keep the existing ``id``, ``name``, and ``description`` alongside the new
+    ``tasks`` and ``edges``. The server rejects an empty ``taskflow.Id``.
     """
 
     resource_id = record["resourceId"]
@@ -333,13 +331,11 @@ def to_portable(
     guid_to_name: dict[str, str],
     dataset_ids: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Replace each item's GUID with its display name so the flow is workspace-agnostic.
+    """Replace item GUIDs with display names for reuse in other workspaces.
 
-    Items whose GUID can't be resolved to a name (deleted/stale references, or ids
-    not present in the workspace item listing) are dropped rather than emitted with
-    ``artifactName: null`` — a null name can never bind on deploy and only adds
-    noise to the unresolved-reference report. ``dataset_ids`` maps semantic model
-    GUIDs to the numeric IDs used by the portal's Power BI encoding.
+    Drop deleted or unlisted items whose names cannot be resolved:
+    ``artifactName: null`` cannot bind during deployment. ``dataset_ids`` maps
+    semantic-model GUIDs to the numeric IDs used by the portal's Power BI encoding.
     """
 
     numeric_to_guid = {
@@ -870,7 +866,6 @@ def deploy_taskflow(
     cluster = cluster or resolve_cluster(pbi)
     record = get_taskflow(pbi, cluster, workspace_id)
     if record is None:
-        # Fresh workspace with no task flow yet — create one.
         create_taskflow(pbi, cluster, workspace_id, {**portable, **task_flow})
     else:
         put_taskflow(pbi, cluster, workspace_id, record, task_flow)

@@ -2,7 +2,7 @@
 
 ## Supported path
 
-The supported repository path is:
+Follow this setup sequence:
 
 1. `scripts/setup.ps1`, `scripts/setup.sh`, or `python scripts/setup.py`
 2. `retail-setup configure`
@@ -25,9 +25,9 @@ The supported repository path is:
 | `deploy/.generated/<env>/` | Ignored live outputs, run journal, and combined KQL |
 | `deploy/.generated/<env>/workspace/` | Environment-specific Fabric item staging |
 
-The environment key is derived from the workspace name. Environment selection
-must be explicit for render and deploy. Local target and generated files are
-not durable sources of truth.
+The workspace name determines the environment key. Select the environment
+explicitly for render and deploy. Local target and generated files are not
+authoritative project records.
 
 ## Time and determinism
 

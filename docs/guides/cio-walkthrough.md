@@ -1,145 +1,124 @@
-# CIO Walkthrough
+# CIO walkthrough
 
-> Audience: a CIO and their leadership team. Goal: tell the story of **Fabric as the
-> operating system for a multi-agent retail business** — one platform, an orchestrator that
-> picks the right brain per question, and a fleet of agents that turn insight into governed,
-> approvable action. Run time: ~15 minutes for the core path, ~25 with the deep cuts.
+Use this walkthrough to show a CIO and their leadership team how Power BI,
+chat, and two operations agents use the same Fabric retail data. Allow about
+15 minutes for the main path or 25 minutes with the additional questions.
+Start with the report, ask questions in chat, then review a replenishment
+proposal and a retention campaign draft.
 
-In this walkthrough we'll go end-to-end: we'll **level-set** on what's deployed and why the
-ontology matters, **see** the business in a Power BI report, **ask** it questions in plain
-English and watch the orchestrator choose between the semantic model, the relationship graph,
-and the live event stream, then **act** on it with two operations agents that draft real,
-costed, approvable decisions — and finally **close the loop** by watching those decisions stream
-back into Fabric as real-time telemetry. No ETL pipelines on stage, no black boxes — every answer
-shows its work.
+Rehearse against the selected environment and read its readiness report first.
+This guide is not a live acceptance record. Replay uses synthetic fixtures,
+and approvals create local demo state, not production orders or campaigns.
+The app attempts to send action telemetry to Eventhouse, but delivery is not
+guaranteed.
 
-This is a presentation procedure, not a live acceptance record. No fresh
-Fabric deployment was performed in the current repair session. Rehearse
-against the selected environment and read its readiness report first.
-Replay is synthetic fixture output; approvals create local demo state, not
-production orders or campaigns. Eventhouse action telemetry is best-effort.
-
----
-
-## Before we start — what's deployed, and why it's useful
+## Before we start: what's deployed, and why it's useful
 
 The data platform is organized in **one Fabric workspace**. The local app,
 operator browser, identity provider, and optional router are additional trust
 and cost boundaries. Four data capabilities share that Fabric foundation:
 
-| Layer | Fabric component | Answers questions about… |
+| Layer | Fabric component | Questions it supports |
 |---|---|---|
-| **Historical analytics** | **Semantic model** (Direct Lake over the Gold Lakehouse) | "What happened / how much / ranked / trend" |
-| **Relationships** | **Ontology** (graph of business entities) | "What is connected to what / trace the path" |
-| **Real-time** | **Eventhouse (KQL)** + streaming | "What is happening right now / last 15 minutes" |
-| **Prediction** | **ML models** (Gold tables) | "What will happen / who's at risk / what to price" |
+| Historical analytics | Semantic model (Direct Lake over the Gold Lakehouse) | Totals, rankings, and trends |
+| Relationships | Ontology (graph of business entities) | Connections between named entities |
+| Real-time | Eventhouse (KQL) and streaming | Recent sales and operational events |
+| Prediction | ML models (Gold tables) | Forecasts, risk estimates, and pricing recommendations |
 
-The point: these are **not four products stitched together.** The same Gold tables feed the
-report, the agents, and the models. The same Eventhouse that streams live sales also captures
-what the AI agents decide.
+The same Gold tables feed the report, agents, and models. Eventhouse holds
+live sales events and any agent telemetry that the app successfully delivers.
 
-**Why the ontology matters** — the part that's hard to copy. A semantic model is great at
-*aggregates* ("net sales by region"). It is *not* built to pull together **everything we know
-about one specific entity** — a single customer's profile, their ML **segment**, and their
-**churn prediction** — into one connected answer. The typed business graph is. Name one customer
-by loyalty card and the ontology fuses their business attributes **and** their ML predictions in
-a single hop. Broad aggregations and deep scans, meanwhile, are routed to the semantic model,
-which handles them far more reliably — and **the orchestrator picks the right brain automatically**.
+Use the semantic model for aggregates such as net sales by region. Use the
+ontology to connect a named synthetic customer's profile with their segment
+and churn prediction. Broad aggregations and deep scans generally belong on
+the semantic model; verify that the selected graph lookup works before the
+presentation.
 
-> For the full architecture, see [Agentic Application](../design/architecture/agentic-application.md).
+See [Agentic application](../design/architecture/agentic-application.md) for
+the architecture and service boundaries.
 
----
+## The interface: what's on screen
 
-## The interface — what's on screen
+The **Dashboard** page places the Power BI report beside the Ask-your-data
+chat, using about 70% and 30% of the space, respectively. The orchestrator
+routes each question without asking the presenter to choose a data source.
 
-Two views do the heavy lifting:
+The **Agent Operations** page shows an approval funnel from the Eventhouse
+`agent_actions` table and refreshes every few seconds.
 
-- **Dashboard** — the **Power BI report (≈70%)** side-by-side with the **Ask-your-data chat
-  (≈30%)**. The CIO sees the visual *and* the conversation in one frame. There is **no** "ask the
-  data agent vs. ask the ontology" toggle — the user just asks, and a background orchestrator
-  routes each question.
-- **Agent Operations** — a live approval-funnel dashboard that streams from the Eventhouse
-  `agent_actions` table and auto-refreshes every few seconds.
+Expand **how I reached this** below an answer to inspect the source, router
+model, call, and result preview. Operations-agent traces include the DAX.
+Fabric MCP services do not return their generated query text.
 
-And under **every** answer, a collapsible **"how I reached this"** trace shows the source, the
-router + the exact model that decided, the call made, the graph path or DAX, and a result preview.
-That's the CIO trust requirement, built in.
+## The walkthrough: see it, ask it, act on it
 
----
+### Act 1: See it (Power BI, ~3 min)
 
-## The walkthrough — see it, ask it, act on it
+Open **Dashboard**, let the report load, then expand these visuals:
 
-The flow has three acts: **See the business → Ask the business → Act on the business.**
+1. Executive sales and margin: show net sales, gross margin %, and channel mix.
+2. Inventory and stockout risk: identify stores to revisit in the
+   replenishment example.
+3. Customer and churn: identify segments to revisit in the retention example.
 
-### Act 1 — See it (Power BI, ~3 min)
+Suggested narration: "The report shows the selected period's sales and risk
+signals. Now let's ask a question about the same data."
 
-Open the **Dashboard** page, let the report load, then **expand 2–3 visuals**:
+### Act 2: Ask it (chat, ~5 min)
 
-1. **Executive sales & margin** — net sales, gross margin %, channel mix. *Sets the scale.*
-2. **Inventory / stockout-risk visual** — surfaces that some stores are running thin. *The hook
-   for Act 3, Agent 1.*
-3. **Customer / churn visual** — segments and at-risk value. *The hook for Act 3, Agent 2.*
-
-Narrate: *"This is the curated semantic model — one version of the truth. But a dashboard only
-answers the questions someone built a chart for. Watch what happens when I just… ask."*
-
-### Act 2 — Ask it (chat, ~5 min)
-
-Ask these in order. After each answer, **expand the "how I reached this" trace** so the room sees
-which brain answered and why.
+Ask these in order. Expand **how I reached this** after each answer to show
+which source answered and why.
 
 | # | Ask this | Source the agent uses | Why this question |
 |---|---|---|---|
-| 1 | *"What were total net sales and gross margin company-wide?"* | **Semantic model** | The chat reads the *same* curated truth as the report |
-| 2 | *"What are the top products by revenue last month, and each one's gross margin %?"* | **Semantic model** | Ranked list + a second measure, instantly |
-| 3 | *"What segment and churn probability belong to loyalty card \<observed-card\>?"* | **Ontology** | Use an authorized synthetic key actually present in the selected environment |
-| 4 | *"How many customers are predicted to churn, and their total lifetime value?"* | **Semantic model over the ML churn table** | Moves from "what happened" to "what *will* happen" |
-| 5 | *"What were the top-selling products in the last 15 minutes?"* | **Real-time (Eventhouse)** | Proves it's **live**, not yesterday's extract |
+| 1 | "What were total net sales and gross margin company-wide?" | Semantic model | Compare chat with the report for the same period |
+| 2 | "What are the top products by revenue last month, and each one's gross margin %?" | Semantic model | Check a ranked list with a second measure |
+| 3 | Ask for the segment and churn probability of an observed loyalty card | Ontology | Use an authorized synthetic key present in this environment |
+| 4 | "How many customers are predicted to churn, and what is their total lifetime value?" | Semantic model over the ML churn table | Inspect model estimates alongside historical value |
+| 5 | "What were the top-selling products in the last 15 minutes?" | Live-sales shortcut; inspect the trace | Check freshness, time window, and whether the result is at product or store grain |
 
-Narrate over the traces: *"Notice the app is choosing a different brain each time — the semantic
-model for the metric, the graph for the relationship, the live stream for right-now — and it's
-telling me which one and why. I never had to pick."*
+Suggested narration: "The trace shows which source answered and why. We can
+compare its result with the report or underlying data."
 
-### Act 3 — Act on it (operations agents, ~6 min)
+### Act 3: Act on it (operations agents, ~6 min)
 
-This is the moment that lands. Ask a question that implies a **decision**, and the orchestrator
-hands off to a specialized **operations agent** that reads the real data, applies business rules,
-and **drafts an approvable action**.
+Ask a question that requests a decision. The orchestrator hands it to an
+operations agent, which reads the deployed synthetic data, applies business
+rules, and drafts a proposal for review.
 
-**Agent 1 — Inventory & Replenishment.** Ask: *"What products are at risk of stockout — and what
-should we do about it?"*
+For Inventory & Replenishment, ask: "What products are at risk of stockout,
+and what should we do about it?"
 
 Inspect the exposure count and assumptions from the actual response, then the
 trace: stockout risk → covering reorders → product prices → coverage rule.
 Review the recommendation card's evidence before approving one local draft.
 Do not repeat counts or dollar amounts from an older workspace.
 
-**Agent 2 — Customer Retention.** Ask: *"Customer churn is rising — what can we do to retain them?"*
+For Customer Retention, ask: "Customer churn is rising. What can we do to
+retain customers?"
 
 Use the current response's cohort count and modeled lifetime-value estimate;
 these are synthetic risk indicators, not guaranteed recoverable revenue. The
-trace should show the agent read the ML churn table → join `customer_segments` for LTV → select the top
-cohort → pull cross-sell anchors from the market-basket model, and a **drafted win-back campaign**
-with Approve / Dismiss.
+trace should show the ML churn read, the join to `customer_segments` for
+lifetime value (LTV), cohort selection, and cross-sell suggestions from the
+market-basket model. Review the draft campaign's **Approve** and **Dismiss**
+controls.
 
-Narrate: *"Two different agents, same pattern: perceive the data, reason with business rules,
-recommend a specific action, and require a human approval. This is a **multi-agent operations
-layer**, not a chatbot."*
+Suggested narration: "Each agent proposes a specific action and shows its
+evidence. Approval records a local decision; it does not execute an order or
+campaign."
 
----
-
-## Validate it — close the loop
+## Validate it: close the loop
 
 Inspect whether each expected draft/decision reached `agent_actions`.
 The app attempts Eventhouse logging asynchronously and can lose events
 without failing the chat or approval. Local approval success is not proof of
 telemetry delivery or an immutable audit record.
 
-Switch to the **Agent Operations** tab after Act 3. The CIO watches, in real time: how many actions
-the agents proposed, how many operators approved, the dollar value of approved replenishments and
-addressed churn LTV. Confirm the actual delivery time instead of promising a
-fixed latency. Behind it, it's plain
-KQL anyone can put on a Fabric Real-Time Dashboard:
+Switch to **Agent Operations** after Act 3. Check the proposed and approved
+action counts, estimated replenishment value, and churn LTV associated with
+the proposals. Confirm actual delivery time rather than promising a fixed
+latency. Query the ingested events with KQL:
 
 ```kusto
 agent_actions
@@ -147,54 +126,30 @@ agent_actions
 | order by agent asc
 ```
 
-The takeaway: the AI isn't a black box bolted on the side. Its recommendations and your team's
-approvals become **first-class, governed, queryable telemetry inside Fabric** — auditable,
-measurable, and ready to drive the next dashboard or the next automation.
+These events can support an operations dashboard. Their presence does not
+establish a complete or immutable approval audit.
 
----
+## Appendix: deep-cut questions (if time allows)
 
-## Recap — the narrative arc
+Use these questions to explore combined metrics and model outputs:
 
-In this walkthrough we showed a living digital twin of a national retailer on **one Fabric
-workspace**, with a team of AI agents on top of it that don't just answer questions — they
-recommend and locally review a next action, with a human in the loop, and
-attempt to send decisions back as telemetry. To tell it in five beats:
+- "What is the total modeled lifetime value of high-churn-risk customers?"
+  Inspect the estimate's limitations before reviewing a local campaign draft.
+- "For products at high stockout risk, estimate the at-risk daily sales."
+  Review the assumptions before approving a local reorder draft.
+- "For each underperforming store, list its top stockout risk, churn-risk
+  customers, and recommended cross-sell." Present this composed action list
+  as a proposal, not a current capability.
 
-1. **"One platform."** Sales history, the relationship graph, the live event stream, and the ML
-   models are all in one Fabric workspace, one copy of the data.
-2. **"Ask, don't build."** A dashboard answers the chart someone built. Here you ask in plain
-   English and an **orchestrator picks the right brain** — and tells you which one.
-3. **"From answers to actions."** Specialized **operations agents** turn an insight into a
-   specific, costed, approvable action — with a human in the loop.
-4. **"Observe the loop."** Check recommendation/approval telemetry in Eventhouse;
-   delivery is best-effort, not a production audit guarantee.
-5. **"This scales."** The same pattern adds a Pricing agent, a Logistics agent, a Marketing agent —
-   each reading the same Fabric foundation. *Fabric is the operating system for a multi-agent
-   retail business.*
+## Appendix: pre-flight checklist
 
----
-
-## Appendix — deep-cut questions (if time allows)
-
-These deliberately span the semantic model **+** ontology **+** ML in one ask:
-
-- **Revenue-at-risk:** *"Quantify the total lifetime value tied to high-churn-risk customers —
-  dollars on the table if we do nothing."* → inspect modeled LTV and limitations,
-  with a local draft campaign.
-- **Stockout → sales impact:** *"For products at high stockout risk, estimate the at-risk daily
-  sales."* → inspect the response's assumptions, with local draft reorders.
-- **Best next action per store:** *"For each underperforming store, surface its top stockout risk,
-  top churn-risk customers, and top cross-sell — one prioritized action list."* → the roadmap slide:
-  where the agent fleet is going.
-
-## Appendix — pre-flight checklist
-
-- [ ] Fabric capacity **Active**; check the environment's actual pause policy.
+- [ ] Fabric capacity is **Active**; check the environment's actual pause policy.
 - [ ] Local app on loopback; signed in as an operator with only necessary permissions.
 - [ ] Streaming notebook running so "last 15 minutes" returns fresh data.
 - [ ] Preserve prior telemetry and proposal evidence; do not clear shared state
       merely to make presentation counters start at zero.
-- [ ] One dry run of the Inventory and Retention questions (the first DAX reads take a few seconds).
+- [ ] Run the Inventory and Retention questions once before presenting; initial
+      DAX reads can take a few seconds.
 
 ## Report-to-chat handoff and fallback
 
@@ -210,9 +165,9 @@ aggregation. Inspect source, grain, window, fallback, and empty/error results;
 the current live-sales shortcut has a fixed store-sales window and does not
 prove arbitrary product/window answers. See [routing](../design/specifications/modules/ml-ai/routing.md).
 
-If a service stalls, stop promising the expected answer: show a previously
-validated report view or explicitly labeled replay and retain the failure for
-follow-up. Explore broader prompts with the
-[evaluation question bank](sample-retail-questions.md), not fixed old results.
+If a service stalls, show a previously validated report view or explicitly
+labeled replay, and retain the failure for follow-up. Use the
+[evaluation question bank](sample-retail-questions.md) to explore broader
+prompts; do not reuse old results as current evidence.
 Pricing, logistics, merchandising, and composed per-store actions remain
 [proposals](../design/specifications/modules/ml-ai/decision-experience.md).

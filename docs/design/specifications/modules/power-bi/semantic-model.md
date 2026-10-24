@@ -2,8 +2,8 @@
 
 ## Source and mode
 
-The source-controlled Power BI Project (PBIP, the folder-based format used to
-version reports and semantic models) is `fabric/powerbi/retail_model.pbip`.
+The Power BI Project (PBIP) at `fabric/powerbi/retail_model.pbip` versions the
+report and semantic model as source-controlled folders.
 The semantic model is Direct Lake over the target Lakehouse. Direct Lake reads
 OneLake tables directly without importing a second copy; the model is not a
 current KQL/DirectQuery hybrid.
@@ -38,7 +38,7 @@ grain, temporal, lineage, intended-use, and limitation contracts in
 - explicit measures
 - discouraged implicit measures
 - date, geography, product, store, DC, and related hierarchies
-- relationships from dimensions to fact and aggregate surfaces
+- relationships from dimensions to facts and aggregates
 - persona-oriented report pages
 
 ## ML publication contract
@@ -73,11 +73,11 @@ that need explicit workspace/Lakehouse binding.
 
 Validation should confirm:
 
-1. all active tables exist;
-2. Direct Lake points to the intended Lakehouse;
-3. required relationships and measures load;
-4. all six required ML tables pass their runtime contract;
-5. access and field visibility match the intended persona.
+1. All active tables exist.
+2. Direct Lake points to the intended Lakehouse.
+3. Required relationships and measures load.
+4. All six required ML tables pass their runtime contract.
+5. Access and field visibility match the intended persona.
 
 Relevant tests:
 

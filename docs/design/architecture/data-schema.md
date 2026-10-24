@@ -13,7 +13,7 @@
   (TMDL, or Tabular Model Definition Language, is the text format used to
   define the Power BI semantic model)
 
-Exact detail belongs in the
+For exact columns, types, and mappings, see the
 [historical data contract](../specifications/modules/generation/data-contract.md),
 [event contract](../specifications/modules/streaming/event-contract.md), and
 [semantic-model specification](../specifications/modules/power-bi/semantic-model.md).
@@ -72,10 +72,10 @@ recommendation, approval, and rejection event tables.
 - owned streaming-only output `fact_online_order_status`
 
 `fact_online_order_status` is not part of the base contract or active semantic
-model. Its schema and PICKED/SHIPPED routes are declared by the streaming
-Silver notebook, its named terminal exception is validated by the solution
-manifest, and the Delta maintenance notebook inventories the table.
-That maintenance inventory also owns the `ag._watermarks` control table.
+model. The streaming Silver notebook declares its schema and PICKED/SHIPPED
+routes. The solution manifest validates its named downstream exception, and
+the Delta maintenance inventory includes both this table and the
+`ag._watermarks` control table.
 
 ## Lakehouse Gold (`au`)
 

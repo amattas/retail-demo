@@ -1,7 +1,7 @@
 # Requirements ownership
 
-Requirements describe outcomes, constraints, and acceptance criteria. They do
-not own implementation detail. Exact interfaces and workflows belong in
+Requirements define required outcomes, constraints, and acceptance criteria.
+Exact interfaces and workflows belong in
 [specifications](../specifications/README.md), current structure belongs in
 [architecture](../architecture/overview.md), and risks and mitigations belong
 in [security](../security/threat-model.md).
@@ -48,5 +48,5 @@ Each module has one requirements page and one backlog. A backlog contains only:
 - `## Open`
 - `## Settled — do not reopen`
 
-Completed-work histories do not belong in backlogs. Git history and
-[traceability.md](traceability.md) retain completion evidence.
+Keep completed work out of backlogs. Git history and
+[traceability.md](traceability.md) retain the evidence.

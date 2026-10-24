@@ -1,11 +1,10 @@
 """Export Fabric items of a given type from a workspace into item folders.
 
-Fetches each item definition from a live Fabric workspace via the
-``getDefinition`` REST API and writes it as a source-control item folder
-(``<name>.<ItemType>/`` containing ``.platform`` and the returned definition
-parts, e.g. ``pipeline-content.json`` for pipelines or ``Files/Config/...`` for
-data agents). Authentication uses the operator login selected by deployment
-configuration.
+Read each definition through the live workspace's ``getDefinition`` REST API.
+Write ``.platform`` and the returned parts into ``<name>.<ItemType>/`` folders
+for source control. Parts include ``pipeline-content.json`` for pipelines and
+``Files/Config/...`` for Data Agents. Authentication uses the operator login
+selected by deployment configuration.
 
 Example:
     python -m deploy.scripts.export_items \

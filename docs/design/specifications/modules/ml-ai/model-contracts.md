@@ -45,8 +45,7 @@ notebooks declare the same schema and validate types and non-null constraints
 immediately before writing that exact physical target. Required contracts
 additionally reference the active Tabular Model Definition Language (TMDL)
 projection and the runtime validator.
-This checked agreement prevents the manifest from becoming an independent,
-unvalidated physical schema.
+These checks keep the manifest aligned with the physical schema.
 
 For all six required outputs, `generated_at` is the true Gold publication
 timestamp and `model_run_id` identifies that generation. Source/business
@@ -59,10 +58,10 @@ remains `computed_at`. Readiness orders and ages `generated_at` from
 the same row as a nonblank run ID; it never treats a business as-of date as a
 generation timestamp.
 
-Promoting `product_recommendations` and `price_elasticity` to the required
-tier means the Reporting gate now also depends on market-basket mining and
-promotion/elasticity analysis succeeding with non-empty results, not only on
-the original demand/segmentation/churn/stockout producers.
+The Reporting gate requires nonempty results from market-basket mining and
+promotion/elasticity analysis, alongside demand, segmentation, churn, and
+stockout outputs. This includes `product_recommendations` and
+`price_elasticity` in the required tier.
 
 The runtime validator creates no tables. It rejects missing/empty required
 outputs, incompatible columns or types, null/duplicate grain keys, invalid
@@ -269,5 +268,5 @@ optional under `ENH-003`.
 ## Preview and support boundary
 
 Ontology and related capabilities require explicit tenant capability checks.
-Semantic-model agents and ontology agents are separate surfaces; failure or
+Semantic-model agents and ontology agents are separate features; failure or
 unavailability of one must not be presented as failure of the other.

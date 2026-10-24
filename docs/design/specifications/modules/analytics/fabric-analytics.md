@@ -55,10 +55,8 @@ The six required Reporting tables also reference their active TMDL projection.
 Repository validation fails when a producer, manifest declaration, validator,
 or TMDL projection disagrees.
 
-The authoritative list of all 14 outputs and their Required, Optional, or
-Experimental tier is in the
-[ML and AI contract](../ml-ai/model-contracts.md#ml-contracts). Keeping one
-tier table prevents the analytics and ML specifications from drifting.
+The [ML and AI contract](../ml-ai/model-contracts.md#ml-contracts) lists all
+14 outputs and their Required, Optional, or Experimental tiers.
 
 `15-validate-required-ml-contract` runs after all required producers. It fails
 on missing or empty tables, incompatible schemas, null or duplicate grain
@@ -107,12 +105,12 @@ Live-specific behavior and divergences:
   because `TABLES` remains the historical contract;
 - live coverage is not equivalent for every historical fact.
 
-Inventory has runtime evidence beyond source/AST contracts:
+Inventory also has runtime test coverage:
 `utility/tests/generation/test_streaming_inventory_runtime.py` executes the
 actual notebook transformation functions with real Spark DataFrames and
 windows. It covers prior-balance continuation, legacy-null repair,
-same-timestamp ordering by `trace_id`, and idempotent replay. The parent reports
-this test passed on Spark 4.2 with a checksum-verified session-local JDK 17.
+same-timestamp ordering by `trace_id`, and idempotent replay. The recorded local
+result is a pass on Spark 4.2 with a checksum-verified session-local JDK 17.
 Target-table lookup is stubbed; no live Delta `MERGE`, full Spark suite, or
 Fabric execution is proven by this test.
 
@@ -144,8 +142,8 @@ query. Deployment rewrites its cluster/database binding.
 
 ## Dashboards and rules
 
-Dashboard JSON/templates and KQL rule definitions are source inputs, not yet
-guaranteed first-class deployable items. They may require manual import and
+Dashboard JSON/templates and KQL rule definitions are source inputs, not
+guaranteed deployable items. They may require manual import and
 binding. Activator is Fabric's event-driven alerting and action service.
 Claims about five-minute schedules or deployed Activator actions are not
 current defaults.
@@ -165,7 +163,7 @@ promotion before issuing the replacement statement. A server commit followed
 by a client exception therefore includes that target in reverse-order
 rollback, rather than silently restoring only earlier targets.
 `tests/test_lakehouse_batch_ml_fixes.py` exercises this failure window with
-executable mocks. The offline batch wave is complete; actual Fabric/Delta
+executable mocks. Local batch work is complete; actual Fabric/Delta
 rollback execution remains a separate live gate.
 
 ## Maintenance
@@ -179,6 +177,5 @@ failures propagate rather than being reclassified as optional absence.
 Operation failures fail the notebook. Deployment supplies configured
 Lakehouse/schema parameters to pipeline notebook activities.
 
-The current remediation is locally implemented, not freshly live-verified.
-Remote KQL, Silver/Gold, pipeline concurrency, and maintenance smoke tests
-remain release gates.
+These changes are implemented locally. Fresh remote KQL, Silver/Gold,
+pipeline-concurrency, and maintenance smoke tests remain release gates.

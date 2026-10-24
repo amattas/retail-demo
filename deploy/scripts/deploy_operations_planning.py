@@ -1,4 +1,4 @@
-"""Publish the opt-in, stopped Operations Agent and native replenishment Plan."""
+"""Publish a stopped Operations Agent and, when selected, a replenishment Plan."""
 
 from __future__ import annotations
 
@@ -569,11 +569,11 @@ def main(argv: list[str] | None = None) -> int:
             console.info("Operations/Planning publication is disabled for this environment.")
             return 0
         console.info(
-            "Would publish bounded signals, a draft notebook, and a STOPPED Operations Agent."
+            "Would publish availability signals, a draft notebook, and a stopped Operations Agent."
         )
         if not args.operations_only and config.operations_planning.include_plan:
             console.info(
-                "Would publish native Plan using a shared fixed-credential connection."
+                "Would publish a native Plan using a shared fixed-credential connection."
             )
         return 0
     outputs = load_terraform_outputs(
@@ -621,7 +621,7 @@ def main(argv: list[str] | None = None) -> int:
     if not organize_after_publish(args.repo_root, args.environment):
         return 1
     console.info(
-        f"Published stopped Operations Agent and {report['signal_count']} availability signals."
+        f"Published a stopped Operations Agent and {report['signal_count']} availability signals."
     )
     console.info(
         f"Planning: {report['plan']['state']}. See operations-planning-report.json."

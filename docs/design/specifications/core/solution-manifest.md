@@ -2,8 +2,8 @@
 
 ## Purpose
 
-`contracts/retail-demo.json` is the canonical container for cross-domain
-metadata. Its top-level sections are frozen at version `1.4.0`:
+`contracts/retail-demo.json` defines shared metadata across the demo's
+modules. Its top-level sections are frozen at version `1.4.0`:
 
 - `metadata` and `version`;
 - `prerequisites` and `commands`;
@@ -14,15 +14,14 @@ metadata. Its top-level sections are frozen at version `1.4.0`:
 - `ml_contracts`;
 - `source_owners`.
 
-The deployment profile entries are executable. The resolver uses them to select
-existing logical assets, notebook groups, pipeline folders, and the physical
-KQL inventory associated with Eventhouse. ML contract entries are executable:
-repository validation compares them with producer notebook declarations,
-required runtime-validator declarations, and active TMDL projections.
+The resolver uses profile entries to select existing logical assets, notebook
+groups, pipeline folders, and Eventhouse KQL objects. Repository validation
+compares ML contract entries with producer notebook declarations, required
+runtime-validator declarations, and active TMDL projections.
 
 ## Authority boundary
 
-The manifest owns stable IDs, logical ownership, support status, descriptions,
+The manifest defines stable IDs, logical ownership, support status, descriptions,
 source pointers, profile-to-existing-group/asset selection, dependency
 metadata, contract and path declarations, and explicit exceptions. It does not
 own item definitions or pipeline bodies. ML schema declarations are validated
@@ -37,9 +36,9 @@ physical schema.
 | Active semantic-model tables and Direct Lake bindings | `model.tmdl` references plus each table TMDL's executable `schemaName`/`entityName` partition |
 | ML output schemas | Producer notebook `ML_OUTPUT_CONTRACTS`; active TMDL for the six Reporting outputs |
 
-Physical inventories are declarations with a derivation and source selector.
-Validators calculate their values from those sources. Item names, event fields,
-and table schemas must not be copied into the manifest.
+Each physical inventory declaration specifies how to derive its members and
+which source to read. Validators calculate the inventory from that source.
+Do not copy item names, event fields, or table schemas into the manifest.
 
 The live event extension follows the same boundary. The manifest stores the
 stable envelope/event/path IDs, business and dedupe keys, UTC event-time
@@ -54,11 +53,10 @@ terminal exception must agree with that path. The envelope declaration must
 select the `ENVELOPE` symbol owned by the event contract and share the physical
 driver source used for `EVENT_PAYLOADS`.
 
-Every pointer is checked for repository-local resolution. Selector-backed
-pointers are parsed by their declared selector, while pointers that name whole
-files or directories provide existence/ownership evidence only. Contract-driving
-selectors are also consumed by the owning repository validation; they are not
-treated as descriptive metadata.
+Every source pointer must resolve inside the repository. Validators parse
+selector-backed pointers using the declared selector. A pointer to a whole
+file or directory proves only that it exists and has an owner; it does not
+validate its contents. Contract checks use the declared selectors directly.
 
 ## Readers and validation
 
@@ -89,7 +87,7 @@ validators. Validation checks:
   required/optional behavior against the unchanged runtime taxonomy;
 - declared inventory exceptions.
 
-Run the non-mutating check from a repository checkout:
+Run this read-only check from a repository checkout:
 
 ```powershell
 python scripts/check_data_contracts.py
@@ -98,17 +96,17 @@ python scripts/check_data_contracts.py
 It prints stable counts and source-derived streaming-only, historical-only, and
 operational boundaries. It never rewrites KQL, notebooks, schemas, or TMDL.
 
-`scripts/solution_manifest.py` is a standard-library-only projection for
-bootstrap-safe identity, prerequisites, canonical command examples, profile
-names and the declared default, publication counts/folders, manifest version,
-and a deterministic semantic SHA-256. `scripts/setup.py` consumes it before
-dependencies are installed and derives its `--profile` default from that view.
+`scripts/solution_manifest.py` uses only the Python standard library. It
+exposes identity, prerequisites, canonical command examples, profile names
+and the default, publication counts/folders, manifest version, and a
+deterministic semantic SHA-256. Bootstrap reads it before installing
+dependencies; `scripts/setup.py` derives its `--profile` default from this view.
 Both readers reject primitive type coercion. Agreement and negative tests keep
 the projection aligned with the typed reader.
 Dry-run output, deploy journals, artifact inventories, and readiness reports
 carry the same manifest version/hash and resolved profile boundaries.
 
-The canonical human-readable projection is the
+For the readable inventory, see the
 [workspace and profile inventory](../../../guides/workspace-inventory.md).
 
 ## Extension points

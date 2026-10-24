@@ -3,7 +3,7 @@
 ## Deployment readiness
 
 Record the environment, tenant, workspace, operator identity, commit, generated
-output path, and deployment run before mutation.
+output path, and deployment run before changing resources.
 
 After publication, verify:
 
@@ -17,8 +17,8 @@ After publication, verify:
 - Lakehouse SQL endpoint metadata visibility;
 - a minimal historical and live data query.
 
-Local `validate_deployment.py` output is necessary but not sufficient evidence
-of live readiness.
+Local `validate_deployment.py` checks are required, but they do not establish
+live readiness.
 
 The supported live command is:
 
@@ -131,13 +131,14 @@ evidence use a seven-day maximum age. Streaming watermark,
 Eventhouse ingestion, and checkpoint evidence use a 30-minute maximum age.
 Pipeline and data evidence must match the exact triggered run or the retained
 successful deployment-journal step. Historical full-demo execution is baseline
-evidence only; current repairs require new live proof. Readiness correlates each model table's freshness with the pipeline
-that runs its producer notebook: because notebooks 07 (market-basket mining)
-and 10 (promotion/elasticity analysis) now also run inside `ml-required` to
-produce the required `product_recommendations` and `price_elasticity`
-outputs, the optional/experimental `product_associations` and `promotion_lift`
-outputs they produce in the same run are correlated with the `ml-required`
-window rather than the `ml-optional`/`ml-experimental` windows. The remaining
+evidence only; current repairs require new live verification.
+
+Readiness correlates each model table with the pipeline that runs its
+producer. Notebooks 07 (market-basket mining) and 10 (promotion/elasticity)
+run inside `ml-required` to produce `product_recommendations` and
+`price_elasticity`. Their additional `product_associations` and
+`promotion_lift` outputs therefore use the `ml-required` freshness window,
+even though those outputs are optional or experimental. The remaining
 [IMP-013](../../../requirements/modules/operations/backlog.md#imp-013) boundary
 includes a recent bounded stream that satisfies the three optional streaming
 checks, plus fresh changed-path readiness and cleanup/degradation validation.
@@ -294,7 +295,7 @@ Confirm whether the table exists in the Lakehouse. If it exists but SQL or
 Power BI cannot see it, run
 `python -m deploy.scripts.refresh_sql_endpoint --environment <env>`. If the
 table does not exist, run the owning setup/ML notebook or gate the dependent
-report surface; do not create placeholder business data.
+report page; do not create placeholder business data.
 
 ## Destructive actions
 
@@ -309,7 +310,7 @@ sleep.
 ## CI platform coverage
 
 `.github/workflows/tests.yml` keeps the full sharded Spark and Parquet/E2E
-paths on Linux. Windows runs its non-Spark suite **and** discovers real Spark
+paths on Linux. Windows runs its non-Spark suite and discovers real Spark
 expression smoke tests with `-m "spark and spark_no_filesystem"`. Current
 marked examples cover inventory replay/repair, delivery keyed as-of history,
 and truck lifecycle key pairing:
@@ -324,9 +325,10 @@ uses `SPARK_LOCAL_HOSTNAME=localhost`. This is non-filesystem execution;
 missing Windows `HADOOP_HOME`/`winutils` still prevents the local Parquet/E2E
 path. Do not describe Windows as excluding every Spark test.
 
-The parent reports these three examples passed locally on Windows with its
-session JDK 17. A separate generator selection passed 85 non-filesystem Spark
-tests; it is not the same selection as the representative Windows CI marker.
+The recorded local results include passes for these three examples on Windows
+with the session's JDK 17. A separate generator selection passed 85
+non-filesystem Spark tests; it is not the same selection as the representative
+Windows CI marker.
 The filename-discovery regression was fixed by marker selection, followed by
 18 passing workflow/pipeline tests. The changed hosted workflow, full Spark
 suite, and live Delta/Fabric execution still require their own evidence.

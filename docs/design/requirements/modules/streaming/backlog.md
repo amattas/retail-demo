@@ -14,7 +14,7 @@
   paths (including derived attribution), and four owned exceptions. Validation
   derives physical fields/types/nullability from authoritative sources; eight
   scenarios and a 23-event fixture set cover the acceptance matrix.
-- **Open external boundary:** Capture a live Fabric staging run through
+- **Remaining live validation:** Capture a Fabric staging run through
   Eventhouse, optional Silver/Gold projection, and Direct Lake. The
   non-mutating repository gate is `python scripts/check_data_contracts.py`.
 

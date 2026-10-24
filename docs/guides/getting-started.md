@@ -1,11 +1,9 @@
 # Getting started
 
-This guide creates a Microsoft Fabric Retail Demo workspace through the
-supported Fabric-native path. It takes you from a clean clone to historical
-Lakehouse data and an optional bounded Eventhouse stream.
-
-**Audience:** first-time operators, business analysts working with a technical
-partner, and entry-level developers.
+Follow this guide to deploy the demo, generate historical Lakehouse data,
+and optionally run a bounded Eventhouse stream. It is written for first-time
+operators, entry-level developers, and business analysts working with a
+technical partner.
 
 You do not need to know every Fabric term before starting. The
 [plain-language glossary](glossary.md) explains the products, data layers, and
@@ -40,7 +38,7 @@ Planning stays excluded because it needs fixed credentials and starts billing
 that cannot be cancelled. No profile deploys the destructive reset notebook or
 starts the long-running stream automatically.
 
-`standard` (no preview surfaces) and `core` (Lakehouse and the eleven historical
+`standard` (no preview features) and `core` (Lakehouse and the eleven historical
 setup notebooks only) are reduced inventories that you must select explicitly
 with `--profile`. See the
 [canonical workspace and profile inventory](workspace-inventory.md).
@@ -70,8 +68,8 @@ PowerShell-only workstation.
 ### Capacity and Spark choice
 
 The committed default disables the custom Spark pool. `core` and `standard`
-use the workspace starter pool. Only `full-demo` selects the source-defined custom pool. Before deployment,
-live preflight confirms that the chosen capacity is active and large enough
+use the workspace starter pool; `full-demo` selects the custom pool defined
+in source. Before deployment, live preflight confirms that the capacity is active and large enough
 for the requested Spark workers. The current full-demo minimum is F64.
 Reporting profiles require at least 18 months of history so that the report and
 machine-learning examples have enough seasonal context. Start with a small
@@ -116,18 +114,18 @@ Use this path for a first deployment.
     ./scripts/setup.sh --workspace-name retail-demo-alice
     ```
 
-The wrapper:
+The wrapper performs these steps:
 
-1. uses or creates a Python environment;
-2. checks Git, Terraform, and Azure CLI;
-3. installs `retail-setup`, version-locked Fabric libraries such as
+1. Uses or creates a Python environment.
+2. Checks Git, Terraform, and Azure CLI.
+3. Installs `retail-setup`, version-locked Fabric libraries such as
    `azure-identity`, `azure-kusto-data`, and `fabric-cicd`, plus the SQL
    connectivity package supported by the operating system. The complete pinned
-   package list is in `utility/requirements-deploy.txt`;
-4. runs interactive configuration;
-5. renders twelve workspace-specific notebooks: setup 01–11 plus
-   `stream-events.ipynb`;
-6. offers to deploy.
+   package list is in `utility/requirements-deploy.txt`.
+4. Runs interactive configuration.
+5. Renders twelve workspace-specific notebooks: setup 01–11 plus
+   `stream-events.ipynb`.
+6. Offers to deploy.
 
 On Windows and Linux, the locked dependency set includes `mssql-python` for
 live Lakehouse freshness verification. If Microsoft ODBC Driver 17 or 18 is
@@ -157,7 +155,7 @@ Useful bootstrap flags:
 | `--deploy` | Runs deploy after configure and render. |
 | `--dry-run` | Previews setup-engine commands; the wrapper may still prepare or activate Python first. |
 | `--skip-prereqs` | Skips package-manager installation of Git, Terraform, and Azure CLI. |
-| `--verbose` | Shows full command and package-install output. |
+| `--verbose` | Shows full package-install output; commands are printed in either mode. |
 | `--recreate` | Deploys in destructive clean-slate mode. |
 
 ### Manually managed Python environment
@@ -273,14 +271,21 @@ The command validates all substitutions before writing:
 12. `stream-events.ipynb`
 
 Output is written to `utility/out/<env>/`. The eleven setup notebooks are the
-historical path. In `setup-pipeline`, 02 (dimension validation), 03, 04, and 05 run in parallel after 01; 06, 07, and 08 run in parallel after 03; 09 waits for 03 to 06. Each notebook runs its own stages concurrently and hands outputs to later notebooks as `gen__*` tables in the Silver staging schema. Setup 10 checks invariants and publishes Silver atomically once 02 to 09 succeed. Setup 11 builds Gold inside `ml-required`, alongside model training, because both read only Silver.
-The stream notebook is optional and deployed separately.
+historical path. In `setup-pipeline`, notebooks 02 (dimension validation), 03,
+04, and 05 run in parallel after 01. Notebooks 06, 07, and 08 run in parallel
+after 03; 09 waits for 03 to 06. Each notebook runs its own stages concurrently
+and passes outputs to later notebooks as `gen__*` tables in the Silver staging
+schema.
+
+Setup 10 checks invariants and publishes Silver atomically once 02 to 09
+succeed. Setup 11 builds Gold inside `ml-required`, alongside model training,
+because both read only Silver. The optional stream notebook is deployed
+separately.
 
 Rendering also records the configured history end date. During deployment, the
 artifact builder uses that date to set the Power BI report's saved date filters
-to the latest generated month. This keeps a three-month setup, an eighteen-month
-setup, and a two-year setup aligned with their own data instead of a hard-coded
-calendar month.
+to the latest generated month, so the report opens on a period present in
+that deployment's data.
 
 ## 6. Preview and deploy
 
@@ -369,7 +374,7 @@ Before using the demo:
    tables, functions, mappings, and materialized views.
 6. For a Reporting profile, confirm the semantic model is bound to the intended
    Lakehouse before opening the report.
-7. Skip ML, ontology, agent, dashboard, or rule surfaces that have not passed
+7. Skip ML, ontology, agent, dashboard, or rule features that have not passed
    their separate readiness checks.
 
 Local `validate_deployment.py` output validates generated files, not live
@@ -396,8 +401,8 @@ kql_database = "retail_eventhouse"
 
 !!! warning "Do not leave the first run unbounded"
 
-    The source default is `run_seconds = 0`, which means “continue until
-    manually stopped.” Set a positive value such as `180` for the first run so
+    The source default is `run_seconds = 0`, which runs until manually
+    stopped. Set a positive value such as `180` for the first run so
     that the notebook stops after three minutes.
 
 Leaving `kusto_uri` blank makes the notebook resolve the KQL Query URI by
@@ -429,7 +434,7 @@ shortcuts, source tables, and watermarks are ready.
 - [Workspace and profile inventory](workspace-inventory.md): check exact
   counts, folders, support, and manual boundaries.
 - [Deployed walkthrough](deployed-walkthrough.md): tour the deployed assets.
-- [Presenter demo](demo-script.md): prepare a defensible presentation.
+- [Presenter demo](demo-script.md): prepare a presentation with checked evidence.
 - [Operations](operations.md): monitor freshness and recover failures.
 - [Security controls](../design/security/controls.md): review the shared-demo
   baseline.

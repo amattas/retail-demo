@@ -1,4 +1,4 @@
-"""Offline validation for generated deployment framework files."""
+"""Check generated deployment files without contacting Fabric."""
 
 from __future__ import annotations
 
@@ -10,15 +10,13 @@ import yaml
 from deploy.scripts import _output as console
 from deploy.scripts.deploy_config import DEPLOY_ROOT, load_environment
 
-# Placeholders that staged item definitions may legitimately contain. They are
-# resolved in-flight by fabric-cicd from parameter.yml at publish time (the
-# on-disk file keeps the placeholder), so a placeholder is only a problem when
-# parameter.yml has no resolving find_replace rule for the environment.
+# Staged files keep these markers until fabric-cicd substitutes them at publish
+# time. Each marker needs a find_replace rule for the selected environment.
 KNOWN_PLACEHOLDERS = ("FABRIC_KQL_DATABASE_RESOURCE_ID",)
 
 
 def _resolved_placeholders(parameter_path: Path, environment: str) -> set[str]:
-    """find_values in parameter.yml that have a replacement for this environment."""
+    """Return markers that parameter.yml can resolve for this environment."""
 
     if not parameter_path.exists():
         return set()
@@ -63,11 +61,6 @@ def validate_generated_files(deploy_root: Path, environment: str) -> list[str]:
             except yaml.YAMLError as exc:
                 errors.append(f"Invalid YAML in {yaml_path}: {exc}")
 
-    # A staged item may contain a placeholder (e.g. the queryset's KQL database
-    # id) as long as parameter.yml has a find_replace rule that resolves it for
-    # this environment — fabric-cicd performs the substitution at publish time.
-    # Only flag a placeholder that has no resolving rule, which would publish the
-    # literal placeholder string.
     workspace_dir = environment_root / "workspace"
     if workspace_dir.exists():
         resolved = _resolved_placeholders(parameter_path, environment)
@@ -89,7 +82,7 @@ def validate_generated_files(deploy_root: Path, environment: str) -> list[str]:
 def main() -> int:
     """Validate generated deployment files."""
 
-    parser = argparse.ArgumentParser(description="Validate deployment framework output")
+    parser = argparse.ArgumentParser(description="Check generated deployment files")
     parser.add_argument("--deploy-root", type=Path, default=DEPLOY_ROOT)
     parser.add_argument("--environment", required=True)
     args = parser.parse_args()
@@ -99,7 +92,7 @@ def main() -> int:
         for error in errors:
             console.error(error)
         return 1
-    console.info("Deployment framework validation passed")
+    console.info("Generated deployment files passed validation.")
     return 0
 
 

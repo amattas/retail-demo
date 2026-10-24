@@ -165,8 +165,8 @@ NOTEBOOK_GROUPS = {
         "14-ml-dynamic-pricing.ipynb",
     ],
     "ontology": ["30-create-ontology.ipynb"],
-    "setup": [],  # handled specially by stage_setup_notebooks — not fabric/lakehouse path
-    "stream": [],  # handled specially by stage_stream_notebooks — utility/out path
+    "setup": [],  # stage_setup_notebooks uses rendered notebooks, not fabric/lakehouse.
+    "stream": [],  # stage_stream_notebooks uses rendered notebooks in utility/out.
     "utility": ["90-augment-and-dedupe-receipts.ipynb"],
     "reset": ["99-reset-lakehouse.ipynb"],
 }
@@ -187,7 +187,7 @@ SETUP_NOTEBOOKS = [
 
 # The live streaming generator. Rendered alongside the setup notebooks (shares
 # the same {{TOKEN}} substitution) but staged under "Notebooks" and
-# deliberately NOT added to the setup pipeline — it runs continuously and is
+# kept out of the setup pipeline because it runs continuously and is
 # started/stopped manually.
 STREAM_NOTEBOOKS = [
     "stream-events",
@@ -507,9 +507,8 @@ def stage_setup_notebooks(
 ) -> list[Path]:
     """Stage rendered setup notebooks as Fabric .Notebook items.
 
-    The notebooks must already have been rendered by `retail-setup render` before
-    calling this function.  Raises FileNotFoundError if any expected notebook is
-    absent in the selected render directory.
+    Run `retail-setup render` first. Raise FileNotFoundError if an expected
+    notebook is missing from the selected render directory.
     """
 
     rendered_dir = rendered_dir or repo_root / "utility" / "out"
@@ -520,7 +519,7 @@ def stage_setup_notebooks(
     ]
     if missing:
         raise FileNotFoundError(
-            f"setup notebooks not rendered — run `retail-setup render` first "
+            f"setup notebooks not rendered; run `retail-setup render` first "
             f"(expected at {rendered_dir}): {missing}"
         )
 
@@ -543,12 +542,10 @@ def stage_stream_notebooks(
     kql_database_name: str = _DEFAULT_KQL_DATABASE_NAME,
     rendered_dir: Path | None = None,
 ) -> list[Path]:
-    """Stage the rendered streaming-generator notebook(s) as Fabric `.Notebook` items.
+    """Stage rendered stream notebooks as Fabric `.Notebook` items.
 
-    Like the setup notebooks, ``stream-events`` is rendered to
-    the selected render directory by ``retail-setup render`` before staging. It is the live
-    driver, so it publishes into the "Notebooks" folder and is never added to the
-    setup pipeline — it is started/stopped manually.
+    Run ``retail-setup render`` first. Publish ``stream-events`` to "Notebooks"
+    but keep it outside the setup pipeline: operators start and stop it manually.
     """
 
     rendered_dir = rendered_dir or repo_root / "utility" / "out"
@@ -559,7 +556,7 @@ def stage_stream_notebooks(
     ]
     if missing:
         raise FileNotFoundError(
-            f"stream notebooks not rendered — run `retail-setup render` first "
+            f"stream notebooks not rendered; run `retail-setup render` first "
             f"(expected at {rendered_dir}): {missing}"
         )
 

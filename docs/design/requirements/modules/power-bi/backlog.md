@@ -11,9 +11,9 @@
 ### ENH-006 - Improve usability, accessibility, and localization {#enh-006}
 
 - **Priority / effort:** Idea / M
-- **Outcome:** Latest-period defaults, drillthrough controls, alt text,
-  keyboard/mobile support, contrast, culture, currency, and forecast confidence
-  are intentionally designed.
+- **Outcome:** The report has latest-period defaults, drillthrough controls,
+  alt text, keyboard and mobile support, readable contrast, appropriate culture
+  and currency settings, and visible forecast confidence.
 
 ## Settled — do not reopen
 

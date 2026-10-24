@@ -1,7 +1,7 @@
 """Export Fabric DataPipeline items from a workspace into item folders.
 
-Thin wrapper over :mod:`deploy.scripts.export_items` for the common case of
-exporting Data Pipelines into ``fabric/pipelines/<name>.DataPipeline/``.
+Use :mod:`deploy.scripts.export_items` to write Data Pipelines to
+``fabric/pipelines/<name>.DataPipeline/``.
 
 Example:
     python -m deploy.scripts.export_pipelines \

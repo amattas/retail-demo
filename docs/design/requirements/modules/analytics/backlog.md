@@ -13,7 +13,7 @@
 
 ## Settled — do not reopen
 
-- Eventhouse owns the hot event path and KQL aggregations.
-- Lakehouse owns durable Silver/Gold history and Direct Lake consumption.
+- Eventhouse stores recent events and runs KQL aggregations.
+- Lakehouse stores durable Silver/Gold history for Direct Lake consumption.
 - Materialized-view and function names must match all querysets, dashboards,
   and rules.

@@ -1,4 +1,4 @@
-"""Validate live tenant and capacity prerequisites before Fabric mutation."""
+"""Check tenant and capacity prerequisites before changing Fabric resources."""
 
 from __future__ import annotations
 

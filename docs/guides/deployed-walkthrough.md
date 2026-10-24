@@ -1,12 +1,10 @@
 # Deployed solution walkthrough
 
-- **Audience:** Retail, analytics, and technology stakeholders
-- **Duration:** 3-5 minute orientation; 15-25 minutes for the full walkthrough
-- **Data:** Synthetic
-
-Use this guide for a browser-first tour of a deployed Microsoft Fabric Retail
-Demo workspace. It complements the [presenter demo](demo-script.md), which
-contains the detailed talk track and support boundaries.
+Use this browser tour to introduce a deployed workspace to retail, analytics,
+and technology teams. Allow 3-5 minutes for orientation or 15-25 minutes for
+the full walkthrough. All data is synthetic. The
+[presenter demo](demo-script.md) provides a detailed talk track and limits
+on what to claim.
 
 !!! note "Representative screenshots"
 
@@ -37,20 +35,18 @@ Open the workspace task flow and select the **Retail Demo** flow.
 
 ![Retail Demo workspace task flow](../assets/screenshots/workspace-task-flow.png)
 
-*The task flow groups ingestion, transformation, storage, semantic, ontology,
-ML, agent, operations-case preparation, and Fabric Apps assets into
-one workspace-level map. Required ML points into the
-Semantic Model; post-Reporting optional and experimental ML points out from it
-so those extensions are not presented as Reporting prerequisites.*
+*The task flow maps ingestion, transformation, storage, the semantic model,
+ontology, ML, agents, case preparation, and Fabric Apps. Required ML feeds the
+Semantic Model; optional and experimental ML follows Reporting.*
 
-Use the flow to explain three paths:
+Explain the paths through the flow:
 
-- **Historical:** load and transform deterministic retail history into the
+- Load and transform deterministic retail history into the
   Lakehouse.
-- **Live:** send typed retail events to Eventhouse and optionally project them
+- Send typed live events to Eventhouse and optionally project them
   into Lakehouse tables.
-- **Serving:** expose curated data through the semantic model, Power BI,
-  ontology, and data-agent surfaces.
+- Make curated data available through the semantic model, Power BI,
+  ontology, and Data Agents.
 
 The task flow is a navigation aid. It does not prove that a notebook, pipeline,
 or stream completed successfully.
@@ -75,16 +71,8 @@ to Analytics and AI.
 - A task-flow node or pipeline canvas is navigation context, not execution
   evidence.
 - Validate the selected data period before discussing any value.
-- Skip optional ontology, agent, ML, or live-streaming surfaces that have not
+- Skip optional ontology, agent, ML, or live-streaming features that have not
   passed their source, permission, and capability checks.
-
-## What to check during the walkthrough
-
-| What you open | What a ready workspace should show |
-| --- | --- |
-| Open the Retail Demo task flow | Historical, live, storage, semantic, ontology, ML, and agent tasks are visible. |
-| Open the Data platform guide | Pipeline, notebook, Lakehouse, and Eventhouse steps are available without analytics detail. |
-| Open the Analytics and AI guide | Ontology, agent, and report steps are available without implementation detail. |
 
 For a timed presentation, continue with the
 [presenter demo](demo-script.md) or a focused

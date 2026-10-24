@@ -3,32 +3,26 @@
     Windows bootstrap for the retail-demo guided setup.
 
 .DESCRIPTION
-    Prepares a Python environment for the guided setup, delegates to
-    scripts/setup.py, and then switches the shell back to the environment that
-    was active before the script ran.
+    Prepares Python, runs scripts/setup.py, and restores the original shell
+    environment when setup returns, including on failure.
 
     Environment selection order:
-      1. If conda is installed, use a conda environment named 'retail-demo'
-         (created with Python 3.13 when it does not exist) and activate it.
-      2. Otherwise, if a local virtual environment (.venv in the repo root)
-         exists, activate it; if it does not exist, create it from a suitable
-         system Python (3.11+) and activate it.
-      3. If conda is missing and no system Python is available to build a venv,
-         install Miniforge with winget and fall back to the conda path.
+      1. If Conda is installed, activate its 'retail-demo' environment.
+         Create it with Python 3.13 if it does not exist.
+      2. Otherwise, activate .venv in the repo root, or create it with an
+         available Python 3.11+ interpreter.
+      3. If neither Conda nor Python 3.11+ is available, install Miniforge
+         with winget and use its Conda environment.
 
-    Only Miniforge is installed here. The remaining CLI prerequisites
-    (git, terraform, az) are installed by scripts/setup.py using the OS package
-    manager (winget on Windows) unless --skip-prereqs is passed.
+    This wrapper installs only Miniforge. scripts/setup.py installs Git,
+    Terraform, and Azure CLI through the system package manager unless
+    --skip-prereqs is passed.
 
     All arguments are forwarded to scripts/setup.py, for example:
         ./scripts/setup.ps1 --workspace-name retail-demo-alice
         ./scripts/setup.ps1 --workspace-name retail-demo-alice --deploy
         ./scripts/setup.ps1 --workspace-name retail-demo-alice --dry-run
 
-.NOTES
-    The environment that is active when the script starts is captured up front
-    and restored when setup.py returns (even on failure), so running this script
-    leaves your shell on the environment you started from.
 #>
 
 [CmdletBinding()]
@@ -47,7 +41,6 @@ $MiniforgeVersion = '26.3.2-3'
 $VenvPath = Join-Path $RepoRoot '.venv'
 
 function Get-EnvSnapshot {
-    # Capture the current process environment so it can be restored on exit.
     $snapshot = New-Object System.Collections.Hashtable ([System.StringComparer]::OrdinalIgnoreCase)
     foreach ($entry in [System.Environment]::GetEnvironmentVariables('Process').GetEnumerator()) {
         $snapshot[[string]$entry.Key] = [string]$entry.Value
@@ -56,14 +49,13 @@ function Get-EnvSnapshot {
 }
 
 function Restore-EnvSnapshot {
-    # Switch the shell back to the captured environment: drop variables that were
-    # added (e.g. CONDA_PREFIX, VIRTUAL_ENV) and restore originals (e.g. PATH).
+    # Remove variables added during setup; restore values captured on entry.
     param([hashtable] $Snapshot)
     $currentKeys = @([System.Environment]::GetEnvironmentVariables('Process').Keys)
     foreach ($key in $currentKeys) {
         if (-not $Snapshot.ContainsKey([string]$key)) {
-            # Remove-Item truly deletes the variable; SetEnvironmentVariable($null)
-            # only blanks it on PowerShell, leaving an empty CONDA_PREFIX/VIRTUAL_ENV.
+            # SetEnvironmentVariable($null) leaves an empty variable in PowerShell.
+            # Remove-Item deletes it, which matters for CONDA_PREFIX/VIRTUAL_ENV.
             Remove-Item -LiteralPath ('Env:\' + [string]$key) -ErrorAction SilentlyContinue
         }
     }
@@ -113,7 +105,6 @@ function Resolve-Conda {
 }
 
 function Resolve-SystemPython {
-    # Find a system Python (3.11+) suitable for creating a virtual environment.
     foreach ($name in @('python', 'python3')) {
         $cmd = Get-Command $name -CommandType Application -ErrorAction SilentlyContinue |
             Select-Object -First 1
@@ -137,7 +128,7 @@ function Resolve-SystemPython {
 
 function Install-Miniforge {
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-        throw 'winget is not available. Install Python 3.11+ or Miniforge manually, then re-run.'
+        throw 'winget is not available. Install Python 3.11+ or Miniforge, then run setup again.'
     }
     Write-Host 'Installing Miniforge with winget...'
     winget install --id CondaForge.Miniforge3 -e `
@@ -149,7 +140,7 @@ function Install-Miniforge {
     }
     $conda = Resolve-Conda
     if (-not $conda) {
-        throw 'Miniforge install completed but conda was not found. Open a new shell and re-run.'
+        throw 'Miniforge installed, but Conda was not found. Open a new shell and run setup again.'
     }
     return $conda
 }
@@ -171,13 +162,12 @@ function Test-CondaEnvExists {
 }
 
 function Enable-CondaEnv {
-    # Create the named environment if missing, then activate it in this process.
     param([string] $Conda, [string] $EnvName)
     if (Test-CondaEnvExists -Conda $Conda -EnvName $EnvName) {
-        Write-Host "Using existing conda environment '$EnvName'."
+        Write-Host "Using Conda environment '$EnvName'."
     }
     else {
-        Write-Host "Creating conda environment '$EnvName' (Python $CondaPythonVersion)..."
+        Write-Host "Creating Conda environment '$EnvName' (Python $CondaPythonVersion)..."
         & $Conda create -n $EnvName "python=$CondaPythonVersion" -y | Out-Host
         if ($LASTEXITCODE -ne 0) {
             throw "Conda environment creation failed (exit code $LASTEXITCODE)."
@@ -196,7 +186,6 @@ function Enable-CondaEnv {
 }
 
 function Enable-Venv {
-    # Activate a local virtual environment in this process.
     param([string] $Path)
     $activate = Join-Path $Path 'Scripts\Activate.ps1'
     if (-not (Test-Path $activate)) {
@@ -205,8 +194,7 @@ function Enable-Venv {
     & $activate
 }
 
-# Remember the environment that is active right now so we can switch back to it
-# once the guided setup finishes (or fails).
+# Restore this environment even if setup fails.
 $originalEnv = Get-EnvSnapshot
 $exitCode = 1
 try {
@@ -214,18 +202,15 @@ try {
     $conda = Resolve-Conda
 
     if ($conda) {
-        # 1) Conda is installed: use (or create) the 'retail-demo' environment.
         Enable-CondaEnv -Conda $conda -EnvName $CondaEnvName
         $python = Join-Path $env:CONDA_PREFIX 'python.exe'
     }
     elseif (Test-Path (Join-Path $VenvPath 'Scripts\Activate.ps1')) {
-        # 2a) No conda, but a local virtual environment already exists: use it.
-        Write-Host "Using existing virtual environment at $VenvPath."
+        Write-Host "Using virtual environment at $VenvPath."
         Enable-Venv -Path $VenvPath
         $python = Join-Path $VenvPath 'Scripts\python.exe'
     }
     else {
-        # 2b) No conda and no venv yet: build one from a suitable system Python.
         $systemPython = Resolve-SystemPython
         if ($systemPython) {
             Write-Host "Creating virtual environment at $VenvPath (using $systemPython)..."
@@ -234,8 +219,7 @@ try {
             $python = Join-Path $VenvPath 'Scripts\python.exe'
         }
         else {
-            # 3) No conda and no Python to build a venv: install Miniforge.
-            Write-Host 'No conda and no suitable Python found; bootstrapping with Miniforge.'
+            Write-Host 'Python 3.11+ and Conda were not found. Installing Miniforge.'
             $conda = Install-Miniforge
             Enable-CondaEnv -Conda $conda -EnvName $CondaEnvName
             $python = Join-Path $env:CONDA_PREFIX 'python.exe'

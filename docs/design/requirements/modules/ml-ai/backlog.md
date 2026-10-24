@@ -20,8 +20,8 @@
   (`d60c1ef9-fafc-4500-84d6-48f6d54d00d5`,
   `c4cc969c-eaee-410a-9e66-84ac1672ccaa`,
   `28e32f8c-d4d4-45cc-96ab-aae5509160fb`). Temporary probe items were deleted.
-  The shipped UI uses a separate OA workload endpoint. The publisher now
-  scripts that endpoint and live readback verifies one KQL source plus the
+  The Fabric UI uses a separate OA workload endpoint. The publisher calls
+  that endpoint, and live readback verifies one KQL source plus the
   `prepare-replenishment-case` Notebook action with `CASE_ID`.
 - Scripted playbook generation reaches the same UI endpoint but is not accepted
   yet. `RetailOntology_AutoGen` now contains the live `StockoutRisk` entity,
@@ -39,14 +39,14 @@
   Planning connections. Native Plan acceptance applies only to environments
   whose policies permit its documented prerequisites.
 - Configure and accept native approvals/SQL writeback in-product before any
-  simulated execution bridge is added. No real ERP execution is in scope.
+  simulated execution bridge is added. Real ERP execution is outside scope.
 
 ### ENH-003 - Ground semantic-model agents and gate ontology agents {#enh-003}
 
 - **Priority / effort:** Idea / M
 - **Outcome:** Agents have business descriptions, synonyms, safe-use
   instructions, approved questions, and capability-aware rebinding.
-- **Preserved unresolved findings:** Re-test named-entity and multi-hop
+- **Remaining validation:** Re-test named-entity and multi-hop
   ontology questions with explicit property names and decomposition guidance.
   Older raw response logs are not current proof: empty filtered joins,
   translation errors, latency, and Eventhouse-bound aggregation need fresh
@@ -63,8 +63,8 @@
 - **Priority / effort:** Idea / L
 - **Outcome:** Every prediction includes model lineage, intended-use limits,
   feature evidence, calibration, and prediction-versus-outcome diagnostics.
-- **Preserved quality concern:** Validate market-basket coverage/diversity,
-  not just nonempty output; bounded product selection can concentrate rules.
+- **Quality check:** Validate market-basket coverage and diversity as well as
+  nonempty output. Bounded product selection can concentrate rules.
 
 ### ENH-010 - Migrate the ontology to the new TMDL experience {#enh-010}
 
@@ -136,7 +136,7 @@
   tool integration is an optional alternative, not a replacement. See
   [Consume a Data Agent in Microsoft 365 Copilot](https://learn.microsoft.com/fabric/data-science/data-agent-microsoft-365-copilot).
 
-### Decision experience acceptance — REQ-MLAI-005
+### Decision experience acceptance: REQ-MLAI-005
 
 - A Fabric Apps spike in `app/fabric-app` stores proposals and append-only
   reviewer decisions in a Fabric SQL database. It uses Fabric SSO

@@ -1,4 +1,4 @@
-"""Fail-closed deployment-profile preflight before Fabric mutation."""
+"""Reject invalid deployment profiles before changing Fabric resources."""
 
 from __future__ import annotations
 
@@ -486,7 +486,9 @@ def _configured_kql_scripts(repo_root: Path) -> list[str]:
 def main() -> int:
     """Validate the configured profile without mutating Fabric."""
 
-    parser = argparse.ArgumentParser(description="Validate deployment profile preflight")
+    parser = argparse.ArgumentParser(
+        description="Check deployment profiles and local prerequisites"
+    )
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT)
     parser.add_argument("--environment", required=True)
     parser.add_argument("--recreate", action="store_true")

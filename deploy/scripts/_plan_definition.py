@@ -1,4 +1,4 @@
-"""Render the offline, human-governed retail workbook as native PlanV1 parts."""
+"""Render the local retail planning workbook as native PlanV1 parts."""
 
 from __future__ import annotations
 

@@ -2,10 +2,9 @@
 
 ## Open
 
-- Remote Terraform backend support/coordination and distributed
-  cross-pipeline/manual-writer serialization remain separate design and
-  validation work. Environment-local files and a pipeline's `concurrency = 1`
-  are not substitutes for those controls.
+- Remote Terraform state coordination and serialization across pipelines and
+  manual writers still need design and validation. Environment-local files
+  and a pipeline's `concurrency = 1` do not provide those controls.
 
 ### IMP-001 - Verify alternate authentication and target selection {#imp-001}
 
@@ -33,16 +32,17 @@
   Terraform, KQL, pipelines, Reporting, agents, task flow, dry-run output, and
   journals use that exact selection. Local and live preflight fail on blockers,
   source gaps, unsafe downgrades, disabled tenant switches, and unsuitable
-  capacities before mutation. Core is preview-free and excludes Reporting. Standard/full use an
-  exact-run required ML gate and two-phase Reporting publication; their prior
+  capacities before changing resources. Core is preview-free and excludes
+  Reporting. Standard/full use an exact-run required ML gate and two-phase
+  Reporting publication; their prior
   `IMP-008` blockers are removed. Full-demo validates preview and capacity
   prerequisites through documented read-only Fabric APIs. A live full-demo run
   has proven tenant/capacity preflight, required Reporting, post-ontology
   publication, and fail-closed readiness.
 - **Remaining outcome:** Live runs must still prove core completion without
   previews and the standalone standard Reporting profile. Prior full-demo
-  evidence is a baseline; changed isolation, resume, saved-plan safeguards,
-  staging, and readiness need fresh integrated and live proof.
+  evidence is a baseline. Changes to isolation, resume, saved-plan safeguards,
+  staging, and readiness need fresh integrated and live verification.
 - **Acceptance:** A tenant without previews can complete the default profile,
   while optional profiles fail preflight before partial publication. Exact
   local inventory, selection, live prerequisite, blocker, and ordering clauses

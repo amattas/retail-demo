@@ -32,13 +32,13 @@ The supported deployment shall produce a usable Fabric workspace with the
 required Lakehouse, Eventhouse/KQL database, notebooks, pipelines, semantic
 model, report, and configured optional assets.
 
-**Acceptance:** Post-deploy checks verify live workspace items and a minimal data
-flow, not only local staging files.
+**Acceptance:** Post-deploy checks verify live workspace items and a minimal
+data flow. Local staging checks alone are insufficient.
 
 ### REQ-CORE-005 - Truthful capability labels
 
 Documentation and demo scripts shall distinguish implemented, optional, manual,
 preview, and proposed capabilities.
 
-**Acceptance:** Every highlighted scenario has a current source artifact,
+**Acceptance:** Each presented scenario has a current source artifact,
 required setup step, and known limitation or backlog link.

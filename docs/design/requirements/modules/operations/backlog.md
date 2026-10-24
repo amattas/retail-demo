@@ -5,8 +5,8 @@
 ### IMP-013 - Prove runtime readiness and publish freshness lineage {#imp-013}
 
 - **Priority / effort:** P2 / L
-- **Outcome:** Post-publish tests and one operator surface prove live workspace
-  usability and freshness.
+- **Outcome:** Post-publish tests and a single operator view establish live
+  workspace usability and data freshness.
 - **Acceptance:** A successful deployment validates required items, bindings,
   KQL objects, schedules, pipeline execution, and freshness signals.
 - **Implemented locally:** `retail-setup verify` and
@@ -25,10 +25,10 @@
   definitions and bindings, exact setup/ML runs, Lakehouse SQL access,
   Reporting, ontology, Data Agents, and task flow. SQL endpoint metadata was
   synchronized for every returned table.
-- **Remaining live boundary:** Revalidate the current remediation's required
+- **Remaining live validation:** Revalidate the current changes' required
   readiness, cleanup-warning aggregation, batch/ML/Reporting, ontology,
-  agents, and task flow. No fresh live deployment occurred in this repair
-  session. Execute the consistency SQL against the live Fabric SQL endpoint.
+  agents, and task flow. Prior live runs do not validate these changes.
+  Execute the consistency SQL against the live Fabric SQL endpoint.
   Also start a bounded `stream-events` run and retain
   recent Silver watermark, Eventhouse ingestion, and checkpoint-identity
   evidence. These three checks are optional because streaming is intentionally
@@ -36,8 +36,8 @@
 - **Local runtime boundary:** Actual inventory, delivery as-of, and truck
   lifecycle expressions passed on local Windows; the Windows CI job now
   includes those three non-filesystem Spark tests. Full Spark/Parquet/E2E
-  coverage remains on Linux, not an unimplemented promise of Windows
-  filesystem support. Changed hosted CI, live Delta `MERGE`, and Fabric
+  coverage remains on Linux; Windows filesystem support is not implemented.
+  Changes to hosted CI, live Delta `MERGE`, and Fabric
   failure/recovery still require separate proof.
 
 ### ENH-008 - Use more platform-native monitoring and governance {#enh-008}
@@ -45,7 +45,7 @@
 - **Priority / effort:** Idea / M
 - **Outcome:** Fabric workspace/Eventhouse monitoring, Monitoring Hub,
   governance, catalog, labels, and Purview/DLP touchpoints are part of the
-  operator story.
+  operator workflow.
 
 ## Settled — do not reopen
 

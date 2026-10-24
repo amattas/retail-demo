@@ -1,13 +1,10 @@
-"""Lightweight retry for transient deploy failures.
+"""Retry transient deployment failures with exponential backoff.
 
-A *cold* ``az account get-access-token`` call intermittently times out (surfacing
-as ``ClientAuthenticationError`` / ``CredentialUnavailableError``, or
-``KustoAuthenticationError`` for the Kusto SDK), and Fabric / Power BI REST calls
-occasionally return a transient 5xx/429 or drop the connection. ``retry_call``
-re-attempts a callable a few times with exponential backoff so a single transient
-failure doesn't abort a deploy.
+Azure token requests can time out. Fabric and Power BI requests can return
+429/5xx responses or lose their connection. ``retry_call`` retries the selected
+exceptions with increasing delays.
 
-The ``sleep`` hook is injectable so tests run without real delays.
+Tests can replace the ``sleep`` hook to avoid real delays.
 """
 
 from __future__ import annotations

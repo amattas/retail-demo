@@ -1,20 +1,19 @@
 # Workspace and profile inventory
 
-This guide is the canonical human-readable inventory for the deployed
-workspace. Use it when you need exact profile contents or item counts. If you
-only need to understand what the demo does, start with
+Use this guide for exact profile contents and item counts. For an overview
+of what the demo does, start with
 [Use cases](use-cases.md) or the
 [plain-language glossary](glossary.md).
 
-`contracts/retail-demo.json` owns the stable IDs, descriptions, support status,
+`contracts/retail-demo.json` defines stable IDs, descriptions, support status,
 source pointers, profiles, boundaries, prerequisites, commands, paths, ML tiers,
 publication expectations, and readiness taxonomy. It is currently manifest
 version `1.4.0`.
 
 Physical fields, tables, notebook bodies, pipeline bodies, and the Tabular
 Model Definition Language (TMDL) files for Power BI remain in their
-authoritative sources. Automated contract tests derive those inventories so
-that this guide does not become a second, outdated schema definition.
+authoritative sources. Contract tests derive inventories from those sources
+and check the counts in this guide.
 
 <!-- manifest-contract:canonical-commands -->
 ## Canonical commands
@@ -70,8 +69,8 @@ The logical asset selections are:
 
 `core` uses only core assets. `standard` adds optional assets but no preview
 assets. `full-demo` adds preview task-flow, ontology, Data Agent, and custom-pool
-assets. Dashboard templates and Activator rule definitions are manual source
-assets, not fabricated publishable items. No profile selects the destructive
+assets. Dashboard templates and Activator rule definitions are reference
+source files, not items published by deployment. No profile selects the destructive
 reset group, starts the long-running stream, or enables a schedule.
 
 The Reporting profiles publish infrastructure first, wait for setup and the
@@ -105,15 +104,15 @@ children remain with their parents. See the
 <!-- manifest-contract:data-counts -->
 ## Data, event, and model inventory
 
-Source-derived current counts are:
+The source defines these counts:
 
-- historical Lakehouse: **36 tables** — **7 dimensions**, **19 facts**, and
-  **10 Gold aggregates**;
-- live events: **18 emitted business event types** and **19 KQL event tables**,
-  where `unknown_event` is the non-emitted operational catch-all;
-- active Direct Lake semantic model: **42 tables** — the 36 historical tables
-  plus the 6 required ML outputs;
-- data/event registry: 3 data contracts, 19 declared paths, and 4 intentional
+- Historical Lakehouse: **36 tables**, comprising **7 dimensions**, **19 facts**,
+  and **10 Gold aggregates**.
+- Live events: **18 emitted business event types** and **19 KQL event tables**.
+  The extra table, `unknown_event`, is a non-emitted operational catch-all.
+- Active Direct Lake semantic model: **42 tables**, comprising the 36
+  historical tables and 6 required ML outputs.
+- Data/event registry: 3 data contracts, 19 declared paths, and 4 intentional
   exceptions.
 
 For exact table and event definitions, see the
@@ -138,7 +137,7 @@ semantic model.
 <!-- manifest-contract:readiness -->
 ## Readiness contract
 
-The verifier produces a stable, structured readiness report that covers:
+The readiness report covers:
 
 - the intended workspace and resource IDs;
 - the selected item inventory;

@@ -2,10 +2,10 @@
 
 ## Authority
 
-`utility/src/retail_setup/generation/schemas.py` is the authoritative base
-Lakehouse table/column/type contract. `engine.py` owns orchestration,
-`invariants.py` owns cross-table validation, `writer.py` owns publication, and
-`gold.py` owns the ten aggregate outputs.
+`utility/src/retail_setup/generation/schemas.py` defines the base Lakehouse
+tables, columns, and types. `engine.py` orchestrates generation,
+`invariants.py` validates relationships across tables, `writer.py` publishes
+outputs, and `gold.py` builds the ten aggregates.
 
 ## Base Silver output
 
@@ -108,20 +108,21 @@ setup notebook that runs it:
 | `setup-09-attribute-marketing` | last-touch attribution | setup-03 to 06 |
 | `setup-10-publish-silver` | invariants and atomic Silver publication | setup-02 to 04, 06 to 09 |
 
-`setup-pipeline` draws this graph at notebook granularity (a test keeps the
-pipeline and the stage graph identical), so independent notebooks run in their
-own Spark sessions at the same time. At most six run at once, which stays
-within the session concurrency the capacity sizing reserves for required ML.
+`setup-pipeline` follows the same dependency graph at notebook level; a test
+checks that the two graphs agree. Independent notebooks run in separate
+Spark sessions. At most six run at once, within the session concurrency that
+capacity sizing reserves for required ML.
 Setup-10 runs its invariant checks and per-table staging, validation, and
 promotion concurrently; every phase still completes for all tables before the
-next starts, and any promotion failure rolls back every table. Gold
-(`setup-11-build-gold`) runs in `ml-required` alongside model training, sharing a
-lane with customer segmentation so that pipeline also stays within six sessions.
-Inside a notebook, ready stages run concurrently (up to six); a stage writes
+next starts, and any promotion failure rolls back every table.
+
+Gold (`setup-11-build-gold`) runs in `ml-required` alongside model training.
+It shares a lane with customer segmentation, keeping that pipeline within
+six sessions.
+Inside a notebook, up to six ready stages run concurrently. A stage writes
 its own outputs one after another so related cached plans are never built
-concurrently. Completion order and the
-notebook split never change the output; a test compares the notebook path with
-single-session `generate_all` row for row.
+concurrently. Completion order and the notebook split do not change the output;
+a test compares the notebook path with single-session `generate_all` row for row.
 
 Stage outputs that a later notebook needs are written as `gen__<stage>__<output>`
 Delta tables in the Silver staging schema. Each records the generation
@@ -131,9 +132,10 @@ single-handoff facts directly from their handoffs and drops every handoff only
 after publication succeeds, so a failed publication can be retried without
 regenerating. Within a notebook, other stage frames are checkpointed under
 `Files/setup/_checkpoints/<notebook>` in the Lakehouse rather than on
-executors, so autoscaling or a lost executor cannot drop data a later step
-needs. `generate_all` (local tests) runs the whole graph in one session with
-the same checkpoints, which stay on the executors when no folder is given.
+executors. Later steps therefore do not depend on an executor's local data
+surviving autoscaling or executor loss. `generate_all` (local tests) runs the
+whole graph in one session with the same checkpoints, which stay on the
+executors when no folder is given.
 
 Generation output never depends on Spark partitioning, so each notebook sizes
 `spark.sql.shuffle.partitions` to the configured receipt-line volume (about
@@ -185,8 +187,7 @@ configuration, and date window.
 
 ### Inventory feedback and unfulfilled demand
 
-Every selling store/SKU participates in inventory-position replenishment,
-not only a daily top-five cohort. The chronological policy learns from past
+The replenishment policy covers every selling store/SKU. It learns from past
 attempted demand, considers on-hand and pending deliveries/accepted restocks,
 and orders case-pack quantities against coverage and safety-stock targets.
 Opening stock is seeded independently of future transactions. Deterministic
@@ -266,10 +267,9 @@ Current invariant checks include:
 - returns posted strictly after the originating sale (never same-day);
 - product lifecycle dates present (no degenerate lifecycles).
 
-Shared live/batch business invariants — operating hours, product launch
-eligibility, return timing, lifecycle presence, and validated profile controls —
-are enforced in
-`utility/src/retail_setup/generation/invariants.py`.
+`utility/src/retail_setup/generation/invariants.py` enforces the shared
+live/batch invariants: operating hours, product launch eligibility, return
+timing, lifecycle presence, and validated profile controls.
 
 ## Naming compatibility
 
@@ -302,7 +302,7 @@ chronological ML splits.
 ## Removed active-path behavior
 
 Local FastAPI control, DuckDB persistence, parquet export, Blob upload, Event
-Hubs, outbox, dead-letter queue (DLQ), and Prometheus surfaces are not part of
+Hubs, outbox, dead-letter queue (DLQ), and Prometheus services are not part of
 the supported Fabric-native contract.
 
 ## Verification

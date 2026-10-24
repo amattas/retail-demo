@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Guided cross-platform setup for the retail-demo workspace.
 
-This script intentionally uses only the Python standard library so it can run
+This script uses only the Python standard library so it can run
 before project dependencies are installed.
 """
 
@@ -67,9 +67,7 @@ DEFAULT_PROFILE = next(
     if profile.default
 )
 
-# Set from --verbose in main(). When False, routine commands print a short,
-# plain-language progress line instead of the raw command. The raw command is
-# always shown if a step fails, so troubleshooting never loses information.
+# --verbose controls pip output; command lines are always printed.
 VERBOSE = False
 
 
@@ -94,7 +92,7 @@ def _divider(char: str = "-", *, width: int = 72) -> None:
 
 
 def _banner(lines: list[str]) -> None:
-    """Print a boxed title block."""
+    """Print the setup title and steps."""
 
     width = 60
     _emit("=" * width)
@@ -234,7 +232,7 @@ def detect_package_manager(system: str | None = None) -> PackageManager | None:
 
 
 def prerequisites() -> dict[str, str]:
-    """Command-line tools the setup flow needs, with plain-language reasons."""
+    """Return required command-line tools and why setup needs them."""
 
     return {
         prerequisite.check_command[0]: (
@@ -271,7 +269,7 @@ def run_command(
     capture_stderr: bool = False,
     environment_overrides: dict[str, str] | None = None,
 ) -> None:
-    """Run a subprocess linearly with a clear divider and command label."""
+    """Print a command and its label, then run it unless this is a dry run."""
 
     _ = interactive
     rendered = " ".join(command)
@@ -317,13 +315,13 @@ def _run_inherit(
             _emit(f"    (command: {rendered})")
         raise SystemExit(
             f"Required program not found: {command[0]}. "
-            "Install it and make sure it is on your PATH, then re-run setup."
+            "Install it and make sure it is on PATH, then run setup again."
         ) from None
     except subprocess.CalledProcessError as exc:
         if not show_raw:
             _emit(f"    (command: {rendered})")
         raise CommandFailed(
-            f"That step failed (exit code {exc.returncode}). Command: {rendered}",
+            f"Command failed (exit code {exc.returncode}). Command: {rendered}",
             stderr=exc.stderr or "",
         ) from None
 
@@ -362,20 +360,20 @@ def install_prerequisites(
         return
 
     descriptions = prerequisites()
-    _emit("These required tools aren't installed yet:")
+    _emit("Missing required tools:")
     for command in missing:
         _emit(f"  - {descriptions[command]}")
 
     if package_manager is None:
         _emit("")
-        _emit("Couldn't find a package manager to install them automatically.")
-        _emit("Please install the tools listed above, then re-run setup.")
+        _emit("No supported package manager found.")
+        _emit("Install the tools listed above, then run setup again.")
         return
 
     if not assume_yes and not prompt_yes_no(
         f"Install them now with {package_manager.name}?", default=True
     ):
-        _emit("Skipping - install the tools above yourself, then re-run setup.")
+        _emit("Installation skipped. Install the listed tools, then run setup again.")
         return
 
     for command in missing:
@@ -405,18 +403,17 @@ def current_python_env() -> PythonEnv:
 
 
 def _pip_flags() -> list[str]:
-    """Quiet pip in normal runs; let it be loud under --verbose.
+    """Keep pip output brief unless --verbose is set.
 
-    ``-q`` drops pip's per-package "Collecting/Downloading/Installing" chatter and
-    progress bars while still surfacing warnings and errors. ``--verbose`` keeps
-    the full output for troubleshooting.
+    ``-q`` hides routine package progress while retaining warnings and errors.
+    ``--verbose`` keeps the full pip output for troubleshooting.
     """
 
     return [] if VERBOSE else ["-q", "--progress-bar", "off"]
 
 
 def install_python_dependencies(env: PythonEnv, *, dry_run: bool) -> None:
-    _emit("Installing the Python packages the demo needs (this can take a minute).")
+    _emit("Installing the Python packages required by the demo.")
     flags = _pip_flags()
     run_command(
         [
@@ -560,8 +557,8 @@ def ensure_azure_login(
         if not windows or not broker_key_error:
             raise
         _emit(
-            "Windows account broker key storage failed. Retrying once with "
-            "browser-based Azure sign-in (no global CLI settings or caches changed)."
+            "Windows account broker key storage failed. Retrying sign-in once "
+            "in the browser. Global CLI settings and caches are unchanged."
         )
         browser_environment = {"AZURE_CORE_ENABLE_BROKER_ON_WINDOWS": "false"}
         run_command(
@@ -603,7 +600,7 @@ def run_retail_setup(
     run_command(
         [str(env.python), "-m", "retail_setup.cli.main", "render", "--env", deploy_env],
         dry_run=dry_run,
-        label="Preparing the notebooks and scripts",
+        label="Rendering workspace notebooks",
     )
 
     _section(4, 4, "Deploying to Microsoft Fabric (optional)")
@@ -617,7 +614,7 @@ def run_retail_setup(
         login_environment = ensure_azure_login(deploy_env, dry_run=dry_run)
         if not dry_run:
             _emit("")
-            _emit("Starting deploy. Each command prints below its own divider.")
+            _emit("Starting deployment.")
         deploy_command = [
             str(env.python),
             "-m",
@@ -638,7 +635,7 @@ def run_retail_setup(
         )
     else:
         _emit("")
-        _emit("Skipping deploy for now. When you're ready:")
+        _emit("Deployment skipped. Run it later with:")
         _emit("  retail-setup deploy --env " + deploy_env)
         _emit(f"  Docs: {DOCS_URL}")
 
@@ -668,28 +665,30 @@ def parse_args() -> argparse.Namespace:
         "--yes", action="store_true", help="Accept setup prompts with defaults."
     )
     parser.add_argument(
-        "--deploy", action="store_true", help="Run deploy after configure/render."
+        "--deploy",
+        action="store_true",
+        help="Deploy after configuring the workspace and rendering notebooks.",
     )
     parser.add_argument(
         "--recreate",
         action="store_true",
-        help="Destroy and recreate the workspace during deploy (clean slate).",
+        help="Destroy the workspace and all its items, then recreate it during deployment.",
     )
     parser.add_argument(
         "--skip-prereqs",
         action="store_true",
-        help="Skip OS package-manager prerequisite installation.",
+        help="Skip installing command-line tools with the system package manager.",
     )
     parser.add_argument(
         "--verbose",
         action="store_true",
-        help="Show the exact commands being run (more detail).",
+        help="Show full package-install output.",
     )
     return parser.parse_args()
 
 
 def _run_guided(args: argparse.Namespace) -> int:
-    """Run the four guided setup steps (under the console when one is active)."""
+    """Run the four guided setup steps."""
     workspace_name = args.workspace_name
     if not workspace_name:
         if args.yes or args.dry_run:
@@ -701,9 +700,9 @@ def _run_guided(args: argparse.Namespace) -> int:
 
     _banner(
         [
-            "Retail Demo - Guided Setup",
+            "Retail Demo setup",
             "",
-            "This gets the demo running in a few steps:",
+            "Setup steps:",
             "  1. Check the required tools (Git, Terraform, Azure CLI)",
             "  2. Install the Python packages",
             "  3. Configure the project",
@@ -716,9 +715,9 @@ def _run_guided(args: argparse.Namespace) -> int:
     _emit(f"Manifest:    {BOOTSTRAP_MANIFEST.version}")
     _emit(f"Project:     {REPO_ROOT}")
     if not args.verbose:
-        _emit("Tip: add --verbose to see the exact commands being run.")
+        _emit("Add --verbose for full package-install output.")
     if args.dry_run:
-        _emit("Dry run: showing what would happen without making changes.")
+        _emit("Dry run: printing commands without running them.")
 
     total = 4
     if not args.skip_prereqs:

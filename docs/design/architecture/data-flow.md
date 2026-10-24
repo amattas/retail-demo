@@ -62,9 +62,8 @@ flowchart LR
     Stream -->|Spark Kusto connector| Event --> Views --> Query
 ```
 
-The Spark Kusto connector groups Spark rows and writes them into Eventhouse
-KQL tables. It is the direct connection between the optional stream notebook
-and Fabric's real-time store.
+The Spark Kusto connector writes groups of rows from the optional stream
+notebook directly to Eventhouse KQL tables.
 
 `unknown_event` is a KQL catch-all table, not a generated business event type.
 
@@ -83,10 +82,10 @@ flowchart LR
 ```
 
 This path uses `ag._watermarks`. Its committed pipeline schedule is disabled.
-Its streaming-only `fact_online_order_status` output is explicitly inventoried:
-the Silver notebook owns its schema and routes, the manifest owns its terminal
-exception, and the Delta maintenance notebook includes the table.
-The same maintenance inventory owns the `ag._watermarks` control table.
+The Silver notebook defines the schema and routes for the streaming-only
+`fact_online_order_status` table. The manifest records its downstream exception,
+and Delta maintenance includes it in the table inventory.
+That inventory also includes the `ag._watermarks` control table.
 
 ## Consumption
 
@@ -103,7 +102,7 @@ flowchart LR
 
 ## Operational state
 
-Source evidence remains distributed across:
+Operational evidence comes from:
 
 - `setup_run_log`
 - `ag._watermarks`

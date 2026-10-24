@@ -1,15 +1,14 @@
 """Render the retail ontology as a new-experience (TMDL) Fabric definition.
 
-The definition is generated from the authoritative physical contracts rather
-than inspected at runtime:
+Generate the definition from the authoritative physical contracts:
 
 * Silver tables: ``retail_setup.generation.schemas.TABLES``;
 * Gold ML outputs: ``ml_contracts`` in ``contracts/retail-demo.json``;
 * Bronze event tables: ``fabric/kql_database/01-create-tables.kql``, exposed to
   the Lakehouse SQL endpoint through the ``cusn`` Eventhouse shortcuts.
 
-Everything here is pure: callers supply the Lakehouse SQL endpoint, its
-database ID, and the Bronze tables that exist. Format reference:
+This module makes no service calls. Callers supply the Lakehouse SQL endpoint,
+its database ID, and the available Bronze tables. Format reference:
 https://learn.microsoft.com/rest/api/fabric/articles/item-management/definitions/ontology-definition
 """
 
