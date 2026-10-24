@@ -1,9 +1,10 @@
 # Connected retail operational twins
 
-This specification owns `REQ-OPS-005`: a read-only, SSO-backed operational
-model of stores, a warehouse/distribution center, and trucks. It is a native
-Power BI report on the existing Fabric semantic model, **not** a deployment
-of the native Digital Twin Builder, Planning, or Operations Agent products.
+This specification defines `REQ-OPS-005`: read-only views of stores, a
+warehouse/distribution center, and trucks, using single sign-on (SSO).
+The implementation is a native Power BI report on the existing Fabric
+semantic model. It does not deploy Digital Twin Builder, Planning, or
+Operations Agent products.
 
 ## Components and scope
 
@@ -23,8 +24,9 @@ flowchart LR
 ```
 
 The pilot includes one recorded DC, two trucks, up to five connected stores,
-and up to twenty products found in their actual cargo records. Fewer observed
-products are reported honestly; no extra SKUs or route links are fabricated.
+and up to twenty products found in their cargo records. If fewer products
+are observed, the report shows that smaller set without inventing SKUs or
+route links.
 The model has no new physical geometry, GPS, temperature, driver assignments,
 reservations, or warehouse-bin data.
 
@@ -37,8 +39,9 @@ observation time, with a fourteen-day lookback. Discovery reads at most
 When a bound is exceeded, the cohort keeps the newest rows. It drops every
 row at the boundary timestamp and moves `window_start` just past it, so
 cargo and report queries cover a complete window. Missing, ambiguous, or
-inconsistent shipment identity still fails. Both trucks must belong to the same recorded DC network. Each
-truck's latest recorded destination is included before filling the store set.
+inconsistent shipment identity still fails. Both trucks must belong to the
+same recorded DC network. Each truck's latest recorded destination is
+included before filling the store set.
 
 `ag.fact_truck_inventory` supplies observed cargo product IDs, joined using
 both truck and shipment identity. All SQL parameters are bound values, not
@@ -118,6 +121,6 @@ bindings, and opt-in orchestration. These are separate from service checks.
 Native report acceptance additionally requires page rendering, selector/
 navigation behavior, and appropriately scoped viewer access. A model query
 or a report item ID alone does not prove those interactive properties.
-The current deployment's native Report and DAX checks succeeded; automatic
+The recorded deployment's native Report and DAX checks succeeded; automatic
 image export is disabled by tenant policy. Do not enable export or relax
 identity policy solely to bypass an acceptance-tool limitation.

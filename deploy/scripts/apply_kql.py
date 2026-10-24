@@ -1,11 +1,10 @@
 """Prepare or execute ordered KQL database scripts.
 
-``--execute`` applies the combined script directly to the Fabric Eventhouse KQL
-database using the configured operator credential. This is the supported path:
-the deploy runs locally with the user's permissions, which include Eventhouse
-administration — unlike a Fabric notebook's identity. The script resolves the
-database's ``queryServiceUri`` from the Fabric REST API, then runs the batch with
-the Kusto Python SDK.
+``--execute`` applies the combined script to the configured Eventhouse KQL
+database. Execution uses the local operator credential, not a notebook's
+runtime identity; the operator needs KQL administration permissions.
+Resolve the database's ``queryServiceUri`` through the Fabric REST API, then
+run the batch with the Kusto Python SDK.
 """
 
 from __future__ import annotations
@@ -190,13 +189,11 @@ def _terraform_outputs(environment: str) -> dict[str, Any]:
 def _summarize_result(table: Any) -> None:
     """Print a concise summary of a ``.execute database script`` result.
 
-    The raw Kusto result has one wide row per command (including the full
-    command text), which is hundreds of rows for the retail schema. Collapse it
-    to a completed/failed count and only print details for failed commands.
+    Print completed and failed counts, with details only for failures.
+    The raw result includes the full text of every command.
 
-    Rows are read straight from the Kusto result table (each ``KustoResultRow``
-    exposes ``to_dict``), so this avoids pulling in pandas — an optional
-    ``azure-kusto-data`` extra that the deploy environment does not install.
+    Reading ``KustoResultRow.to_dict`` directly avoids the optional pandas
+    dependency, which the deployment environment does not install.
     """
 
     rows = [row.to_dict() for row in table]
@@ -240,7 +237,7 @@ def apply_to_database(
         workspace_id, kql_database_id, credential
     )
     database_name = kql_database_name or resolved_name
-    console.info(f"Applying KQL to '{database_name}' @ {query_uri}")
+    console.info(f"Applying KQL to '{database_name}' at {query_uri}")
 
     from deploy.scripts._retry import retry_call
 
@@ -289,7 +286,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--profile",
-        help="Expected executable profile; must match --environment configuration.",
+        help="Deployment profile; must match the --environment configuration.",
     )
     parser.add_argument(
         "--workspace-id", help="Fabric workspace id (overrides --environment)."

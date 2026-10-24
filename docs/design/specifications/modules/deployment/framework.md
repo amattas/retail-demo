@@ -31,9 +31,9 @@ flowchart LR
     Ontology --> Agents --> TaskFlow --> FinalVerify
 ```
 
-Local and live preflight are the first executable plan steps and precede every
-destroy, apply, publish, and KQL mutation. Local preflight validates source and
-state contracts. The orchestrator invokes it with `--source-only` to check
+Local and live preflight run before Terraform destroy/apply, item publication,
+or KQL changes. Local preflight validates source and state contracts.
+The orchestrator invokes it with `--source-only` to check
 committed notebook inputs before rendering; it does not require a prior
 rendered output set. Explicit rendered-output validation resolves
 `utility/out/<env>/`, not the shared legacy output directory.
@@ -47,7 +47,7 @@ Manager after resolving the configured capacity name. An explicit
 subscription is searched, or all accessible subscriptions owned by the
 configured tenant are enumerated. All pages and subscription ownership must
 be validated, and exactly one capacity name match must remain. An inaccessible
-page or subscription is not silently skipped to manufacture a unique match.
+page or subscription cannot be skipped to produce an apparently unique match.
 Only `Microsoft.Fabric/capacities` F-SKU resources in `Paused` or `Suspended`
 are resumed, with API version `2023-11-01`. Identity/name/subscription
 mismatches, inactive trial/Premium capacities, and ambiguous Fabric lookup
@@ -97,8 +97,8 @@ update-in-place or recreate. `--yes` skips that prompt.
 targets, profile, manifest hash, ordered step IDs, and content/command
 fingerprint must match. The fingerprint covers deployment sources, selected
 configuration, dictionary files, and ordered commands. Legacy journals without
-the required plan/fingerprint fields are rejected rather than guessed
-compatible. Failed, degraded, skipped, or pending steps do not
+the required plan/fingerprint fields are rejected; compatibility is never
+assumed. Failed, degraded, skipped, or pending steps do not
 extend the reusable prefix. Completed runs cannot be resumed. An interrupted
 recreate preserves its prior recreate target identity only when every prior
 step through `deletion-wait` succeeded. An unfinished destructive phase refuses
@@ -117,8 +117,8 @@ closed.
 
 Before retrying a pending apply, resume regenerates and checks the saved plan.
 Before retrying a pending item-publication phase, it rebuilds that phase's
-staging, including post-ontology artifacts. A succeeded build entry is not
-proof that ephemeral local files remain intact. Resume is not a substitute
+staging, including post-ontology artifacts. A successful build record does not
+prove that temporary local files remain intact. Resume is not a substitute
 for live target validation or readiness evidence.
 
 ## Workspace-scoped environments
@@ -212,7 +212,7 @@ used silently; conflicting provider tenant variables are rejected.
 
 ## Manifest authority and executable profiles
 
-`contracts/retail-demo.json` owns stable asset IDs/descriptions, support
+`contracts/retail-demo.json` defines stable asset IDs/descriptions, support
 metadata, dependencies, profile-to-existing-asset/group selection, expected
 publication counts/folders, canonical commands/prerequisites, and readiness
 expectations. Physical item and schema definitions remain in `deploy/config/deploy.yml`,
@@ -226,8 +226,8 @@ notebook references. All profiles exclude the destructive `reset` group.
 | Profile | Assets | Groups | Pipelines | KQL scripts | Publication behavior |
 | --- | ---: | --- | ---: | ---: | --- |
 | `core` (explicit selection) | 1 | `setup` | 0 | 0 | Lakehouse shell and eleven rendered historical setup notebooks; no Eventhouse, Reporting, ML, stream, preview, task flow, or custom pool |
-| `standard` | 8 | `setup`, `core`, `stream`, `ml-required` | 5 | 6 | Supported real-time/streaming plus fail-closed required ML/Reporting path; starter pool and no preview surfaces |
-| `full-demo` (manifest default for every entry point) | 14 | standard groups plus `ml-optional`, `ml-experimental`, `ontology`, `utility` | 7 | 6 | Required Reporting gate plus post-Reporting extended ML and advanced/preview surfaces except reset |
+| `standard` | 8 | `setup`, `core`, `stream`, `ml-required` | 5 | 6 | Supported real-time/streaming plus fail-closed required ML/Reporting path; starter pool and no preview features |
+| `full-demo` (manifest default for every entry point) | 14 | standard groups plus `ml-optional`, `ml-experimental`, `ontology`, `utility` | 7 | 6 | Required Reporting gate plus post-Reporting extended ML and advanced/preview features except reset |
 
 The exact initial infrastructure/Reporting counts are `5+0`, `30+2`, and `40+2`
 respectively. They and the workspace-folder sets are validated while staging;
@@ -412,8 +412,8 @@ items, stages and publishes Data Agents, deploys and reads back the task flow,
 and runs complete readiness verification.
 
 Task-flow deployment fails before publication when any selected reference is
-unresolved; it never publishes a silently partial graph. The normal full-demo deploy and the recovery command use the same completion
-path.
+unresolved; it never publishes a silently partial graph. Normal full-demo
+deployment and the recovery command use the same completion path.
 
 Task-flow publication currently relies on Fabric/Power BI metadata behavior
 that is not a stable public source-control item contract.
@@ -466,9 +466,8 @@ failed/unknown evidence marks the journal and linked readiness report
 pipeline only with `retail-setup verify --env <env> --run-pipeline`.
 
 The verifier, report, and local contracts are implemented. Historical
-full-demo evidence predates the current remediation; no fresh live deployment
-was performed in this repair session. Readiness consistency and remote smoke
-tests remain open, as does recent manually started streaming evidence under
+full-demo evidence predates these changes. Fresh readiness-consistency and
+remote smoke tests remain open, along with recent manual-stream evidence under
 [IMP-013](../../../requirements/modules/operations/backlog.md#imp-013).
 
 ## Evidence

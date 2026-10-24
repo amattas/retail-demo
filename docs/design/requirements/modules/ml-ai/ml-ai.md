@@ -2,7 +2,7 @@
 
 ### REQ-MLAI-001 - Explicit support tier
 
-Every ML, ontology, and agent surface shall be classified as required, optional,
+Every ML, ontology, and agent feature shall be classified as required, optional,
 experimental, preview, or manual.
 
 ### REQ-MLAI-002 - Trustworthy model output
@@ -41,9 +41,10 @@ An Operations Agent and optional native Plan shall use explicit source
 evidence for bounded replenishment planning. Reporting deployments shall
 publish the Operations Agent by default; a service rejection of the agent
 shall be reported as a warning without failing the rest of the deployment.
-Native Planning shall remain excluded unless explicitly included. Publish monitoring stopped, require
-human approval for draft preparation, and prohibit real purchasing or
-historical-data mutations. Native Planning shall require a supported shared
+Native Planning shall remain excluded unless explicitly included. Deployment
+shall publish monitoring stopped. Draft preparation shall require human approval;
+real purchasing and changes to historical data are prohibited.
+Native Planning shall require a supported shared
 model connection and explicit billing acknowledgement. Source publication,
 interactive feature acceptance, and external execution shall remain distinct
 claims; unresolved tenant/connection prerequisites shall fail honestly.

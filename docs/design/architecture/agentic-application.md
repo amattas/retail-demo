@@ -1,56 +1,44 @@
-# Agentic Application
+# Agentic application
 
-This page covers the **conversational analytics + multi-agent action layer** that
-sits on top of the Fabric retail platform — end-to-end. We start with what it is
-and why it's useful, then walk the architecture left-to-right, then explain how the
-orchestrator, the two MCP servers, and the operations agents work under the hood —
-all without leaving the single Fabric workspace.
+The optional local application places chat beside an embedded Power BI report.
+An orchestrator routes questions to Fabric data services or to operations
+agents that draft replenishment and retention proposals.
 
 The Fabric data platform and the optional local application have different
 trust boundaries. The app can run synthetic replay, uses operator credentials
 for live calls, and delivers an embed token to the browser. Its approval store
 is local and its Eventhouse telemetry is best-effort, not durable production
-audit. The current working tree has not been freshly deployed in this repair
-session. See [decision boundaries](../specifications/modules/ml-ai/decision-experience.md).
+audit. Check the environment's readiness report before using live features.
+See [decision boundaries](../specifications/modules/ml-ai/decision-experience.md).
 
-> If you're looking for the data platform itself (streaming, Lakehouse medallion,
-> Eventhouse, semantic model), see [Architecture overview](overview.md). This page is the
-> **application** that consumes it.
-
----
+For the underlying streaming, Lakehouse, Eventhouse, and semantic-model
+architecture, see [Architecture overview](overview.md).
 
 ## What it is, and why it's useful
 
-The agentic application is a small local web app that puts a **chat interface next
-to an embedded Power BI report** and, behind the scenes, a **team of AI agents** over
-the deployed `retail-demo` workspace. It does three things a dashboard alone can't:
+The app uses the deployed `retail-demo` workspace to answer business questions
+and prepare local action drafts:
 
-- **Ask, don't build.** You ask a business question in plain English and a background
-  **orchestrator** routes it to the right "brain" — the **semantic model** for metrics,
-  the **ontology graph** for entity-360 relationships, or the **real-time Eventhouse**
-  for what's happening right now — and tells you which one it used and why.
-- **From answers to actions.** When a question implies a *decision* ("stock is low —
-  what should we do?"), the orchestrator hands off to a specialized **operations agent**
-  that reads the real data, applies business rules, and **drafts an approvable action**
-  with a human in the loop.
-- **Observable decisions.** The app attempts to send recommendations and
-  approvals to Eventhouse as telemetry; ingestion failures can be swallowed.
-  Verify delivery rather than treating the UI state as an audit guarantee.
+- It routes metrics to the semantic model, named-entity relationships to the
+  ontology, and supported live-sales questions to recent event data. A trace
+  records the selected route and reason.
+- When a user requests an action, an operations agent reads the deployed
+  synthetic data, applies business rules, and drafts a proposal for human review.
+- It attempts to send recommendations and approvals to Eventhouse. Ingestion
+  failures can be suppressed, so verify delivery separately from the UI state.
 
-The data platform uses **one Fabric workspace**; the local app, browser,
+The data platform uses one Fabric workspace; the local app, browser,
 identity, and router remain additional trust and cost boundaries.
 The same Gold tables feed the report, the agents, and
-the ML models; the same Eventhouse that streams live sales also captures what the agents
-decide.
-
----
+the ML models. Eventhouse holds live sales and successfully delivered agent
+telemetry.
 
 ## End-to-end architecture
 
-Here's the whole picture. On the **left**, the user works in one app surface — a Power BI
-report and a chat box side-by-side. In the **middle**, an orchestrator decides which
-Fabric capability should answer. On the **right**, those capabilities all read from the
-**same OneLake** foundation, and the agents' decisions flow **back** into the Eventhouse.
+The user works with a report and chat in one application. The orchestrator
+selects a Fabric data service or operations agent for each question. These
+services use the shared data platform; the app also attempts to log agent
+decisions in Eventhouse.
 
 ```mermaid
 flowchart TD
@@ -97,93 +85,89 @@ flowchart TD
     class Dash dash;
 ```
 
-**The flow, in one breath:** the user asks → the orchestrator routes → a Fabric capability
-(or an agent) answers → if it's an action, the agent drafts it for human approval → the
-decision is logged to the Eventhouse → it shows up on a live operations dashboard.
-
----
-
 ## The pieces, left to right
 
-### 1. The app surface — report + chat, side by side
+### 1. The app surface: report + chat, side by side
 
 The app is a small FastAPI backend serving a single-page front end with three pages:
 
-- **Dashboard** — the **Power BI report (≈70%)** next to the **chat (≈30%)**, so you see
-  the visual and the conversation in one frame. The report is embedded
-  **user-owns-data**: the backend mints an AAD token from the developer's `az login`
-  session, so there's no app registration or service principal to stand up for the demo.
-- **Agent Operations** — a live approval-funnel dashboard that streams straight from the
-  Eventhouse `agent_actions` table and auto-refreshes (KPI cards, an events-per-minute
-  timeline, a per-agent funnel, and a live feed of every recommendation and approval).
-- **Ontology Explorer** — renders the business graph (entities and their relationships)
-  so you can *show* the model the agents reason over.
+- **Dashboard** places the Power BI report and chat side by side, using about
+  70% and 30% of the space. The report uses user-owns-data embedding: the backend
+  obtains a Microsoft Entra ID token from the developer's `az login` session.
+  The demo does not require a separate app registration or service principal.
+- **Agent Operations** refreshes an approval-funnel dashboard from Eventhouse
+  `agent_actions`, with KPI cards, an events-per-minute timeline, a per-agent
+  funnel, and a feed of ingested recommendations and approvals.
+- **Ontology Explorer** displays business entities and their relationships.
 
-There is **no "ask the data agent vs. ask the ontology" toggle.** The user just asks; the
-orchestrator picks.
+The orchestrator chooses the data source for a question.
 
-### 2. The orchestrator — which brain answers?
+### 2. The orchestrator: which brain answers?
 
-Under the hood, an **LLM intent router** (`gpt-4o-mini` on Azure OpenAI, keyless via AAD)
-reads each question and classifies it into one of four routes:
+An LLM intent router (`gpt-4o-mini` on Azure OpenAI, authenticated through
+Microsoft Entra ID) classifies each question into a route:
 
 | Route | Goes to | Example question |
 |---|---|---|
-| Metric / ranking / trend / ML rollup | **Data Agent** → semantic model | "Top 10 stores by net sales, YoY %" |
-| Single named entity, in context | **Ontology MCP** → business graph | "What segment and churn risk does loyalty member LC012304678 have?" |
-| Right-now / last-N-minutes | **Eventhouse (KQL)** | "Top products in the last 15 minutes" |
-| Implies a decision/action | **Operations agent** | "Stock is low — what should we do?" |
+| Metric, ranking, trend, or ML rollup | Data Agent over the semantic model | "Top 10 stores by net sales, YoY %" |
+| Single named entity, in context | Ontology MCP over the business graph | "What segment and churn risk does loyalty member LC012304678 have?" |
+| Recent sales | Live-sales shortcut over event data | "Top products in the last 15 minutes" |
+| Decision or action | Operations agent | "Stock is low. What should we do?" |
 
-The router is **pluggable**: set `RETAIL_LLM_PROVIDER=anthropic` + `RETAIL_ANTHROPIC_API_KEY`
-to route with **Claude** instead, and the trace then names the actual model. If the LLM call
-fails for any reason, a deterministic **keyword router** takes over, and the chosen analytic
-surface still **falls back** to the other if it can't answer (e.g. a graph walk the service
-can't complete at scale). Smart by default, deterministic as a safety net.
+The live-sales shortcut currently uses a fixed 15-minute store-sales query.
+It does not guarantee the product grain or time window requested in a question.
+See the [routing specification](../specifications/modules/ml-ai/routing.md)
+for gate order and fallback behavior.
 
-### 3. The two MCP servers — Data Agent and Ontology
+To use Claude for routing, set `RETAIL_LLM_PROVIDER=anthropic` and
+`RETAIL_ANTHROPIC_API_KEY`. The trace names the model used. If the LLM call
+fails, a deterministic keyword router selects the route. The Data Agent and
+ontology can fall back to each other when one cannot answer.
 
-Both Fabric capabilities are reached over **Model Context Protocol (MCP)** — each call is a
-single JSON-RPC `POST` to a streamable-HTTP endpoint, authenticated with a Fabric bearer token:
+### 3. The two MCP servers: Data Agent and Ontology
 
-- **Data Agent MCP** (`.../dataagents/{id}/agent`) sits on the **semantic model** and answers
-  aggregates, rankings, trends, and ML rollups. It translates NL → DAX **inside Fabric** with
-  Fabric's own model and returns the answer (not the DAX).
-- **Ontology MCP** (`.../items/{id}/ontologyEndpoint`) exposes the **business graph**. It's
-  strongest at **entity-360 lookups** — name one customer and it fuses their business profile
-  with their ML **segment** and **churn** prediction in a single hop. It translates NL → graph
-  query **inside Fabric** and returns rows + a natural-language summary.
+The app calls both Fabric services through Model Context Protocol (MCP).
+Each call is a JSON-RPC `POST` to a streamable-HTTP endpoint, authenticated
+with a Fabric bearer token:
 
-> **Why the ontology matters:** a semantic model is great at aggregates but isn't built to pull
-> together *everything we know about one specific entity* into one connected answer. The typed
-> business graph (`Customer → Receipt → Product`, `Customer → ChurnPrediction`, `Store → Truck →
-> DistributionCenter`) is. Broad aggregations and deep multi-hop scans are routed to the semantic
-> model, which handles them far more reliably at scale.
+- Data Agent MCP (`.../dataagents/{id}/agent`) answers aggregates, rankings,
+  trends, and ML rollups over the semantic model. Fabric translates natural
+  language into DAX and returns the answer without the generated query.
+- Ontology MCP (`.../items/{id}/ontologyEndpoint`) exposes the business graph.
+  It connects a named entity's profile with related data, such as a customer's
+  segment and churn prediction. Fabric translates the question into a graph
+  query and returns rows with a natural-language summary.
 
-You can connect to both MCP servers directly from **VS Code** to experiment — see the
+Use named-entity graph lookups for relationships such as
+`Customer → ChurnPrediction`. Route broad aggregations and deep scans to
+the semantic model, and verify graph paths before presenting them.
+
+You can connect to both MCP servers from VS Code. See the
 [VS Code MCP setup](../../guides/deployed-analytics-ai.md#connect-from-vs-code-mcp) for the `.vscode/mcp.json` setup.
 
-### 4. The operations agents — perceive, reason, recommend, log
+### 4. The operations agents: perceive, reason, recommend, log
 
-When a question implies an action, the orchestrator hands off to a specialized agent that
-runs **DAX the app itself authors** (so, unlike the two MCPs, its query is fully transparent):
+When a user requests an action, the orchestrator selects an agent that runs
+app-authored DAX. The trace can show these queries in full.
 
-- **Inventory & Replenishment** — reads the ML **stockout-risk** table, cross-checks
-  `fact_reorders` for SKUs with no open reorder, joins `dim_products` for price to put a
-  **dollar** on the risk, applies a "reorder to a 14-day cover" rule, and **drafts reorders**
-  with Approve / Dismiss.
-- **Customer Retention** — reads the ML **churn** table, joins `customer_segments` for lifetime
-  value, ranks and selects a campaign cohort, pulls cross-sell anchors from the **market-basket**
-  model, and **drafts a win-back campaign** with Approve / Dismiss.
+Inventory & Replenishment reads stockout-risk predictions, checks
+`fact_reorders` for SKUs without an open reorder, and joins `dim_products`
+for prices. It applies a 14-day inventory-cover rule and drafts reorders
+with **Approve** and **Dismiss** controls.
 
-Both follow the same pattern: **perceive** the data → **reason** with business rules →
-**recommend** a specific, costed action → require a **human approval**.
+Customer Retention reads churn predictions, joins `customer_segments` for
+lifetime value, and selects a ranked campaign cohort. It adds cross-sell
+suggestions from the market-basket model and drafts a win-back campaign
+with **Approve** and **Dismiss** controls.
 
-### 5. The closed loop — write-back to the Eventhouse
+Both agents estimate a proposal's value and require human review. Local
+approval does not place an order or execute a campaign.
+
+### 5. The closed loop: write-back to the Eventhouse
 
 The app attempts to log drafts and approvals in Eventhouse
-**`agent_actions`** — the same real-time store that streams live sales. This can provide a live
-**approval funnel** the app renders on the Agent Operations page, and the exact same data is
-plain KQL anyone can drop on a Fabric Real-Time Dashboard:
+`agent_actions`, alongside live sales events. Successfully ingested events
+feed the Agent Operations approval funnel and can be queried with KQL:
 
 ```kusto
 agent_actions
@@ -197,49 +181,32 @@ Successfully ingested events are queryable inside Fabric. The source
 durable audit, authenticated per-user approvals, and production actions need
 the additional controls under `THREAT-009` / `SEC-012`.
 
----
-
-## Under the hood — transparency and which model thinks
+## Under the hood: transparency and which model thinks
 
 ### "Show me how the agent got the answer"
 
-Under every answer the chat shows a collapsible **"how I reached this"** trace:
+The collapsible **how I reached this** trace below an answer records the
+source, router model, decision reason, and exact MCP tool call and arguments.
+For ontology results, it reconstructs an entity path from the returned
+columns and shows a row preview. For operations agents, it shows the
+app-authored DAX.
 
-- **Source** — semantic model, ontology graph, or a named operations agent.
-- **Router + model** — which router decided and the exact model it used, plus a one-line reason.
-- **Call made** — the exact MCP tool + arguments sent (e.g. `search_ontology({...})`).
-- **Graph path traversed** *(ontology)* — the entities and relationships the query walked,
-  reconstructed from the result columns, with a preview of the actual rows.
-- **Queries executed** *(operations agents)* — the **literal DAX** the agent generated and ran.
-
-> **Honesty note:** the Fabric **Data Agent** and **Ontology MCP** generate and run their query
-> *server-side* and do **not** return the query text — so for those two we show the call, the
-> entities/relationships traversed, and a result preview. The **operations agents** run DAX *we*
-> author, so for them we show the full query verbatim.
+Fabric's Data Agent and Ontology services generate queries server-side and
+do not return the query text. Their traces show the request and returned
+evidence, not the hidden query.
 
 ### Which model is doing the thinking?
 
-There are **three** distinct interpretation steps, and they do **not** all use the same model:
-
-1. **Intent routing** — *our* code, an LLM intent router on Azure OpenAI `gpt-4o-mini` (keyless
-   via AAD). **This is the only model we control**, and it's swappable to **Claude** via config.
-2. **NL → DAX** (semantic-model answers) — inside the **Fabric Data Agent**, Fabric's own model.
-   Not swappable.
-3. **NL → graph query** (ontology answers) — inside the **Fabric Ontology service**, Fabric's own
-   model. Not swappable.
-
-So "use Claude" is achievable for **routing today** (with an Anthropic key); the query translation
-in steps 2–3 is owned by Fabric.
-
----
+The application controls the intent-routing model, which defaults to Azure
+OpenAI `gpt-4o-mini` and can be changed to Claude with an Anthropic key.
+Fabric controls the models that translate natural language into DAX and
+ontology queries. The application cannot replace those models.
 
 ## Why this matters
 
-This isn't four products stitched together. It's **one Fabric workspace** — the relationship graph,
-the live event stream, the curated metrics, and the ML models all on one copy of the data — with an
-**orchestrator that picks the right brain per question** and a **fleet of operations agents** that
-turn insight into governed, approvable action and log it back as telemetry. The same pattern adds a
-Pricing agent, a Logistics agent, a Marketing agent next — each reading the same foundation. *Fabric
-is the operating system for a multi-agent retail business.*
+The application lets a presenter move from a report value to a question and
+then to a reviewable local proposal using the same retail data. Pricing,
+logistics, and marketing agents remain proposed extensions; see the
+[decision experience specification](../specifications/modules/ml-ai/decision-experience.md).
 
-For the presenter's click-path, see the [CIO Walkthrough](../../guides/cio-walkthrough.md).
+For presentation steps, see the [CIO walkthrough](../../guides/cio-walkthrough.md).

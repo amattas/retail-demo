@@ -16,8 +16,8 @@ merchandising, or executive/analytics audiences.
 1. Complete the [getting-started guide](getting-started.md).
 2. Confirm the required KQL tables and `ag`/`au` Lakehouse tables exist.
 3. Open the Eventhouse query editor, Power BI report, and the streaming notebook.
-4. Decide whether dashboard, ontology, agent, and ML surfaces are ready; skip any
-   surface that has not passed its support gate.
+4. Check whether the dashboard, ontology, agents, and ML outputs are ready.
+   Skip any feature whose source, permission, or capability checks have failed.
 5. Keep the [operations guide](operations.md) open for recovery.
 
 ## 1. Frame the architecture
@@ -33,7 +33,7 @@ Talk track:
   durable history and summaries.
 - Power BI uses Direct Lake, which reads Lakehouse data without importing a
   second copy.
-- Optional ontology and agent surfaces add business context after their
+- Optional ontology and agents add business context after their
   capability and binding checks pass.
 
 ## 2. Start live data
@@ -105,8 +105,8 @@ predictive pages as supported output.
 
 ## 6. Close with actions and roadmap
 
-If a validated pricing approval or alert scenario is available, show it as an
-optional governed action. In `full-demo`, you can also open the
+If a pricing approval or alert scenario has been validated, show it as an
+optional action. In `full-demo`, you can also open the
 `retail-approvals` Fabric App to show a different reviewer recording an
 append-only decision on a replenishment proposal; the app does not place
 orders. RTI dashboards and Activator rules are checked in as
@@ -118,7 +118,7 @@ action story from the owning backlog:
 
 ## Do not overclaim
 
-Avoid using these as headline proof points without the stated qualification:
+Keep these qualifications in the presentation:
 
 - Truck dwell behavior is owned by the
   [event contract](../design/specifications/modules/streaming/event-contract.md#truck-lifecycle);

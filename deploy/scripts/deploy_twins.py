@@ -158,7 +158,7 @@ def publish_twins(repo_root: Path, config: Any, outputs: dict[str, Any]) -> dict
                 _write_atomic(backup, current)
             report["model_backup"] = str(backup.relative_to(repo_root))
             _write_atomic(path, report)
-            console.info(f"Publishing {len(changes)} additive twin model objects...")
+            console.info(f"Publishing {len(changes)} twin model additions...")
             response = session.post(
                 f"{API}/workspaces/{workspace_id}/semanticModels/{model_id}/updateDefinition",
                 json={"definition": updated}, timeout=30, allow_redirects=False,
@@ -177,14 +177,14 @@ def publish_twins(repo_root: Path, config: Any, outputs: dict[str, Any]) -> dict
             report["model_refresh_id"] = request_id
             _write_atomic(path, report)
 
-        console.info("Refreshing Direct Lake framing for the twin source snapshot...")
+        console.info("Refreshing the Direct Lake snapshot for the twins report...")
         refresh_model(credential, workspace_id, model_id, on_started=refresh_started)
         if require_sso(session, workspace_id, model_id) != original_bindings:
             raise NativeItemError("Model binding metadata changed after refresh.")
         report["query_evidence"] = verify_entity_queries(
             credential, workspace_id, model_id, cohort, load_metrics(repo_root),
         )
-        console.info("Publishing connected Store, Warehouse and Truck views...")
+        console.info("Publishing connected Store, Warehouse, and Truck views...")
         report_id = ensure_native_item(
             session, workspace_id=workspace_id, item_type="Report", display_name=REPORT_NAME,
             description="Connected store, warehouse and truck operational twins; SSO, source evidence and read-only what-if.",

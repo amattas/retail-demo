@@ -1,8 +1,7 @@
 # Security architecture
 
-Threats and mitigations are owned by the
-[threat model](../security/threat-model.md) and
-[controls](../security/controls.md).
+See the [threat model](../security/threat-model.md) for security risks and
+[controls](../security/controls.md) for their mitigations.
 
 ## Trust boundaries
 
@@ -74,13 +73,13 @@ are not part of the default release.
 
 - Tenant-aware identity, bearer request handling, and target checks exist;
   alternate-authentication and renamed-target live proof remains `IMP-001`.
-- Required Eventhouse writes now raise on failure so Spark cannot commit a
+- Required Eventhouse writes raise on failure so Spark cannot commit a
   failed micro-batch. Replay/checkpoint and deep-reconciliation code has local
   tests, but fresh injected-failure Fabric proof remains outstanding.
 - Environment-local configuration/render/staging and saved-plan guards do not
   replace operator review or serialize arbitrary remote writers.
-- No fresh live deployment was performed in this repair session. Prior
-  readiness reports do not verify the current changes.
+- Prior readiness reports do not verify subsequent changes; collect fresh
+  live evidence for the revision being deployed.
 - The optional local app uses operator identity and browser token delivery for
   embedding; its proposal store is local and its Eventhouse telemetry is
   best-effort. See `THREAT-009` before describing this as durable governance.

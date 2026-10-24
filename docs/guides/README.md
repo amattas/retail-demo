@@ -1,8 +1,7 @@
 # Guides
 
-These guides explain how to set up, explore, present, and operate the current
-demo. Choose a guide based on the task you need to complete; you do not need to
-read them in file-name order.
+Choose a guide for the task at hand. You can start with setup, a workspace
+tour, presentation steps, or operations; there is no required reading order.
 
 If Fabric terminology is new to you, keep the
 [plain-language glossary](glossary.md) open while you work.
@@ -33,6 +32,5 @@ If Fabric terminology is new to you, keep the
 | [Operations](operations.md) | Operators and support engineers | Readiness status, freshness, monitoring, recovery, reset, and capacity guidance. |
 | [Plain-language glossary](glossary.md) | Any reader | Definitions for Fabric, data, reporting, deployment, streaming, and machine-learning terms used throughout the site. |
 
-The guides explain what to do. Contributors who need exact schemas, interfaces,
-or acceptance criteria should continue to
+For exact schemas, interfaces, or acceptance criteria, see
 [Design documentation](../design/README.md).

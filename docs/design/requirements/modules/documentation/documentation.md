@@ -3,8 +3,8 @@
 ### REQ-DOCS-001 - Canonical source
 
 `docs/` shall be the only documentation site source. Root and component READMEs
-shall remain concise entry points that link to canonical owners. The published
-entry experience shall offer role-based paths for business users, analysts,
+shall remain concise entry points that link to the authoritative pages. The
+site's entry pages shall offer role-based paths for business users, analysts,
 presenters, operators, and developers, plus a shared plain-language glossary.
 
 ### REQ-DOCS-002 - Durable ownership

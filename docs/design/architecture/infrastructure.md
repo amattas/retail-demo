@@ -104,7 +104,7 @@ allowing separate child folders. These managed exceptions are recorded in
 
 ## Local deployment state
 
-Each workspace name derives a local environment key. Its ignored environment
+Each workspace name determines a local environment key. Its ignored environment
 overlay, Terraform input, backend state, Terraform data directory,
 `fabric-cicd` configuration, live outputs, and run journal stay under that
 key. Generation configuration lives at
@@ -117,15 +117,14 @@ target; path isolation is not a distributed lock.
 ## Current constraints
 
 - The default `full-demo` inventory includes live-preflight-validated preview
-  surfaces; explicitly selected `core` and `standard` inventories are
+  features; explicitly selected `core` and `standard` inventories are
   preview-free.
 - Task-flow deployment uses metadata behavior outside a stable Fabric item
   source-control contract.
 - Offline validation does not prove live workspace readiness. The separate
-  profile-aware verifier queries live Fabric, Kusto, and Lakehouse SQL
-  surfaces. Prior full-demo evidence is a baseline, not proof of the current
-  remediation; fresh required-path and optional-stream evidence remains
-  environment- and run-specific.
+  profile-aware verifier queries Fabric, Kusto, and Lakehouse SQL.
+  Prior full-demo evidence does not validate later changes. Collect fresh
+  required-path and optional-stream evidence for each environment and run.
 
 See [deployment requirements](../requirements/modules/deployment/deployment.md)
 and the [operations backlog](../requirements/modules/operations/backlog.md).

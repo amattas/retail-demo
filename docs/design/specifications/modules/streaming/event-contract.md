@@ -68,14 +68,14 @@ be processed.
 
 For each micro-batch, the notebook:
 
-1. persists the batch;
-2. finds present mapped event types;
-3. resolves one notebook runtime token;
-4. maps JSON to typed envelope/payload columns;
-5. writes event types concurrently to their same-named KQL tables;
-6. uses `FailIfNotExist`;
-7. sets `flushImmediately=true`;
-8. unpersists the batch.
+1. Persists the batch.
+2. Finds present mapped event types.
+3. Resolves one notebook runtime token.
+4. Maps JSON to typed envelope/payload columns.
+5. Writes event types concurrently to their same-named KQL tables.
+6. Uses `FailIfNotExist`.
+7. Sets `flushImmediately=true`.
+8. Unpersists the batch.
 
 If `kusto_uri` is blank, the notebook resolves the KQL database
 `queryServiceUri` by display name in the current workspace.
@@ -105,8 +105,7 @@ If `kusto_uri` is blank, the notebook resolves the KQL database
 These controls make expected retries idempotent and are covered by injected
 failure/replay contracts. `tests/test_streaming_dedup_contract.py` executes the
 actual `foreachBatch` sink function with mocked connector operations,
-including partial table-write, unmapped-event, and credential failures;
-counting static `raise` statements is not the verification method.
+including partial table-write, unmapped-event, and credential failures.
 These tests do not establish live Spark/Kusto transactional behavior.
 The readiness adapter checks live ingestion and
 checkpoint tags. The remaining
@@ -191,5 +190,5 @@ exception.
 
 Repository acceptance for `IMP-005` is complete. A live Fabric staging run
 through Eventhouse, the optional Silver/Gold projection, and Direct Lake
-remains the external evidence boundary; the static check does not claim that
+remains required external evidence. The static check does not prove
 tenant-level execution.

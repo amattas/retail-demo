@@ -723,7 +723,7 @@ def configure(
     if any(value is None for value in _prompted_values) and sys.stdin.isatty():
         typer.echo("")
         typer.echo("=" * 70)
-        typer.echo("  INPUT REQUIRED — review each value and press Enter to accept [default]")
+        typer.echo("  INPUT REQUIRED: review each value; press Enter to accept [default]")
         typer.echo("=" * 70)
 
     workspace_name = _prompt_str(
@@ -2362,7 +2362,7 @@ def _echo_profile_inventory(profile: ResolvedProfile) -> None:
     if profile.blockers:
         for blocker in profile.blockers:
             typer.echo(
-                f"  BLOCKED: {blocker.tracking_issue} — {blocker.description}"
+                f"  BLOCKED: {blocker.tracking_issue}: {blocker.description}"
             )
 
 
@@ -3309,7 +3309,7 @@ def deploy(
                 ):
                     recreate = True
                 else:
-                    typer.echo("Keeping it — updating the existing workspace in place.")
+                    typer.echo("Updating the existing workspace in place.")
     plan = _deploy_plan(
         env,
         skip_terraform,

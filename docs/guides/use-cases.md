@@ -1,6 +1,7 @@
 # Use cases
 
-The demo supports several retail stories, but their current maturity differs.
+Use the table below to choose a retail scenario and check its implementation
+and verification limits before presenting it.
 
 | Use case | Current evidence | Status |
 | --- | --- | --- |
@@ -23,8 +24,8 @@ then show durable Silver/Gold data and the store-operations report page.
 ### Inventory and replenishment
 
 Show inventory movements, reorder signals, stockout detections, and current
-inventory Gold output. Label detections and snapshots accurately; do not call a
-recent detection "open" without state folding.
+inventory Gold output. A recent stockout detection does not establish that
+the stockout is still open; fold subsequent events into current state first.
 
 ### Omnichannel
 

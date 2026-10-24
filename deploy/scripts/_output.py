@@ -1,12 +1,11 @@
-"""Consistent console output for deploy sub-scripts.
+"""Console output for deployment scripts.
 
-The ``retail-setup deploy`` orchestrator prints a divider, a ``[i/total]``
-header, and the command for each step. These helpers keep every sub-script's
-own output uniform underneath that header: short status lines indented to
-align with the command echo, with nested details indented one level further.
+``retail-setup deploy`` prints a divider, a ``[i/total]`` header, and each
+step's command. These helpers align status lines with that command and indent
+details one level further.
 
-Import the module (not the names) so the short verbs never clash with local
-variables, e.g. ``for error in errors: console.error(error)``::
+Import the module as ``console`` to avoid shadowing its helpers with local
+names such as ``error``::
 
     from deploy.scripts import _output as console
     console.info("Wrote configs")
@@ -28,7 +27,7 @@ def info(message: str) -> None:
 
 
 def detail(message: str) -> None:
-    """Print an indented sub-detail, e.g. a staged item or unbound reference."""
+    """Print an indented detail, such as a staged item or unbound reference."""
 
     print(f"{_DETAIL_INDENT}{message}")
 

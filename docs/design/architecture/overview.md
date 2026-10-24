@@ -2,11 +2,11 @@
 
 ## Purpose
 
-The repository delivers a Microsoft Fabric retail demo with two active modes:
+The demo has two data paths:
 
 1. Fabric-native historical setup through `retail-setup` and setup notebooks.
-2. Optional live Real-Time Intelligence (RTI) through `stream-events.ipynb`
-   writing directly to Eventhouse and queried with KQL (Kusto Query Language).
+2. Optional live Real-Time Intelligence (RTI): `stream-events.ipynb` writes
+   directly to Eventhouse, where KQL (Kusto Query Language) queries the events.
 
 ```mermaid
 flowchart LR
@@ -51,12 +51,12 @@ flowchart LR
 `setup-01` through `setup-11` seed dictionaries, generate dimensions and facts,
 publish Silver, and build Gold directly in the Lakehouse. Fact generation is
 split by domain into notebooks that run in parallel where the stage graph
-allows. This path does not require ADLS
-parquet shortcuts or the retained historical-load notebook.
+allows. This path does not require ADLS parquet shortcuts or the retained
+historical-load notebook.
 
 ## Optional live path
 
-`stream-events` emits eighteen typed business event types to Eventhouse through
+`stream-events` emits eighteen business event types to Eventhouse through
 the Spark Kusto connector, which is the Kusto software component for Apache
 Spark. KQL supplies the recent-event query path. Optional
 Eventhouse shortcuts and streaming transforms project events into Lakehouse
@@ -79,13 +79,13 @@ directly from OneLake without importing a second copy.
 
 - Deployment profiles select exact, dependency-checked groups. The destructive
   reset group is excluded from every automatic profile.
-- Dashboard and rule assets are not yet guaranteed first-class deployable items.
+- Dashboard and rule source files are not guaranteed deployable items.
 - The semantic model is Direct Lake and has 42 active tables, including six ML
   outputs.
 - `fact_online_order_status` is a streaming-only Silver output outside the base
   table contract.
 - Prior full-demo setup, ML, Reporting, ontology, agents, task flow, and
-  readiness runs are baseline evidence. No fresh live deployment was performed
-  in this repair session. Current changed-path validation, alternate
-  authentication, core/standard profile proof, and recent optional streaming
-  evidence remain in the owning module backlogs.
+  readiness runs provide baseline evidence, not validation of subsequent
+  changes. Validation of changed paths, alternate authentication,
+  core/standard profiles, and recent optional streaming remains in the
+  relevant module backlogs.

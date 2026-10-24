@@ -1,8 +1,8 @@
 # Presenter journeys
 
-Use one of these standalone journeys when a persona needs a focused,
-repeatable 5-7 minute demo. They use the deployed Eventhouse tables and
-`retail_querysets.KQLQueryset`; no optional surface is required.
+Choose one of these 5-7 minute demonstrations for a specific audience. Each
+uses deployed Eventhouse tables and `retail_querysets.KQLQueryset`, without
+requiring a dashboard, ontology, or agent.
 
 ## Common preflight and boundaries
 
@@ -38,7 +38,7 @@ not readiness proof. For journeys that use `mv_store_sales_minute`, also run
 the store-sales query during that polling window and require at least one
 recent minute bucket.
 
-The following surfaces are not part of these reproducible core journeys:
+These demonstrations exclude the following features:
 
 - Dashboard templates require validated import and binding
   ([ENH-001](../design/requirements/modules/analytics/backlog.md#enh-001)).
@@ -57,11 +57,11 @@ The following surfaces are not part of these reproducible core journeys:
 
 ## Retail operations: live store and fulfillment pulse
 
-**Audience goal:** Verify that store sales and omnichannel fulfillment events
-are arriving and can be investigated by store or lifecycle stage.
+Show that store sales and fulfillment events are arriving, then investigate
+them by store or lifecycle stage.
 
-**Presenter prompt:** "What is happening across stores and fulfillment right
-now, and what evidence shows that the feed is live?"
+Ask: "What is happening across stores and fulfillment right now, and what
+evidence shows that the feed is live?"
 
 ### Assets and readiness
 
@@ -84,9 +84,9 @@ union withsource=table_name receipt_created, online_order_created,
 
 ### Run the journey
 
-1. **Frame the question (30 seconds).** State that this is a live operational
-   pulse, not a promised current-state control plane.
-2. **Show store sales (2 minutes).** Run:
+1. Introduce the question (30 seconds). Explain that these queries show recent
+   events, not authoritative current state.
+2. Show store sales (2 minutes). Run:
 
     ```kql
     let lookback = 60m;
@@ -96,14 +96,14 @@ union withsource=table_name receipt_created, online_order_created,
     | order by ts desc
     ```
 
-   **Expected observation:** Recent minute buckets appear for one or more
-   stores. Sales, receipt count, and average basket vary by store and time.
+   Expect recent minute buckets for one or more stores, with sales, receipt
+   count, and average basket varying by store and time.
 
-   **Talk track:** "The stream lands typed receipt events in Eventhouse. This
+   Say: "The stream writes typed receipt events to Eventhouse. This
    materialized view turns them into a bounded operational sales trend without
    waiting for a report refresh."
 
-3. **Show fulfillment progression (2 minutes).** Run:
+3. Show fulfillment progression (2 minutes). Run:
 
     ```kql
     let window = 24h;
@@ -114,16 +114,16 @@ union withsource=table_name receipt_created, online_order_created,
     | order by stage asc
     ```
 
-   **Expected observation:** The result shows event counts for created, picked,
-   and shipped stages. Counts need not match because the window is bounded and
+   Expect event counts for created, picked, and shipped stages.
+   Counts need not match because the window is bounded and
    events can arrive out of order.
 
-   **Talk track:** "These are lifecycle event counts, not a claim that every
+   Say: "These are lifecycle event counts, not a claim that every
    order is currently in one stage. The shared order identifier supports deeper
    investigation when needed."
 
-4. **Close (1 minute).** Point back to the latest ingestion timestamps as the
-   evidence of freshness. Add truck dwell only after a bounded live run returns
+4. Finish with freshness evidence (1 minute). Point to the latest ingestion
+   timestamps. Add truck dwell only after a bounded live run returns
    recent paired lifecycle rows from `fn_truck_sla()` in the demo workspace.
 
 ### Fallback
@@ -147,11 +147,11 @@ union withsource=table_name receipt_created, online_order_created,
 
 ## Merchandising: product demand and replenishment signals
 
-**Audience goal:** Identify products generating recent sales and correlate that
-activity with inventory, stockout-detection, and reorder signals.
+Identify products with recent sales, then compare their inventory,
+stockout-detection, and reorder signals.
 
-**Presenter prompt:** "Which products are moving, and where should a
-merchandiser investigate replenishment signals?"
+Ask: "Which products are selling, and where should a merchandiser investigate
+replenishment signals?"
 
 ### Assets and readiness
 
@@ -177,10 +177,10 @@ Present the replenishment step only after all four rows pass.
 
 ### Run the journey
 
-1. **Frame the question (30 seconds).** Explain that the journey combines
+1. Introduce the question (30 seconds). Explain that the demonstration combines
    demand and replenishment events without claiming a current inventory
    balance.
-2. **Rank recent product demand (2 minutes).** Open
+2. Rank recent product demand (2 minutes). Open
    `q_top_products_by_sales`, or run:
 
     ```kql
@@ -192,13 +192,13 @@ Present the replenishment step only after all four rows pass.
     | top 25 by revenue desc
     ```
 
-   **Expected observation:** Products rank differently by revenue and units;
+   Expect products to rank differently by revenue and units;
    the result uses product identifiers from typed receipt-line events.
 
-   **Talk track:** "This is a recent demand ranking at product grain. It is a
+   Say: "This ranks recent demand by product. It is a
    starting point for investigation, not a forecast or recommendation."
 
-3. **Inspect inventory movement (90 seconds).** Run:
+3. Inspect inventory movement (90 seconds). Run:
 
     ```kql
     let window = 30m;
@@ -210,13 +210,13 @@ Present the replenishment step only after all four rows pass.
     | top 25 by latest desc
     ```
 
-   **Expected observation:** Recent movement reasons and signed quantity
-   changes appear for store/product combinations.
+   Expect recent movement reasons and signed quantity changes for
+   store/product combinations.
 
-   **Talk track:** "These are movements within the selected window. Summing
+   Say: "These are movements within the selected window. Summing
    deltas here does not reconstruct an authoritative on-hand balance."
 
-4. **Show replenishment signals (90 seconds).** Run:
+4. Show replenishment signals (90 seconds). Run:
 
     ```kql
     let window = 30m;
@@ -227,16 +227,16 @@ Present the replenishment step only after all four rows pass.
     | top 25 by latest desc
     ```
 
-   **Expected observation:** Detection and reorder event types appear by
+   Expect detection and reorder event types by
    store/product when generated in the selected window.
 
-   **Talk track:** "A detection or reorder is evidence that a workflow emitted
+   Say: "A detection or reorder is evidence that a workflow emitted
    a signal. We are not labeling the item as currently out of stock or the
    reorder as still pending."
 
-5. **Close (30 seconds).** Emphasize traceable event grain and explicit KPI
-   limits. Do not extend this into marketing attribution, ML recommendations,
-   or pricing writeback without their separate gates.
+5. Finish with the limits (30 seconds). State what one row represents and
+   what the metrics establish. Do not add marketing attribution, ML
+   recommendations, or pricing writeback without their separate gates.
 
 ### Fallback
 
@@ -262,10 +262,10 @@ Present the replenishment step only after all four rows pass.
 
 ## Executive and analytics: recent performance summary
 
-**Audience goal:** Summarize recent store sales, payment mix, and online-order
-volume while making time window and grain explicit.
+Summarize recent store sales, payment mix, and online-order volume. State the
+time window and what each row represents.
 
-**Presenter prompt:** "What can leadership learn from the latest activity, and
+Ask: "What can leadership learn from the latest activity, and
 what evidence supports each headline?"
 
 ### Assets and readiness
@@ -287,9 +287,9 @@ union withsource=table_name payment_processed, online_order_created
 
 ### Run the journey
 
-1. **Frame the summary (30 seconds).** State that every result is synthetic,
+1. Introduce the summary (30 seconds). State that every result is synthetic,
    recent, and bounded by the query window.
-2. **Show store performance (2 minutes).** Run:
+2. Show store performance (2 minutes). Run:
 
     ```kql
     let lookback = 60m;
@@ -299,14 +299,13 @@ union withsource=table_name payment_processed, online_order_created
     | order by ts desc
     ```
 
-   **Expected observation:** Store/minute results provide recent sales,
+   Expect store/minute results with recent sales,
    transaction volume, and basket context without requiring a dashboard.
 
-   **Talk track:** "We can inspect the metric, grain, and freshness directly.
-   The strongest headline is the observable variation, not a fixed demo
-   number."
+   Say: "These rows show sales, receipts, and average basket by store and
+   minute. Use the current results rather than numbers from an earlier demo."
 
-3. **Show payment mix (90 seconds).** Open `q_tender_mix`, or run:
+3. Show payment mix (90 seconds). Open `q_tender_mix`, or run:
 
     ```kql
     let window = 15m;
@@ -316,13 +315,13 @@ union withsource=table_name payment_processed, online_order_created
     | order by amount desc
     ```
 
-   **Expected observation:** Payment methods contribute different portions of
-   recent processed amount.
+   Expect payment methods to account for different shares of the recent
+   processed amount.
 
-   **Talk track:** "This is payment-event mix for the selected window. It does
+   Say: "This is payment-event mix for the selected window. It does
    not infer customer preference beyond the observed synthetic transactions."
 
-4. **Show online demand (90 seconds).** Open `q_online_orders_15m`, or run:
+4. Show online demand (90 seconds). Open `q_online_orders_15m`, or run:
 
     ```kql
     let window = 15m;
@@ -334,15 +333,16 @@ union withsource=table_name payment_processed, online_order_created
     | project orders, subtotal, tax, total, aov
     ```
 
-   **Expected observation:** One bounded summary reports created-order count,
-   value components, and average order value when rows are present.
+   Expect a summary of created-order count, value components, and average
+   order value when rows are present.
 
-   **Talk track:** "This is created online demand, not completed revenue or a
+   Say: "This is created online demand, not completed revenue or a
    fulfillment service-level claim."
 
-5. **Close (30 seconds).** Restate source, time window, and grain. Use Power BI
-   or a dashboard only if its binding and current data period were validated
-   before the session. Do not replace evidence with an ungated agent answer.
+5. Finish with the limits (30 seconds). State the source, time window, and grain.
+   Use Power BI or a dashboard only if its binding and current data period
+   were validated before the session. An unchecked agent answer is not a
+   substitute for evidence.
 
 ### Fallback
 
@@ -357,7 +357,7 @@ union withsource=table_name payment_processed, online_order_created
    `run_seconds = 180`.
 2. Poll the readiness query every 15 seconds for up to five minutes, then rerun
    the store-sales query and confirm recent minute buckets.
-3. If only a visualization surface fails, remain in the KQL queryset and follow
+3. If only the visualization fails, stay in the KQL queryset and follow
    the Power BI recovery entry in
    [Operations](operations.md#common-recovery-paths).
 4. Do not clear Eventhouse or Lakehouse data between presentations.

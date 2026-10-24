@@ -42,9 +42,9 @@ All nav targets must exist. Canonical Markdown uses relative links, Mermaid
 diagrams, and Zensical-compatible Markdown rather than MDX/React or
 Docusaurus-only metadata.
 
-Task-focused user documentation remains under `docs/guides/`. Normative
-technical material remains under `docs/design/` so implementation detail does
-not dominate the primary user journey.
+Task-focused guides live under `docs/guides/`. Technical requirements and
+contracts live under `docs/design/`, separate from setup and presentation
+instructions.
 
 The Home and guide-index pages route readers by role and task. User-facing
 guides assume no source-code knowledge. They explain business meaning before
@@ -70,9 +70,10 @@ Module backlogs contain only `Open` and `Settled — do not reopen`.
 
 ## Temporary artifacts
 
-Dated plans/specs, raw review findings, generated context, and migration audits
-must not be public systems of record. Durable content is promoted before those
-artifacts are deleted or replaced by pointers.
+Keep dated plans, raw findings, generated context, and migration audits out
+of the published source tree. Move their lasting requirements, decisions,
+and unresolved work into the relevant technical pages before deleting the
+temporary files or replacing them with pointers.
 
 The prior `docs/superpowers/` implementation plans were removed after durable
 content was promoted. Temporary planning material must remain outside the
@@ -83,10 +84,10 @@ The pinned Zensical version does not support `exclude_docs` or `draft_docs`
 Omitting a page from `nav` does **not** prevent publication or indexing.
 Do not add an unsupported exclusion setting as a security control.
 
-Root-level action/CX drafts were reconciled into the
-[decision experience](../ml-ai/decision-experience.md), ML/AI backlog, and
-`THREAT-009` / `SEC-012`. Routing and the evaluation question bank now have
-specification/guide owners; presenter guidance lives in the CIO walkthrough.
+The [decision experience](../ml-ai/decision-experience.md), ML/AI backlog, and
+`THREAT-009` / `SEC-012` replace the former root-level action and customer
+experience drafts. Routing has a specification; evaluation questions and the
+CIO walkthrough have dedicated guides.
 Raw response logs and generated HTML/diagram exports were removed after
 preserving unresolved ontology, model-quality, action, and security concerns.
 The action-framework URL remains a pointer for existing component links.
@@ -118,7 +119,7 @@ python -m zensical serve
 1. Update the canonical owner and all derived links in the same change.
 2. Preserve stable requirement, threat, control, improvement, and enhancement
    IDs.
-3. Keep module backlogs limited to `Open` and `Settled - do not reopen`.
+3. Keep module backlogs limited to `Open` and `Settled — do not reopen`.
 4. Use Mermaid for diagrams.
 5. Define unfamiliar acronyms and explain what an operational status means
    before listing internal field names or check IDs.
@@ -171,5 +172,5 @@ The required GitHub repository settings are:
 
 After publishing, verify the Pages API and Docs workflow, the root redirect
 to `/latest/`, and selector metadata for **Latest** plus the selected stable
-minor lines. These external checks were not performed as part of this local
-documentation repair; a clean build does not establish their current state.
+minor lines. A clean local build does not establish the state of those
+external settings or published files.

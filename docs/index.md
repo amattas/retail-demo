@@ -2,22 +2,17 @@
 
 ## About this demo
 
-This demo shows how a retailer can bring sales, inventory, customer, marketing,
-fulfillment, and supply-chain data together in Microsoft Fabric. All data is
-synthetic, so you can use the solution for learning and demonstrations without
-exposing real customer or company records.
+This demo brings a retailer's sales, inventory, customer, marketing,
+fulfillment, and supply-chain data together in Microsoft Fabric. All records
+are synthetic, so demonstrations do not expose real customer or company data.
 
-The solution supports two complementary views of the business:
+Historical sales and operations data lives in a Lakehouse and is presented
+through Power BI. Optional live events go to Eventhouse, where you can query
+them with KQL (Kusto Query Language).
 
-- **Historical analysis:** repeatable sales and operations history stored in a
-  Lakehouse and presented through Power BI.
-- **Optional live operations:** generated retail events written to Eventhouse
-  and queried with KQL (Kusto Query Language).
-
-It also includes machine-learning outputs, a business ontology, and Data
-Agents. These extensions demonstrate how the same governed data can support
-forecasts, risk signals, business relationships, and natural-language
-questions.
+Machine-learning outputs add forecasts and risk estimates. An ontology maps
+business relationships, and Data Agents answer natural-language questions
+over the deployed data.
 
 ## Choose the path that matches your role
 
@@ -30,7 +25,7 @@ questions.
 | Operating an existing workspace | [Operations](guides/operations.md) | Readiness results, freshness, recovery, and safe reruns. |
 | An entry-level developer | [Plain-language glossary](guides/glossary.md), then [Design overview](design/README.md) | Fabric terminology first, then components, contracts, and implementation boundaries. |
 
-Not sure which guide you need? Use the [guide index](guides/README.md).
+The [guide index](guides/README.md) lists the full set of guides.
 
 ## What the demo contains
 

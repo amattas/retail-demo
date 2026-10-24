@@ -13,7 +13,7 @@ development or validation.
 
 ### REQ-STREAM-003 - Cross-layer contract
 
-Every live event shall have an intentional mapping to Eventhouse and, where
+Every live event shall have a documented mapping to Eventhouse and, where
 applicable, Silver, Gold, ontology, and Power BI consumers.
 
 ### REQ-STREAM-004 - Replay-safe progress

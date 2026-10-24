@@ -1,11 +1,13 @@
-"""Run a named Fabric Data Pipeline on demand via the Job Scheduler API.
+"""Start or monitor a named Fabric Data Pipeline.
 
-Resolves the workspace from the captured Terraform outputs, finds the pipeline
-item by display name, and starts an on-demand run:
+Resolve the workspace from captured Terraform outputs and find the pipeline
+by display name. Start an on-demand run through the Job Scheduler API:
 
     POST {FABRIC_API}/workspaces/{ws}/items/{pipelineId}/jobs/instances?jobType=Pipeline
 
-Auth reuses the configured operator login (see ``export_items.build_session``).
+Use ``--reattach-location`` or ``--reattach-run-id`` to monitor an existing run
+without submitting another. Authentication uses the configured operator login
+(see ``export_items.build_session``).
 """
 
 from __future__ import annotations
@@ -361,7 +363,7 @@ def wait_for_pipeline_job(
             console.warn(
                 f"Pipeline status polling hit a network error "
                 f"({consecutive_network_errors}/{max_consecutive_network_errors}); "
-                "will retry at next interval..."
+                "retrying at the next poll interval."
             )
             time.sleep(
                 min(poll_interval_seconds, execution_remaining, monitor_remaining)
@@ -505,7 +507,7 @@ def _parse_job_time(value: object) -> datetime | None:
 
 
 def main() -> int:
-    """Start an on-demand run of a named Fabric pipeline."""
+    """Start or monitor a named Fabric pipeline."""
 
     parser = argparse.ArgumentParser(description="Run a Fabric Data Pipeline on demand")
     parser.add_argument("--environment", required=True)
@@ -523,39 +525,39 @@ def main() -> int:
     parser.add_argument(
         "--wait",
         action="store_true",
-        help="Wait for the exact started run to reach terminal success.",
+        help="Wait for this exact run to complete successfully.",
     )
     parser.add_argument(
         "--timeout-seconds",
         type=float,
         default=21600,
-        help="Maximum acceptable execution time for the Fabric run.",
+        help="Execution-time limit in seconds for the Fabric run.",
     )
     parser.add_argument(
         "--monitor-timeout-seconds",
         type=float,
         default=None,
-        help="Maximum time this local process remains attached to an active run.",
+        help="Stop waiting after this many seconds without cancelling the Fabric run.",
     )
     parser.add_argument(
         "--poll-interval-seconds",
         type=float,
         default=15,
-        help="Delay between job-instance status requests.",
+        help="Seconds between run-status requests.",
     )
     parser.add_argument(
         "--evidence-output",
         type=Path,
-        help="Write bounded exact-run correlation evidence to this JSON path.",
+        help="Save this run's identity, status, and timestamps as JSON at this path.",
     )
     reattach = parser.add_mutually_exclusive_group()
     reattach.add_argument(
         "--reattach-location",
-        help="Poll this exact existing Fabric job Location without POSTing.",
+        help="Monitor this exact Fabric job Location without starting a new run.",
     )
     reattach.add_argument(
         "--reattach-run-id",
-        help="Poll this exact existing Fabric run ID without POSTing.",
+        help="Monitor this exact Fabric run ID without starting a new run.",
     )
     args = parser.parse_args()
 
@@ -682,7 +684,7 @@ def main() -> int:
             console.error(str(exc))
             return 1
         console.info(
-            f"Pipeline run for {args.pipeline!r} reached terminal success "
+            f"Pipeline run for {args.pipeline!r} completed successfully "
             f"({status})."
         )
     return 0

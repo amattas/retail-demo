@@ -1,17 +1,16 @@
 # Plain-language glossary
 
-Use this page when a guide, screenshot, or Fabric screen uses an unfamiliar
-term. The definitions describe how each term is used in this demo rather than
-every feature the Microsoft Fabric product supports.
+Look up unfamiliar terms from the guides, screenshots, and Fabric UI here.
+These definitions describe this demo, not every use of each term in Fabric.
 
 ## Business and reporting terms
 
 | Term | Plain-language meaning |
 | --- | --- |
-| **Business measure** | A reusable calculation, such as net sales or gross margin, with one agreed definition. Power BI and Data Agents use measures so that answers are based on the same business rules. |
+| **Business measure** | A reusable calculation, such as net sales or gross margin. Power BI and Data Agents use the same measure definitions to apply the same business rules. |
 | **Dimension** | Descriptive data used to group or filter results. Examples include Store, Product, Customer, and Date. |
 | **Fact** | A record of something that happened or changed, such as a receipt, payment, inventory movement, or online order. |
-| **Grain** | What one row represents. For example, “one row per receipt” and “one row per product on a receipt” are different grains. |
+| **Grain** | What one row represents. A table with one row per receipt has a different grain from one with one row per product on a receipt. |
 | **KPI** | Key performance indicator. A KPI is a measure used to monitor an outcome, such as sales, margin, stockout risk, or fulfillment time. |
 | **ROAS** | Return on ad spend. It compares attributed sales with advertising cost. Attribution is an estimate, so ROAS should be presented with its time window and attribution rules. |
 | **Semantic model** | The reusable Power BI data layer that defines tables, relationships, measures, and business-friendly names. It is often called a dataset in everyday Power BI conversation. |
@@ -23,16 +22,16 @@ every feature the Microsoft Fabric product supports.
 | --- | --- |
 | **Capacity** | The Fabric computing resources that run notebooks, queries, pipelines, and reports. Larger or busier demos need more capacity. |
 | **Activator** | Fabric's event-driven alerting and action service. The repository contains rule ideas, but the default deployment does not publish a complete Activator workflow. |
-| **Data Agent** | A Fabric conversational experience that answers natural-language questions using approved data sources. An answer still needs to be checked against its stated period, measures, and source data. |
+| **Data Agent** | A Fabric service that answers natural-language questions using approved data sources. Check each answer against its stated period, measures, and source data. |
 | **Delta table** | A table stored in the Delta Lake format. Delta adds schema and transaction history to data files so that Spark and Fabric can update them safely. |
 | **Direct Lake** | A Power BI connection mode that reads Fabric Lakehouse data directly from OneLake instead of copying it into a separate imported dataset. |
 | **Eventhouse** | Fabric storage and query technology for high-volume, time-sensitive event data. This demo uses it for optional live retail events. |
 | **Fabric workspace** | The shared Fabric area that contains the demo's Lakehouse, Eventhouse, notebooks, pipelines, reports, ontology, and other items. |
 | **KQL** | Kusto Query Language, the query language used for Eventhouse data. KQL is designed for time-based events, logs, and operational analysis. |
 | **KQL queryset** | A saved collection of KQL query tabs connected to an Eventhouse database. The demo deploys one queryset for repeatable operational questions. |
-| **Lakehouse** | Fabric storage that combines data-lake files with table and SQL experiences. This demo stores durable historical and analytical tables in a Lakehouse. |
+| **Lakehouse** | Fabric storage for data-lake files and tables, with Spark and SQL access. This demo uses it for historical and analytical tables. |
 | **OneLake** | The organization-wide storage layer used by Microsoft Fabric. A Fabric Lakehouse stores its files and tables in OneLake. |
-| **Ontology** | A business map that connects concepts such as Store, Product, Customer, and Receipt to the underlying data. It helps people and agents navigate data using business language. |
+| **Ontology** | A map of business concepts, such as Store, Product, Customer, and Receipt, and their relationships to each other and the underlying data. |
 | **Power BI Project (PBIP)** | The folder-based, source-control-friendly format used for the checked-in Power BI report and semantic model. |
 | **Real-Time Intelligence (RTI)** | The Fabric workload for event-driven analysis. Eventhouse, KQL querysets, dashboards, and Activator are part of this area. |
 | **Spark** | A distributed data-processing engine used by Fabric notebooks. The setup and machine-learning notebooks use Spark to create or transform data. |
@@ -50,7 +49,7 @@ every feature the Microsoft Fabric product supports.
 | **`ag` schema** | The short schema name used for Silver tables in this demo. For example, `ag.fact_receipts` contains durable receipt history. |
 | **`au` schema** | The short schema name used for Gold tables and machine-learning outputs in this demo. For example, `au.sales_minute_store` contains summarized store sales. |
 | **`cusn` schema** | The Lakehouse schema used for read-only shortcuts to Eventhouse tables. It lets Spark notebooks query live event data without copying it first. |
-| **Medallion architecture** | A common way to organize data as Bronze, Silver, and Gold layers. Each layer adds structure and business usefulness. |
+| **Medallion architecture** | Data organized into Bronze source records, Silver cleaned tables, and Gold summaries and model outputs. |
 | **Shortcut** | A Fabric reference to data stored elsewhere. A shortcut makes data visible without creating another physical copy. |
 | **Watermark** | A saved progress marker. `ag._watermarks` records how far a streaming transformation has processed so that the next run can continue safely. |
 
@@ -94,9 +93,8 @@ every feature the Microsoft Fabric product supports.
 | --- | --- |
 | **Model output** | A table containing a prediction, segment, forecast, or recommendation produced by a machine-learning notebook. |
 | **Required model** | One of the six outputs needed by the Power BI report: demand forecast, customer segments, churn predictions, stockout risk, product recommendations, or price elasticity. Reporting is not published until these pass validation. |
-| **Optional model** | A useful extension that runs after Reporting in `full-demo`. Its failure does not remove the required report. |
+| **Optional model** | An additional model that runs after Reporting in `full-demo`. Its failure does not remove the required report. |
 | **Experimental model** | A preview output with stronger limitations. Treat it as an exploration, not an automated business decision. |
 
-When a term is still unclear, start with the
-[deployed walkthrough](deployed-walkthrough.md), which shows where each item
-appears in the workspace, then follow the linked technical reference.
+The [deployed walkthrough](deployed-walkthrough.md) shows where these items
+appear in the workspace.

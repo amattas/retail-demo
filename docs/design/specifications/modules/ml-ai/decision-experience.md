@@ -1,7 +1,8 @@
 # Decision experience and action boundaries
 
-This is the living owner of the reusable action-layer and Retail CX design.
-It replaces dated implementation plans, not the Fabric profile manifest.
+This specification defines the proposed action layer and Retail customer
+experience (CX). It replaces dated implementation plans; the Fabric profile
+manifest still defines deployment selections.
 `REQ-MLAI-005` remains `proposed`: the presence of replay/app code does not
 prove the complete scenario, shared hosting, or production execution.
 
@@ -15,7 +16,7 @@ selected mode before presenting any answer as live.
 Live proposals are local JSON records managed by `app/backend/proposals.py`.
 Approving a record changes its local status; it does not submit a purchase
 order, send a campaign, or call an ERP, CRM, pricing, or workforce system.
-`app/backend/eventhouse.py` sends telemetry on daemon threads and swallows
+`app/backend/eventhouse.py` sends telemetry on daemon threads and suppresses
 ingestion errors. It is best-effort telemetry, not a guaranteed audit trail.
 These limitations are tracked by `THREAT-009` and `SEC-012`.
 
@@ -83,8 +84,8 @@ live signals, freezes the inspected snapshot, and merges a DRAFT into
 Existing APPROVED or RESOLVED cases are not relabeled or audited as DRAFT.
 An idempotently tagged Kusto audit follows the durable Delta write. The
 two services are not an atomic transaction: failures propagate and a retry
-can finish the missing audit without duplicating the draft. No historical
-`ag`/`au` tables or external purchasing systems are mutated.
+can finish the missing audit without duplicating the draft. Historical
+`ag`/`au` tables and external purchasing systems remain unchanged.
 
 `retail-replenishment` is a native **Plan**, not another autonomous agent.
 Its supported `PlanV1` definition binds the deployed semantic model through

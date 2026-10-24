@@ -3192,7 +3192,7 @@ def _print_summary(report: dict[str, Any], path: Path) -> None:
         f"{counts['skipped']} skipped."
     )
     if report["status"] == "DEGRADED" and required_ready:
-        console.info("Required deployment READY. Non-blocking readiness notices remain.")
+        console.info("Required deployment READY. Review the notices below.")
         console.detail(summary)
     else:
         console.info(summary)
@@ -3215,8 +3215,8 @@ def _print_summary(report: dict[str, Any], path: Path) -> None:
         unobserved_stream = set()
     if unobserved_stream:
         console.info(
-            "Optional live-stream evidence is not recorded yet; expected before "
-            "stream-events is started. This does not block deployment."
+            "No optional live-stream evidence yet; this is expected before "
+            "stream-events is started. Missing stream evidence does not block deployment."
         )
     for check in report["checks"]:
         if check["status"] in {"FAIL", "UNKNOWN"}:
@@ -3236,7 +3236,7 @@ def main(argv: list[str] | None = None) -> int:
     """CLI entry point for live readiness verification."""
 
     parser = argparse.ArgumentParser(
-        description="Verify profile-aware live Fabric readiness and freshness"
+        description="Check live Fabric readiness and data freshness for the selected profile"
     )
     parser.add_argument("--environment", required=True)
     parser.add_argument("--repo-root", type=Path, default=REPO_ROOT)
@@ -3244,16 +3244,16 @@ def main(argv: list[str] | None = None) -> int:
         "--run-pipeline",
         action="store_true",
         help=(
-            "Explicitly run and wait for the profile-required post-publish "
-            "pipeline before checking evidence."
+            "Start the profile-required post-publish pipeline and wait for it "
+            "to finish before checking evidence."
         ),
     )
     parser.add_argument(
         "--defer-post-ontology",
         action="store_true",
         help=(
-            "Skip ontology, Data Agent, and task-flow evidence until the "
-            "live-validated post-ontology publication step."
+            "Defer ontology, Data Agent, and task-flow checks until "
+            "post-ontology publication is verified."
         ),
     )
     parser.add_argument("--timeout-seconds", type=float, default=21600)

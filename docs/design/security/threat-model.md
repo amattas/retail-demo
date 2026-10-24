@@ -1,8 +1,9 @@
 # Threat model
 
-This document owns the security threats for the Microsoft Fabric Retail Demo.
-Controls live in [controls.md](controls.md); implementation and verification
-evidence lives in [traceability](../requirements/traceability.md).
+This document records the demo's security threats. See
+[controls.md](controls.md) for mitigations and
+[traceability](../requirements/traceability.md) for implementation and
+verification evidence.
 
 ## Scope and assumptions
 
@@ -55,7 +56,7 @@ flowchart LR
 | `THREAT-005` | Activity, deployment state, or freshness is not observable. | Incidents or stale demo output go undetected. | `SEC-008` | Readiness has historical baseline evidence; current cleanup/degradation consistency and fresh required/optional execution remain open. |
 | `THREAT-006` | Misbinding or unsafe reset targets the wrong tenant, workspace, or state. | Cross-environment modification or destructive loss. | `SEC-001`, `SEC-009` | Environment-local paths, fingerprinted resume, target validation, and saved-plan guards exist. They do not lock concurrent remote writers or replace operator review; live recovery drills remain outstanding. |
 | `THREAT-007` | Required streaming or deploy failures are treated as success. | Lost integrity, advanced checkpoints, or false readiness. | `SEC-008`, `SEC-011` | Required writes and progress fail closed in source; fresh Fabric failure/recovery proof remains open. Successful promotion with cleanup warnings must degrade, not falsely fail, readiness. |
-| `THREAT-008` | Public docs publish secrets, target-specific values, or temporary internal evidence. | Disclosure and stale guidance. | `SEC-003`, `SEC-010` | Review source and built files, not just navigation. Zensical publishes non-nav files; old tagged sites require separate inspection. |
+| `THREAT-008` | Public docs publish secrets, target-specific values, or temporary internal evidence. | Disclosure and stale guidance. | `SEC-003`, `SEC-010` | Review every source and built file, including files omitted from navigation. Zensical publishes non-nav files; inspect old tagged sites separately. |
 | `THREAT-009` | The optional app presents replay, local approval, or lossy telemetry as authenticated production action/audit evidence. | False operational assurance, unauthorized future actions, or lost evidence. | `SEC-003`, `SEC-008`, `SEC-012` | Proposals are local drafts and Eventhouse logging is best-effort. Per-user authorization, production adapters, durable audit, evidence validation, idempotency, and scope limits are not established by an approval button. |
 | `THREAT-010` | Notebook substitution executes configuration strings, or unverified/mismatched dictionary content is reused. | Unintended statements or irreproducible data. | `SEC-007`, `SEC-013` | Literal/JSON encoding, ref and cache checks, mutable refresh, and manifest-last publication are implemented; notebooks were rebuilt and drift checked. Explicit refs/fork overrides remain caller-selected; fresh live execution remains open. |
 
@@ -63,4 +64,4 @@ flowchart LR
 
 Review when identities, public endpoints, agents, data classification, preview
 defaults, external action adapters, or documentation publication boundaries
-change. No fresh Fabric deployment was performed in this repair session.
+change. Prior Fabric runs do not validate changes made after those runs.

@@ -1,11 +1,10 @@
-# Chat Orchestrator — How Questions Are Routed
+# Chat orchestrator: how questions are routed
 
-> How the Retail Intelligence chat (`app/`) decides whether a question is answered by the
-> **Fabric Data Agent** (semantic model), the **Ontology MCP** (knowledge graph), or an
-> **Action agent** (Inventory / Retention) — and how it falls back when the first choice
-> can't answer.
+Retail Intelligence chat (`app/`) routes questions to the Fabric Data Agent,
+Ontology MCP, or an Inventory or Retention action agent. This page describes
+route selection and what happens when a data service cannot answer.
 
-The whole orchestrator lives in `app/backend/main.py` (the `/api/chat` handler, `_orchestrate`,
+The orchestrator lives in `app/backend/main.py` (the `/api/chat` handler, `_orchestrate`,
 `_route_with_reason`, `_action_route`) plus the LLM classifier in `app/backend/llm_router.py`.
 
 This describes local source behavior, not guaranteed live service responses.
@@ -13,22 +12,18 @@ Replay bypasses live routing. Inspect the actual response trace and mode;
 fallback cannot make unavailable Fabric services or missing data ready.
 See [decision and security boundaries](decision-experience.md).
 
----
-
-## 1. The three (four) destinations
+## 1. Destinations {#1-the-three-four-destinations}
 
 | Route | Backend | Best for |
 |---|---|---|
-| **data-agent** | Fabric Data Agent over the `retail_model` semantic model (Direct Lake) | Aggregates, KPIs, totals/averages, rankings, trends, time windows, ML rollups, broad multi-hop scans over many rows |
-| **ontology** | Ontology MCP (graph of entities + relationships, incl. Eventhouse telemetry) | A **single named entity** (a customer's loyalty card, a product, a store) fused with its ML predictions + live event telemetry through the graph; 1‑hop "which X is linked to named Y" lookups |
-| **inventory** | Inventory & Replenishment **action agent** | The user asks what to **do** about stock / replenishment (action verbs) → recommendation card + drafted reorders |
-| **retention** | Customer Retention **action agent** | The user asks what to **do** about churn / retention → recommendation card + drafted win‑back campaign |
+| `data-agent` | Fabric Data Agent over the `retail_model` semantic model (Direct Lake) | Aggregates, KPIs, rankings, trends, time windows, ML rollups, and broad scans |
+| `ontology` | Ontology MCP (entity relationships, including Eventhouse telemetry) | A named customer's, product's, or store's related data; one-hop lookups |
+| `inventory` | Inventory & Replenishment action agent | Requests to act on stock or replenishment; returns a recommendation card and draft reorders |
+| `retention` | Customer Retention action agent | Requests to act on churn or retention; returns a recommendation card and draft campaign |
 
-The action agents (`inventory`, `retention`) are terminal — they own their own answer and never
-fall back. `data-agent` and `ontology` are a **paired ranking**: one is tried first, the other is
-the automatic fallback.
-
----
+The action agents (`inventory`, `retention`) return their own answers without
+fallback. For `data-agent` and `ontology`, the router ranks the two services:
+it tries one first and uses the other as a fallback.
 
 ## 2. The decision flow
 
@@ -67,59 +62,61 @@ flowchart TD
     Z --> P
 ```
 
----
-
 ## 3. Step-by-step
 
-The handler evaluates these gates **in order**; the first match wins.
+The handler evaluates these gates in order; the first match wins.
 
-1. **Manual override (`surface`)** — if the API request sets `"surface": "data-agent"` or
-   `"ontology"`, that single backend is used (no fallback). Used for debugging / the UI's
-   force-a-source control. Router label = *manual override*.
+1. Manual override (`surface`): if the request sets `"surface": "data-agent"`
+   or `"ontology"`, the handler uses only that backend, with no fallback.
+   Debugging and the UI's force-a-source control use this override.
+   The router label is `manual override`.
 
-2. **Real-time sales-velocity shortcut** — questions like *"which sold the most in the last 15
-   minutes"* (regex on *last/past N minutes/hours* + a sales verb). The current
-   shortcut sends a fixed 15-minute store-sales query to the **lite ontology**
+2. Real-time sales-velocity shortcut: a regex matches questions such as
+   "which sold the most in the last 15 minutes" using a last/past time window
+   and a sales verb. The shortcut sends a fixed 15-minute store-sales query to the lite ontology
    over Store and `receipt_created`, returning `routedTo = ontology-lite`.
    It does not guarantee that arbitrary requested windows or product grain are
    honored. Historical Gold also has a latest-window snapshot, but that is not
    evidence of a current live window. Shortcut failure falls through to normal
    routing.
 
-3. **LLM intent router** (`llm_router.classify`) — the primary brain. A small, fast,
-   `temperature=0` JSON classification call (Azure OpenAI **gpt-4o-mini** by default, keyless via
-   `az login`; swappable to Claude with `RETAIL_LLM_PROVIDER=anthropic`). It returns
-   `{"route", "reason"}` using a system prompt + ~14 few-shot examples that encode the policy:
-   - **One named entity + its connected business/ML/telemetry context → ontology** (Customer-360,
+3. LLM intent router (`llm_router.classify`): a `temperature=0` JSON
+   classification call uses Azure OpenAI `gpt-4o-mini` by default,
+   authenticated through `az login`. Set `RETAIL_LLM_PROVIDER=anthropic`
+   to use Claude. It returns `{"route", "reason"}` using a system prompt
+   and about 14 examples that encode this policy:
+   - A named entity and its related business, ML, or telemetry data go to ontology (Customer-360,
      "which stores are at risk of selling out *White Truffle Powder*", "for store S000028, how many
      `stockout_detected` events and which products").
-   - **Aggregates / rankings / trends / ML rollups / broad multi-hop scans → data-agent.**
-   - **An action verb** (should, do, prevent, draft, create, reorder, replenish, launch, recommend)
-     **+ a domain → inventory / retention.** A bare *"which … are at risk"* (no action verb) is a
-     lookup, **not** an action.
+   - Aggregates, rankings, trends, ML rollups, and broad scans go to data-agent.
+   - An action verb (should, do, prevent, draft, create, reorder, replenish,
+     launch, recommend) with a domain selects inventory or retention.
+     "Which customers are at risk" is a lookup, not an action request.
 
    The chosen route also sets the fallback order: `data-agent` → `[data-agent, ontology]`;
    `ontology` → `[ontology, data-agent]`.
 
-4. **Keyword fallback router** — if the LLM call fails, times out, returns bad JSON, or is disabled
+4. Keyword fallback router: if the LLM call fails, times out, returns bad JSON, or is disabled
    (`RETAIL_LLM_ROUTER=0`), a deterministic keyword router provides a local fallback:
-   - `_action_route`: an **action cue** (`what should we do`, `recommend`, `how do we`, …) plus an
-     inventory/retention **domain** word, *or* a direct verb (`reorder`, `replenish`, `win-back`,
-     `retain`, …) → the matching action agent.
-   - Else `_route_with_reason`: a **Data-Agent cue** (`total`, `sum`, `count`, `top`, `trend`,
-     `churn`, `revenue`, `%`, …) → data-agent first; an **Ontology cue** (`deliver`, `supplies`,
-     `linked`, `route`, `which stores`, `connected to`, …) → ontology first; no cue → **data-agent
-     first** (the safe default).
+   - `_action_route` selects the matching agent for an action cue
+     (`what should we do`, `recommend`, `how do we`) plus an inventory or
+     retention domain word, or a direct verb such as `reorder`, `replenish`,
+     `win-back`, or `retain`.
+   - Otherwise, `_route_with_reason` tries data-agent first for cues such as
+     `total`, `sum`, `count`, `top`, `trend`, `churn`, `revenue`, and `%`.
+     It tries ontology first for cues such as `deliver`, `supplies`, `linked`,
+     `route`, `which stores`, and `connected to`. With no cue, it defaults to
+     data-agent first.
 
-5. **Execute + automatic fallback** — the chosen `order` is tried in sequence. A backend "fails"
+5. Execution and fallback: the handler tries the chosen `order` in sequence. A backend fails
    (and falls through to the next) when it raises an HTTP/timeout error, returns empty / "no
    results", or the ontology translator emits a transient bad-query error after its retries. If the
-   first succeeds, the second is never called. If **both** fail, the user gets a graceful
-   *"I couldn't answer that from either…"* message instead of a 500.
+   first succeeds, the second is never called. If both fail, the response
+   says neither service could answer, rather than returning a 500.
 
-6. **Answer synthesis + trace** — ontology answers often come back as bare `store_id` / `product_id`
-   integers; the synthesis step resolves them to **store numbers + locations** and **product names**.
-   Every response carries `routedTo` and a **trace** (router model, decision reason, steps, the exact
+6. Answer synthesis and trace: the synthesis step resolves bare ontology
+   `store_id` and `product_id` integers to store numbers, locations, and product names.
+   Every response carries `routedTo` and a trace (router model, decision reason, steps, the exact
    MCP call, the reconstructed graph path, a raw-row preview, and whether it `fellBack`).
 
    The store/product lookup helpers use the explicitly imported `dax` client
@@ -127,17 +124,13 @@ The handler evaluates these gates **in order**; the first match wins.
    import and row-to-name mapping regression. This is local lookup coverage,
    not proof of a successful remote semantic-model query.
 
----
-
 ## 4. Why two routers?
 
-The LLM router *understands intent* (it can tell "which customers are at risk" — a lookup — from
-"churn is rising, what do we do" — an action — even though both say "churn"). The keyword router is
-the **safety net**: deterministic, no network dependency, and guarantees the chat keeps working if
-Azure OpenAI is unreachable. Downstream Fabric calls can still fail; a local
-route choice is not proof that the question can be answered.
-
----
+The LLM router distinguishes a lookup such as "which customers are at risk"
+from an action request such as "churn is rising, what do we do." The keyword
+router provides a deterministic route choice without a network call when
+the LLM is unavailable. Downstream Fabric calls can still fail; choosing a
+route does not guarantee an answer.
 
 ## 5. Worked examples
 
@@ -149,10 +142,8 @@ route choice is not proof that the question can be answered.
 | "For store S000028, how many `stockout_detected` events and which products?" | **ontology** | One named store's own live event telemetry, walked to its affected products. |
 | "Which products sold the most in the last 15 minutes?" | **ontology-lite shortcut** | Currently uses a fixed store-sales query; inspect grain rather than treating this as a verified product answer. |
 | "How many customers are predicted to churn and their total LTV?" | **data-agent** | Aggregate count/value over the ML churn table. |
-| "Stock is running low — what should we do about it?" | **inventory** | Action cue + inventory domain → drafts reorders. |
-| "Churn is rising — how do we retain customers?" | **retention** | Action cue + retention domain → drafts a win-back campaign. |
-
----
+| "Stock is running low. What should we do about it?" | **inventory** | Action cue and inventory domain select draft reorders. |
+| "Churn is rising. How do we retain customers?" | **retention** | Action cue and retention domain select a draft win-back campaign. |
 
 ## 6. Knobs
 
@@ -164,6 +155,6 @@ route choice is not proof that the question can be answered.
 | Request body `"surface": "data-agent"\|"ontology"` | Force one backend (no routing, no fallback). |
 | Request body `"router": "keyword"` | Skip the LLM for that single request. |
 
-> **Note:** only the **router** is a model we control. The actual NL→DAX (Data Agent) and
-> NL→graph-query (Ontology) translation runs **inside Fabric** with Fabric's own model and is not
-> swappable. The trace names the router model that made the decision.
+Only the routing model is configurable by this application. Fabric controls
+the models that translate natural language into DAX and ontology queries.
+The trace names the router model that selected the route.

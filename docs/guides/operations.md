@@ -1,16 +1,14 @@
 # Operations guide
 
-This guide covers routine readiness, monitoring, and recovery. Provisioning and
-publication are covered by [Deployment](deployment.md). Exact failure and
-recovery behavior is owned by the
-[operations runbook](../design/specifications/modules/operations/runbook.md).
-Use the [workspace and profile inventory](workspace-inventory.md) for canonical
-prerequisites, selected assets, expected counts, folders, and support
-boundaries.
+Use this guide to check readiness, monitor data, and recover failures in an
+existing workspace. It is written for operators, analysts validating a demo,
+and support engineers. The [plain-language glossary](glossary.md) explains
+unfamiliar Fabric and data-layer terms.
 
-**Audience:** workspace operators, analysts validating a demo, and support
-engineers. The [plain-language glossary](glossary.md) explains the Fabric and
-data-layer terms used below.
+See [Deployment](deployment.md) for provisioning and publication, the
+[operations runbook](../design/specifications/modules/operations/runbook.md)
+for exact failure behavior, and the
+[workspace inventory](workspace-inventory.md) for selected assets and counts.
 
 ## Readiness checklist
 
@@ -46,16 +44,15 @@ reference and edge.
 | usage error | The command or profile request is invalid. | `2` |
 | `DEGRADED` | Required checks passed, but optional evidence failed or is unknown. | `3` |
 
-`DEGRADED` does not mean the required deployment failed. It means the
-workspace is usable for required scenarios, but an optional story should not
-be presented yet. A new deployment where `stream-events` has not been started
+`DEGRADED` means required scenarios are usable, but an optional feature is not
+ready to present. A new deployment where `stream-events` has not been started
 normally reports three optional unknowns:
 
 - no recent Silver streaming watermark;
 - no recent Eventhouse ingestion; and
 - no checkpoint identity attached to Eventhouse ingestion.
 
-A recent watermark alone is no longer enough for a green streaming check.
+A recent watermark alone is not enough for a passing streaming check.
 The verifier also samples settled receipt/inventory keys and Gold sales
 against Silver, checking orphan keys and null balances. Missing or empty
 samples remain `UNKNOWN`; observed mismatches are `FAIL`. Both are optional
@@ -84,7 +81,7 @@ Before running the verifier:
    `ml-required`.
 5. For Reporting profiles, retain the deployment journal that correlates the
    exact setup and required-ML pipeline runs.
-6. Confirm optional ML, ontology, agent, dashboard, and rule surfaces are ready
+6. Confirm optional ML, ontology, agent, dashboard, and rule features are ready
    before including them.
 7. Run a bounded stream before expecting streaming freshness checks to pass.
 
@@ -100,7 +97,7 @@ unknown state, timeout, mismatched run, or missing `Location` evidence. It does
 not start streaming, required ML, optional ML, or any schedule. A profile
 without a post-publish pipeline rejects this option as a usage error.
 
-Do not treat these as equivalent:
+Different checks establish different facts:
 
 | Evidence | What it proves |
 | --- | --- |
@@ -129,9 +126,9 @@ Use these signals together:
 | Alert state | Whether optional detections or actions are pending | The deployed alert or action table, when selected |
 | Deployment identity | Which source revision and Fabric resources produced the evidence | Git commit, `deploy-run.json`, and `terraform-output.json` |
 
-`retail-setup verify` unifies these signals without persisting source rows.
+`retail-setup verify` checks these signals without saving source rows.
 For required machine learning, it checks the publication time and the
-identifier of the run that produced the same row. Business “as of” fields
+identifier of the run that produced the same row. Business "as of" fields
 describe the source period; they do not prove when the model output was
 published.
 Setup and model evidence may be at most seven days old. Streaming watermarks,
@@ -226,13 +223,13 @@ pipeline evidence. Do not weaken the gate or mark its failed run successful.
 
 For a normal update:
 
-1. preserve the failed or prior run identifiers;
-2. confirm the target environment and workspace;
-3. rerender notebooks when configuration or source changed;
-4. preview the deployment plan;
-5. deploy in place without recreate;
-6. rerun only affected data workloads;
-7. compare row counts, timestamps, and bindings with the prior known-good run.
+1. Preserve the failed or prior run identifiers.
+2. Confirm the target environment and workspace.
+3. Rerender notebooks when configuration or source changed.
+4. Preview the deployment plan.
+5. Deploy in place without recreate.
+6. Rerun only affected data workloads.
+7. Compare row counts, timestamps, and bindings with the prior known-good run.
 
 Each workspace environment has isolated generation configuration, rendered
 output, Terraform state/data, and `deploy/.generated/<env>/workspace/`

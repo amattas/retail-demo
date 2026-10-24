@@ -413,8 +413,8 @@ def main() -> int:
         )
     if readiness_status == "DEGRADED":
         console.warn(
-            "Recovered deployment is ready with optional degraded evidence; "
-            "see the linked readiness report."
+            "Required deployment checks passed. Review remaining issues in "
+            "the linked readiness report."
         )
     return 1 if readiness_status == "FAILED" else 0
 

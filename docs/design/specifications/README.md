@@ -1,12 +1,12 @@
 # Specifications
 
-Specifications own exact behavior: interfaces, files, schemas, mappings,
+Specifications define exact behavior: interfaces, files, schemas, mappings,
 workflow order, state transitions, errors, compatibility, and current known
 divergence.
 
 Requirements describe what must be true. Architecture describes where
-components sit. Security describes threats and controls. Guides derive
-procedures from these specifications.
+components sit. Security describes threats and controls. The guides turn
+these specifications into procedures.
 
 ## Module owners
 
@@ -24,5 +24,5 @@ procedures from these specifications.
 | Security | [Access control](modules/security/access-control.md) |
 | Documentation | [Zensical site](modules/documentation/site.md) |
 
-Dated implementation plans and the retired Docusaurus source were reconciled
-into these owners and removed.
+These specifications replace the dated implementation plans and retired
+Docusaurus source.

@@ -7,7 +7,7 @@
 - Direct Python: `python scripts/setup.py`
 - Installed CLI: `retail-setup`
 
-The shell wrappers converge on the Python guided setup.
+Both shell wrappers invoke the same Python guided setup.
 When `--profile` is omitted, both wrappers prepend `--profile full-demo`;
 a later explicit `--profile` argument overrides it. Direct `scripts/setup.py`
 and `retail-setup` commands use the same manifest-default `full-demo` profile.
@@ -16,7 +16,7 @@ Before dependencies are installed, `scripts/solution_manifest.py` reads the
 manifest version/hash, prerequisites, canonical examples, and profile
 names/default/publication expectations. `scripts/setup.py` derives its tool
 checks, profile choices, and profile default from that projection and validates
-its Python minimum against the manifest and utility package constraint.
+its minimum Python version against the manifest and utility package constraint.
 
 The guided bootstrap checks Git, Terraform, and Azure CLI, then installs the
 editable utility plus `azure-identity`, `azure-kusto-data`, `fabric-cicd`,
@@ -85,7 +85,7 @@ compatibility; configure writes the environment-specific path.
 
 Reconfiguring an existing environment removes the legacy
 `spark.use_custom_pool` and `notebooks.include` overlay keys. Deployment
-profiles now own both selections; unrelated Spark and notebook settings remain
+profiles now control both selections; unrelated Spark and notebook settings remain
 unchanged.
 
 The active non-interactive inputs include:
@@ -149,7 +149,7 @@ Only a 404 for a declared optional file is accepted; other download/JSON
 failures stop the attempt. Publication invalidates the old manifest, replaces
 files, removes stale optional files, and atomically publishes the new manifest
 last. This is not an atomic directory swap or distributed transaction:
-interrupted publication cannot leave a valid manifest blessing partial data.
+interrupted publication cannot leave a manifest that marks partial data as valid.
 `utility/tests/test_dictionary_seed_cache.py` covers revision changes,
 corruption, interrupted downloads, immutable hits, mutable refresh, optional
 404 behavior, and invalid JSON.
@@ -181,7 +181,14 @@ claiming the packaged/rendered artifact set is current.
 11. `setup-11-build-gold.ipynb`
 12. `stream-events.ipynb`
 
-In `setup-pipeline`, 02 (dimension validation), 03, 04, and 05 run in parallel after 01; 06, 07, and 08 run in parallel after 03; 09 waits for 03 to 06. Each notebook runs its own stages concurrently and hands outputs to later notebooks as `gen__*` tables in the Silver staging schema. Setup 10 checks invariants and publishes Silver atomically once 02 to 09 succeed. Setup 11 builds Gold inside `ml-required`, alongside model training, because both read only Silver.
+In `setup-pipeline`, notebooks 02 (dimension validation), 03, 04, and 05 run in
+parallel after 01. Notebooks 06, 07, and 08 run in parallel after 03; 09 waits
+for 03 to 06. Each notebook runs its own stages concurrently and passes outputs
+to later notebooks as `gen__*` tables in the Silver staging schema.
+
+Setup 10 checks invariants and publishes Silver atomically once 02 to 09
+succeed. Setup 11 builds Gold inside `ml-required`, alongside model training,
+because both read only Silver.
 
 ### Required tokens
 
@@ -237,9 +244,10 @@ including custom `months` or explicit date ranges.
 
 Terraform apply consumes the saved, validated plan. `--yes` pre-confirms
 Terraform apply but does not skip the destructive-change guard, required pipeline gates
-or live tenant/capacity preflight. Full-demo proceeds without boundary prompts
-when the required tenant switches and capacity are valid. Disabled settings
-and invalid capacity fail before Fabric mutation with exact remediation.
+or live tenant/capacity preflight. Full-demo's capability preflight needs no
+prompt when the required tenant switches and capacity are valid. Disabled
+settings and invalid capacity fail before Fabric changes, with instructions
+for correcting the problem.
 `--skip-terraform` rejects missing, placeholder,
 incomplete, or wrong-workspace Terraform outputs before publication.
 `--recreate` polls for workspace-name release for up to 180 seconds between

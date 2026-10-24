@@ -4,7 +4,7 @@
 
 Every deploy shall resolve one explicit workspace-derived environment and
 validate its tenant, workspace, resource identifiers, and isolated Terraform
-state before mutation.
+state before changing resources.
 
 ### REQ-DEPLOY-002 - Ordered publication
 
@@ -23,7 +23,7 @@ outputs with `--skip-terraform`.
 
 ### REQ-DEPLOY-004 - Honest result
 
-A required failed step shall produce a failed or explicitly degraded final
+A failed required step shall produce a failed or explicitly degraded final
 result. Optional steps shall be named and reported separately.
 
 ### REQ-DEPLOY-005 - Profiles and previews

@@ -110,7 +110,7 @@ def main() -> int:
         return 1
 
     console.info(
-        f"Captured workspace access validated: {report.workspace_name} "
+        f"Verified workspace access: {report.workspace_name} "
         f"({report.workspace_id})."
     )
     return 0

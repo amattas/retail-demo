@@ -1,12 +1,8 @@
 # Deployed walkthrough: data platform
 
-- **Audience:** Data engineering, analytics, and technology stakeholders
-- **Duration:** 10-15 minutes
-- **Data:** Synthetic
-
-Use this page after the
-[deployed walkthrough overview](deployed-walkthrough.md) to show how Microsoft
-Fabric orchestrates, transforms, stores, and queries the retail data.
+Allow 10-15 minutes to show data engineering, analytics, and technology teams
+how Fabric loads, transforms, stores, and queries the synthetic retail data.
+Start with the [walkthrough overview](deployed-walkthrough.md).
 
 !!! note "Representative screenshots"
 
@@ -19,7 +15,7 @@ Fabric orchestrates, transforms, stores, and queries the retail data.
 Open the **Pipelines** folder. Use the deployed pipelines to explain how
 notebooks are grouped into repeatable operations:
 
-- `historical-data-load` creates the durable historical foundation.
+- `historical-data-load` loads historical data into the Lakehouse.
 - `streaming-data-load` runs Silver transformation before Gold aggregation.
 - `ml-required` runs the six Reporting producers (including market-basket
   mining and promotion/elasticity analysis) and contract validator.
@@ -45,8 +41,8 @@ notebooks are grouped into repeatable operations:
     extended-model failures cannot block Reporting.
 
 The pipeline canvas shows orchestration order. Use the **Run** history and
-activity output, not the presence of a green dependency arrow, as execution
-evidence.
+activity output to confirm execution; a green dependency arrow only shows
+the intended order.
 
 ## 2. Inspect a transformation notebook
 
@@ -55,9 +51,8 @@ Open the **Spark Notebooks** folder, then open
 
 ![Streaming-to-Silver notebook](../assets/screenshots/notebook-streaming-to-silver.png)
 
-*The notebook explains how new Eventhouse rows are moved into cleaned Silver
-tables, how it remembers the last processed event, and why column names use
-lowercase words separated by underscores.*
+*The notebook moves new Eventhouse rows into Silver tables and uses a
+watermark to track the last processed event. Column names use `snake_case`.*
 
 Use the notebook header to explain the transform without scrolling through
 implementation details. Do not run the notebook until its Lakehouse binding
@@ -85,7 +80,7 @@ Point out:
 
 - `ag` contains cleaned, typed Silver dimensions and facts.
 - `au` contains business-ready Gold summaries used for analytics.
-- `fact_receipts` provides durable receipt-grain history.
+- `fact_receipts` stores historical data with one row per receipt.
 - The preview demonstrates shape and content, not current operational
   freshness.
 
@@ -99,7 +94,7 @@ when explaining table ownership and columns.
 2. Confirm that `retail_eventhouse` appears in **Explorer** with the typed
    event tables.
 3. Select the `q_receipts_minute_by_store` tab. It reads the
-   `mv_store_sales_minute` materialized view, a bounded hot-path aggregation.
+   `mv_store_sales_minute` materialized view, which aggregates recent store sales.
 4. Select **Run**. If no stream has run in the last hour, widen `lookback`
    (for example to `7d`) to show the most recent results.
 

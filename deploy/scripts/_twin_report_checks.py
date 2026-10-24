@@ -1,4 +1,4 @@
-"""Verify report field references against the actual target model, not just source."""
+"""Check report field references against the target semantic model."""
 
 from __future__ import annotations
 

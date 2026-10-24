@@ -1,13 +1,10 @@
-"""Poll Fabric for a workspace's absence after a destroy, before recreating it.
+"""Wait for Fabric to release a deleted workspace's name before recreating it.
 
-Fabric releases a deleted workspace's display name asynchronously. Recreating
-immediately with the same name can race the still-draining old workspace, so
-`retail-setup deploy --recreate` used to insert a blind fixed-duration sleep
-between the destroy and the apply. This module replaces that sleep with a
-bounded poll of the same Fabric REST API the rest of the deploy framework
-uses, authenticated with the operator credential selected by ``auth_mode``
-(never silently substituting a different login, e.g. Azure CLI when
-``azure_powershell`` is configured).
+Fabric releases names asynchronously, so recreating a workspace immediately
+can conflict with the deleted item. Poll the Fabric REST API with a time limit
+between destroy and apply, using the operator credential selected by
+``auth_mode``. Never substitute another login, such as Azure CLI when
+``azure_powershell`` is configured.
 """
 
 from __future__ import annotations
@@ -53,12 +50,9 @@ class WorkspaceDeletionTimeout(TimeoutError):
 
 
 class WorkspacePaginationError(RuntimeError):
-    """Raised when Fabric's workspace listing API returns a looping/malformed
-    pagination response (the same continuation token/URI repeats).
+    """Raised when workspace pagination is malformed or repeats a marker.
 
-    This fails closed rather than silently returning a partial (and possibly
-    incomplete) set of workspace names, which could otherwise cause the
-    target workspace to be falsely reported absent.
+    Reject partial listings so an existing workspace cannot be reported absent.
     """
 
 

@@ -1,17 +1,13 @@
 # Deployed walkthrough: analytics and AI
 
-- **Audience:** Retail, analytics, and business stakeholders
-- **Duration:** 10-15 minutes
-- **Data:** Synthetic
-
-Use this page after the
-[deployed walkthrough overview](deployed-walkthrough.md) to show business
-context, grounded agent answers, and the Power BI outcome.
+Allow 10-15 minutes to show retail and analytics teams the ontology, Data
+Agents, and Power BI report over synthetic data. Start with the
+[walkthrough overview](deployed-walkthrough.md).
 
 !!! note "Optional surfaces"
 
-    Ontology and data-agent experiences require valid source bindings,
-    permissions, and capability support. Skip a surface that has not passed
+    Ontology and Data Agents require valid source bindings,
+    permissions, and capability support. Skip a feature that has not passed
     its preflight checks.
 
 ## 1. Show business context in the ontology
@@ -31,9 +27,8 @@ Lakehouse and Eventhouse sources.
 *The Relationship view shows Store connected to Geography, Receipt, Promotion,
 and the machine-learning StockoutRisk entity.*
 
-Explain that the ontology adds shared business meaning over existing Lakehouse
-and Eventhouse data. It does not replace the physical schema or create a second
-copy of the source data.
+The ontology maps business concepts to existing Lakehouse and Eventhouse data.
+It does not replace the physical schema or copy the source data.
 
 ## 2. Test a grounded data-agent answer
 
@@ -55,7 +50,7 @@ The agent can use every table in `retail_model`, including the receipt-level
 fact tables. Ask about a complete month: the latest month is usually partial,
 so month-over-month and year-over-year figures for it look artificially low.
 If you compare with the report, set the report's date filter to the same month
-first. Treat every generated answer as a hypothesis to verify against
+first. Check each generated answer against
 measures, query output, and source timestamps.
 
 Skip an agent when it has no selected data sources, returns an error, or has
@@ -157,10 +152,11 @@ These screenshots use the apps' synthetic sample data.
 
 ## Connect from VS Code (MCP)
 
-Both the Data Agent and the Ontology expose **streamable-HTTP MCP servers**, so you
-can talk to them directly from VS Code's agent-mode chat (Copilot) to experiment with
-questions before wiring them into the [agentic application](../design/architecture/agentic-application.md).
-Each call is a single JSON-RPC `POST` authenticated with a **Fabric bearer token**.
+The Data Agent and Ontology expose streamable-HTTP Model Context Protocol
+(MCP) servers. Call them from Copilot's agent-mode chat in VS Code to test
+questions before connecting them to the
+[agentic application](../design/architecture/agentic-application.md).
+Each call is a JSON-RPC `POST` authenticated with a Fabric bearer token.
 
 The endpoint URLs follow these shapes (substitute your workspace, data-agent, and
 ontology-item GUIDs):
@@ -179,7 +175,8 @@ https://api.fabric.microsoft.com/v1/mcp/dataPlane/workspaces/{workspaceId}/items
 az login
 ```
 
-**2. Mint a Fabric token** (valid ~60–75 min — copy the output):
+**2. Obtain a Fabric token** and copy the output. Tokens are valid for about
+60-75 minutes:
 
 ```powershell
 az account get-access-token --resource https://api.fabric.microsoft.com --query accessToken -o tsv
@@ -213,20 +210,21 @@ for the token once per session and passes it in the `Authorization` header:
 }
 ```
 
-**4. Start the servers** — click the **Start** code-lens above each server in
-`.vscode/mcp.json` (or run **MCP: List Servers** from the Command Palette), paste the
-token, then open Copilot Chat in **Agent** mode and confirm both tools are enabled.
+**4. Start the servers.** Select **Start** above each server in `.vscode/mcp.json`,
+or run **MCP: List Servers** from the Command Palette. Paste the token, then
+open Copilot Chat in **Agent** mode and confirm both tools are enabled.
 
 The Data Agent advertises one tool (`DataAgent_<name>`); the Ontology advertises
-`list_ontology_entity_types` and `search_ontology`. When calls start returning **401**,
-the token has expired — re-mint it (step 2) and **MCP: List Servers → Restart**.
+`list_ontology_entity_types` and `search_ontology`. If calls return **401**
+because the token expired, repeat step 2, then use **MCP: List Servers** to
+restart the servers.
 
 !!! tip "Which one to ask"
 
-    The **Data Agent** is best at aggregates, rankings, and trends ("top 10 products by
-    revenue last quarter"). The **Ontology** is best at single named-entity 360 lookups
-    ("what segment is loyalty member LC012304678 in, and their churn probability?") and
-    tends to error on deep multi-hop scans.
+    Use the Data Agent for aggregates, rankings, and trends, such as the top
+    10 products by revenue last quarter. Use the Ontology for a named
+    entity's related data, such as a loyalty member's segment and churn
+    probability. Deep multi-hop scans can fail.
 
 ## Analytics and AI validation
 

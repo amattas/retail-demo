@@ -2,7 +2,7 @@
 
 ## Open
 
-- Re-run target/authentication and destructive recovery smoke gates after the
+- Repeat target/authentication and destructive recovery smoke checks after the
   current environment/resume/saved-plan changes (`SEC-001`, `SEC-009`,
   `IMP-001`); local code is not fresh Fabric proof.
 - Inspect published current and historical documentation plus search indexes
