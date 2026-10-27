@@ -78,17 +78,21 @@ capacity has room.
 
 ## 2. Clone the repository
 
+Clone the `1.1.0` release tag, or
+[download the 1.1.0 archive](https://github.com/amattas/retail-demo/archive/refs/tags/1.1.0.zip)
+and extract it. Do not deploy from `main`; it carries unreleased changes.
+
 === "Windows PowerShell"
 
     ```powershell
-    git clone https://github.com/amattas/retail-demo.git
+    git clone --branch 1.1.0 https://github.com/amattas/retail-demo.git
     Set-Location retail-demo
     ```
 
 === "macOS or Linux"
 
     ```bash
-    git clone https://github.com/amattas/retail-demo.git
+    git clone --branch 1.1.0 https://github.com/amattas/retail-demo.git
     cd retail-demo
     ```
 
