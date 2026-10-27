@@ -1,5 +1,17 @@
 # Microsoft Fabric Retail Demo
 
+!!! tip "Download release 1.1.0"
+
+    These docs describe release **1.1.0**. Deploy from the release, not from
+    `main`: `main` carries unreleased changes that may not match these docs.
+
+    [Download 1.1.0 (.zip)](https://github.com/amattas/retail-demo/archive/refs/tags/1.1.0.zip){ .md-button .md-button--primary }
+    [Download 1.1.0 (.tar.gz)](https://github.com/amattas/retail-demo/archive/refs/tags/1.1.0.tar.gz){ .md-button }
+    [Release notes](https://github.com/amattas/retail-demo/releases/tag/1.1.0){ .md-button }
+
+    To use Git instead, clone the release tag:
+    `git clone --branch 1.1.0 https://github.com/amattas/retail-demo.git`
+
 ## About this demo
 
 This demo brings a retailer's sales, inventory, customer, marketing,
