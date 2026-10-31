@@ -101,17 +101,6 @@ def test_checkout_actions_never_persist_credentials() -> None:
     assert not violations, f"checkout credentials must not persist: {violations}"
 
 
-def test_write_token_is_configured_only_after_dependency_install() -> None:
-    docs = yaml.safe_load((WORKFLOWS / "docs.yml").read_text(encoding="utf-8"))
-    steps = docs["jobs"]["docs"]["steps"]
-    names = [step.get("name", "") for step in steps]
-
-    credential_index = names.index("Configure publish credentials")
-    assert names.index("Install documentation tools") < credential_index
-    assert credential_index < names.index("Publish")
-    assert "GH_PAGES_TOKEN" in steps[credential_index]["env"]
-
-
 def test_python_lockfiles_are_hash_complete() -> None:
     for path in LOCK_FILES:
         text = path.read_text(encoding="utf-8")

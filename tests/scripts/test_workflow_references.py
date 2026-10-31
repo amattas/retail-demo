@@ -9,6 +9,9 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 FULL_COMMIT_SHA = re.compile(r"^[0-9a-fA-F]{40}$")
+# Shared reusable workflows are deliberately consumed from the default branch
+# (mattas-net/.github STANDARD.md); the shared repo's own self-test gates changes.
+SHARED_WORKFLOW = re.compile(r"^mattas-net/\.github/\.github/workflows/[\w.-]+\.yml@main$")
 
 
 def _load_workflow(name: str) -> dict:
@@ -37,7 +40,7 @@ def _is_mutable_action_reference(reference: object) -> bool:
         return True
 
     reference = reference.strip("\"'")
-    if reference.startswith("./"):
+    if reference.startswith("./") or SHARED_WORKFLOW.fullmatch(reference):
         return False
 
     _, separator, revision = reference.rpartition("@")
@@ -68,6 +71,9 @@ def test_workflow_working_directories_exist() -> None:
         ("owner/repository/action@0123456789abcdef0123456789abcdef01234567", False),
         ("./.github/actions/setup", False),
         ("./.github/workflows/reusable.yml", False),
+        ("mattas-net/.github/.github/workflows/python-ci.yml@main", False),
+        ("mattas-net/.github/.github/workflows/python-ci.yml@v1", True),
+        ("other-org/.github/.github/workflows/python-ci.yml@main", True),
     ],
 )
 def test_mutable_action_reference_detection(reference: str, expected: bool) -> None:
@@ -122,16 +128,17 @@ def test_workflow_action_references_are_immutable() -> None:
     )
 
 
-def test_tests_workflow_uses_discovery_and_markers() -> None:
-    jobs = _load_workflow("tests.yml")["jobs"]
-    utility_commands = _run_commands(jobs["utility-tests"])
+def test_checks_workflow_uses_discovery_and_markers() -> None:
+    jobs = _load_workflow("checks.yml")["jobs"]
+    python_inputs = jobs["python"]["with"]
     spark_commands = _run_commands(jobs["spark-tests"])
     e2e_commands = _run_commands(jobs["spark-e2e"])
     windows_commands = _run_commands(jobs["windows-tests"])
     docs_commands = _run_commands(jobs["docs-tests"])
     all_commands = "\n".join(
         (
-            utility_commands,
+            python_inputs["test"],
+            python_inputs["extra-checks"],
             spark_commands,
             e2e_commands,
             windows_commands,
@@ -139,9 +146,15 @@ def test_tests_workflow_uses_discovery_and_markers() -> None:
         )
     )
 
-    assert 'python -m pytest -q -m "not spark"' in utility_commands
-    assert "python -m ruff check src tests scripts" in utility_commands
-    assert "python -m pytest -q --ignore=tests/docs" in utility_commands
+    assert python_inputs["working-directory"] == "utility"
+    assert python_inputs["test"] == 'python -m pytest -q -m "not spark"'
+    assert python_inputs["lint-paths"] == "src tests scripts"
+    assert "--require-hashes -r requirements-ci.txt" in python_inputs["install"]
+    assert "python scripts/build_notebooks.py --check" in python_inputs["extra-checks"]
+    assert (
+        "PYTHONPATH=. python -m pytest -q --ignore=tests/docs"
+        in python_inputs["extra-checks"]
+    )
     assert "python scripts/run_ci_shards.py" in spark_commands
     assert "--shard-index ${{ matrix.shard }}" in spark_commands
     assert "--max-tests-per-process 8" in spark_commands
@@ -152,11 +165,8 @@ def test_tests_workflow_uses_discovery_and_markers() -> None:
     assert re.search(r"test_[A-Za-z0-9_]+\.py", all_commands) is None
 
 
-def test_tests_workflow_covers_supported_surfaces_and_windows() -> None:
-    jobs = _load_workflow("tests.yml")["jobs"]
-    utility_step_names = {
-        step.get("name") for step in jobs["utility-tests"]["steps"]
-    }
+def test_checks_workflow_covers_supported_surfaces_and_windows() -> None:
+    jobs = _load_workflow("checks.yml")["jobs"]
     spark_step_names = {
         step.get("name") for step in jobs["spark-tests"]["steps"]
     }
@@ -171,12 +181,9 @@ def test_tests_workflow_covers_supported_surfaces_and_windows() -> None:
     }
 
     assert jobs["windows-tests"]["runs-on"] == "windows-latest"
-    assert {
-        "Lint utility code",
-        "Run fast utility tests",
-        "Notebook drift check",
-        "Run deploy, KQL, and semantic-model contracts",
-    } <= utility_step_names
+    assert jobs["python"]["uses"].startswith(
+        "mattas-net/.github/.github/workflows/python-ci.yml@"
+    )
     assert jobs["spark-tests"]["strategy"]["matrix"]["shard"] == [0, 1, 2, 3]
     assert {"Run discovered Spark shard"} <= spark_step_names
     assert {"Run local E2E test"} <= e2e_step_names
@@ -189,10 +196,13 @@ def test_tests_workflow_covers_supported_surfaces_and_windows() -> None:
         "Run documentation tests",
         "Build current and versioned documentation",
     } <= docs_step_names
-    assert set(jobs["release-gate"]["needs"]) == {
-        "utility-tests",
+    # The `checks` alias is the single required context: it must wait for every
+    # repo-specific job as well as the shared python job.
+    assert set(jobs["checks"]["needs"]) == {
+        "python",
         "spark-tests",
         "spark-e2e",
         "windows-tests",
         "docs-tests",
     }
+    assert jobs["security"]["needs"] == "python"

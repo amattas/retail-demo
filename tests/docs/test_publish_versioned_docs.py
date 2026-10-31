@@ -65,18 +65,18 @@ def test_rejects_pushing_a_preview_branch() -> None:
         raise AssertionError("Expected preview branch push to be rejected")
 
 
-def test_docs_workflow_publishes_full_history_with_version_script() -> None:
+def test_docs_workflow_publishes_through_shared_workflow_with_locked_install() -> None:
     workflow = yaml.safe_load(
         (REPO_ROOT / ".github" / "workflows" / "docs.yml").read_text(
             encoding="utf-8"
         )
     )
-    steps = workflow["jobs"]["docs"]["steps"]
-    checkout = next(step for step in steps if step.get("uses", "").startswith(
-        "actions/checkout@"
-    ))
-    publish = next(step for step in steps if step.get("name") == "Publish")
+    job = workflow["jobs"]["docs"]
 
-    assert checkout["with"]["fetch-depth"] == 0
-    assert checkout["with"]["ref"] == "main"
-    assert "scripts/publish_versioned_docs.py --push" in publish["run"]
+    # Full-history checkout, main-only publish and `publish_versioned_docs.py --push`
+    # live in the shared reusable workflow (mattas-net/.github docs.yml).
+    assert job["uses"] == "mattas-net/.github/.github/workflows/docs.yml@main"
+    assert job["permissions"] == {"contents": "write"}
+    assert job["with"]["python-version"] == "3.13"
+    assert "--require-hashes -r requirements-docs.txt" in job["with"]["install"]
+    assert (REPO_ROOT / "scripts" / "publish_versioned_docs.py").is_file()

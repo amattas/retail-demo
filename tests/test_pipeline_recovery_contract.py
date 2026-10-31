@@ -52,7 +52,7 @@ def test_required_ml_retries_only_the_bounded_validator() -> None:
 
 def test_windows_ci_runs_real_non_filesystem_spark_smokes():
     workflow = yaml.safe_load(
-        (ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
+        (ROOT / ".github" / "workflows" / "checks.yml").read_text(encoding="utf-8")
     )
     steps = workflow["jobs"]["windows-tests"]["steps"]
     smoke_index = next(

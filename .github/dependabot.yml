@@ -1,21 +1,69 @@
+# Standard Dependabot config (mattas-net security standard): monthly, 7-day cooldown,
+# one grouped PR per ecosystem. Security updates are separate and stay immediate.
 version: 2
 updates:
-  - package-ecosystem: github-actions
-    directory: /
-    schedule:
-      interval: weekly
+- package-ecosystem: pip
+  directory: /
+  schedule:
+    interval: monthly
+  cooldown:
+    default-days: 7
+  groups:
+    pip:
+      patterns:
+      - '*'
 
-  - package-ecosystem: pip
-    directory: /
-    schedule:
-      interval: weekly
+- package-ecosystem: pip
+  directory: /utility
+  schedule:
+    interval: monthly
+  cooldown:
+    default-days: 7
+  groups:
+    pip:
+      patterns:
+      - '*'
 
-  - package-ecosystem: pip
-    directory: /utility
-    schedule:
-      interval: weekly
+- package-ecosystem: pip
+  directory: /app
+  schedule:
+    interval: monthly
+  cooldown:
+    default-days: 7
+  groups:
+    pip:
+      patterns:
+      - '*'
 
-  - package-ecosystem: terraform
-    directory: /deploy/terraform
-    schedule:
-      interval: weekly
+- package-ecosystem: npm
+  directory: /app/fabric-app
+  schedule:
+    interval: monthly
+  cooldown:
+    default-days: 7
+  groups:
+    npm:
+      patterns:
+      - '*'
+
+- package-ecosystem: terraform
+  directory: /deploy/terraform
+  schedule:
+    interval: monthly
+  cooldown:
+    default-days: 7
+  groups:
+    terraform:
+      patterns:
+      - '*'
+
+- package-ecosystem: github-actions
+  directory: /
+  schedule:
+    interval: monthly
+  cooldown:
+    default-days: 7
+  groups:
+    github-actions:
+      patterns:
+      - '*'
