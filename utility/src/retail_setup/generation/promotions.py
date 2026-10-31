@@ -60,8 +60,11 @@ def generate_promotions(
         .withColumn(
             "trace_id",
             F.concat(
-                F.lit("TRC-PRM-"), F.col("receipt_id_ext"), F.lit("-"),
-                F.col("promo_code"), F.lit("-"),
+                F.lit("TRC-PRM-"),
+                F.col("receipt_id_ext"),
+                F.lit("-"),
+                F.col("promo_code"),
+                F.lit("-"),
                 F.col("line_number").cast("string"),
             ),
         )
@@ -78,8 +81,9 @@ def generate_promotions(
         .withColumn("DiscountAmount", F.col("discount_amount"))
         .withColumn("DiscountCents", F.col("discount_cents"))
         # Legacy pandas-index column bound by the semantic model
-        .withColumn("__index_level_0__",
-                    legacy_index("receipt_id_ext", "promo_code", "line_number"))
+        .withColumn(
+            "__index_level_0__", legacy_index("receipt_id_ext", "promo_code", "line_number")
+        )
         .select(*column_names("fact_promo_lines"))
     )
 
@@ -94,17 +98,18 @@ def generate_promotions(
         "receipt_id_ext", "event_ts", "event_date", "store_id", "customer_id"
     )
     promotions = (
-        agg
-        .join(headers, "receipt_id_ext")
+        agg.join(headers, "receipt_id_ext")
         .withColumn("discount_amount", _fmt(F.col("discount_cents")))
         # BOGO codes are buy-one-get-one; everything else is a percentage off.
-        .withColumn("discount_type",
-                    F.when(F.col("promo_code").startswith("BOGO"), F.lit("BOGO"))
-                    .otherwise(F.lit("PERCENTAGE")))
+        .withColumn(
+            "discount_type",
+            F.when(F.col("promo_code").startswith("BOGO"), F.lit("BOGO")).otherwise(
+                F.lit("PERCENTAGE")
+            ),
+        )
         .withColumn(
             "trace_id",
-            F.concat(F.lit("TRC-PRM-"), F.col("receipt_id_ext"), F.lit("-"),
-                     F.col("promo_code")),
+            F.concat(F.lit("TRC-PRM-"), F.col("receipt_id_ext"), F.lit("-"), F.col("promo_code")),
         )
         # IMP-007: NULL unless the underlying receipt was selected for
         # attribution; enriched in attribution.py.

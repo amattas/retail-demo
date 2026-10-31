@@ -15,9 +15,16 @@ ZONES = ["ENTRANCE_MAIN", "ENTRANCE_SIDE", "AISLES_A", "AISLES_B", "CHECKOUT"]
 
 @pytest.fixture(scope="module")
 def setup(spark):
-    cfg = GenerationConfig(store_type="grocery", start_date=date(2025, 12, 23),
-                           end_date=date(2025, 12, 27), store_count=2, dc_count=1,
-                           customer_count=200, seed=9, transactions_per_store_day=40)
+    cfg = GenerationConfig(
+        store_type="grocery",
+        start_date=date(2025, 12, 23),
+        end_date=date(2025, 12, 27),
+        store_count=2,
+        dc_count=1,
+        customer_count=200,
+        seed=9,
+        transactions_per_store_day=40,
+    )
     dicts = load_dictionaries(default_dictionary_root(), "grocery")
     dims = generate_dimensions(spark, dicts, cfg)
     sales = generate_receipts_group(spark, dims, dicts.profile, cfg)
@@ -33,18 +40,15 @@ def test_store_ops(spark, setup):
     assert ops.filter(F.col("event_date") == date(2025, 12, 25)).count() == 0
     per = ops.groupBy("store_id", "event_date").count().collect()
     assert all(r["count"] == 2 for r in per)
-    assert {r.operation_type for r in ops.select("operation_type").distinct().collect()} == \
-        {"opened", "closed"}
+    assert {r.operation_type for r in ops.select("operation_type").distinct().collect()} == {
+        "opened",
+        "closed",
+    }
 
 
 def test_receipts_skip_christmas(setup):
     _, _, sales = setup
-    assert (
-        sales["fact_receipts"]
-        .filter(F.col("event_date") == date(2025, 12, 25))
-        .count()
-        == 0
-    )
+    assert sales["fact_receipts"].filter(F.col("event_date") == date(2025, 12, 25)).count() == 0
 
 
 def test_foot_traffic(spark, setup):
@@ -55,10 +59,12 @@ def test_foot_traffic(spark, setup):
     assert ft.filter(F.col("count") < 0).count() == 0
     assert ft.filter((F.col("dwell_seconds") < 30) | (F.col("dwell_seconds") > 420)).count() == 0
     # traffic exceeds receipts for matching store-hours
-    rc = sales["fact_receipts"].groupBy(
-        "store_id", F.date_trunc("hour", "event_ts").alias("hr")).count()
-    tt = ft.groupBy("store_id", F.col("event_ts").alias("hr")) \
-           .agg(F.sum("count").alias("traffic"))
+    rc = (
+        sales["fact_receipts"]
+        .groupBy("store_id", F.date_trunc("hour", "event_ts").alias("hr"))
+        .count()
+    )
+    tt = ft.groupBy("store_id", F.col("event_ts").alias("hr")).agg(F.sum("count").alias("traffic"))
     j = rc.join(tt, ["store_id", "hr"])
     assert j.count() > 0
     assert j.filter(F.col("traffic") < F.col("count")).count() == 0
@@ -67,10 +73,12 @@ def test_foot_traffic(spark, setup):
 def test_foot_traffic_covers_open_hours_without_receipts(spark, setup):
     cfg, dims, sales = setup
     ft = generate_foot_traffic(spark, sales["fact_receipts"], dims, cfg)
-    rc = sales["fact_receipts"].groupBy(
-        "store_id", F.date_trunc("hour", "event_ts").alias("hr")).count()
-    tt = ft.groupBy("store_id", F.col("event_ts").alias("hr")) \
-           .agg(F.sum("count").alias("traffic"))
+    rc = (
+        sales["fact_receipts"]
+        .groupBy("store_id", F.date_trunc("hour", "event_ts").alias("hr"))
+        .count()
+    )
+    tt = ft.groupBy("store_id", F.col("event_ts").alias("hr")).agg(F.sum("count").alias("traffic"))
     # every receipt store-hour still has a foot-traffic row (coverage preserved)
     assert rc.join(tt, ["store_id", "hr"], "left_anti").count() == 0
     # and open store-hours with no receipts now emit browsing traffic

@@ -10,10 +10,15 @@ from retail_setup.generation.schemas import spark_schema
 
 
 def _stock_frame(spark, table, rows):
-    return spark.range(1).select(
-        F.explode(F.from_json(F.lit(json.dumps(rows)), ArrayType(spark_schema(table))))
-        .alias("row"),
-    ).select("row.*")
+    return (
+        spark.range(1)
+        .select(
+            F.explode(F.from_json(F.lit(json.dumps(rows)), ArrayType(spark_schema(table)))).alias(
+                "row"
+            ),
+        )
+        .select("row.*")
+    )
 
 
 def _stock_tables(spark):
@@ -47,26 +52,60 @@ def _stock_tables(spark):
     ]
     rows = {
         "fact_store_inventory_txn": [
-            dict(zip(
-                ["trace_id", "product_id", "event_ts", "txn_type", "quantity", "balance",
-                 "source", "requested_quantity", "unfulfilled_quantity"],
-                row,
-            ), store_id=1)
+            dict(
+                zip(
+                    [
+                        "trace_id",
+                        "product_id",
+                        "event_ts",
+                        "txn_type",
+                        "quantity",
+                        "balance",
+                        "source",
+                        "requested_quantity",
+                        "unfulfilled_quantity",
+                    ],
+                    row,
+                ),
+                store_id=1,
+            )
             for row in store
         ],
         "fact_dc_inventory_txn": [
-            dict(zip(
-                ["trace_id", "product_id", "event_ts", "txn_type", "quantity", "balance", "Source"],
-                row,
-            ), dc_id=1)
+            dict(
+                zip(
+                    [
+                        "trace_id",
+                        "product_id",
+                        "event_ts",
+                        "txn_type",
+                        "quantity",
+                        "balance",
+                        "Source",
+                    ],
+                    row,
+                ),
+                dc_id=1,
+            )
             for row in dc
         ],
         "fact_truck_inventory": [
-            dict(zip(
-                ["trace_id", "shipment_id", "product_id", "truck_id", "quantity",
-                 "event_ts", "action", "location_type"],
-                row,
-            ), location_id=1)
+            dict(
+                zip(
+                    [
+                        "trace_id",
+                        "shipment_id",
+                        "product_id",
+                        "truck_id",
+                        "quantity",
+                        "event_ts",
+                        "action",
+                        "location_type",
+                    ],
+                    row,
+                ),
+                location_id=1,
+            )
             for row in truck
         ],
         "fact_receipts": [
@@ -74,8 +113,13 @@ def _stock_tables(spark):
             for identifier, kind, _, ts in receipts
         ],
         "fact_receipt_lines": [
-            {"receipt_id_ext": identifier, "line_num": 1, "product_id": 1,
-             "quantity": quantity, "event_ts": ts}
+            {
+                "receipt_id_ext": identifier,
+                "line_num": 1,
+                "product_id": 1,
+                "quantity": quantity,
+                "event_ts": ts,
+            }
             for identifier, _, quantity, ts in receipts
         ],
     }
@@ -100,7 +144,8 @@ def test_physical_invariants_reject_clamps_deficits_lost_demand_and_broken_trans
             "quantity",
             F.when(F.col("trace_id") == "TRC-INV-R1-1", -11)
             .when(F.col("trace_id") == "TRC-INV-RET1-1", 4)
-            .when(F.col("trace_id") == "SI1", 7).otherwise(F.col("quantity")),
+            .when(F.col("trace_id") == "SI1", 7)
+            .otherwise(F.col("quantity")),
         )
         .withColumn(
             "balance",
@@ -108,13 +153,15 @@ def test_physical_invariants_reject_clamps_deficits_lost_demand_and_broken_trans
         )
         .withColumn(
             "unfulfilled_quantity",
-            F.when(F.col("txn_type") == "LOST_SALE", F.lit(None).cast("long"))
-            .otherwise(F.col("unfulfilled_quantity")),
+            F.when(F.col("txn_type") == "LOST_SALE", F.lit(None).cast("long")).otherwise(
+                F.col("unfulfilled_quantity")
+            ),
         )
     )
     tables["fact_store_inventory_txn"] = store.unionByName(store.filter("trace_id = 'INIT2'"))
     tables["fact_dc_inventory_txn"] = (
-        tables["fact_dc_inventory_txn"].filter("trace_id != 'DCINIT2'")
+        tables["fact_dc_inventory_txn"]
+        .filter("trace_id != 'DCINIT2'")
         .withColumn(
             "quantity",
             F.when(F.col("trace_id") == "DCOUT1", -7).otherwise(F.col("quantity")),
@@ -128,15 +175,17 @@ def test_physical_invariants_reject_clamps_deficits_lost_demand_and_broken_trans
         tables["fact_truck_inventory"]
         .withColumn(
             "event_ts",
-            F.when(F.col("action") == "UNLOAD", F.to_timestamp(F.lit("2025-01-01 11:00:00")))
-            .otherwise(F.col("event_ts")),
+            F.when(
+                F.col("action") == "UNLOAD", F.to_timestamp(F.lit("2025-01-01 11:00:00"))
+            ).otherwise(F.col("event_ts")),
         )
         .withColumn(
             "location_type",
             F.when(F.col("action") == "UNLOAD", "DC").otherwise(F.col("location_type")),
         )
         .withColumn(
-            "quantity", F.when(F.col("action") == "UNLOAD", 8).otherwise(F.col("quantity")),
+            "quantity",
+            F.when(F.col("action") == "UNLOAD", 8).otherwise(F.col("quantity")),
         )
     )
     tables["fact_truck_inventory"] = truck.unionByName(truck.filter("action = 'UNLOAD'"))

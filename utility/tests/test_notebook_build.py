@@ -163,9 +163,7 @@ def test_setup_pipeline_draws_the_stage_graph():
 
 
 def test_setup11_loads_every_gold_source_table():
-    driver_path = (
-        UTILITY / "notebooks" / "templates" / "driver-11-gold.py"
-    )
+    driver_path = UTILITY / "notebooks" / "templates" / "driver-11-gold.py"
     driver_tree = ast.parse(driver_path.read_text())
     sources_assignment = next(
         node
@@ -178,11 +176,7 @@ def test_setup11_loads_every_gold_source_table():
     )
     loaded_sources = set(ast.literal_eval(sources_assignment.value))
 
-    gold_tree = ast.parse(
-        (
-            UTILITY / "src" / "retail_setup" / "generation" / "gold.py"
-        ).read_text()
-    )
+    gold_tree = ast.parse((UTILITY / "src" / "retail_setup" / "generation" / "gold.py").read_text())
     required_sources = {
         node.slice.value
         for node in ast.walk(gold_tree)

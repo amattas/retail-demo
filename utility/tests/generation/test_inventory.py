@@ -23,8 +23,14 @@ from retail_setup.generation.returns import generate_returns
 from retail_setup.generation.runtime import seeded_draws
 from retail_setup.generation.schemas import column_names
 
-TABLES = ["fact_store_inventory_txn", "fact_dc_inventory_txn", "fact_truck_moves",
-          "fact_truck_inventory", "fact_reorders", "fact_stockouts"]
+TABLES = [
+    "fact_store_inventory_txn",
+    "fact_dc_inventory_txn",
+    "fact_truck_moves",
+    "fact_truck_inventory",
+    "fact_reorders",
+    "fact_stockouts",
+]
 
 
 def test_dc_count_rejects_fixed_width_shipment_id_overflow():
@@ -40,9 +46,16 @@ def test_dc_count_rejects_fixed_width_shipment_id_overflow():
 
 @pytest.fixture(scope="module")
 def setup(spark):
-    cfg = GenerationConfig(store_type="grocery", start_date=date(2025, 8, 4),
-                           end_date=date(2025, 8, 10), store_count=2, dc_count=1,
-                           customer_count=200, seed=23, transactions_per_store_day=40)
+    cfg = GenerationConfig(
+        store_type="grocery",
+        start_date=date(2025, 8, 4),
+        end_date=date(2025, 8, 10),
+        store_count=2,
+        dc_count=1,
+        customer_count=200,
+        seed=23,
+        transactions_per_store_day=40,
+    )
     dicts = load_dictionaries(default_dictionary_root(), "grocery")
     dims = generate_dimensions(spark, dicts, cfg)
     sales = generate_receipts_group(spark, dims, dicts.profile, cfg)
@@ -64,16 +77,27 @@ def seeded_logistics(spark):
         seed=23,
         truck_capacity=100,
     )
-    events = spark.createDataFrame([
-        asdict(event)
-        for product in range(1, 11)
-        for event in simulate_sku(
-            [Demand(datetime(2025, 8, 4, 12) + timedelta(days=day),
-                    f"R-{product}-{day}", 1, 30) for day in range(7)],
-            store_id=1, product_id=product, start_date=cfg.start_date,
-            end_date=cfg.end_date, seed=cfg.seed, capacity=cfg.truck_capacity,
-        )
-    ], _EVENT_SCHEMA).withColumn("event_date", F.to_date("event_ts"))
+    events = spark.createDataFrame(
+        [
+            asdict(event)
+            for product in range(1, 11)
+            for event in simulate_sku(
+                [
+                    Demand(
+                        datetime(2025, 8, 4, 12) + timedelta(days=day), f"R-{product}-{day}", 1, 30
+                    )
+                    for day in range(7)
+                ],
+                store_id=1,
+                product_id=product,
+                start_date=cfg.start_date,
+                end_date=cfg.end_date,
+                seed=cfg.seed,
+                capacity=cfg.truck_capacity,
+            )
+        ],
+        _EVENT_SCHEMA,
+    ).withColumn("event_date", F.to_date("event_ts"))
     store_dc = spark.createDataFrame(
         [(1, 1)],
         "store_id long, dc_id long",
@@ -112,9 +136,11 @@ def test_balances_are_running(setup):
     txn = inv["fact_store_inventory_txn"]
     # spot-check one (store, product): balance deltas equal quantities
     key = txn.groupBy("store_id", "product_id").count().orderBy(F.desc("count")).first()
-    seq = (txn.filter((F.col("store_id") == key.store_id)
-                      & (F.col("product_id") == key.product_id))
-           .orderBy("event_ts", "trace_id").collect())
+    seq = (
+        txn.filter((F.col("store_id") == key.store_id) & (F.col("product_id") == key.product_id))
+        .orderBy("event_ts", "trace_id")
+        .collect()
+    )
     running = 0
     for r in seq:
         running += r.quantity
@@ -125,23 +151,24 @@ def test_truck_lifecycle(seeded_logistics):
     _, moves, truck_inventory = seeded_logistics
     assert moves.count() > 0, "fixed seed must produce shipment lifecycle rows"
     per = moves.groupBy("shipment_id").agg(
-        F.collect_set("status").alias("statuses"), F.count("*").alias("n"))
+        F.collect_set("status").alias("statuses"), F.count("*").alias("n")
+    )
     for r in per.collect():
-        assert set(r.statuses) == {"SCHEDULED", "LOADING", "IN_TRANSIT", "ARRIVED",
-                                   "UNLOADING", "COMPLETED"}
+        assert set(r.statuses) == {
+            "SCHEDULED",
+            "LOADING",
+            "IN_TRANSIT",
+            "ARRIVED",
+            "UNLOADING",
+            "COMPLETED",
+        }
         assert r.n == 6
     done = moves.filter("status = 'COMPLETED'")
     assert done.filter(F.col("actual_unload_duration") < 30).count() == 0
     # load/unload pairs exist per shipment product
-    loads = (
-        truck_inventory.filter("action = 'LOAD'")
-        .groupBy("shipment_id", "product_id")
-        .count()
-    )
+    loads = truck_inventory.filter("action = 'LOAD'").groupBy("shipment_id", "product_id").count()
     unloads = (
-        truck_inventory.filter("action = 'UNLOAD'")
-        .groupBy("shipment_id", "product_id")
-        .count()
+        truck_inventory.filter("action = 'UNLOAD'").groupBy("shipment_id", "product_id").count()
     )
     assert loads.join(unloads, ["shipment_id", "product_id"], "left_anti").count() == 0
 
@@ -152,14 +179,12 @@ def test_shipments_respect_capacity_when_one_reorder_exceeds_it(spark):
             (1, date(2025, 8, 4), 1, 10, 60),
             (1, date(2025, 8, 4), 1, 20, 10),
         ],
-        "store_id long, event_date date, dc_id long, product_id long, "
-        "reorder_quantity long",
+        "store_id long, event_date date, dc_id long, product_id long, reorder_quantity long",
     )
 
     split = _split_reorders_by_capacity(reorders, capacity=25)
-    leg_totals = (
-        split.groupBy("store_id", "event_date", "leg")
-        .agg(F.sum("reorder_quantity").alias("quantity"))
+    leg_totals = split.groupBy("store_id", "event_date", "leg").agg(
+        F.sum("reorder_quantity").alias("quantity")
     )
     assert leg_totals.filter(F.col("quantity") > 25).count() == 0
     assert split.filter(F.col("product_id") == 10).count() == 3
@@ -169,8 +194,11 @@ def test_shipments_respect_capacity_when_one_reorder_exceeds_it(spark):
 def test_reorder_priorities(seeded_logistics):
     ro, _, _ = seeded_logistics
     assert ro.count() > 0, "fixed seed must produce reorders"
-    assert {r.priority for r in ro.select("priority").distinct().collect()} <= \
-        {"NORMAL", "HIGH", "URGENT"}
+    assert {r.priority for r in ro.select("priority").distinct().collect()} <= {
+        "NORMAL",
+        "HIGH",
+        "URGENT",
+    }
     rows = ro.collect()
     assert {row.product_id for row in rows} == set(range(1, 11))
     assert all(row.reorder_quantity > 0 and row.reorder_quantity % 12 == 0 for row in rows)
@@ -201,16 +229,21 @@ def _inventory_txns(spark, quantities):
         )
         for index, quantity in enumerate(quantities)
     ]
-    return spark.createDataFrame(rows, schema=", ".join([
-        "node_id long",
-        "product_id long",
-        "quantity long",
-        "txn_type string",
-        "source string",
-        "event_ts timestamp",
-        "event_date date",
-        "trace_id string",
-    ])).select(*TXN_COLS)
+    return spark.createDataFrame(
+        rows,
+        schema=", ".join(
+            [
+                "node_id long",
+                "product_id long",
+                "quantity long",
+                "txn_type string",
+                "source string",
+                "event_ts timestamp",
+                "event_date date",
+                "trace_id string",
+            ]
+        ),
+    ).select(*TXN_COLS)
 
 
 def _opening_stock(balanced):

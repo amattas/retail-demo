@@ -58,10 +58,7 @@ def test_profiles_resolve_to_exact_dependency_closed_inventories() -> None:
         "setup-pipeline.DataPipeline",
         "streaming-data-load.DataPipeline",
     )
-    assert (
-        profiles["standard"].reporting_gate_pipeline_ref
-        == "ml-required.DataPipeline"
-    )
+    assert profiles["standard"].reporting_gate_pipeline_ref == "ml-required.DataPipeline"
     assert profiles["standard"].post_reporting_pipeline_refs == ()
     assert profiles["standard"].kql_scripts == (
         "01-create-tables.kql",
@@ -109,9 +106,7 @@ def test_profiles_resolve_to_exact_dependency_closed_inventories() -> None:
         "streaming-data-load.DataPipeline",
     )
     assert profiles["full-demo"].kql_scripts == profiles["standard"].kql_scripts
-    assert profiles["full-demo"].post_deploy_pipeline_ref == (
-        "setup-pipeline.DataPipeline"
-    )
+    assert profiles["full-demo"].post_deploy_pipeline_ref == ("setup-pipeline.DataPipeline")
     assert profiles["full-demo"].post_reporting_pipeline_refs == (
         "ml-optional.DataPipeline",
         "ml-experimental.DataPipeline",
@@ -137,21 +132,11 @@ def test_standard_and_full_profiles_publish_no_enabled_automatic_schedule() -> N
     for name in ("standard", "full-demo"):
         profile = _profiles()[name]
         for pipeline_ref in profile.pipeline_refs:
-            schedule_path = (
-                REPO_ROOT
-                / "fabric"
-                / "pipelines"
-                / pipeline_ref
-                / ".schedules"
-            )
+            schedule_path = REPO_ROOT / "fabric" / "pipelines" / pipeline_ref / ".schedules"
             if not schedule_path.is_file():
                 continue
-            schedules = json.loads(
-                schedule_path.read_text(encoding="utf-8")
-            )["schedules"]
-            assert not any(
-                schedule.get("enabled") is True for schedule in schedules
-            ), pipeline_ref
+            schedules = json.loads(schedule_path.read_text(encoding="utf-8"))["schedules"]
+            assert not any(schedule.get("enabled") is True for schedule in schedules), pipeline_ref
 
 
 def test_resolver_adds_transitive_asset_dependencies() -> None:
@@ -180,10 +165,7 @@ def test_imp008_profile_blockers_are_replaced_by_executable_reporting_gate() -> 
     assert all(profile.blockers == () for profile in profiles.values())
     assert profiles["core"].reporting_gate_pipeline_ref is None
     for name in ("standard", "full-demo"):
-        assert (
-            profiles[name].reporting_gate_pipeline_ref
-            == "ml-required.DataPipeline"
-        )
+        assert profiles[name].reporting_gate_pipeline_ref == "ml-required.DataPipeline"
 
 
 def test_full_demo_uses_live_preflight_instead_of_acknowledgements() -> None:

@@ -126,15 +126,11 @@ class ResolvedProfile:
 
     @property
     def manual_asset_ids(self) -> tuple[str, ...]:
-        return tuple(
-            asset.id for asset in self.assets if asset.disposition == "manual"
-        )
+        return tuple(asset.id for asset in self.assets if asset.disposition == "manual")
 
     @property
     def preview_asset_ids(self) -> tuple[str, ...]:
-        return tuple(
-            asset.id for asset in self.assets if asset.support_status == "preview"
-        )
+        return tuple(asset.id for asset in self.assets if asset.support_status == "preview")
 
     def expected_staged_item_count(
         self,
@@ -313,24 +309,19 @@ def _validate_group_asset_agreement(
             )
         if required_asset not in selected_ids:
             raise ProfileResolutionError(
-                f"notebook group {group!r} requires selected asset "
-                f"{required_asset!r}"
+                f"notebook group {group!r} requires selected asset {required_asset!r}"
             )
     for asset_id, required_group in _ASSET_REQUIRED_GROUPS.items():
         if asset_id in selected_ids and required_group not in groups:
             raise ProfileResolutionError(
-                f"selected asset {asset_id!r} requires notebook group "
-                f"{required_group!r}"
+                f"selected asset {asset_id!r} requires notebook group {required_group!r}"
             )
     if "asset.ml-notebooks" in selected_ids and "ml-required" not in groups:
         raise ProfileResolutionError(
-            "selected asset 'asset.ml-notebooks' requires notebook group "
-            "'ml-required'"
+            "selected asset 'asset.ml-notebooks' requires notebook group 'ml-required'"
         )
     if groups & _ML_GROUPS and "ml-required" not in groups:
-        raise ProfileResolutionError(
-            "optional or experimental ML groups require 'ml-required'"
-        )
+        raise ProfileResolutionError("optional or experimental ML groups require 'ml-required'")
 
 
 def _resolve_kql_scripts(
@@ -339,14 +330,10 @@ def _resolve_kql_scripts(
     validation: RepositoryValidation,
     configured: tuple[str, ...] | list[str] | None,
 ) -> tuple[str, ...]:
-    available = validation.inventories[
-        "inventory.eventhouse.configured-kql-scripts"
-    ]
+    available = validation.inventories["inventory.eventhouse.configured-kql-scripts"]
     ordered = tuple(configured) if configured is not None else tuple(sorted(available))
     if len(ordered) != len(set(ordered)):
-        raise ProfileResolutionError(
-            "eventhouse.kql_scripts must not contain duplicates"
-        )
+        raise ProfileResolutionError("eventhouse.kql_scripts must not contain duplicates")
     if frozenset(ordered) != available:
         raise ProfileResolutionError(
             "eventhouse.kql_scripts differs from the manifest-validated source inventory"
@@ -371,13 +358,9 @@ def _resolve_item_types(
     if "asset.ml-notebooks" in selected_ids:
         required.add("MLExperiment")
 
-    available_order = (
-        tuple(available) if available is not None else _DEFAULT_ITEM_TYPE_ORDER
-    )
+    available_order = tuple(available) if available is not None else _DEFAULT_ITEM_TYPE_ORDER
     if len(available_order) != len(set(available_order)):
-        raise ProfileResolutionError(
-            "deployment.item_types_in_scope must not contain duplicates"
-        )
+        raise ProfileResolutionError("deployment.item_types_in_scope must not contain duplicates")
     missing = sorted(required - set(available_order))
     if missing:
         raise ProfileResolutionError(

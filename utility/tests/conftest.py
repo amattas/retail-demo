@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import pytest
 
+
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     """Classify runtime-dependent tests without maintaining module lists."""
     for item in items:

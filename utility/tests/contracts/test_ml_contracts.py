@@ -110,9 +110,7 @@ def test_ml_tier_inventory_is_exact_and_reporting_requires_only_required() -> No
         "pricing_recommendations",
     }
     assert {
-        contract.output.table
-        for contract in manifest.ml_contracts
-        if contract.reporting_required
+        contract.output.table for contract in manifest.ml_contracts if contract.reporting_required
     } == validation.ml_contracts.required_tables
 
 
@@ -120,14 +118,10 @@ def test_corrected_notebook_output_shapes_are_manifested() -> None:
     manifest, _ = load_repository_manifest(REPO_ROOT)
     contracts = {contract.output.table: contract for contract in manifest.ml_contracts}
 
-    churn_fields = {
-        field.name: field for field in contracts["churn_predictions"].output.fields
-    }
+    churn_fields = {field.name: field for field in contracts["churn_predictions"].output.fields}
     assert churn_fields["is_churned_actual"].data_type == "int"
     assert churn_fields["is_churned_actual"].nullable
-    assert "inventory_as_of" in {
-        field.name for field in contracts["stockout_risk"].output.fields
-    }
+    assert "inventory_as_of" in {field.name for field in contracts["stockout_risk"].output.fields}
     assert contracts["promotion_lift"].output.grain == (
         "store_id",
         "promo_code",
@@ -135,17 +129,17 @@ def test_corrected_notebook_output_shapes_are_manifested() -> None:
         "product_id",
         "discount_type",
     )
-    dwell_fields = {
-        field.name for field in contracts["dwell_predictions"].output.fields
-    }
-    assert not {
-        "actual_dwell_minutes",
-        "departed_ts",
-        "prediction_error_minutes",
-    } & dwell_fields
+    dwell_fields = {field.name for field in contracts["dwell_predictions"].output.fields}
+    assert (
+        not {
+            "actual_dwell_minutes",
+            "departed_ts",
+            "prediction_error_minutes",
+        }
+        & dwell_fields
+    )
     pricing_fields = {
-        field.name: field
-        for field in contracts["pricing_recommendations"].output.fields
+        field.name: field for field in contracts["pricing_recommendations"].output.fields
     }
     assert pricing_fields["ml_confidence"].nullable
     assert {
@@ -215,9 +209,7 @@ def test_required_schemas_retain_all_legacy_reporting_bindings() -> None:
     }
 
     for table_name, legacy_fields in legacy_bindings.items():
-        current_fields = {
-            field.name for field in contracts[table_name].output.fields
-        }
+        current_fields = {field.name for field in contracts[table_name].output.fields}
         assert legacy_fields <= current_fields
 
 
@@ -248,9 +240,7 @@ def test_repository_validation_rejects_producer_schema_drift() -> None:
     document = _document()
     demand = _contract(document, "demand_forecast")
     predicted_units = next(
-        field
-        for field in demand["output"]["fields"]
-        if field["name"] == "predicted_units"
+        field for field in demand["output"]["fields"] if field["name"] == "predicted_units"
     )
     predicted_units["data_type"] = "long"
     manifest = SolutionManifest.model_validate(document)

@@ -114,7 +114,8 @@ def _build_ads(ctx: GenerationContext) -> StageOutputs:
 
 def _build_refunds(ctx: GenerationContext, plan: StageOutputs) -> StageOutputs:
     return returns_mod.generate_returns(
-        ctx.spark, _accepted(plan), ctx.dims, ctx.cfg, return_headers=plan["return_headers"])
+        ctx.spark, _accepted(plan), ctx.dims, ctx.cfg, return_headers=plan["return_headers"]
+    )
 
 
 def _build_promos(ctx: GenerationContext, plan: StageOutputs) -> StageOutputs:
@@ -127,8 +128,11 @@ def _build_store_ops(ctx: GenerationContext) -> StageOutputs:
 
 
 def _build_foot_traffic(ctx: GenerationContext, plan: StageOutputs) -> StageOutputs:
-    return {"fact_foot_traffic": store_activity.generate_foot_traffic(
-        ctx.spark, plan["fact_receipts"], ctx.dims, ctx.cfg)}
+    return {
+        "fact_foot_traffic": store_activity.generate_foot_traffic(
+            ctx.spark, plan["fact_receipts"], ctx.dims, ctx.cfg
+        )
+    }
 
 
 def _build_ble(ctx: GenerationContext, plan: StageOutputs) -> StageOutputs:
@@ -141,7 +145,8 @@ def _build_ledgers(ctx: GenerationContext, plan: StageOutputs) -> StageOutputs:
     # Restocking returns are already events in the fulfillment plan, so the
     # ledgers need no refund frames.
     return inventory.generate_inventory_chain(
-        ctx.spark, _accepted(plan), {}, ctx.dims, ctx.cfg, fulfillment=result)
+        ctx.spark, _accepted(plan), {}, ctx.dims, ctx.cfg, fulfillment=result
+    )
 
 
 def _union(frames: list[DataFrame]) -> DataFrame:
@@ -152,52 +157,109 @@ def _union(frames: list[DataFrame]) -> DataFrame:
 
 
 def _build_attributed(
-    ctx: GenerationContext, plan: StageOutputs, refunds: StageOutputs,
-    online: StageOutputs, promos: StageOutputs, ads: StageOutputs,
+    ctx: GenerationContext,
+    plan: StageOutputs,
+    refunds: StageOutputs,
+    online: StageOutputs,
+    promos: StageOutputs,
+    ads: StageOutputs,
 ) -> StageOutputs:
     # IMP-007: deterministic last-touch attribution over every purchase stream.
     inputs = {
-        **ctx.dims, **promos, **ads,
+        **ctx.dims,
+        **promos,
+        **ads,
         "fact_receipts": _union([plan["fact_receipts"], refunds["fact_receipts"]]),
         "fact_receipt_lines": _union([plan["fact_receipt_lines"], refunds["fact_receipt_lines"]]),
         "fact_online_order_headers": online["fact_online_order_headers"],
         "fact_payments": _union(
-            [plan["fact_payments"], refunds["fact_payments"], online["payments"]]),
+            [plan["fact_payments"], refunds["fact_payments"], online["payments"]]
+        ),
     }
     out = attribution.generate_attribution(ctx.spark, inputs, ctx.cfg)
     return {name: out[name] for name in _ATTRIBUTED}
 
 
 _ATTRIBUTED = (
-    "fact_receipts", "fact_online_order_headers", "fact_payments",
-    "fact_promotions", "fact_marketing", "fact_marketing_attribution",
+    "fact_receipts",
+    "fact_online_order_headers",
+    "fact_payments",
+    "fact_promotions",
+    "fact_marketing",
+    "fact_marketing_attribution",
 )
 _LEDGERS = (
-    "fact_store_inventory_txn", "fact_dc_inventory_txn", "fact_truck_moves",
-    "fact_truck_inventory", "fact_reorders", "fact_stockouts",
+    "fact_store_inventory_txn",
+    "fact_dc_inventory_txn",
+    "fact_truck_moves",
+    "fact_truck_inventory",
+    "fact_reorders",
+    "fact_stockouts",
 )
 
 STAGES: tuple[Stage, ...] = (
-    Stage("candidates", "setup-03-generate-sales", (), _RECEIPT_GROUP,
-          _build_candidates, handoff=False),
-    Stage("plan", "setup-03-generate-sales", ("candidates",),
-          ("return_headers", "events", *_RECEIPT_GROUP), _build_plan),
-    Stage("online", "setup-04-generate-online-orders", (),
-          ("fact_online_order_headers", "fact_online_order_lines", "payments"), _build_online),
+    Stage(
+        "candidates",
+        "setup-03-generate-sales",
+        (),
+        _RECEIPT_GROUP,
+        _build_candidates,
+        handoff=False,
+    ),
+    Stage(
+        "plan",
+        "setup-03-generate-sales",
+        ("candidates",),
+        ("return_headers", "events", *_RECEIPT_GROUP),
+        _build_plan,
+    ),
+    Stage(
+        "online",
+        "setup-04-generate-online-orders",
+        (),
+        ("fact_online_order_headers", "fact_online_order_lines", "payments"),
+        _build_online,
+    ),
     Stage("ads", "setup-05-generate-marketing", (), ("fact_marketing",), _build_ads),
-    Stage("refunds", "setup-06-generate-returns-and-promotions", ("plan",),
-          _RECEIPT_GROUP, _build_refunds),
-    Stage("promos", "setup-06-generate-returns-and-promotions", ("plan",),
-          ("fact_promotions", "fact_promo_lines"), _build_promos),
-    Stage("store_ops", "setup-07-generate-store-activity", (), ("fact_store_ops",),
-          _build_store_ops),
-    Stage("foot_traffic", "setup-07-generate-store-activity", ("plan",),
-          ("fact_foot_traffic",), _build_foot_traffic),
-    Stage("ble", "setup-07-generate-store-activity", ("plan",),
-          ("fact_ble_pings", "fact_customer_zone_changes"), _build_ble),
+    Stage(
+        "refunds",
+        "setup-06-generate-returns-and-promotions",
+        ("plan",),
+        _RECEIPT_GROUP,
+        _build_refunds,
+    ),
+    Stage(
+        "promos",
+        "setup-06-generate-returns-and-promotions",
+        ("plan",),
+        ("fact_promotions", "fact_promo_lines"),
+        _build_promos,
+    ),
+    Stage(
+        "store_ops", "setup-07-generate-store-activity", (), ("fact_store_ops",), _build_store_ops
+    ),
+    Stage(
+        "foot_traffic",
+        "setup-07-generate-store-activity",
+        ("plan",),
+        ("fact_foot_traffic",),
+        _build_foot_traffic,
+    ),
+    Stage(
+        "ble",
+        "setup-07-generate-store-activity",
+        ("plan",),
+        ("fact_ble_pings", "fact_customer_zone_changes"),
+        _build_ble,
+    ),
     Stage("ledgers", "setup-08-generate-inventory", ("plan",), _LEDGERS, _build_ledgers),
-    Stage("attributed", "setup-09-attribute-marketing",
-          ("plan", "refunds", "online", "promos", "ads"), _ATTRIBUTED, _build_attributed),
+    Stage(
+        "attributed",
+        "setup-09-attribute-marketing",
+        ("plan", "refunds", "online", "promos", "ads"),
+        _ATTRIBUTED,
+        _build_attributed,
+    ),
 )
 _STAGE_BY_NAME = {stage.name: stage for stage in STAGES}
 STAGE_NOTEBOOKS = tuple(dict.fromkeys(stage.notebook for stage in STAGES))
@@ -235,30 +297,39 @@ def setup_notebook_dependencies() -> dict[str, tuple[str, ...]]:
     for notebook in STAGE_NOTEBOOKS:
         upstream = {
             _STAGE_BY_NAME[dep].notebook
-            for stage in STAGES if stage.notebook == notebook
+            for stage in STAGES
+            if stage.notebook == notebook
             for dep in stage.deps
         } - {notebook}
         graph[notebook] = tuple(sorted(upstream)) or (DICTIONARIES_NOTEBOOK,)
-    graph[PUBLISH_NOTEBOOK] = tuple(sorted(
-        {DIMENSIONS_NOTEBOOK}
-        | {_STAGE_BY_NAME[stage].notebook for stage in _PUBLISHED_STAGES}))
+    graph[PUBLISH_NOTEBOOK] = tuple(
+        sorted(
+            {DIMENSIONS_NOTEBOOK} | {_STAGE_BY_NAME[stage].notebook for stage in _PUBLISHED_STAGES}
+        )
+    )
     return graph
 
 
 def generate_dimension_frames(
-    spark: SparkSession, dicts: DictionarySet, cfg: GenerationConfig,
+    spark: SparkSession,
+    dicts: DictionarySet,
+    cfg: GenerationConfig,
 ) -> dict[str, DataFrame]:
     dims = dims_mod.generate_dimensions(spark, dicts, cfg)
     # dim_date is padded ±5 years — the semantic model's date relationships
     # need the headroom around the generated fact window.
     dims["dim_date"] = dims_mod.generate_dim_date(
-        spark, _shift_year(cfg.start_date, -5), _shift_year(cfg.end_date, 5))
+        spark, _shift_year(cfg.start_date, -5), _shift_year(cfg.end_date, 5)
+    )
     return dims
 
 
 def generate_all(
-    spark: SparkSession, dicts: DictionarySet, cfg: GenerationConfig,
-    *, checkpoint_dir: str | None = None,
+    spark: SparkSession,
+    dicts: DictionarySet,
+    cfg: GenerationConfig,
+    *,
+    checkpoint_dir: str | None = None,
 ) -> GenerationResult:
     """Run the whole stage graph in one session and return every Silver table.
 
@@ -276,21 +347,31 @@ def generate_all(
     dims = _checkpoint_frames(generate_dimension_frames(spark, dicts, cfg), reliable)
     ctx = GenerationContext(spark, dicts, cfg, dims)
     out = run_stages(ctx, STAGES, {}, lambda _stage, frames: _checkpoint_frames(frames, reliable))
-    tables = {**dims, **{
-        name: _union([out[stage][output] for stage, output in sources])
-        for name, sources in SILVER_SOURCES.items()
-    }}
+    tables = {
+        **dims,
+        **{
+            name: _union([out[stage][output] for stage, output in sources])
+            for name, sources in SILVER_SOURCES.items()
+        },
+    }
     # Release stage data the published tables no longer read.
-    referenced = {id(out[stage][output]) for sources in SILVER_SOURCES.values()
-                  for stage, output in sources}
-    _release(frame for frames in out.values() for frame in frames.values()
-             if id(frame) not in referenced)
+    referenced = {
+        id(out[stage][output]) for sources in SILVER_SOURCES.values() for stage, output in sources
+    }
+    _release(
+        frame for frames in out.values() for frame in frames.values() if id(frame) not in referenced
+    )
     return GenerationResult(tables=tables)
 
 
 def run_generation_notebook(
-    spark: SparkSession, dicts: DictionarySet, cfg: GenerationConfig, notebook: str,
-    store: HandoffStore, *, checkpoint_dir: str | None = None,
+    spark: SparkSession,
+    dicts: DictionarySet,
+    cfg: GenerationConfig,
+    notebook: str,
+    store: HandoffStore,
+    *,
+    checkpoint_dir: str | None = None,
 ) -> dict[str, StageOutputs]:
     """Run one setup notebook's stages, reading and writing handoff tables.
 
@@ -317,8 +398,7 @@ def run_generation_notebook(
     def materialize(stage: Stage, frames: StageOutputs) -> StageOutputs:
         if not stage.handoff:
             return _checkpoint_frames(frames, reliable)
-        return _persist_frames(
-            frames, lambda output, frame: store.save(stage.name, output, frame))
+        return _persist_frames(frames, lambda output, frame: store.save(stage.name, output, frame))
 
     out = run_stages(ctx, stages, inputs, materialize)
     _release(dims.values())
@@ -326,8 +406,12 @@ def run_generation_notebook(
 
 
 def load_publication(
-    spark: SparkSession, dicts: DictionarySet, cfg: GenerationConfig,
-    store: HandoffStore, *, checkpoint_dir: str | None = None,
+    spark: SparkSession,
+    dicts: DictionarySet,
+    cfg: GenerationConfig,
+    store: HandoffStore,
+    *,
+    checkpoint_dir: str | None = None,
 ) -> tuple[dict[str, DataFrame], dict[str, str]]:
     """Assemble every Silver table from handoffs for the publish notebook.
 
@@ -348,7 +432,9 @@ def load_publication(
 
 
 def run_stages(
-    ctx: GenerationContext, stages: Iterable[Stage], inputs: dict[str, StageOutputs],
+    ctx: GenerationContext,
+    stages: Iterable[Stage],
+    inputs: dict[str, StageOutputs],
     materialize: Callable[[Stage, StageOutputs], StageOutputs],
 ) -> dict[str, StageOutputs]:
     """Run each stage once its dependencies finish, up to MAX_PARALLEL_STAGES at once.
@@ -363,8 +449,7 @@ def run_stages(
     pending = {stage.name: stage for stage in stages}
     results: dict[str, StageOutputs] = dict(inputs)
     consumers = {
-        name: {other.name for other in pending.values() if name in other.deps}
-        for name in pending
+        name: {other.name for other in pending.values() if name in other.deps} for name in pending
     }
     running: dict[Future, str] = {}
     failure: BaseException | None = None
@@ -373,13 +458,19 @@ def run_stages(
         frames = stage.build(ctx, *[results[dep] for dep in stage.deps])
         if set(frames) != set(stage.outputs):
             raise ValueError(
-                f"stage {stage.name!r} built {sorted(frames)}, declared {sorted(stage.outputs)}")
+                f"stage {stage.name!r} built {sorted(frames)}, declared {sorted(stage.outputs)}"
+            )
         return materialize(stage, frames)
 
     def release_finished() -> None:
         for name, users in consumers.items():
-            if (name in results and name not in _PUBLISHED_STAGES and name not in inputs
-                    and users and all(user in results for user in users)):
+            if (
+                name in results
+                and name not in _PUBLISHED_STAGES
+                and name not in inputs
+                and users
+                and all(user in results for user in users)
+            ):
                 _release(results[name].values())
                 users.clear()
 
@@ -424,7 +515,8 @@ def _inheriting(fn: Callable) -> Callable:
 
 
 def _persist_frames(
-    frames: StageOutputs, persist: Callable[[str, DataFrame], DataFrame],
+    frames: StageOutputs,
+    persist: Callable[[str, DataFrame], DataFrame],
 ) -> StageOutputs:
     """Persist sibling frames one at a time, computing shared work once.
 
@@ -451,6 +543,7 @@ def _checkpoint_frames(frames: StageOutputs, reliable: bool) -> StageOutputs:
     directory and survive executor loss; local checkpoints keep rows on the
     executors that computed them and are only safe for local runs.
     """
+
     def checkpoint(_name: str, frame: DataFrame) -> DataFrame:
         return frame.checkpoint(eager=True) if reliable else frame.localCheckpoint(eager=True)
 
@@ -472,5 +565,3 @@ def _release(frames: Iterable[DataFrame]) -> None:
         checkpoint_file = rdd.getCheckpointFile()
         if checkpoint_file.isDefined():
             delete_lakehouse_path(frame.sparkSession, checkpoint_file.get())
-
-

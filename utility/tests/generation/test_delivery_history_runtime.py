@@ -11,20 +11,13 @@ from pyspark.sql.window import Window
 pytestmark = pytest.mark.spark_no_filesystem
 
 NOTEBOOK_PATH = (
-    Path(__file__).resolve().parents[3]
-    / "fabric"
-    / "lakehouse"
-    / "13-ml-delivery-prediction.ipynb"
+    Path(__file__).resolve().parents[3] / "fabric" / "lakehouse" / "13-ml-delivery-prediction.ipynb"
 )
 
 
 def _code_cells():
     notebook = json.loads(NOTEBOOK_PATH.read_text(encoding="utf-8"))
-    return [
-        "".join(cell["source"])
-        for cell in notebook["cells"]
-        if cell["cell_type"] == "code"
-    ]
+    return ["".join(cell["source"]) for cell in notebook["cells"] if cell["cell_type"] == "code"]
 
 
 @pytest.mark.parametrize("live_state", ["empty", "open_only", "completed_and_open"])

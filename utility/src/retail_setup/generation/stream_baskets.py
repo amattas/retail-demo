@@ -16,8 +16,11 @@ from retail_setup.generation.runtime import seeded_draws
 
 
 def attach_stream_baskets(
-    spark: SparkSession, purchases: DataFrame, products: DataFrame,
-    profile: StoreTypeProfile, seed: int,
+    spark: SparkSession,
+    purchases: DataFrame,
+    products: DataFrame,
+    profile: StoreTypeProfile,
+    seed: int,
 ) -> DataFrame:
     """Snapshot launch eligibility at stream start; restart to include new launches."""
     draws = seeded_draws(seed)
@@ -25,10 +28,13 @@ def attach_stream_baskets(
         products, spark.range(1).select(F.current_date().alias("event_date")), draws
     )
     weight = sum(
-        (F.when(
-            F.col("department") == name,
-            F.lit(value) * _seasonal_factor(name, F.month("event_date")),
-        ).otherwise(0.0) for name, value in profile.department_weights.items()),
+        (
+            F.when(
+                F.col("department") == name,
+                F.lit(value) * _seasonal_factor(name, F.month("event_date")),
+            ).otherwise(0.0)
+            for name, value in profile.department_weights.items()
+        ),
         F.lit(0.0),
     )
     # Department arrays are bounded profile metadata, not a collected customer pool.
@@ -38,30 +44,46 @@ def attach_stream_baskets(
     total = sum(row["_weight"] for row in entries)
     missing = set(profile.department_weights) - {row["department"] for row in entries}
     if missing:
-        raise ValueError(f"Live catalog has no launched products for departments: {sorted(missing)}")
+        raise ValueError(
+            f"Live catalog has no launched products for departments: {sorted(missing)}"
+        )
     cumulative = 0.0
     metadata = []
     for row in entries:
         cumulative += row["_weight"] / total
         metadata.append((row["department"], cumulative, row["_catalog"]))
-    schema = "department string, _cdf double, _catalog array<struct<_cdf:double," \
-             "product_id:bigint,SalePrice:double,taxability:string>>"
+    schema = (
+        "department string, _cdf double, _catalog array<struct<_cdf:double,"
+        "product_id:bigint,SalePrice:double,taxability:string>>"
+    )
     lookup = spark.createDataFrame(metadata, schema).agg(
-        F.sort_array(F.collect_list(F.struct("_cdf", "department", "_catalog"))).alias("_departments")
+        F.sort_array(F.collect_list(F.struct("_cdf", "department", "_catalog"))).alias(
+            "_departments"
+        )
     )
     line_value = sum(row["_weight"] * row["_expected_line_value"] for row in entries) / total
     taxable_value = sum(row["_weight"] * row["_expected_taxable_value"] for row in entries) / total
-    purchases = purchases.join(F.broadcast(lookup)).withColumn(
-        "_offer", draws.u(["receipt_id"], "offer") < profile.promo_rate
-    ).withColumn(
-        "basket_n",
-        retail_basket_size(
-            draws, ["receipt_id"], F.col("customer_id"),
-            calibrated_basket_mean(
-                F.lit(line_value), F.lit(taxable_value), F.col("store_bps") / 10000.0,
-                profile.avg_ticket_target, profile.promo_rate, profile.basket_lambda,
-            ), F.col("_offer"), profile.promo_rate,
-        ),
+    purchases = (
+        purchases.join(F.broadcast(lookup))
+        .withColumn("_offer", draws.u(["receipt_id"], "offer") < profile.promo_rate)
+        .withColumn(
+            "basket_n",
+            retail_basket_size(
+                draws,
+                ["receipt_id"],
+                F.col("customer_id"),
+                calibrated_basket_mean(
+                    F.lit(line_value),
+                    F.lit(taxable_value),
+                    F.col("store_bps") / 10000.0,
+                    profile.avg_ticket_target,
+                    profile.promo_rate,
+                    profile.basket_lambda,
+                ),
+                F.col("_offer"),
+                profile.promo_rate,
+            ),
+        )
     )
 
     def line(index):
@@ -78,9 +100,12 @@ def attach_stream_baskets(
         quantity = retail_quantity(draws, keys, department["department"])
         unit = F.round(product["SalePrice"] * 100).cast("long")
         return F.struct(
-            index.alias("line_num"), product["product_id"].alias("product_id"),
-            quantity.alias("quantity"), unit.alias("unit_cents"),
-            (unit * quantity).alias("gross_cents"), product["taxability"].alias("taxability"),
+            index.alias("line_num"),
+            product["product_id"].alias("product_id"),
+            quantity.alias("quantity"),
+            unit.alias("unit_cents"),
+            (unit * quantity).alias("gross_cents"),
+            product["taxability"].alias("taxability"),
         )
 
     return purchases.withColumn(

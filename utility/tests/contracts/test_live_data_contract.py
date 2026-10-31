@@ -34,15 +34,9 @@ MANIFEST_PATH = REPO_ROOT / "contracts" / "retail-demo.json"
 MANIFEST = load_solution_manifest(MANIFEST_PATH)
 SNAPSHOT = derive_data_contract_snapshot(MANIFEST, REPO_ROOT)
 VALIDATION = validate_data_contracts(MANIFEST, REPO_ROOT)
-EVENT_CONTRACT = next(
-    contract for contract in MANIFEST.data_contracts if contract.kind == "event"
-)
+EVENT_CONTRACT = next(contract for contract in MANIFEST.data_contracts if contract.kind == "event")
 EVENTS = {event.event_type: event for event in EVENT_CONTRACT.events}
-PATHS = {
-    path.event_ids[0]: path
-    for path in MANIFEST.event_paths
-    if path.path_kind == "emitted"
-}
+PATHS = {path.event_ids[0]: path for path in MANIFEST.event_paths if path.path_kind == "emitted"}
 EXCEPTIONS = {exception.id: exception for exception in MANIFEST.exceptions}
 FIXTURES = {
     event.event_type: event
@@ -78,9 +72,7 @@ class _SparkFunctions:
 
 
 def _kusto_writer_columns(event_type: str) -> list[str]:
-    driver_path = (
-        REPO_ROOT / "utility" / "notebooks" / "templates" / "driver-05-stream.py"
-    )
+    driver_path = REPO_ROOT / "utility" / "notebooks" / "templates" / "driver-05-stream.py"
     tree = ast.parse(driver_path.read_text(encoding="utf-8"), filename=str(driver_path))
     function = next(
         node
@@ -121,16 +113,11 @@ def test_all_event_wire_route_and_terminal_contracts(event_type: str) -> None:
     fixture = FIXTURES[event_type]
     path = PATHS[declaration.id]
 
-    expected_types = {
-        field.name: field.data_type for field in (*payload, *envelope)
-    }
+    expected_types = {field.name: field.data_type for field in (*payload, *envelope)}
     assert ddl == expected_types
     assert {name: item[0] for name, item in mapping.items()} == expected_types
     assert {name: item[1] for name, item in mapping.items()} == {
-        **{
-            field.name: f"$.payload.{field.source_name}"
-            for field in payload
-        },
+        **{field.name: f"$.payload.{field.source_name}" for field in payload},
         **{field.name: f"$.{field.name}" for field in envelope},
     }
     assert all(field.nullable for field in (*payload, *envelope))
@@ -149,21 +136,13 @@ def test_all_event_wire_route_and_terminal_contracts(event_type: str) -> None:
     assert isinstance(event_time, str) and event_time.endswith("Z")
     assert fixture.envelope["ingest_timestamp"].endswith("Z")
 
-    assert [
-        target.name for target in path.targets if target.layer == "eventhouse"
-    ] == [event_type]
+    assert [target.name for target in path.targets if target.layer == "eventhouse"] == [event_type]
     silver_target = SNAPSHOT.silver.routes[event_type]
-    assert [
-        target.name for target in path.targets if target.layer == "silver"
-    ] == [silver_target]
-    for gold_target in (
-        target.name for target in path.targets if target.layer == "gold"
-    ):
+    assert [target.name for target in path.targets if target.layer == "silver"] == [silver_target]
+    for gold_target in (target.name for target in path.targets if target.layer == "gold"):
         assert silver_target in SNAPSHOT.gold[gold_target].source_tables
 
-    semantic_targets = [
-        target.name for target in path.targets if target.layer == "semantic"
-    ]
+    semantic_targets = [target.name for target in path.targets if target.layer == "semantic"]
     if semantic_targets:
         assert path.terminal_exception_id is None
         assert set(semantic_targets) <= set(SNAPSHOT.semantic_tables)
@@ -202,17 +181,11 @@ def test_envelope_kql_and_fixture_counts_are_exact() -> None:
 
 def test_derived_attribution_route_uses_verified_inputs_and_terminals() -> None:
     path = next(
-        path
-        for path in MANIFEST.event_paths
-        if path.id == "event-path.marketing-attribution"
+        path for path in MANIFEST.event_paths if path.id == "event-path.marketing-attribution"
     )
     route = SNAPSHOT.silver.derived_routes["marketing_attribution"]
     event_silver_targets = {
-        next(
-            target.name
-            for target in PATHS[event_id].targets
-            if target.layer == "silver"
-        )
+        next(target.name for target in PATHS[event_id].targets if target.layer == "silver")
         for event_id in path.event_ids
     }
 
@@ -222,9 +195,10 @@ def test_derived_attribution_route_uses_verified_inputs_and_terminals() -> None:
         "fact_marketing",
         "fact_marketing_attribution",
     )
-    assert {
-        target.name for target in path.targets if target.layer == "semantic"
-    } == {"fact_marketing_attribution", "campaign_performance_daily"}
+    assert {target.name for target in path.targets if target.layer == "semantic"} == {
+        "fact_marketing_attribution",
+        "campaign_performance_daily",
+    }
 
 
 def test_named_boundaries_match_only_source_derived_differences() -> None:
@@ -245,9 +219,7 @@ def test_named_boundaries_match_only_source_derived_differences() -> None:
         "fact_truck_inventory",
     }
     for kind in ("operational-catch-all", "streaming-only", "historical-only"):
-        exception = next(
-            exception for exception in MANIFEST.exceptions if exception.kind == kind
-        )
+        exception = next(exception for exception in MANIFEST.exceptions if exception.kind == kind)
         assert exception.rationale
         assert exception.verification_owner
 
@@ -255,9 +227,7 @@ def test_named_boundaries_match_only_source_derived_differences() -> None:
 def test_streaming_state_tables_have_owned_contract_and_maintenance_path() -> None:
     exception = EXCEPTIONS["exception.streaming.online-order-status"]
     paths = {
-        path.id: path
-        for path in MANIFEST.event_paths
-        if path.terminal_exception_id == exception.id
+        path.id: path for path in MANIFEST.event_paths if path.terminal_exception_id == exception.id
     }
     notebook_source = notebook_python_source(
         REPO_ROOT / "fabric" / "lakehouse" / "03-streaming-to-silver.ipynb"
@@ -300,9 +270,7 @@ def test_nullable_and_unknown_fixtures_cover_intentional_boundaries() -> None:
     nullable = scenarios["nullable-variants"].events
     receipt = next(event for event in nullable if event.event_type == "receipt_created")
     line = next(event for event in nullable if event.event_type == "receipt_line_added")
-    declined = next(
-        event for event in nullable if event.event_type == "payment_processed"
-    )
+    declined = next(event for event in nullable if event.event_type == "payment_processed")
     unknown = scenarios["unknown-event-dlq"].events
 
     assert receipt.payload["campaign_id"] is None
@@ -325,20 +293,15 @@ def test_active_tmdl_types_and_legacy_names_are_source_derived() -> None:
         ).data_type
         == "double"
     )
-    assert {
-        field.name for field in SNAPSHOT.historical_tables["fact_dc_inventory_txn"]
-    } >= {"Source", "__index_level_0__"}
+    assert {field.name for field in SNAPSHOT.historical_tables["fact_dc_inventory_txn"]} >= {
+        "Source",
+        "__index_level_0__",
+    }
     required_ml = {
-        contract.output.table
-        for contract in MANIFEST.ml_contracts
-        if contract.tier == "required"
+        contract.output.table for contract in MANIFEST.ml_contracts if contract.tier == "required"
     }
     for table_name, table in SNAPSHOT.semantic_tables.items():
-        expected_schema = (
-            "au"
-            if table_name in SNAPSHOT.gold or table_name in required_ml
-            else "ag"
-        )
+        expected_schema = "au" if table_name in SNAPSHOT.gold or table_name in required_ml else "ag"
         assert (table.source_schema, table.source_table) == (
             expected_schema,
             table_name,
@@ -395,9 +358,7 @@ def test_event_path_mode_rejects_unknown_and_contradictory_values() -> None:
 def test_event_path_rejects_existing_but_wrong_terminal_exception() -> None:
     document = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     path = next(
-        item
-        for item in document["event_paths"]
-        if item["id"] == "event-path.online-order-picked"
+        item for item in document["event_paths"] if item["id"] == "event-path.online-order-picked"
     )
     path["terminal_exception_id"] = "exception.historical.no-live-event-route"
 
@@ -407,9 +368,7 @@ def test_event_path_rejects_existing_but_wrong_terminal_exception() -> None:
 
 def test_event_contract_rejects_wrong_envelope_symbol_pointer() -> None:
     document = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-    contract = next(
-        item for item in document["data_contracts"] if item["kind"] == "event"
-    )
+    contract = next(item for item in document["data_contracts"] if item["kind"] == "event")
     contract["envelope"]["source"] = next(
         source
         for source in contract["sources"]

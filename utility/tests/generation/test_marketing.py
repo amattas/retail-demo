@@ -12,9 +12,15 @@ from retail_setup.generation.schemas import column_names
 
 @pytest.fixture(scope="module")
 def setup(spark):
-    cfg = GenerationConfig(store_type="grocery", start_date=date(2025, 6, 2),
-                           end_date=date(2025, 6, 8), store_count=4, dc_count=1,
-                           customer_count=200, seed=31)
+    cfg = GenerationConfig(
+        store_type="grocery",
+        start_date=date(2025, 6, 2),
+        end_date=date(2025, 6, 8),
+        store_count=4,
+        dc_count=1,
+        customer_count=200,
+        seed=31,
+    )
     dicts = load_dictionaries(default_dictionary_root(), "grocery")
     dims = generate_dimensions(spark, dicts, cfg)
     return cfg, dims, generate_marketing(spark, dims, cfg)

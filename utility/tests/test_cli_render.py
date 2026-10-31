@@ -19,25 +19,27 @@ def _seed(root: Path, profile: str = "core") -> None:
     (root / "deploy/config/environments").mkdir(parents=True)
     repo_root = Path(__file__).resolve().parents[2]
     config = yaml.safe_load(
-        (repo_root / "deploy" / "config" / "deploy.yml").read_text(
-            encoding="utf-8"
-        )
+        (repo_root / "deploy" / "config" / "deploy.yml").read_text(encoding="utf-8")
     )
     config["lakehouse"]["name"] = "lh_x"
     config["deployment"]["profile"] = profile
-    (root / "deploy/config/deploy.yml").write_text(
-        yaml.safe_dump(config, sort_keys=False)
-    )
+    (root / "deploy/config/deploy.yml").write_text(yaml.safe_dump(config, sort_keys=False))
     (root / "deploy/config/environments/dev.yml").write_text(
-        "tenant_id: aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\n"
-        "workspace:\n"
-        "  name: retail-demo-dev\n"
+        "tenant_id: aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\nworkspace:\n  name: retail-demo-dev\n"
     )
     (root / "utility/config/environments").mkdir(parents=True, exist_ok=True)
     start_date = "2023-09-01" if profile != "core" else "2025-01-01"
-    (root / "utility/config/environments/dev.yaml").write_text(yaml.safe_dump({
-        "store_type": "grocery", "start_date": start_date,
-        "end_date": "2025-02-28", "store_count": 5, "seed": 3}))
+    (root / "utility/config/environments/dev.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "store_type": "grocery",
+                "start_date": start_date,
+                "end_date": "2025-02-28",
+                "store_count": 5,
+                "seed": 3,
+            }
+        )
+    )
     # Copy committed inputs because Windows CI does not grant symlink privileges.
     real = Path(__file__).resolve().parents[1] / "notebooks"
     shutil.copytree(real, root / "utility" / "notebooks")
@@ -45,8 +47,9 @@ def _seed(root: Path, profile: str = "core") -> None:
 
 def test_render_writes_rendered_notebooks(tmp_path):
     _seed(tmp_path)
-    result = runner.invoke(app, ["render", "--repo-root", str(tmp_path),
-                                 "--env", "dev", "--ref", "deadbeef"])
+    result = runner.invoke(
+        app, ["render", "--repo-root", str(tmp_path), "--env", "dev", "--ref", "deadbeef"]
+    )
     assert result.exit_code == 0, result.output
     out = tmp_path / "utility" / "out" / "dev"
     files = sorted(p.name for p in out.glob("*.ipynb"))
@@ -131,17 +134,14 @@ def test_render_rejects_stale_short_history_for_standard(tmp_path):
 
 def test_render_requires_configure_first(tmp_path):
     (tmp_path / "deploy/config/environments").mkdir(parents=True)
-    (tmp_path / "deploy/config/deploy.yml").write_text(
-        yaml.safe_dump({"lakehouse": {"name": "x"}}))
+    (tmp_path / "deploy/config/deploy.yml").write_text(yaml.safe_dump({"lakehouse": {"name": "x"}}))
     (tmp_path / "deploy/config/environments/dev.yml").write_text("{}")
     result = runner.invoke(app, ["render", "--repo-root", str(tmp_path), "--env", "dev"])
     assert result.exit_code != 0
     assert "configure" in result.output
 
 
-def test_render_manifest_uses_months_resolved_setup_window(
-    monkeypatch, tmp_path
-):
+def test_render_manifest_uses_months_resolved_setup_window(monkeypatch, tmp_path):
     _seed(tmp_path)
     (tmp_path / "utility" / "config" / "environments" / "dev.yaml").write_text(
         yaml.safe_dump(
@@ -208,12 +208,8 @@ def test_render_isolates_generation_config_and_output_by_environment(tmp_path):
 
     assert dev.exit_code == 0, dev.output
     assert prod.exit_code == 0, prod.output
-    dev_notebook = (
-        tmp_path / "utility/out/dev/setup-02-generate-dimensions.ipynb"
-    ).read_text()
-    prod_notebook = (
-        tmp_path / "utility/out/prod/setup-02-generate-dimensions.ipynb"
-    ).read_text()
+    dev_notebook = (tmp_path / "utility/out/dev/setup-02-generate-dimensions.ipynb").read_text()
+    prod_notebook = (tmp_path / "utility/out/prod/setup-02-generate-dimensions.ipynb").read_text()
     assert "lh_x" in dev_notebook
     assert "lh_prod" in prod_notebook
     assert dev_notebook != prod_notebook

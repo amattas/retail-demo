@@ -172,7 +172,11 @@ class PublicationCoordinator:
     """
 
     def __init__(
-        self, backend: PublicationBackend, log: LogFn, *, max_workers: int = 1,
+        self,
+        backend: PublicationBackend,
+        log: LogFn,
+        *,
+        max_workers: int = 1,
     ) -> None:
         self.backend = backend
         self.log = log
@@ -236,7 +240,9 @@ class PublicationCoordinator:
         return PublicationOutcome(state=COMPLETED, promoted=[t.name for t in promoted])
 
     def _run_all(
-        self, operation: Callable[[TableTarget], Any], targets: Sequence[TableTarget],
+        self,
+        operation: Callable[[TableTarget], Any],
+        targets: Sequence[TableTarget],
     ) -> list[tuple[TableTarget, Any, Exception | None]]:
         """Run ``operation`` for every target concurrently; results in target order."""
         from concurrent.futures import ThreadPoolExecutor
@@ -246,14 +252,12 @@ class PublicationCoordinator:
             # tagging) on jobs started from worker threads.
             from pyspark import inheritable_thread_target as in_thread
         except ImportError:  # the coordinator itself does not need Spark
+
             def in_thread(function: Callable[..., Any]) -> Callable[..., Any]:
                 return function
 
         with ThreadPoolExecutor(self.max_workers) as pool:
-            futures = [
-                (target, pool.submit(in_thread(operation), target))
-                for target in targets
-            ]
+            futures = [(target, pool.submit(in_thread(operation), target)) for target in targets]
             results: list[tuple[TableTarget, Any, Exception | None]] = []
             for target, future in futures:
                 try:
@@ -286,7 +290,8 @@ class PublicationCoordinator:
 
         # Phase 2 — validate every staged table before any promotion.
         validate_results = self._run_all(
-            lambda target: self.backend.validate(target, staged_counts[target]), targets,
+            lambda target: self.backend.validate(target, staged_counts[target]),
+            targets,
         )
         first_failure = next((r for r in validate_results if r[2] is not None), None)
         if first_failure is not None:
@@ -314,7 +319,11 @@ class PublicationCoordinator:
             # them so rollback restores or drops every target of the run.
             others = [target for target, _ in failed[1:]]
             return self._roll_back(
-                first_target, first_error, [*promoted, *others], target_states, staged,
+                first_target,
+                first_error,
+                [*promoted, *others],
+                target_states,
+                staged,
             )
 
         cleanup_failures = self._cleanup_all(staged)
@@ -338,7 +347,9 @@ class PublicationCoordinator:
         if cleanup_failures:
             failure_text = "; ".join(f"{name}: {err}" for name, err in cleanup_failures)
             self.log(
-                "__run__", "FAILED", None,
+                "__run__",
+                "FAILED",
+                None,
                 f"staging cleanup also failed: {failure_text}"[:ERROR_TEXT_LIMIT],
             )
         return PublicationOutcome(
@@ -376,7 +387,9 @@ class PublicationCoordinator:
             names = ", ".join(preserved)
             failure_text = "; ".join(f"{name}: {err}" for name, err in failures)
             self.log(
-                "__run__", ROLLBACK_FAILED, None,
+                "__run__",
+                ROLLBACK_FAILED,
+                None,
                 f"{error}; rollback failures: {failure_text}; "
                 f"staging preserved for manual recovery: {names}"[:ERROR_TEXT_LIMIT],
             )
@@ -446,9 +459,9 @@ class PublicationCoordinator:
         """
         preserved = [name for name, _ in cleanup_failures]
         failure_text = "; ".join(f"{name}: {err}" for name, err in cleanup_failures)
-        message = (
-            f"data promoted successfully; staging cleanup failed: {failure_text}"
-        )[:ERROR_TEXT_LIMIT]
+        message = (f"data promoted successfully; staging cleanup failed: {failure_text}")[
+            :ERROR_TEXT_LIMIT
+        ]
         self.log("__run__", COMPLETED_CLEANUP_FAILED, len(promoted), message)
         return PublicationOutcome(
             state=COMPLETED_CLEANUP_FAILED,
@@ -471,8 +484,7 @@ class PublicationCoordinator:
         preserved = [name for name, _ in cleanup_failures]
         failure_text = "; ".join(f"{name}: {err}" for name, err in cleanup_failures)
         message = (
-            f"{error}; data rolled back successfully; staging cleanup failed: "
-            f"{failure_text}"
+            f"{error}; data rolled back successfully; staging cleanup failed: {failure_text}"
         )[:ERROR_TEXT_LIMIT]
         self.log("__run__", ROLLED_BACK_CLEANUP_FAILED, None, message)
         return PublicationOutcome(

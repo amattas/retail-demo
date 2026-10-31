@@ -51,9 +51,7 @@ def test_run_batches_uses_fresh_processes_and_aggregates_failures(
         calls.append(command)
         return subprocess.CompletedProcess(
             command,
-            returncode=int(
-                any(argument.startswith("test_b.py::") for argument in command)
-            ),
+            returncode=int(any(argument.startswith("test_b.py::") for argument in command)),
         )
 
     monkeypatch.setattr(run_ci_shards.subprocess, "run", fake_run)

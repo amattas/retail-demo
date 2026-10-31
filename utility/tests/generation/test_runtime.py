@@ -62,18 +62,14 @@ def test_store_day_grid_builds_dates_with_spark_range(spark):
 def test_fixed_width_decimal_pads_without_truncating(spark):
     formatter = getattr(runtime, "fixed_width_decimal", None)
     assert formatter is not None
-    value = spark.range(1).select(
-        formatter(F.lit(7), 3, "sample_id").alias("formatted")
-    ).first()[0]
+    value = spark.range(1).select(formatter(F.lit(7), 3, "sample_id").alias("formatted")).first()[0]
     assert value == "007"
 
 
 def test_fixed_width_decimal_fails_on_overflow(spark):
     formatter = getattr(runtime, "fixed_width_decimal", None)
     assert formatter is not None
-    overflow = spark.range(1).select(
-        formatter(F.lit(1000), 3, "sample_id").alias("formatted")
-    )
+    overflow = spark.range(1).select(formatter(F.lit(1000), 3, "sample_id").alias("formatted"))
     with pytest.raises(Exception) as exc_info:
         overflow.collect()
     assert "sample_id exceeds 3 digits" in str(exc_info.value)
@@ -82,10 +78,14 @@ def test_fixed_width_decimal_fails_on_overflow(spark):
 def test_minimum_width_decimal_never_truncates(spark):
     formatter = getattr(runtime, "minimum_width_decimal", None)
     assert formatter is not None
-    values = spark.range(1).select(
-        formatter(F.lit(7), 3).alias("padded"),
-        formatter(F.lit(1000), 3).alias("overflow"),
-    ).first()
+    values = (
+        spark.range(1)
+        .select(
+            formatter(F.lit(7), 3).alias("padded"),
+            formatter(F.lit(1000), 3).alias("overflow"),
+        )
+        .first()
+    )
     assert values.padded == "007"
     assert values.overflow == "1000"
 

@@ -9,8 +9,13 @@ from retail_setup.generation.handoff import (
     generation_fingerprint,
 )
 
-CFG = GenerationConfig(store_type="grocery", start_date=date(2025, 9, 1),
-                       end_date=date(2025, 9, 7), store_count=2, seed=99)
+CFG = GenerationConfig(
+    store_type="grocery",
+    start_date=date(2025, 9, 1),
+    end_date=date(2025, 9, 7),
+    store_count=2,
+    seed=99,
+)
 
 
 def test_fingerprint_tracks_generation_settings_not_dictionary_location():

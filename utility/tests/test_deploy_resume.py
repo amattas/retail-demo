@@ -71,10 +71,15 @@ def test_resume_regenerates_ephemeral_inputs_without_repeating_setup(producer, c
 
 
 def test_resume_preserves_completed_recreate_without_repeating_destruction():
-    previous = _run({
-        "terraform-init": "SUCCEEDED", "terraform-destroy-recreate": "SUCCEEDED",
-        "deletion-wait": "SUCCEEDED", "setup": "SUCCEEDED", "reporting": "FAILED",
-    })
+    previous = _run(
+        {
+            "terraform-init": "SUCCEEDED",
+            "terraform-destroy-recreate": "SUCCEEDED",
+            "deletion-wait": "SUCCEEDED",
+            "setup": "SUCCEEDED",
+            "reporting": "FAILED",
+        }
+    )
     previous.targets["recreate"] = "True"
     assert _deploy_resume.recreate_mode(previous) is True
     journal.get_step(previous, "terraform-destroy-recreate").status = "RUNNING"
@@ -83,23 +88,27 @@ def test_resume_preserves_completed_recreate_without_repeating_destruction():
 
 
 def test_resume_recreate_allows_failure_after_destroy_and_deletion_wait():
-    previous = _run({
-        "terraform-destroy-recreate": "SUCCEEDED",
-        "deletion-wait": "SUCCEEDED",
-        "setup": "SUCCEEDED",
-        "required-ml-reporting-gate": "FAILED",
-    })
+    previous = _run(
+        {
+            "terraform-destroy-recreate": "SUCCEEDED",
+            "deletion-wait": "SUCCEEDED",
+            "setup": "SUCCEEDED",
+            "required-ml-reporting-gate": "FAILED",
+        }
+    )
     previous.targets["recreate"] = "True"
 
     assert _deploy_resume.recreate_mode(previous) is True
 
 
 def test_resume_recreate_rejects_unfinished_destroy_or_deletion_wait():
-    previous = _run({
-        "terraform-destroy-recreate": "SUCCEEDED",
-        "deletion-wait": "FAILED",
-        "setup": "PENDING",
-    })
+    previous = _run(
+        {
+            "terraform-destroy-recreate": "SUCCEEDED",
+            "deletion-wait": "FAILED",
+            "setup": "PENDING",
+        }
+    )
     previous.targets["recreate"] = "True"
 
     with pytest.raises(ValueError, match="unfinished destructive recreate"):
@@ -111,19 +120,13 @@ def test_resume_requires_explicit_adoption_for_fingerprint_change():
     current = _run({"setup": "PENDING", "required-ml-reporting-gate": "PENDING"})
     previous.manifest["input_fingerprint"] = "old-inputs"
     current.manifest["input_fingerprint"] = "new-inputs"
-    previous.manifest["input_fingerprints"]["files"][
-        "deploy/scripts/run_pipeline.py"
-    ] = "old"
-    current.manifest["input_fingerprints"]["files"][
-        "deploy/scripts/run_pipeline.py"
-    ] = "new"
+    previous.manifest["input_fingerprints"]["files"]["deploy/scripts/run_pipeline.py"] = "old"
+    current.manifest["input_fingerprints"]["files"]["deploy/scripts/run_pipeline.py"] = "new"
 
     with pytest.raises(ValueError, match="input_fingerprint"):
         cli._resume_succeeded_prefix(previous, current)
 
-    assert cli._resume_succeeded_prefix(
-        previous, current, allow_runner_file_change=True
-    ) == 1
+    assert cli._resume_succeeded_prefix(previous, current, allow_runner_file_change=True) == 1
 
 
 def test_adopted_run_rejects_drift_in_any_other_source_file():
@@ -131,19 +134,21 @@ def test_adopted_run_rejects_drift_in_any_other_source_file():
     current = _run({"setup": "PENDING", "required-ml-reporting-gate": "PENDING"})
     previous.manifest["input_fingerprint"] = "old-inputs"
     current.manifest["input_fingerprint"] = "new-inputs"
-    previous.manifest["input_fingerprints"]["files"].update({
-        "deploy/scripts/run_pipeline.py": "old-runner",
-        "fabric/lakehouse/06-ml-demand-forecast.ipynb": "same-notebook",
-    })
-    current.manifest["input_fingerprints"]["files"].update({
-        "deploy/scripts/run_pipeline.py": "new-runner",
-        "fabric/lakehouse/06-ml-demand-forecast.ipynb": "changed-notebook",
-    })
+    previous.manifest["input_fingerprints"]["files"].update(
+        {
+            "deploy/scripts/run_pipeline.py": "old-runner",
+            "fabric/lakehouse/06-ml-demand-forecast.ipynb": "same-notebook",
+        }
+    )
+    current.manifest["input_fingerprints"]["files"].update(
+        {
+            "deploy/scripts/run_pipeline.py": "new-runner",
+            "fabric/lakehouse/06-ml-demand-forecast.ipynb": "changed-notebook",
+        }
+    )
 
     with pytest.raises(ValueError, match="fabric/lakehouse/06-ml-demand-forecast.ipynb"):
-        cli._resume_succeeded_prefix(
-            previous, current, allow_runner_file_change=True
-        )
+        cli._resume_succeeded_prefix(previous, current, allow_runner_file_change=True)
 
 
 def test_reporting_packaging_repair_allows_only_build_artifacts_change():
@@ -163,18 +168,17 @@ def test_reporting_packaging_repair_allows_only_build_artifacts_change():
     )
     previous.manifest["input_fingerprint"] = "old-inputs"
     current.manifest["input_fingerprint"] = "new-inputs"
-    previous.manifest["input_fingerprints"]["files"][
-        "deploy/scripts/build_artifacts.py"
-    ] = "old"
-    current.manifest["input_fingerprints"]["files"][
-        "deploy/scripts/build_artifacts.py"
-    ] = "new"
+    previous.manifest["input_fingerprints"]["files"]["deploy/scripts/build_artifacts.py"] = "old"
+    current.manifest["input_fingerprints"]["files"]["deploy/scripts/build_artifacts.py"] = "new"
 
-    assert cli._resume_succeeded_prefix(
-        previous,
-        current,
-        allowed_source_changes={"deploy/scripts/build_artifacts.py"},
-    ) == 1
+    assert (
+        cli._resume_succeeded_prefix(
+            previous,
+            current,
+            allowed_source_changes={"deploy/scripts/build_artifacts.py"},
+        )
+        == 1
+    )
     assert [step.status for step in current.steps] == [
         "SUCCEEDED",
         "PENDING",
@@ -268,9 +272,7 @@ def test_adopt_completed_required_pipeline_run_verifies_exact_run(
         lambda *_args: [adopted],
     )
     config = SimpleNamespace(
-        profile=SimpleNamespace(
-            reporting_gate_pipeline_ref="ml-required.DataPipeline"
-        ),
+        profile=SimpleNamespace(reporting_gate_pipeline_ref="ml-required.DataPipeline"),
         auth_mode="azure_cli",
         tenant_id="tenant-id",
     )
@@ -469,16 +471,20 @@ def test_monitor_timeout_keeps_pipeline_step_running_and_resumable(
 
 
 def test_resumed_deploy_rechecks_capacity_without_rerunning_completed_setup(tmp_path, monkeypatch):
-    previous = _run({
-        "live-profile-preflight": "SUCCEEDED",
-        "setup": "SUCCEEDED",
-        "reporting": "FAILED",
-    })
-    current = _run({
-        "live-profile-preflight": "PENDING",
-        "setup": "PENDING",
-        "reporting": "PENDING",
-    })
+    previous = _run(
+        {
+            "live-profile-preflight": "SUCCEEDED",
+            "setup": "SUCCEEDED",
+            "reporting": "FAILED",
+        }
+    )
+    current = _run(
+        {
+            "live-profile-preflight": "PENDING",
+            "setup": "PENDING",
+            "reporting": "PENDING",
+        }
+    )
     cli._resume_succeeded_prefix(previous, current)
     execute = Mock(return_value=SimpleNamespace(returncode=0))
     monkeypatch.setattr(cli.subprocess, "run", execute)
@@ -487,7 +493,8 @@ def test_resumed_deploy_rechecks_capacity_without_rerunning_completed_setup(tmp_
     cli._run_plan_plain(tmp_path, "dev", plan, len(plan), yes=True, journal=current)
 
     assert [call.args[0] for call in execute.call_args_list] == [
-        ["live-profile-preflight"], ["reporting"],
+        ["live-profile-preflight"],
+        ["reporting"],
     ]
 
 
@@ -578,14 +585,10 @@ def test_fingerprint_details_identify_changed_source_files(tmp_path):
     runner.parent.mkdir(parents=True)
     runner.write_text("before", encoding="utf-8")
     commands = [["run"]]
-    before = _deploy_resume.fingerprint_details(
-        tmp_path, "dev", generation, commands
-    )
+    before = _deploy_resume.fingerprint_details(tmp_path, "dev", generation, commands)
 
     runner.write_text("after", encoding="utf-8")
-    after = _deploy_resume.fingerprint_details(
-        tmp_path, "dev", generation, commands
-    )
+    after = _deploy_resume.fingerprint_details(tmp_path, "dev", generation, commands)
 
     assert _deploy_resume.changed_fingerprint_inputs(before, after) == {
         "deploy/scripts/run_pipeline.py"

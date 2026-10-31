@@ -5,15 +5,22 @@ from pathlib import Path
 import pytest
 
 from retail_setup.notebooks.inject import (
-    NOTEBOOKS, REQUIRED_TOKENS, render_notebooks,
+    NOTEBOOKS,
+    REQUIRED_TOKENS,
+    render_notebooks,
 )
 
 UTILITY = Path(__file__).resolve().parents[1]
 
 VALUES = {
-    "LAKEHOUSE_NAME": "demo_lh", "SILVER_DB": "ag", "GOLD_DB": "au",
-    "STORE_TYPE": "hardware", "START_DATE": "2025-01-01",
-    "END_DATE": "2025-02-28", "STORE_COUNT": "12", "SEED": "7",
+    "LAKEHOUSE_NAME": "demo_lh",
+    "SILVER_DB": "ag",
+    "GOLD_DB": "au",
+    "STORE_TYPE": "hardware",
+    "START_DATE": "2025-01-01",
+    "END_DATE": "2025-02-28",
+    "STORE_COUNT": "12",
+    "SEED": "7",
     "DICTIONARY_REF": "abc123",
 }
 
@@ -48,6 +55,7 @@ def test_required_tokens_match_committed_notebooks():
     for name in NOTEBOOKS:
         src = (UTILITY / "notebooks" / f"{name}.ipynb").read_text()
         import re
+
         found |= set(re.findall(r"\{\{(\w+)\}\}", src))
     assert found == set(REQUIRED_TOKENS)
 
@@ -77,29 +85,37 @@ def test_render_encodes_ref_as_literal_not_executable_code(tmp_path, ref):
     )
     tree = ast.parse(parameter_source)
     reference = next(
-        node for node in tree.body
+        node
+        for node in tree.body
         if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "DICTIONARY_REF"
-                for target in node.targets)
+        and any(
+            isinstance(target, ast.Name) and target.id == "DICTIONARY_REF"
+            for target in node.targets
+        )
     )
     assert isinstance(reference.value, ast.Call)
     assert ast.literal_eval(reference.value.args[0]) == ref
-    assert not any(
-        isinstance(node, ast.Name) and node.id == "INJECTED" for node in ast.walk(tree)
-    )
+    assert not any(isinstance(node, ast.Name) and node.id == "INJECTED" for node in ast.walk(tree))
 
 
 def test_render_rejects_tokens_outside_literals_without_partial_output(tmp_path):
     source = tmp_path / "source"
     source.mkdir()
     for index, name in enumerate(NOTEBOOKS[:2]):
-        (source / f"{name}.ipynb").write_text(json.dumps({
-            "cells": [{
-                "cell_type": "code",
-                "source": ['x = "{{SEED}}"\n' if index == 0 else "x = {{SEED}}\n"],
-            }],
-            "metadata": {},
-        }), encoding="utf-8")
+        (source / f"{name}.ipynb").write_text(
+            json.dumps(
+                {
+                    "cells": [
+                        {
+                            "cell_type": "code",
+                            "source": ['x = "{{SEED}}"\n' if index == 0 else "x = {{SEED}}\n"],
+                        }
+                    ],
+                    "metadata": {},
+                }
+            ),
+            encoding="utf-8",
+        )
     output = tmp_path / "rendered"
     with pytest.raises(ValueError, match="outside supported string literals"):
         render_notebooks(VALUES, output, source, NOTEBOOKS[:2])

@@ -56,13 +56,11 @@ def generate_store_ops(
 ) -> DataFrame:
     """Two rows (opened/closed) per store-day, skipping Dec 25 of any year."""
 
-    stores = dims["dim_stores"].select(
-        F.col("ID").alias("store_id"), "operating_hours")
+    stores = dims["dim_stores"].select(F.col("ID").alias("store_id"), "operating_hours")
     store_ids = [r.store_id for r in stores.select("store_id").collect()]
 
     grid = (
-        store_day_grid(spark, store_ids, cfg.start_date, cfg.end_date,
-                       cfg.seed, "store_ops")
+        store_day_grid(spark, store_ids, cfg.start_date, cfg.end_date, cfg.seed, "store_ops")
         .filter(~((F.month("day") == 12) & (F.dayofmonth("day") == 25)))
         .join(stores, "store_id")
     )
@@ -75,28 +73,35 @@ def generate_store_ops(
         close_hour = F.when(cond, c) if close_hour is None else close_hour.when(cond, c)
     # unknown formats fall back to standard hours instead of silent NULL event_ts
     grid = grid.withColumn("open_hour", open_hour.otherwise(6)).withColumn(
-        "close_hour", close_hour.otherwise(22))
+        "close_hour", close_hour.otherwise(22)
+    )
 
     day_ts = F.unix_timestamp(F.col("day").cast("timestamp"))
     open_ts = F.timestamp_seconds(day_ts + F.col("open_hour") * 3600)
     # 24h stores "close" at 23:59:00 the same day; others at close_hour:00
-    close_secs = F.when(
-        F.col("close_hour") == 24, F.lit(23 * 3600 + 59 * 60)
-    ).otherwise(F.col("close_hour") * 3600)
+    close_secs = F.when(F.col("close_hour") == 24, F.lit(23 * 3600 + 59 * 60)).otherwise(
+        F.col("close_hour") * 3600
+    )
     close_ts = F.timestamp_seconds(day_ts + close_secs)
 
     ops = grid.select(
         "store_id",
         F.col("day").alias("event_date"),
-        F.explode(F.array(
-            F.struct(F.lit("opened").alias("operation_type"), open_ts.alias("event_ts")),
-            F.struct(F.lit("closed").alias("operation_type"), close_ts.alias("event_ts")),
-        )).alias("op"),
+        F.explode(
+            F.array(
+                F.struct(F.lit("opened").alias("operation_type"), open_ts.alias("event_ts")),
+                F.struct(F.lit("closed").alias("operation_type"), close_ts.alias("event_ts")),
+            )
+        ).alias("op"),
     ).select(
         F.col("op.event_ts").alias("event_ts"),
         F.concat(
-            F.lit("TRC-OPS-"), F.col("store_id"), F.lit("-"),
-            F.col("event_date"), F.lit("-"), F.col("op.operation_type"),
+            F.lit("TRC-OPS-"),
+            F.col("store_id"),
+            F.lit("-"),
+            F.col("event_date"),
+            F.lit("-"),
+            F.col("op.operation_type"),
         ).alias("trace_id"),
         F.col("store_id").cast("long").alias("store_id"),
         F.col("op.operation_type").alias("operation_type"),
@@ -118,9 +123,7 @@ def generate_foot_traffic(
     del receipts
     profile = load_dictionaries(cfg.resolved_dictionary_root, cfg.store_type).profile
     grid = generate_hourly_visits(spark, dims["dim_stores"], profile, cfg)
-    store_attrs = dims["dim_stores"].select(
-        F.col("ID").alias("store_id"), "store_format"
-    )
+    store_attrs = dims["dim_stores"].select(F.col("ID").alias("store_id"), "store_format")
     hourly = grid.withColumnRenamed("visitors", "total_visitors").join(store_attrs, "store_id")
 
     # per-format share column for each zone, then explode the 5-zone structs
@@ -130,20 +133,24 @@ def generate_foot_traffic(
         upper = None
         for fmt, shares in FORMAT_ZONE_SHARES.items():
             cond = F.col("store_format") == fmt
-            lo_share, hi_share = sum(shares[:i]), sum(shares[:i + 1])
+            lo_share, hi_share = sum(shares[:i]), sum(shares[: i + 1])
             lower = F.when(cond, lo_share) if lower is None else lower.when(cond, lo_share)
             upper = F.when(cond, hi_share) if upper is None else upper.when(cond, hi_share)
         lo, hi = ZONE_DWELL[zone]
-        zone_structs.append(F.struct(
-            F.lit(zone).alias("zone"),
-            lower.alias("lower"),
-            upper.alias("upper"),
-            F.lit(lo).alias("dwell_lo"),
-            F.lit(hi).alias("dwell_hi"),
-        ))
+        zone_structs.append(
+            F.struct(
+                F.lit(zone).alias("zone"),
+                lower.alias("lower"),
+                upper.alias("upper"),
+                F.lit(lo).alias("dwell_lo"),
+                F.lit(hi).alias("dwell_hi"),
+            )
+        )
 
     ft = hourly.select(
-        "store_id", "hour_ts", "total_visitors",
+        "store_id",
+        "hour_ts",
+        "total_visitors",
         F.explode(F.array(*zone_structs)).alias("z"),
     )
 
@@ -151,20 +158,25 @@ def generate_foot_traffic(
     ft = ft.select(
         F.col("hour_ts").alias("event_ts"),
         F.concat(
-            F.lit("TRC-FT-"), F.col("store_id"), F.lit("-"),
-            F.date_format("hour_ts", "yyyyMMddHH"), F.lit("-"), F.col("z.zone"),
+            F.lit("TRC-FT-"),
+            F.col("store_id"),
+            F.lit("-"),
+            F.date_format("hour_ts", "yyyyMMddHH"),
+            F.lit("-"),
+            F.col("z.zone"),
         ).alias("trace_id"),
         F.col("store_id").cast("long").alias("store_id"),
-        F.format_string("SENSOR_%03d_%s", F.col("store_id"), F.col("z.zone"))
-            .alias("sensor_id"),
+        F.format_string("SENSOR_%03d_%s", F.col("store_id"), F.col("z.zone")).alias("sensor_id"),
         F.col("z.zone").alias("zone"),
-        F.floor(
-            F.col("z.dwell_lo") + dwell_u * (F.col("z.dwell_hi") - F.col("z.dwell_lo") + 1)
-        ).cast("long").alias("dwell_seconds"),
+        F.floor(F.col("z.dwell_lo") + dwell_u * (F.col("z.dwell_hi") - F.col("z.dwell_lo") + 1))
+        .cast("long")
+        .alias("dwell_seconds"),
         (
             F.round(F.col("total_visitors") * F.col("z.upper"))
             - F.round(F.col("total_visitors") * F.col("z.lower"))
-        ).cast("long").alias("count"),
+        )
+        .cast("long")
+        .alias("count"),
         F.to_date("hour_ts").alias("event_date"),
     )
     return ft.select(*column_names("fact_foot_traffic"))

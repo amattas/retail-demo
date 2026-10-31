@@ -69,7 +69,9 @@ def test_lakehouse_backend_stage_creates_staging_db_once_and_writes_delta():
     spark = MagicMock()
     df = MagicMock()
     spark.table.return_value.count.return_value = 42
-    target = TableTarget(name="fact_receipts", db="ag", staging_name="lh.ag_stage.run1__fact_receipts")
+    target = TableTarget(
+        name="fact_receipts", db="ag", staging_name="lh.ag_stage.run1__fact_receipts"
+    )
     backend = _LakehouseBackend(spark, "lh", "run-1", {("ag", "fact_receipts"): df})
 
     count = backend.stage(target)
@@ -126,7 +128,9 @@ def test_lakehouse_backend_target_state_reports_absent_target():
     spark = MagicMock()
     spark.catalog.tableExists.return_value = False
     backend = _LakehouseBackend(spark, "lh", "run-1", {})
-    target = TableTarget(name="fact_receipts", db="ag", staging_name="lh.ag_stage.run1__fact_receipts")
+    target = TableTarget(
+        name="fact_receipts", db="ag", staging_name="lh.ag_stage.run1__fact_receipts"
+    )
 
     state = backend.target_state(target)
 
@@ -141,7 +145,9 @@ def test_lakehouse_backend_target_state_captures_delta_version_for_existing_targ
     history_row.__getitem__.return_value = 9
     spark.sql.return_value.collect.return_value = [history_row]
     backend = _LakehouseBackend(spark, "lh", "run-1", {})
-    target = TableTarget(name="fact_receipts", db="ag", staging_name="lh.ag_stage.run1__fact_receipts")
+    target = TableTarget(
+        name="fact_receipts", db="ag", staging_name="lh.ag_stage.run1__fact_receipts"
+    )
 
     state = backend.target_state(target)
 
@@ -154,7 +160,9 @@ def test_lakehouse_backend_promote_uses_create_or_replace_table():
     spark = MagicMock()
     spark.table.return_value.count.return_value = 7
     backend = _LakehouseBackend(spark, "lh", "run-1", {})
-    target = TableTarget(name="fact_receipts", db="ag", staging_name="lh.ag_stage.run1__fact_receipts")
+    target = TableTarget(
+        name="fact_receipts", db="ag", staging_name="lh.ag_stage.run1__fact_receipts"
+    )
 
     count = backend.promote(target)
 
@@ -168,7 +176,9 @@ def test_lakehouse_backend_promote_uses_create_or_replace_table():
 def test_lakehouse_backend_restore_uses_restore_table_to_version_as_of():
     spark = MagicMock()
     backend = _LakehouseBackend(spark, "lh", "run-1", {})
-    target = TableTarget(name="fact_receipts", db="ag", staging_name="lh.ag_stage.run1__fact_receipts")
+    target = TableTarget(
+        name="fact_receipts", db="ag", staging_name="lh.ag_stage.run1__fact_receipts"
+    )
 
     backend.restore(target, TargetState(existed=True, restore_token=3))
 
@@ -178,7 +188,9 @@ def test_lakehouse_backend_restore_uses_restore_table_to_version_as_of():
 def test_lakehouse_backend_drop_and_cleanup_use_drop_table_if_exists():
     spark = MagicMock()
     backend = _LakehouseBackend(spark, "lh", "run-1", {})
-    target = TableTarget(name="fact_receipts", db="ag", staging_name="lh.ag_stage.run1__fact_receipts")
+    target = TableTarget(
+        name="fact_receipts", db="ag", staging_name="lh.ag_stage.run1__fact_receipts"
+    )
 
     backend.drop(target)
     spark.sql.assert_called_once_with("DROP TABLE IF EXISTS lh.ag.fact_receipts")

@@ -218,9 +218,7 @@ def _validate_ml_contracts(
     for contract in manifest.ml_contracts:
         table_name = contract.output.table
         if table_name in seen_tables:
-            raise ManifestSourceError(
-                f"ML output table is declared more than once: {table_name!r}"
-            )
+            raise ManifestSourceError(f"ML output table is declared more than once: {table_name!r}")
         seen_tables.add(table_name)
         by_tier[contract.tier].add(table_name)
 
@@ -234,15 +232,11 @@ def _validate_ml_contracts(
             notebook_ml_source_tables(producer_path),
         )
         if tuple(contract.source_tables) != source_tables:
-            raise ManifestSourceError(
-                f"ML source-table mismatch for {table_name!r}"
-            )
+            raise ManifestSourceError(f"ML source-table mismatch for {table_name!r}")
         try:
             producer_schema = producer_schemas[table_name]
         except KeyError as exc:
-            raise ManifestSourceError(
-                f"ML producer does not declare {table_name!r}"
-            ) from exc
+            raise ManifestSourceError(f"ML producer does not declare {table_name!r}") from exc
         manifest_schema = tuple(
             PhysicalField(
                 name=field.name,
@@ -252,9 +246,7 @@ def _validate_ml_contracts(
             for field in contract.output.fields
         )
         if producer_schema != manifest_schema:
-            raise ManifestSourceError(
-                f"ML producer/manifest schema mismatch for {table_name!r}"
-            )
+            raise ManifestSourceError(f"ML producer/manifest schema mismatch for {table_name!r}")
 
         if contract.tier != "required":
             continue
@@ -276,9 +268,7 @@ def _validate_ml_contracts(
                 "required ML validator schema and semantic-rule inventories differ"
             )
         if validator_schemas.get(table_name) != manifest_schema:
-            raise ManifestSourceError(
-                f"required ML validator schema mismatch for {table_name!r}"
-            )
+            raise ManifestSourceError(f"required ML validator schema mismatch for {table_name!r}")
         expected_rule = MlValidationRule(
             grain=tuple(contract.output.grain),
             as_of=contract.output.as_of_column,
@@ -298,8 +288,7 @@ def _validate_ml_contracts(
         model_pointers = [
             source
             for source in contract.sources
-            if source.selector is not None
-            and source.selector.kind == "tmdl_active_table_schemas"
+            if source.selector is not None and source.selector.kind == "tmdl_active_table_schemas"
         ]
         if len(model_pointers) != 1:
             raise ManifestSourceError(
@@ -316,16 +305,11 @@ def _validate_ml_contracts(
                 f"required ML output {table_name!r} is not active in model.tmdl"
             )
         if model_table.source_schema != "au" or model_table.source_table != table_name:
-            raise ManifestSourceError(
-                f"required ML TMDL binding mismatch for {table_name!r}"
-            )
+            raise ManifestSourceError(f"required ML TMDL binding mismatch for {table_name!r}")
         expected_tmdl = tuple(
-            (field.name, _spark_to_tmdl_type(field.data_type))
-            for field in manifest_schema
+            (field.name, _spark_to_tmdl_type(field.data_type)) for field in manifest_schema
         )
-        actual_tmdl = tuple(
-            (field.name, field.data_type) for field in model_table.fields
-        )
+        actual_tmdl = tuple((field.name, field.data_type) for field in model_table.fields)
         if actual_tmdl != expected_tmdl:
             raise ManifestSourceError(
                 f"required ML producer/TMDL schema mismatch for {table_name!r}"
@@ -362,9 +346,7 @@ def _spark_to_tmdl_type(data_type: str) -> str:
             "timestamp": "dateTime",
         }[data_type]
     except KeyError as exc:
-        raise ManifestSourceError(
-            f"ML type {data_type!r} cannot be exposed through TMDL"
-        ) from exc
+        raise ManifestSourceError(f"ML type {data_type!r} cannot be exposed through TMDL") from exc
 
 
 def _validate_profiles(

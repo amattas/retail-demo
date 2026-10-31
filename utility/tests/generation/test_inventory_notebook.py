@@ -21,7 +21,10 @@ def test_flat_inventory_worker_serializes_without_retail_package_imports():
 
     # __main__ matches a notebook cell and forces cloudpickle's by-value path.
     producer = subprocess.run(
-        [sys.executable, "-c", """
+        [
+            sys.executable,
+            "-c",
+            """
 import base64 as _probe_base64
 import json as _probe_json
 import sys as _probe_sys
@@ -33,13 +36,20 @@ _probe_worker = partial(
     seed=17, capacity=25, daily_prior=1.0, time_zone="UTC",
 )
 print(_probe_base64.b64encode(_probe_pickle.dumps(_probe_worker)).decode("ascii"))
-"""],
-        input=json.dumps(sources), capture_output=True, text=True, timeout=60,
+""",
+        ],
+        input=json.dumps(sources),
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
     assert producer.returncode == 0, producer.stderr
 
     consumer = subprocess.run(
-        [sys.executable, "-c", """
+        [
+            sys.executable,
+            "-c",
+            """
 import base64
 import importlib.abc
 import sys
@@ -79,7 +89,11 @@ assert len(returns) == 1 and returns[0]["source"] == "RET1"
 assert returns[0]["event_ts"] == datetime(2024, 1, 2, 12, tzinfo=timezone.utc)
 assert all(event["quantity"] <= 25 for event in events if event["kind"] == "SHIPMENT")
 assert not any(name.startswith("retail_setup") for name in sys.modules)
-"""],
-        input=producer.stdout, capture_output=True, text=True, timeout=60,
+""",
+        ],
+        input=producer.stdout,
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
     assert consumer.returncode == 0, consumer.stderr

@@ -13,9 +13,16 @@ from retail_setup.generation.schemas import column_names
 
 @pytest.fixture(scope="module")
 def setup(spark):
-    cfg = GenerationConfig(store_type="grocery", start_date=date(2025, 5, 5),
-                           end_date=date(2025, 5, 11), store_count=2, dc_count=1,
-                           customer_count=200, seed=21, transactions_per_store_day=50)
+    cfg = GenerationConfig(
+        store_type="grocery",
+        start_date=date(2025, 5, 5),
+        end_date=date(2025, 5, 11),
+        store_count=2,
+        dc_count=1,
+        customer_count=200,
+        seed=21,
+        transactions_per_store_day=50,
+    )
     dicts = load_dictionaries(default_dictionary_root(), "grocery")
     dims = generate_dimensions(spark, dicts, cfg)
     sales = generate_receipts_group(spark, dims, dicts.profile, cfg)
@@ -33,7 +40,8 @@ def test_promo_lines_match_discounted_receipt_lines(setup):
     sales, _, promo_lines = setup
     discounted = sales["fact_receipt_lines"].filter(
         F.col("promo_code").isNotNull()
-        & (F.col("unit_cents") * F.col("quantity") - F.col("ext_cents") > 0))
+        & (F.col("unit_cents") * F.col("quantity") - F.col("ext_cents") > 0)
+    )
     discounted_count = discounted.count()
     promo_line_count = promo_lines.count()
     assert discounted_count > 0
@@ -47,8 +55,8 @@ def test_promotions_aggregate(setup):
     promo_count = promos.count()
     assert promo_count > 0
     agg = promo_lines.groupBy("receipt_id_ext", "promo_code").agg(
-        F.sum("discount_cents").alias("d"),
-        F.countDistinct("product_id").alias("pc"))
+        F.sum("discount_cents").alias("d"), F.countDistinct("product_id").alias("pc")
+    )
     j = promos.join(agg, ["receipt_id_ext", "promo_code"])
     assert j.count() == promo_count
     assert j.filter(F.col("discount_cents") != F.col("d")).count() == 0
@@ -59,6 +67,9 @@ def test_promotions_link_to_receipts(setup):
     sales, promos, _ = setup
     assert promos.join(sales["fact_receipts"], "receipt_id_ext", "left_anti").count() == 0
     assert promos.filter(~F.col("discount_type").isin("PERCENTAGE", "BOGO")).count() == 0
-    assert promos.filter(
-        F.col("promo_code").startswith("BOGO") & (F.col("discount_type") != "BOGO")
-    ).count() == 0
+    assert (
+        promos.filter(
+            F.col("promo_code").startswith("BOGO") & (F.col("discount_type") != "BOGO")
+        ).count()
+        == 0
+    )

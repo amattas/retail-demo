@@ -65,9 +65,7 @@ def _fingerprint_file_hashes(
     app_root = repo_root / "app" / "fabric-app"
     for current, directories, files in os.walk(app_root):
         directories[:] = [
-            name
-            for name in directories
-            if name not in {"node_modules", "dist", ".temp", ".vite"}
+            name for name in directories if name not in {"node_modules", "dist", ".temp", ".vite"}
         ]
         inputs.update(
             Path(current) / name

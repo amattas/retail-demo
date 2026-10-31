@@ -17,17 +17,21 @@ def generate_hourly_visits(
 ) -> DataFrame:
     draws = seeded_draws(cfg.seed)
     hours = stores.select(
-        F.col("ID").alias("store_id"), "GeographyID", "daily_traffic_multiplier",
+        F.col("ID").alias("store_id"),
+        "GeographyID",
+        "daily_traffic_multiplier",
         "operating_hours",
     )
     is_24 = F.col("operating_hours") == "24h"
     parts = F.split("operating_hours", "-")
     hours = hours.withColumn(
         "hour",
-        F.explode(F.sequence(
-            F.when(is_24, 0).otherwise(parts.getItem(0).cast("int")),
-            F.when(is_24, 24).otherwise(parts.getItem(1).cast("int")) - 1,
-        )),
+        F.explode(
+            F.sequence(
+                F.when(is_24, 0).otherwise(parts.getItem(0).cast("int")),
+                F.when(is_24, 24).otherwise(parts.getItem(1).cast("int")) - 1,
+            )
+        ),
     ).withColumn(
         "_hour_weight",
         F.element_at(F.array(*[F.lit(w) for w in profile.hourly_weights]), F.col("hour") + 1),
@@ -51,7 +55,8 @@ def generate_hourly_visits(
     # Nearby stores share weather; store/hour conversion remains heterogeneous.
     weather = F.exp(0.15 * draws.gauss(["GeographyID", "day"], "weather") - 0.15**2 / 2)
     conversion = 1.0 / (
-        1.0 + F.exp(
+        1.0
+        + F.exp(
             F.lit(1.2657)
             - 0.25 * draws.gauss(["store_id"], "conversion-store")
             - 0.20 * draws.gauss(["store_id", "day", "hour"], "conversion-hour")
@@ -59,8 +64,12 @@ def generate_hourly_visits(
     )
     grid = grid.withColumn(
         "_visits_mean",
-        F.lit(cfg.transactions_per_store_day / 0.225) * daily * monthly * weather
-        * F.col("daily_traffic_multiplier") * F.col("_hour_share"),
+        F.lit(cfg.transactions_per_store_day / 0.225)
+        * daily
+        * monthly
+        * weather
+        * F.col("daily_traffic_multiplier")
+        * F.col("_hour_share"),
     ).withColumn("_conversion", conversion)
     grid = grid.withColumn(
         "visitors",
@@ -72,14 +81,20 @@ def generate_hourly_visits(
     grid = grid.withColumn(
         "n_receipts",
         F.aggregate(
-            visitor_ids, F.lit(0).cast("long"),
-            lambda count, visitor: count + (
-                draws.u(["store_id", "day", "hour", visitor], "visit-conversion")
-                < F.col("_conversion")
-            ).cast("long"),
+            visitor_ids,
+            F.lit(0).cast("long"),
+            lambda count, visitor: (
+                count
+                + (
+                    draws.u(["store_id", "day", "hour", visitor], "visit-conversion")
+                    < F.col("_conversion")
+                ).cast("long")
+            ),
         ),
     )
     return grid.withColumn(
         "hour_ts",
-        F.timestamp_seconds(F.unix_timestamp(F.col("day").cast("timestamp")) + F.col("hour") * 3600),
+        F.timestamp_seconds(
+            F.unix_timestamp(F.col("day").cast("timestamp")) + F.col("hour") * 3600
+        ),
     ).select("store_id", "day", "hour", "hour_ts", "visitors", "n_receipts")

@@ -17,8 +17,13 @@ from retail_setup.generation.schemas import column_names
 @pytest.fixture(scope="module")
 def cfg():
     return GenerationConfig(
-        store_type="grocery", start_date=date(2025, 3, 3), end_date=date(2025, 3, 9),
-        store_count=3, dc_count=1, customer_count=300, seed=7,
+        store_type="grocery",
+        start_date=date(2025, 3, 3),
+        end_date=date(2025, 3, 9),
+        store_count=3,
+        dc_count=1,
+        customer_count=300,
+        seed=7,
         transactions_per_store_day=40,
     )
 
@@ -31,8 +36,10 @@ def dicts():
 @pytest.fixture(scope="module")
 def group(spark, cfg, dicts):
     dims = generate_dimensions(spark, dicts, cfg)
-    tables = {name: frame.cache() for name, frame in
-              generate_receipts_group(spark, dims, dicts.profile, cfg).items()}
+    tables = {
+        name: frame.cache()
+        for name, frame in generate_receipts_group(spark, dims, dicts.profile, cfg).items()
+    }
     yield tables
     for frame in tables.values():
         frame.unpersist()
@@ -54,6 +61,7 @@ def test_receipt_ids_unique_and_formatted(group):
 
 def test_event_fields_populated(group):
     from pyspark.sql import functions as F
+
     for t in ["fact_receipts", "fact_receipt_lines", "fact_payments"]:
         df = group[t]
         assert df.filter(F.col("event_ts").isNull() | F.col("event_date").isNull()).count() == 0, t
@@ -61,6 +69,7 @@ def test_event_fields_populated(group):
 
 def test_lines_fk_and_math(group, spark):
     from pyspark.sql import functions as F
+
     lines, receipts = group["fact_receipt_lines"], group["fact_receipts"]
     # every line belongs to a receipt
     orphans = lines.join(receipts, "receipt_id_ext", "left_anti")
@@ -76,19 +85,22 @@ def test_lines_fk_and_math(group, spark):
     assert mismatch.count() == 0
     # total = subtotal + tax (discounts already applied at line level)
     bad_total = receipts.filter(
-        F.col("total_cents") != F.col("subtotal_cents") + F.col("tax_cents"))
+        F.col("total_cents") != F.col("subtotal_cents") + F.col("tax_cents")
+    )
     assert bad_total.count() == 0
 
 
 def test_payments_one_per_receipt(group):
     from pyspark.sql import functions as F
+
     pay, receipts = group["fact_payments"], group["fact_receipts"]
     assert pay.count() == receipts.count()
     assert pay.filter(F.col("order_id_ext").isNotNull()).count() == 0  # in-store only here
     joined = pay.join(receipts.select("receipt_id_ext", "total_cents"), "receipt_id_ext")
     assert joined.filter(F.col("amount_cents") != F.col("total_cents")).count() == 0
-    cash_declines = pay.filter((F.col("payment_method") == "CASH") &
-                               (F.col("status") == "DECLINED"))
+    cash_declines = pay.filter(
+        (F.col("payment_method") == "CASH") & (F.col("status") == "DECLINED")
+    )
     assert cash_declines.count() == 0
     declined = pay.filter(F.col("status") == "DECLINED")
     assert declined.filter(F.col("decline_reason").isNull()).count() == 0
@@ -112,16 +124,22 @@ def test_determinism(spark, cfg, dicts):
     dims = generate_dimensions(spark, dicts, cfg)
     a = generate_receipts_group(spark, dims, dicts.profile, cfg)
     b = generate_receipts_group(spark, dims, dicts.profile, cfg)
-    assert sorted(r.receipt_id_ext for r in a["fact_receipts"].collect()) == \
-           sorted(r.receipt_id_ext for r in b["fact_receipts"].collect())
+    assert sorted(r.receipt_id_ext for r in a["fact_receipts"].collect()) == sorted(
+        r.receipt_id_ext for r in b["fact_receipts"].collect()
+    )
 
 
 def test_different_seeds_differ(spark, dicts):
     def gen(seed):
         cfg = GenerationConfig(
-            store_type="grocery", start_date=date(2025, 3, 3),
-            end_date=date(2025, 3, 4), store_count=2, dc_count=1,
-            customer_count=100, seed=seed, transactions_per_store_day=20,
+            store_type="grocery",
+            start_date=date(2025, 3, 3),
+            end_date=date(2025, 3, 4),
+            store_count=2,
+            dc_count=1,
+            customer_count=100,
+            seed=seed,
+            transactions_per_store_day=20,
         )
         dims = generate_dimensions(spark, dicts, cfg)
         g = generate_receipts_group(spark, dims, dicts.profile, cfg)
@@ -139,22 +157,22 @@ def test_churn_cohort_stops_receiving_purchases_after_cutoff(spark):
         customer_count=5000,
         seed=7,
     )
-    rows = [
-        (f"early-{customer_id}", cfg.start_date, customer_id)
-        for customer_id in range(10, 110, 10)
-    ] + [
-        (f"late-{customer_id}", cfg.end_date, customer_id)
-        for customer_id in range(10, 110, 10)
-    ] + [
-        (
-            f"mid-{customer_id}",
-            cfg.start_date + timedelta(days=180),
-            customer_id,
-        )
-        for customer_id in range(10, 5010, 10)
-    ] + [
-        ("active", cfg.end_date, 11)
-    ]
+    rows = (
+        [
+            (f"early-{customer_id}", cfg.start_date, customer_id)
+            for customer_id in range(10, 110, 10)
+        ]
+        + [(f"late-{customer_id}", cfg.end_date, customer_id) for customer_id in range(10, 110, 10)]
+        + [
+            (
+                f"mid-{customer_id}",
+                cfg.start_date + timedelta(days=180),
+                customer_id,
+            )
+            for customer_id in range(10, 5010, 10)
+        ]
+        + [("active", cfg.end_date, 11)]
+    )
     receipts = spark.createDataFrame(
         rows,
         "receipt_id_ext string, event_date date, customer_id long",
@@ -175,8 +193,7 @@ def test_churn_cohort_stops_receiving_purchases_after_cutoff(spark):
         assert 1 <= actual[f"late-{customer_id}"] <= cfg.customer_count
     assert actual["active"] == 11
     mid_reassigned = sum(
-        actual[f"mid-{customer_id}"] != customer_id
-        for customer_id in range(10, 5010, 10)
+        actual[f"mid-{customer_id}"] != customer_id for customer_id in range(10, 5010, 10)
     )
     assert 0 < mid_reassigned < 500
 
@@ -192,5 +209,6 @@ def test_unknown_department_raises(spark, cfg, dicts):
 
 def test_subtotal_mirrors_subtotal_amount(group):
     from pyspark.sql import functions as F
+
     receipts = group["fact_receipts"]
     assert receipts.filter(F.col("Subtotal") != F.col("subtotal_amount")).count() == 0
