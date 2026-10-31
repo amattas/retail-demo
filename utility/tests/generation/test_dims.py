@@ -11,8 +11,13 @@ from retail_setup.generation.schemas import column_names
 @pytest.fixture(scope="module")
 def small_cfg():
     return GenerationConfig(
-        store_type="grocery", start_date=date(2025, 1, 1), end_date=date(2025, 1, 7),
-        store_count=4, dc_count=2, customer_count=200, seed=42,
+        store_type="grocery",
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 1, 7),
+        store_count=4,
+        dc_count=2,
+        customer_count=200,
+        seed=42,
     )
 
 
@@ -27,8 +32,14 @@ def dims(spark, small_cfg, dicts):
 
 
 def test_all_dims_present_with_contract_columns(dims):
-    for table in ["dim_geographies", "dim_stores", "dim_distribution_centers",
-                  "dim_trucks", "dim_customers", "dim_products"]:
+    for table in [
+        "dim_geographies",
+        "dim_stores",
+        "dim_distribution_centers",
+        "dim_trucks",
+        "dim_customers",
+        "dim_products",
+    ]:
         assert table in dims
         assert dims[table].columns == column_names(table)
 
@@ -75,8 +86,9 @@ def test_trucks_dc_assignment(dims):
 def test_determinism(spark, small_cfg, dicts):
     a = generate_dimensions(spark, dicts, small_cfg)
     b = generate_dimensions(spark, dicts, small_cfg)
-    assert sorted(map(tuple, a["dim_customers"].collect())) == \
-           sorted(map(tuple, b["dim_customers"].collect()))
+    assert sorted(map(tuple, a["dim_customers"].collect())) == sorted(
+        map(tuple, b["dim_customers"].collect())
+    )
 
 
 def test_customers_are_generated_from_a_spark_range(dims):

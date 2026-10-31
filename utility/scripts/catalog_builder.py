@@ -61,13 +61,15 @@ def build_catalog(tree: dict, seed: int) -> dict:
                         if name in seen:
                             continue
                         seen.add(name)
-                        products.append({
-                            "ProductName": name,
-                            "BasePrice": _price(rng, sub["price_min"], sub["price_max"]),
-                            "Department": dept["name"],
-                            "Category": cat_name,
-                            "Subcategory": sub["name"],
-                        })
+                        products.append(
+                            {
+                                "ProductName": name,
+                                "BasePrice": _price(rng, sub["price_min"], sub["price_max"]),
+                                "Department": dept["name"],
+                                "Category": cat_name,
+                                "Subcategory": sub["name"],
+                            }
+                        )
     return {"products": products, "brands": brands}
 
 

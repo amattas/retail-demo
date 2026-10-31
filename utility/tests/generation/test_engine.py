@@ -11,10 +11,18 @@ from retail_setup.generation.invariants import run_invariants
 from retail_setup.generation.schemas import TABLES, column_names
 
 
-CFG = GenerationConfig(store_type="grocery", start_date=date(2025, 9, 1),
-                       end_date=date(2025, 9, 7), store_count=2, dc_count=1,
-                       customer_count=200, seed=99, transactions_per_store_day=30,
-                       online_orders_per_day=20, return_rate=0.05)
+CFG = GenerationConfig(
+    store_type="grocery",
+    start_date=date(2025, 9, 1),
+    end_date=date(2025, 9, 7),
+    store_count=2,
+    dc_count=1,
+    customer_count=200,
+    seed=99,
+    transactions_per_store_day=30,
+    online_orders_per_day=20,
+    return_rate=0.05,
+)
 
 
 @pytest.fixture(scope="module")
@@ -62,7 +70,8 @@ def test_notebook_pipeline_reproduces_single_session_generation(result, spark, d
     # Every single-handoff fact is promoted straight from its handoff.
     assert prestaged == {
         name: store.name(*sources[0])
-        for name, sources in engine.SILVER_SOURCES.items() if len(sources) == 1
+        for name, sources in engine.SILVER_SOURCES.items()
+        if len(sources) == 1
     }
     assert "fact_receipt_lines" not in prestaged
 
@@ -78,14 +87,20 @@ def test_stages_wait_for_dependencies(spark):
         def run(_ctx, *deps):
             order.append(name)
             return {name: spark.range(value + sum(d[n].count() for d in deps for n in d))}
+
         return run
 
     ctx = engine.GenerationContext(spark, None, CFG, {})
-    out = engine.run_stages(ctx, [
-        _stage("c", ("a", "b"), build("c", 3)),
-        _stage("b", ("a",), build("b", 2)),
-        _stage("a", (), build("a", 1)),
-    ], {}, lambda _stage, frames: frames)
+    out = engine.run_stages(
+        ctx,
+        [
+            _stage("c", ("a", "b"), build("c", 3)),
+            _stage("b", ("a",), build("b", 2)),
+            _stage("a", (), build("a", 1)),
+        ],
+        {},
+        lambda _stage, frames: frames,
+    )
     assert order.index("a") < order.index("b") < order.index("c")
     assert out["c"]["c"].count() == 3 + 1 + 3
 
@@ -102,9 +117,15 @@ def test_stage_failure_is_raised_and_dependants_never_start(spark):
 
     ctx = engine.GenerationContext(spark, None, CFG, {})
     with pytest.raises(RuntimeError, match="builder exploded"):
-        engine.run_stages(ctx, [
-            _stage("bad", (), broken), _stage("after", ("bad",), after),
-        ], {}, lambda _stage, frames: frames)
+        engine.run_stages(
+            ctx,
+            [
+                _stage("bad", (), broken),
+                _stage("after", ("bad",), after),
+            ],
+            {},
+            lambda _stage, frames: frames,
+        )
     assert started == []
 
 
@@ -143,7 +164,7 @@ def test_unions_applied(result):
     assert receipts.filter("receipt_type = 'RETURN'").count() > 0
     assert receipts.filter("receipt_type = 'SALE'").count() > 0
     pay = out.tables["fact_payments"]
-    assert pay.filter(F.col("order_id_ext").isNotNull()).count() > 0   # online
+    assert pay.filter(F.col("order_id_ext").isNotNull()).count() > 0  # online
     assert pay.filter(F.col("receipt_id_ext").isNotNull()).count() > 0  # in-store + returns
     both = pay.filter(F.col("order_id_ext").isNotNull() & F.col("receipt_id_ext").isNotNull())
     assert both.count() == 0
@@ -161,7 +182,8 @@ def test_invariants_catch_violations(result, spark):
     _, out = result
     broken = dict(out.tables)
     broken["fact_receipt_lines"] = out.tables["fact_receipt_lines"].withColumn(
-        "receipt_id_ext", F.lit("RCPBOGUS"))
+        "receipt_id_ext", F.lit("RCPBOGUS")
+    )
     report = run_invariants(spark, broken)
     assert not report.passed
     assert any("fact_receipt_lines" in f for f in report.failures)

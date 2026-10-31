@@ -387,24 +387,16 @@ class Profile(CatalogEntry):
         )
         for reference in gated_refs:
             if reference is not None and reference not in self.pipeline_refs:
-                raise ValueError(
-                    "pipeline gate references must also appear in pipeline_refs"
-                )
+                raise ValueError("pipeline gate references must also appear in pipeline_refs")
         if self.reporting_gate_pipeline_ref is not None:
             if self.post_deploy_pipeline_ref is None:
-                raise ValueError(
-                    "reporting_gate_pipeline_ref requires post_deploy_pipeline_ref"
-                )
+                raise ValueError("reporting_gate_pipeline_ref requires post_deploy_pipeline_ref")
             if self.reporting_gate_pipeline_ref == self.post_deploy_pipeline_ref:
                 raise ValueError("setup and Reporting gate pipelines must differ")
-        if len(set(self.post_reporting_pipeline_refs)) != len(
-            self.post_reporting_pipeline_refs
-        ):
+        if len(set(self.post_reporting_pipeline_refs)) != len(self.post_reporting_pipeline_refs):
             raise ValueError("post_reporting_pipeline_refs must be unique")
         if self.reporting_gate_pipeline_ref in self.post_reporting_pipeline_refs:
-            raise ValueError(
-                "the required Reporting gate cannot be a post-Reporting pipeline"
-            )
+            raise ValueError("the required Reporting gate cannot be a post-Reporting pipeline")
         return self
 
 
@@ -453,13 +445,9 @@ class DataContract(CatalogEntry):
                 raise ValueError(f"data contract {field_name} must be unique")
         if self.kind == "event":
             if self.envelope is None or not self.events or not self.fixture_sources:
-                raise ValueError(
-                    "event contracts require an envelope, events, and fixture sources"
-                )
+                raise ValueError("event contracts require an envelope, events, and fixture sources")
         elif self.envelope is not None or self.events or self.fixture_sources:
-            raise ValueError(
-                "only event contracts may declare envelope, events, or fixtures"
-            )
+            raise ValueError("only event contracts may declare envelope, events, or fixtures")
         event_types = [event.event_type for event in self.events]
         if len(set(event_types)) != len(event_types):
             raise ValueError("event contract event_type values must be unique")
@@ -502,9 +490,7 @@ class EventPath(CatalogEntry):
             raise ValueError("derived paths cannot declare an Eventhouse target")
         has_semantic_terminal = "semantic" in layers
         if has_semantic_terminal == (self.terminal_exception_id is not None):
-            raise ValueError(
-                "paths require either a semantic terminal or one named exception"
-            )
+            raise ValueError("paths require either a semantic terminal or one named exception")
         return self
 
 
@@ -582,11 +568,7 @@ class MlOutputContract(ManifestModel):
             self.as_of_column,
             *self.lineage_columns,
             *self.probability_columns,
-            *(
-                (self.forecast_horizon_column,)
-                if self.forecast_horizon_column is not None
-                else ()
-            ),
+            *((self.forecast_horizon_column,) if self.forecast_horizon_column is not None else ()),
         )
         missing = sorted(set(references) - set(names))
         if missing:
@@ -602,28 +584,16 @@ class MlOutputContract(ManifestModel):
             self.as_of_column,
             *self.lineage_columns,
             *self.probability_columns,
-            *(
-                (self.forecast_horizon_column,)
-                if self.forecast_horizon_column is not None
-                else ()
-            ),
+            *((self.forecast_horizon_column,) if self.forecast_horizon_column is not None else ()),
         }
-        nullable = {
-            field.name for field in self.fields if field.nullable
-        }
+        nullable = {field.name for field in self.fields if field.nullable}
         invalid_nullable = sorted(required_non_null & nullable)
         if invalid_nullable:
             raise ValueError(
-                "ML grain/as-of/lineage/probability fields cannot be nullable: "
-                f"{invalid_nullable}"
+                f"ML grain/as-of/lineage/probability fields cannot be nullable: {invalid_nullable}"
             )
-        if (
-            self.forecast_horizon_days is not None
-            and self.forecast_horizon_column is not None
-        ):
-            raise ValueError(
-                "declare either a fixed or row-level forecast horizon, not both"
-            )
+        if self.forecast_horizon_days is not None and self.forecast_horizon_column is not None:
+            raise ValueError("declare either a fixed or row-level forecast horizon, not both")
         return self
 
 
@@ -657,10 +627,7 @@ class MlContract(CatalogEntry):
                 raise ValueError(f"ML {field_name} must be unique")
         if self.producer not in self.sources:
             raise ValueError("ML producer must also appear in sources")
-        if (
-            self.producer.selector is None
-            or self.producer.selector.kind != "notebook_ml_contract"
-        ):
+        if self.producer.selector is None or self.producer.selector.kind != "notebook_ml_contract":
             raise ValueError("ML producer requires notebook_ml_contract selector")
         if self.tier == "required":
             if (
@@ -668,17 +635,13 @@ class MlContract(CatalogEntry):
                 or self.validator.selector is None
                 or self.validator.selector.kind != "notebook_ml_validator"
             ):
-                raise ValueError(
-                    "required ML contracts require notebook_ml_validator"
-                )
+                raise ValueError("required ML contracts require notebook_ml_validator")
             if self.validator not in self.sources:
                 raise ValueError("ML validator must also appear in sources")
         elif self.validator is not None:
             raise ValueError("only required ML contracts declare a validator")
         if self.reporting_required != (self.tier == "required"):
-            raise ValueError(
-                "only required-tier ML outputs may be required by Reporting"
-            )
+            raise ValueError("only required-tier ML outputs may be required by Reporting")
         if self.tier == "required" and not self.output.lineage_columns:
             raise ValueError("required ML outputs must expose row-level lineage")
         return self

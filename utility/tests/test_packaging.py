@@ -58,9 +58,7 @@ def test_wheel_contains_runtime_assets(built_wheel: Path):
     assert expected_dictionaries <= names
 
 
-def test_clean_wheel_install_loads_dictionaries_and_renders(
-    built_wheel: Path, tmp_path: Path
-):
+def test_clean_wheel_install_loads_dictionaries_and_renders(built_wheel: Path, tmp_path: Path):
     environment = tmp_path / "venv"
     venv.EnvBuilder(with_pip=True, system_site_packages=True).create(environment)
     python = environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")

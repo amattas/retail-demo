@@ -27,18 +27,37 @@ def dict_root(tmp_path: Path) -> Path:
     (shared / "first_names.json").write_text(json.dumps([{"Name": "Avery"}, {"Name": "Blake"}]))
     (shared / "last_names.json").write_text(json.dumps([{"Name": "Stone"}]))
     (shared / "geographies.json").write_text(
-        json.dumps([{"City": "Springfield", "State": "OH", "Zip": "44101",
-                     "District": "D1", "Region": "Midwest"}])
+        json.dumps(
+            [
+                {
+                    "City": "Springfield",
+                    "State": "OH",
+                    "Zip": "44101",
+                    "District": "D1",
+                    "Region": "Midwest",
+                }
+            ]
+        )
     )
     (shared / "tax_rates.json").write_text(
-        json.dumps([{"StateCode": "OH", "County": "Cuyahoga", "City": "Cleveland",
-                     "CombinedRate": "0.08"}])
+        json.dumps(
+            [{"StateCode": "OH", "County": "Cuyahoga", "City": "Cleveland", "CombinedRate": "0.08"}]
+        )
     )
     t = tmp_path / "toytown"
     t.mkdir()
     (t / "products.json").write_text(
-        json.dumps([{"ProductName": "Wooden Train", "BasePrice": "19.99",
-                     "Department": "Toys", "Category": "Vehicles", "Subcategory": "Trains"}])
+        json.dumps(
+            [
+                {
+                    "ProductName": "Wooden Train",
+                    "BasePrice": "19.99",
+                    "Department": "Toys",
+                    "Category": "Vehicles",
+                    "Subcategory": "Trains",
+                }
+            ]
+        )
     )
     (t / "brands.json").write_text(
         json.dumps([{"Brand": "PlayCraft", "Company": "PlayCraft Co", "Category": "Toys"}])
@@ -64,8 +83,19 @@ def test_unknown_store_type_lists_options(dict_root: Path):
 
 def test_invalid_entry_reports_file(dict_root: Path):
     bad = dict_root / "toytown" / "products.json"
-    bad.write_text(json.dumps([{"ProductName": "", "BasePrice": "1.00",
-                                "Department": "D", "Category": "C", "Subcategory": "S"}]))
+    bad.write_text(
+        json.dumps(
+            [
+                {
+                    "ProductName": "",
+                    "BasePrice": "1.00",
+                    "Department": "D",
+                    "Category": "C",
+                    "Subcategory": "S",
+                }
+            ]
+        )
+    )
     with pytest.raises(ValueError, match="products.json"):
         load_dictionaries(dict_root, "toytown")
 
@@ -90,7 +120,18 @@ def test_missing_shared_file_raises_value_error(dict_root: Path):
 def test_bad_row_error_includes_row_index(dict_root: Path):
     # Row 0 has an empty ProductName, which fails validation; error must contain index.
     bad = dict_root / "toytown" / "products.json"
-    bad.write_text(json.dumps([{"ProductName": "", "BasePrice": "1.00",
-                                "Department": "D", "Category": "C", "Subcategory": "S"}]))
+    bad.write_text(
+        json.dumps(
+            [
+                {
+                    "ProductName": "",
+                    "BasePrice": "1.00",
+                    "Department": "D",
+                    "Category": "C",
+                    "Subcategory": "S",
+                }
+            ]
+        )
+    )
     with pytest.raises(ValueError, match=r"products\.json\[0\]"):
         load_dictionaries(dict_root, "toytown")

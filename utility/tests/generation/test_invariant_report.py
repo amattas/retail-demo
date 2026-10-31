@@ -13,6 +13,7 @@ def test_concurrent_evaluation_keeps_declaration_order_and_failures():
         def count():
             threads.add(threading.get_ident())
             return value
+
         return count
 
     for name, value in [("a", 0), ("b", 2), ("c", 0), ("d", 5)]:

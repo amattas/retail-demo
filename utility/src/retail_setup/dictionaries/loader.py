@@ -49,7 +49,8 @@ def available_store_types(root: Path) -> list[str]:
     if not root.is_dir():
         return []
     return sorted(
-        p.name for p in root.iterdir()
+        p.name
+        for p in root.iterdir()
         if p.is_dir() and not p.name.startswith("_") and (p / "profile.json").exists()
     )
 

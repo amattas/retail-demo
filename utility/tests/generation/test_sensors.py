@@ -15,9 +15,16 @@ BLE_ZONES = {"ENTRANCE", "ELECTRONICS", "GROCERY", "CLOTHING", "CHECKOUT"}
 
 @pytest.fixture(scope="module")
 def setup(spark):
-    cfg = GenerationConfig(store_type="grocery", start_date=date(2025, 7, 7),
-                           end_date=date(2025, 7, 9), store_count=2, dc_count=1,
-                           customer_count=150, seed=17, transactions_per_store_day=30)
+    cfg = GenerationConfig(
+        store_type="grocery",
+        start_date=date(2025, 7, 7),
+        end_date=date(2025, 7, 9),
+        store_count=2,
+        dc_count=1,
+        customer_count=150,
+        seed=17,
+        transactions_per_store_day=30,
+    )
     dicts = load_dictionaries(default_dictionary_root(), "grocery")
     dims = generate_dimensions(spark, dicts, cfg)
     sales = generate_receipts_group(spark, dims, dicts.profile, cfg)

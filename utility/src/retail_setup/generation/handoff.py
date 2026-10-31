@@ -46,8 +46,12 @@ class HandoffMismatchError(RuntimeError):
 
 class HandoffStore:
     def __init__(
-        self, spark: SparkSession, cfg: GenerationConfig, *,
-        lakehouse: str | None = None, base_path: str | None = None,
+        self,
+        spark: SparkSession,
+        cfg: GenerationConfig,
+        *,
+        lakehouse: str | None = None,
+        base_path: str | None = None,
     ) -> None:
         if (lakehouse is None) == (base_path is None):
             raise ValueError("Provide exactly one of lakehouse= or base_path=")
@@ -72,10 +76,13 @@ class HandoffStore:
         """Write one stage output and return a frame that reads it back."""
         name = self.name(stage, output)
         if self.base_path is None:
-            (frame.write.format("delta").mode("overwrite")
-             .option("overwriteSchema", "true")
-             .option("userMetadata", self.fingerprint)
-             .saveAsTable(name))
+            (
+                frame.write.format("delta")
+                .mode("overwrite")
+                .option("overwriteSchema", "true")
+                .option("userMetadata", self.fingerprint)
+                .saveAsTable(name)
+            )
             return self.spark.table(name)
         frame.write.mode("overwrite").parquet(name)
         (Path(name) / _FINGERPRINT_MARKER).write_text(self.fingerprint, encoding="utf-8")
@@ -85,7 +92,9 @@ class HandoffStore:
         name = self.name(stage, output)
         found = self._fingerprint_of(name)
         if found != self.fingerprint:
-            reason = "is missing" if found is None else "was generated for a different configuration"
+            reason = (
+                "is missing" if found is None else "was generated for a different configuration"
+            )
             raise HandoffMismatchError(
                 f"Handoff {name} {reason}; rerun the setup notebook that produces "
                 f"stage {stage!r} (or the whole setup pipeline)."
@@ -104,7 +113,9 @@ class HandoffStore:
         self.ensure_schema()
         for row in self.spark.sql(f"SHOW TABLES IN {self.lakehouse}.{self.schema}").collect():
             if row.tableName.startswith(HANDOFF_PREFIX):
-                self.spark.sql(f"DROP TABLE IF EXISTS {self.lakehouse}.{self.schema}.{row.tableName}")
+                self.spark.sql(
+                    f"DROP TABLE IF EXISTS {self.lakehouse}.{self.schema}.{row.tableName}"
+                )
 
     def _fingerprint_of(self, name: str) -> str | None:
         if self.base_path is not None:

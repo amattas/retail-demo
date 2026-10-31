@@ -62,9 +62,7 @@ class seeded_draws:
         radius = F.sqrt(-2.0 * F.log(F.lit(1.0) - self.u(cols, f"{salt}|g1")))
         return radius * F.cos(F.lit(6.283185307179586) * self.u(cols, f"{salt}|g2"))
 
-    def negative_binomial(
-        self, cols: list, salt: str, mean: Column, shape: int = 12
-    ) -> Column:
+    def negative_binomial(self, cols: list, salt: str, mean: Column, shape: int = 12) -> Column:
         """Exact sum of geometric draws; integer shape controls overdispersion."""
         if shape < 1:
             raise ValueError("negative-binomial shape must be positive")
@@ -73,12 +71,11 @@ class seeded_draws:
         )
         probability = valid_mean / (valid_mean + F.lit(float(shape)))
         draws = [
-            F.when(valid_mean == 0, F.lit(0)).otherwise(
-                F.floor(
-                    F.log(F.lit(1.0) - self.u(cols, f"{salt}|nb{i}"))
-                    / F.log(probability)
-                )
-            ).cast("long")
+            F.when(valid_mean == 0, F.lit(0))
+            .otherwise(
+                F.floor(F.log(F.lit(1.0) - self.u(cols, f"{salt}|nb{i}")) / F.log(probability))
+            )
+            .cast("long")
             for i in range(shape)
         ]
         return sum(draws, F.lit(0).cast("long"))
@@ -154,9 +151,7 @@ def date_grid(
     if end < start:
         raise ValueError("end must be on or after start")
     days = (end - start).days + 1
-    return spark.range(days).select(
-        F.date_add(F.lit(start), F.col("id").cast("int")).alias(column)
-    )
+    return spark.range(days).select(F.date_add(F.lit(start), F.col("id").cast("int")).alias(column))
 
 
 def store_day_grid(

@@ -49,10 +49,7 @@ def build_return_headers(
     sales = sales_group["fact_receipts"].filter(
         (F.col("receipt_type") == "SALE")
         & (F.col("event_date") < F.lit(cfg.end_date))
-        & ~(
-            (F.month("event_date") == 12)
-            & (F.dayofmonth("event_date") == 25)
-        )
+        & ~((F.month("event_date") == 12) & (F.dayofmonth("event_date") == 25))
     )
 
     # --- sample: per-day rate, 6x on Dec 26, hard-capped at 10%.
@@ -72,17 +69,12 @@ def build_return_headers(
         .agg(F.count("*").alias("_day_count"))
         .withColumn("_expected", F.col("_day_count") * day_rate)
     )
-    cumulative = (
-        Window.orderBy("event_date")
-        .rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    cumulative = Window.orderBy("event_date").rowsBetween(
+        Window.unboundedPreceding, Window.currentRow
     )
-    prior = (
-        Window.orderBy("event_date")
-        .rowsBetween(Window.unboundedPreceding, -1)
-    )
+    prior = Window.orderBy("event_date").rowsBetween(Window.unboundedPreceding, -1)
     quotas = (
-        daily
-        .withColumn("_cumulative_expected", F.sum("_expected").over(cumulative))
+        daily.withColumn("_cumulative_expected", F.sum("_expected").over(cumulative))
         .withColumn(
             "_prior_expected",
             F.coalesce(F.sum("_expected").over(prior), F.lit(0.0)),
@@ -99,10 +91,8 @@ def build_return_headers(
     u_ret = d.u(["receipt_id_ext"], "return")
     day_w = Window.partitionBy("event_date")
     sampled = (
-        sales
-        .join(quotas, "event_date")
-        .withColumn("_ret_rank", F.row_number().over(
-            day_w.orderBy(u_ret, "receipt_id_ext")))
+        sales.join(quotas, "event_date")
+        .withColumn("_ret_rank", F.row_number().over(day_w.orderBy(u_ret, "receipt_id_ext")))
         .filter(F.col("_ret_rank") <= F.col("_n_keep"))
         .drop("_n_keep", "_ret_rank")
     )
@@ -110,8 +100,7 @@ def build_return_headers(
     # --- header: new RET id (RET(3)+yyyyMMddHHmm(12)+store4+seq6 = 25 chars,
     # unique because seq is a row_number per (store_id, return day) at noon)
     sequenced = (
-        sampled
-        .withColumnRenamed("receipt_id_ext", "orig_receipt_id_ext")
+        sampled.withColumnRenamed("receipt_id_ext", "orig_receipt_id_ext")
         .withColumnRenamed("event_date", "orig_event_date")
         .withColumn(
             "_max_delay",
@@ -125,10 +114,7 @@ def build_return_headers(
             "_return_delay",
             (
                 F.lit(1)
-                + F.floor(
-                    d.u(["orig_receipt_id_ext"], "return_delay")
-                    * F.col("_max_delay")
-                )
+                + F.floor(d.u(["orig_receipt_id_ext"], "return_delay") * F.col("_max_delay"))
             ).cast("int"),
         )
         .withColumn(
@@ -142,8 +128,7 @@ def build_return_headers(
         .withColumn(
             "event_date",
             F.when(
-                (F.month("_candidate_date") == 12)
-                & (F.dayofmonth("_candidate_date") == 25),
+                (F.month("_candidate_date") == 12) & (F.dayofmonth("_candidate_date") == 25),
                 F.when(
                     F.date_add("_candidate_date", 1) <= F.col("_latest_return_date"),
                     F.date_add("_candidate_date", 1),
@@ -154,19 +139,23 @@ def build_return_headers(
             (F.col("event_date") > F.col("orig_event_date"))
             & (F.col("event_date") <= F.col("_latest_return_date"))
         )
-        .withColumn("event_ts", F.to_timestamp(
-            F.concat(F.col("event_date").cast("string"), F.lit(" 12:00:00"))))
+        .withColumn(
+            "event_ts",
+            F.to_timestamp(F.concat(F.col("event_date").cast("string"), F.lit(" 12:00:00"))),
+        )
     )
-    seq_w = Window.partitionBy("store_id", "event_date").orderBy(
-        "orig_receipt_id_ext"
-    )
+    seq_w = Window.partitionBy("store_id", "event_date").orderBy("orig_receipt_id_ext")
     return (
-        sequenced
-        .withColumn("seq", F.row_number().over(seq_w))
-        .withColumn("receipt_id_ext", F.concat(
-            F.lit("RET"), F.date_format("event_ts", "yyyyMMddHHmm"),
-            fixed_width_decimal(F.col("store_id"), 4, "return store ID"),
-            fixed_width_decimal(F.col("seq"), 6, "daily return sequence")))
+        sequenced.withColumn("seq", F.row_number().over(seq_w))
+        .withColumn(
+            "receipt_id_ext",
+            F.concat(
+                F.lit("RET"),
+                F.date_format("event_ts", "yyyyMMddHHmm"),
+                fixed_width_decimal(F.col("store_id"), 4, "return store ID"),
+                fixed_width_decimal(F.col("seq"), 6, "daily return sequence"),
+            ),
+        )
         .withColumn("trace_id", F.concat(F.lit("TRC"), F.col("receipt_id_ext")))
         .withColumn("customer_id", F.lit(None).cast("long"))
         .withColumn("receipt_type", F.lit("RETURN"))
@@ -217,56 +206,89 @@ def generate_returns(
     )
 
     fact_receipts = header.select(
-        "receipt_id_ext", "trace_id", "event_ts", "event_date", "store_id",
-        "customer_id", "receipt_type", "tender_type", "subtotal_cents",
+        "receipt_id_ext",
+        "trace_id",
+        "event_ts",
+        "event_date",
+        "store_id",
+        "customer_id",
+        "receipt_type",
+        "tender_type",
+        "subtotal_cents",
         _fmt(F.col("discount_cents")).alias("discount_amount"),
-        "tax_cents", "total_cents",
+        "tax_cents",
+        "total_cents",
         _fmt(F.col("subtotal_cents")).alias("subtotal_amount"),
         _fmt(F.col("tax_cents")).alias("tax_amount"),
-        _fmt(F.col("total_cents")).alias("total_amount"), "payment_method",
+        _fmt(F.col("total_cents")).alias("total_amount"),
+        "payment_method",
         # Legacy semantic-model column mirrors subtotal_amount (TMDL contract).
         _fmt(F.col("subtotal_cents")).alias("Subtotal"),
-        "gross_subtotal_cents", "discount_cents", "attribution_journey_id",
-        "campaign_id", "impression_id_ext",
+        "gross_subtotal_cents",
+        "discount_cents",
+        "attribution_journey_id",
+        "campaign_id",
+        "impression_id_ext",
     ).select(*column_names("fact_receipts"))
 
     # --- lines: mirror the original receipt's lines, negated
     orig_lines = sales_group["fact_receipt_lines"].select(
         F.col("receipt_id_ext").alias("orig_receipt_id_ext"),
-        "line_num", "product_id", "quantity", "unit_cents", "ext_cents",
+        "line_num",
+        "product_id",
+        "quantity",
+        "unit_cents",
+        "ext_cents",
     )
     fact_receipt_lines = (
-        header.select("orig_receipt_id_ext", "receipt_id_ext",
-                      "event_ts", "event_date")
+        header.select("orig_receipt_id_ext", "receipt_id_ext", "event_ts", "event_date")
         .join(orig_lines, "orig_receipt_id_ext")
         .withColumn("quantity", (-F.col("quantity")).cast("int"))
         .withColumn("ext_cents", -F.col("ext_cents"))
         .withColumn("promo_code", F.lit("RETURN"))
         .select(
-            "receipt_id_ext", "event_ts", "event_date", "line_num", "product_id",
-            "quantity", _fmt(F.col("unit_cents")).alias("unit_price"), "unit_cents",
-            _fmt(F.col("ext_cents")).alias("ext_price"), "ext_cents", "promo_code",
-        ).select(*column_names("fact_receipt_lines"))
+            "receipt_id_ext",
+            "event_ts",
+            "event_date",
+            "line_num",
+            "product_id",
+            "quantity",
+            _fmt(F.col("unit_cents")).alias("unit_price"),
+            "unit_cents",
+            _fmt(F.col("ext_cents")).alias("ext_price"),
+            "ext_cents",
+            "promo_code",
+        )
+        .select(*column_names("fact_receipt_lines"))
     )
 
     # --- payments: one negative APPROVED CREDIT_CARD refund per return
     fact_payments = (
-        fact_receipts
-        .withColumn("order_id_ext", F.lit(None).cast("string"))
+        fact_receipts.withColumn("order_id_ext", F.lit(None).cast("string"))
         .withColumn("amount_cents", F.col("total_cents"))
         .withColumn("amount", _fmt(F.col("amount_cents")))
-        .withColumn("transaction_id", F.concat(
-            F.lit("TXN_"), F.unix_timestamp("event_ts").cast("string"), F.lit("_"),
-            fixed_width_decimal(
-                d.h64(["receipt_id_ext"], "txn") % 1_000_000,
-                6,
-                "return transaction suffix",
-            )))
+        .withColumn(
+            "transaction_id",
+            F.concat(
+                F.lit("TXN_"),
+                F.unix_timestamp("event_ts").cast("string"),
+                F.lit("_"),
+                fixed_width_decimal(
+                    d.h64(["receipt_id_ext"], "txn") % 1_000_000,
+                    6,
+                    "return transaction suffix",
+                ),
+            ),
+        )
         .withColumn("status", F.lit("APPROVED"))
         .withColumn("decline_reason", F.lit(None).cast("string"))
-        .withColumn("processing_time_ms", (
-            F.lit(_PROC_MS_LO) + d.u(["receipt_id_ext"], "proc")
-            * F.lit(_PROC_MS_HI - _PROC_MS_LO)).cast("long"))
+        .withColumn(
+            "processing_time_ms",
+            (
+                F.lit(_PROC_MS_LO)
+                + d.u(["receipt_id_ext"], "proc") * F.lit(_PROC_MS_HI - _PROC_MS_LO)
+            ).cast("long"),
+        )
         .select(*column_names("fact_payments"))
     )
 

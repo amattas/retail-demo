@@ -121,15 +121,23 @@ def test_write_all_promotes_prestaged_handoffs_without_dropping_them(spark, tmp_
     from retail_setup.generation.writer import write_all
 
     cfg = GenerationConfig(
-        store_type="grocery", start_date=date(2025, 11, 3), end_date=date(2025, 11, 3),
-        store_count=1, seed=7,
+        store_type="grocery",
+        start_date=date(2025, 11, 3),
+        end_date=date(2025, 11, 3),
+        store_count=1,
+        seed=7,
     )
     store = HandoffStore(spark, cfg, base_path=str(tmp_path / "handoffs"))
     handoff = store.save("ble", "fact_ble_pings", spark.range(3))
     tables = {"fact_ble_pings": handoff, "dim_example": spark.range(2)}
 
     written = write_all(
-        tables, {}, cfg, run_id="run-a", base_path=str(tmp_path / "lake"), fmt="parquet",
+        tables,
+        {},
+        cfg,
+        run_id="run-a",
+        base_path=str(tmp_path / "lake"),
+        fmt="parquet",
         prestaged={"fact_ble_pings": store.name("ble", "fact_ble_pings")},
     )
 
@@ -138,8 +146,15 @@ def test_write_all_promotes_prestaged_handoffs_without_dropping_them(spark, tmp_
     # Publication never drops a handoff; the publish notebook does after success.
     assert store.load("ble", "fact_ble_pings").count() == 3
     with pytest.raises(ValueError, match="not Silver candidates"):
-        write_all(tables, {}, cfg, run_id="run-b", base_path=str(tmp_path / "lake"),
-                  fmt="parquet", prestaged={"fact_unknown": "x"})
+        write_all(
+            tables,
+            {},
+            cfg,
+            run_id="run-b",
+            base_path=str(tmp_path / "lake"),
+            fmt="parquet",
+            prestaged={"fact_unknown": "x"},
+        )
 
 
 def test_write_all_lakehouse_mode_signature():

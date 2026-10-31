@@ -11,7 +11,10 @@ import pytest
 
 TEMPLATES = Path(__file__).resolve().parents[1] / "notebooks" / "templates"
 DRIVERS = [
-    "driver-02-dimensions.py", "driver-03-stage.py", "driver-10-publish.py", "driver-11-gold.py",
+    "driver-02-dimensions.py",
+    "driver-03-stage.py",
+    "driver-10-publish.py",
+    "driver-11-gold.py",
 ]
 
 
@@ -32,8 +35,9 @@ def _run(name, monkeypatch, *, loaded, probe_ok):
     for module in [m for m in sys.modules if m.split(".", 1)[0] in {"pydantic", "pydantic_core"}]:
         monkeypatch.delitem(sys.modules, module)
     # The install branch evicts these; register them so teardown restores them.
-    for module in [m for m in sys.modules
-                   if m.split(".", 1)[0] in {"typing_extensions", "typing_inspection"}]:
+    for module in [
+        m for m in sys.modules if m.split(".", 1)[0] in {"typing_extensions", "typing_inspection"}
+    ]:
         monkeypatch.setitem(sys.modules, module, sys.modules[module])
     if loaded is not None:
         monkeypatch.setitem(sys.modules, "pydantic", types.SimpleNamespace(VERSION=loaded))

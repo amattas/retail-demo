@@ -71,7 +71,12 @@ class InventoryEvent:
 
 
 def shipment_events(
-    seed: int, store_id: int, product_id: int, day: date, quantity: int, capacity: int,
+    seed: int,
+    store_id: int,
+    product_id: int,
+    day: date,
+    quantity: int,
+    capacity: int,
 ) -> Iterator[InventoryEvent]:
     """One SKU per shipment leg; the ledger consumes these exact timestamps."""
     draw = stable_int(seed, store_id, product_id, day, "service")
@@ -85,18 +90,33 @@ def shipment_events(
         completed = arrival + timedelta(minutes=30 + (draw // 1803) % 91)
         shipment_id = f"SHIP-{day:%Y%m%d}-{store_id}-{product_id}-{leg}"
         yield InventoryEvent(
-            store_id, product_id, datetime.combine(day, inventory_time(23, 59, 59)),
-            f"TRC-PLAN-{shipment_id}", "SHIPMENT", min(capacity, quantity - offset),
-            shipment_id, shipment_id=shipment_id, leg=leg,
+            store_id,
+            product_id,
+            datetime.combine(day, inventory_time(23, 59, 59)),
+            f"TRC-PLAN-{shipment_id}",
+            "SHIPMENT",
+            min(capacity, quantity - offset),
+            shipment_id,
+            shipment_id=shipment_id,
+            leg=leg,
             scheduled_ts=datetime.combine(day + timedelta(days=1), inventory_time()),
-            loading_ts=loading, depart_ts=departure, eta=arrival,
-            unloading_ts=unloading, etd=completed,
+            loading_ts=loading,
+            depart_ts=departure,
+            eta=arrival,
+            unloading_ts=unloading,
+            etd=completed,
         )
 
 
 def simulate_sku(
-    demand: Iterable[Demand], *, store_id: int, product_id: int,
-    start_date: date, end_date: date, seed: int, capacity: int,
+    demand: Iterable[Demand],
+    *,
+    store_id: int,
+    product_id: int,
+    start_date: date,
+    end_date: date,
+    seed: int,
+    capacity: int,
     daily_prior: float = 1.0,
 ) -> Iterator[InventoryEvent]:
     """Consume sorted demand with O(one SKU + pending deliveries/returns) state."""
@@ -104,8 +124,13 @@ def simulate_sku(
         raise ValueError("invalid inventory simulation bounds")
     on_hand = opening_stock(seed, store_id, product_id)
     yield InventoryEvent(
-        store_id, product_id, datetime.combine(start_date, inventory_time()),
-        f"TRC-INIT-ST-{store_id}-{product_id}", "INITIAL", on_hand, "SEED",
+        store_id,
+        product_id,
+        datetime.combine(start_date, inventory_time()),
+        f"TRC-INIT-ST-{store_id}-{product_id}",
+        "INITIAL",
+        on_hand,
+        "SEED",
         balance=on_hand,
     )
     pending: list[tuple[datetime, str, InventoryEvent]] = []
@@ -140,20 +165,30 @@ def simulate_sku(
             if fulfilled:
                 on_hand -= candidate.quantity
             yield InventoryEvent(
-                store_id, product_id, candidate.event_ts, candidate.trace_id,
+                store_id,
+                product_id,
+                candidate.event_ts,
+                candidate.trace_id,
                 "SALE" if fulfilled else "LOST_SALE",
-                -candidate.quantity if fulfilled else 0, "CUSTOMER_PURCHASE",
-                balance=on_hand, receipt_id=candidate.receipt_id,
-                line_num=candidate.line_num, requested_quantity=candidate.quantity,
+                -candidate.quantity if fulfilled else 0,
+                "CUSTOMER_PURCHASE",
+                balance=on_hand,
+                receipt_id=candidate.receipt_id,
+                line_num=candidate.line_num,
+                requested_quantity=candidate.quantity,
                 unfulfilled_quantity=0 if fulfilled else candidate.quantity,
             )
             if fulfilled and candidate.return_ts is not None:
                 if candidate.return_ts <= candidate.event_ts or not candidate.return_id:
                     raise ValueError("restock returns must identify a later return")
                 returned = InventoryEvent(
-                    store_id, product_id, candidate.return_ts,
-                    f"TRC-INV-{candidate.return_id}-{candidate.line_num}", "RETURN",
-                    candidate.quantity, candidate.return_id,
+                    store_id,
+                    product_id,
+                    candidate.return_ts,
+                    f"TRC-INV-{candidate.return_id}-{candidate.line_num}",
+                    "RETURN",
+                    candidate.quantity,
+                    candidate.return_id,
                 )
                 heappush(pending, (returned.event_ts, returned.trace_id, returned))
                 expected_returns += returned.quantity
@@ -172,27 +207,41 @@ def simulate_sku(
         target = max(point + CASE_PACK, ceil(rate * 8))
         # Only near-term returns reduce the order. A distant return cannot
         # cover demand before the service lead time has elapsed.
-        near_returns = sum(
-            event.quantity for ts, _, event in pending
-            if event.kind == "RETURN" and ts <= closing + timedelta(days=4)
-        ) if expected_returns else 0
+        near_returns = (
+            sum(
+                event.quantity
+                for ts, _, event in pending
+                if event.kind == "RETURN" and ts <= closing + timedelta(days=4)
+            )
+            if expected_returns
+            else 0
+        )
         position = on_hand + inbound + near_returns
         if position <= point:
             quantity = ceil((target - position) / CASE_PACK) * CASE_PACK
-            priority = "URGENT" if on_hand == 0 else (
-                "HIGH" if on_hand < rate * 2 else "NORMAL"
-            )
+            priority = "URGENT" if on_hand == 0 else ("HIGH" if on_hand < rate * 2 else "NORMAL")
             yield InventoryEvent(
-                store_id, product_id, closing,
-                f"TRC-RO-{store_id}-{day}-{product_id}", "REORDER", quantity,
-                "POLICY", balance=on_hand, reorder_point=point, priority=priority,
+                store_id,
+                product_id,
+                closing,
+                f"TRC-RO-{store_id}-{day}-{product_id}",
+                "REORDER",
+                quantity,
+                "POLICY",
+                balance=on_hand,
+                reorder_point=point,
+                priority=priority,
             )
             for shipment in shipment_events(seed, store_id, product_id, day, quantity, capacity):
                 yield shipment
                 delivery = InventoryEvent(
-                    store_id, product_id, shipment.unloading_ts,
-                    f"TRC-SI-{shipment.shipment_id}-{product_id}", "INBOUND_SHIPMENT",
-                    shipment.quantity, shipment.shipment_id,
+                    store_id,
+                    product_id,
+                    shipment.unloading_ts,
+                    f"TRC-SI-{shipment.shipment_id}-{product_id}",
+                    "INBOUND_SHIPMENT",
+                    shipment.quantity,
+                    shipment.shipment_id,
                 )
                 heappush(pending, (delivery.event_ts, delivery.trace_id, delivery))
                 inbound += delivery.quantity

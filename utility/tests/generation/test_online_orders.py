@@ -12,9 +12,16 @@ from retail_setup.generation.schemas import column_names
 
 @pytest.fixture(scope="module")
 def setup(spark):
-    cfg = GenerationConfig(store_type="grocery", start_date=date(2025, 4, 7),
-                           end_date=date(2025, 4, 13), store_count=3, dc_count=2,
-                           customer_count=300, seed=13, online_orders_per_day=40)
+    cfg = GenerationConfig(
+        store_type="grocery",
+        start_date=date(2025, 4, 7),
+        end_date=date(2025, 4, 13),
+        store_count=3,
+        dc_count=2,
+        customer_count=300,
+        seed=13,
+        online_orders_per_day=40,
+    )
     dicts = load_dictionaries(default_dictionary_root(), "grocery")
     dims = generate_dimensions(spark, dicts, cfg)
     return cfg, dims, generate_online_orders(spark, dims, dicts.profile, cfg)
@@ -40,19 +47,13 @@ def test_lines_link_and_money(setup):
     _, _, g = setup
     headers = g["fact_online_order_headers"]
     lines = g["fact_online_order_lines"]
-    assert (
-        lines.join(headers, lines.order_id == headers.order_id_ext, "left_anti").count()
-        == 0
-    )
+    assert lines.join(headers, lines.order_id == headers.order_id_ext, "left_anti").count() == 0
     live = lines.filter(F.col("fulfillment_status") != "CANCELLED")
     sums = live.groupBy("order_id").agg(F.sum("ext_cents").alias("s"))
     j = headers.join(sums, headers.order_id_ext == sums.order_id)
     assert j.filter(F.col("subtotal_cents") != F.col("s")).count() == 0
     assert (
-        headers.filter(
-            F.col("total_cents")
-            != F.col("subtotal_cents") + F.col("tax_cents")
-        ).count()
+        headers.filter(F.col("total_cents") != F.col("subtotal_cents") + F.col("tax_cents")).count()
         == 0
     )
 
@@ -74,27 +75,18 @@ def test_lines_only_use_launched_products(setup):
 def test_fulfillment_modes_and_nodes(setup):
     _, dims, g = setup
     lines = g["fact_online_order_lines"]
-    modes = {
-        r.fulfillment_mode
-        for r in lines.select("fulfillment_mode").distinct().collect()
-    }
+    modes = {r.fulfillment_mode for r in lines.select("fulfillment_mode").distinct().collect()}
     assert modes <= {"SHIP_FROM_DC", "SHIP_FROM_STORE", "BOPIS"}
     dc_ids = {r.ID for r in dims["dim_distribution_centers"].select("ID").collect()}
     st_ids = {r.ID for r in dims["dim_stores"].select("ID").collect()}
-    bad_dc = lines.filter(
-        (F.col("node_type") == "DC") & ~F.col("node_id").isin(*dc_ids)
-    )
-    bad_st = lines.filter(
-        (F.col("node_type") == "STORE") & ~F.col("node_id").isin(*st_ids)
-    )
+    bad_dc = lines.filter((F.col("node_type") == "DC") & ~F.col("node_id").isin(*dc_ids))
+    bad_st = lines.filter((F.col("node_type") == "STORE") & ~F.col("node_id").isin(*st_ids))
     assert bad_dc.count() == 0 and bad_st.count() == 0
 
 
 def test_lifecycle_ordering(setup):
     _, _, g = setup
-    lines = g["fact_online_order_lines"].filter(
-        F.col("fulfillment_status") == "DELIVERED"
-    )
+    lines = g["fact_online_order_lines"].filter(F.col("fulfillment_status") == "DELIVERED")
     assert lines.count() > 0
     assert lines.filter(F.col("picked_ts") < F.col("event_ts")).count() == 0
     shipped = lines.filter(F.col("shipped_ts").isNotNull())
@@ -105,8 +97,9 @@ def test_lifecycle_ordering(setup):
 def test_backordered_lines_shipped_not_delivered(setup):
     _, _, g = setup
     lines_df = g["fact_online_order_lines"]
-    statuses = {r.fulfillment_status
-                for r in lines_df.select("fulfillment_status").distinct().collect()}
+    statuses = {
+        r.fulfillment_status for r in lines_df.select("fulfillment_status").distinct().collect()
+    }
     assert statuses <= {"DELIVERED", "SHIPPED", "CANCELLED"}
     assert "SHIPPED" in statuses  # a fraction of non-BOPIS lines backorder
     shipped = lines_df.filter(F.col("fulfillment_status") == "SHIPPED")
@@ -120,9 +113,12 @@ def test_cancellations_zeroed_no_payment(setup):
     _, _, g = setup
     h, pay = g["fact_online_order_headers"], g["payments"]
     cancelled = h.join(
-        g["fact_online_order_lines"].filter("fulfillment_status = 'CANCELLED'")
-        .select(F.col("order_id").alias("order_id_ext")).distinct(),
-        "order_id_ext")
+        g["fact_online_order_lines"]
+        .filter("fulfillment_status = 'CANCELLED'")
+        .select(F.col("order_id").alias("order_id_ext"))
+        .distinct(),
+        "order_id_ext",
+    )
     assert cancelled.filter(F.col("total_cents") != 0).count() == 0
     assert pay.join(cancelled.select("order_id_ext"), "order_id_ext").count() == 0
     # payments basics

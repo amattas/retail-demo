@@ -11,9 +11,7 @@ from pathlib import Path
 from typing import Any
 
 KQL_TYPES = frozenset({"bool", "datetime", "dynamic", "int", "long", "real", "string"})
-SPARK_TYPES = frozenset(
-    {"boolean", "date", "double", "int", "long", "string", "timestamp"}
-)
+SPARK_TYPES = frozenset({"boolean", "date", "double", "int", "long", "string", "timestamp"})
 ML_SPARK_TYPES = SPARK_TYPES | frozenset({"array<long>", "array<string>"})
 TMDL_TYPES = frozenset({"boolean", "dateTime", "decimal", "double", "int64", "string"})
 _ML_GOLD_SCHEMA = "au"
@@ -106,9 +104,7 @@ def notebook_ml_output_schemas(
         if not isinstance(table_name, str) or not table_name.isidentifier():
             raise ValueError("ML_OUTPUT_CONTRACTS keys must be identifiers")
         if not isinstance(records, (list, tuple)) or not records:
-            raise TypeError(
-                f"ML_OUTPUT_CONTRACTS[{table_name!r}] must be a sequence"
-            )
+            raise TypeError(f"ML_OUTPUT_CONTRACTS[{table_name!r}] must be a sequence")
         fields: list[PhysicalField] = []
         for record in records:
             if (
@@ -119,9 +115,7 @@ def notebook_ml_output_schemas(
                 or record[1] not in ML_SPARK_TYPES
                 or not isinstance(record[2], bool)
             ):
-                raise ValueError(
-                    f"invalid ML output field in {table_name}: {record!r}"
-                )
+                raise ValueError(f"invalid ML output field in {table_name}: {record!r}")
             fields.append(
                 PhysicalField(
                     name=record[0],
@@ -144,8 +138,7 @@ def notebook_ml_output_schemas(
             or sum(isinstance(node, ast.Raise) for node in ast.walk(helper)) < 2
         ):
             raise ValueError(
-                "validate_ml_output must reject schema drift and nulls in "
-                "non-nullable fields"
+                "validate_ml_output must reject schema drift and nulls in non-nullable fields"
             )
         _validate_ml_output_write_sites(tree, set(schemas))
     return schemas
@@ -157,11 +150,7 @@ def _validate_ml_output_write_sites(
 ) -> None:
     """Tie every declared schema to the frame and physical table actually written."""
 
-    calls = [
-        node
-        for node in ast.walk(tree)
-        if _named_call(node, "validate_ml_output")
-    ]
+    calls = [node for node in ast.walk(tree) if _named_call(node, "validate_ml_output")]
     called_outputs = [
         _string_constant(call.args[1], "validate_ml_output table")
         for call in calls
@@ -209,8 +198,7 @@ def _validate_ml_output_write_sites(
                     table_name,
                 ]:
                     raise ValueError(
-                        f"validated ML output {table_name!r} writes "
-                        f"{physical_target!r}"
+                        f"validated ML output {table_name!r} writes {physical_target!r}"
                     )
                 validated_call_ids.add(id(call))
             for nested_body in _nested_statement_bodies(statement):
@@ -219,8 +207,7 @@ def _validate_ml_output_write_sites(
     inspect_body(tree.body)
     if validated_call_ids != {id(call) for call in calls}:
         raise ValueError(
-            "validate_ml_output must assign the validated frame immediately "
-            "before its Delta write"
+            "validate_ml_output must assign the validated frame immediately before its Delta write"
         )
 
 
@@ -295,9 +282,7 @@ def _top_level_assignments(tree: ast.Module) -> dict[str, ast.AST]:
             target = statement.targets[0]
             if isinstance(target, ast.Name):
                 assignments[target.id] = statement.value
-        elif isinstance(statement, ast.AnnAssign) and isinstance(
-            statement.target, ast.Name
-        ):
+        elif isinstance(statement, ast.AnnAssign) and isinstance(statement.target, ast.Name):
             assignments[statement.target.id] = statement.value
     return assignments
 
@@ -327,9 +312,9 @@ def _static_string(
             for value in node.values
         )
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
-        return _static_string(
-            node.left, assignments, resolving
-        ) + _static_string(node.right, assignments, resolving)
+        return _static_string(node.left, assignments, resolving) + _static_string(
+            node.right, assignments, resolving
+        )
     if _named_call(node, "get_env"):
         assert isinstance(node, ast.Call)
         default = next(
@@ -345,8 +330,10 @@ def _nested_statement_bodies(statement: ast.stmt) -> tuple[list[ast.stmt], ...]:
     bodies: list[list[ast.stmt]] = []
     for attribute in ("body", "orelse", "finalbody"):
         value = getattr(statement, attribute, None)
-        if isinstance(value, list) and value and all(
-            isinstance(child, ast.stmt) for child in value
+        if (
+            isinstance(value, list)
+            and value
+            and all(isinstance(child, ast.stmt) for child in value)
         ):
             bodies.append(value)
     if isinstance(statement, ast.Try):
@@ -387,8 +374,7 @@ def notebook_ml_validation_rules(path: Path) -> dict[str, MlValidationRule]:
             raise ValueError("REQUIRED_ML_RULES keys must be identifiers")
         if not isinstance(value, dict) or set(value) != expected_keys:
             raise ValueError(
-                f"REQUIRED_ML_RULES[{table_name!r}] must define exactly "
-                f"{sorted(expected_keys)}"
+                f"REQUIRED_ML_RULES[{table_name!r}] must define exactly {sorted(expected_keys)}"
             )
 
         grain = _ml_rule_columns(value["grain"], table_name, "grain", require_items=True)
@@ -405,9 +391,7 @@ def notebook_ml_validation_rules(path: Path) -> dict[str, MlValidationRule]:
         )
         as_of = value["as_of"]
         if not isinstance(as_of, str) or not as_of.isidentifier():
-            raise ValueError(
-                f"REQUIRED_ML_RULES[{table_name!r}].as_of must be an identifier"
-            )
+            raise ValueError(f"REQUIRED_ML_RULES[{table_name!r}].as_of must be an identifier")
         horizon = value["horizon"]
         if isinstance(horizon, bool) or (
             horizon is not None
@@ -440,22 +424,14 @@ def _ml_rule_columns(
     require_items: bool = False,
 ) -> tuple[str, ...]:
     if not isinstance(value, (list, tuple)):
-        raise TypeError(
-            f"REQUIRED_ML_RULES[{table_name!r}].{field_name} must be a sequence"
-        )
+        raise TypeError(f"REQUIRED_ML_RULES[{table_name!r}].{field_name} must be a sequence")
     values = tuple(value)
     if require_items and not values:
-        raise ValueError(
-            f"REQUIRED_ML_RULES[{table_name!r}].{field_name} must not be empty"
-        )
+        raise ValueError(f"REQUIRED_ML_RULES[{table_name!r}].{field_name} must not be empty")
     if any(not isinstance(item, str) or not item.isidentifier() for item in values):
-        raise ValueError(
-            f"REQUIRED_ML_RULES[{table_name!r}].{field_name} must contain identifiers"
-        )
+        raise ValueError(f"REQUIRED_ML_RULES[{table_name!r}].{field_name} must contain identifiers")
     if len(values) != len(set(values)):
-        raise ValueError(
-            f"REQUIRED_ML_RULES[{table_name!r}].{field_name} must be unique"
-        )
+        raise ValueError(f"REQUIRED_ML_RULES[{table_name!r}].{field_name} must be unique")
     return values
 
 
@@ -537,9 +513,7 @@ def kql_table_schemas(path: Path) -> dict[str, dict[str, str]]:
             if match is None:
                 raise ValueError(f"unparsed KQL field in {table_name}: {line}")
             if match.group(2) not in KQL_TYPES:
-                raise ValueError(
-                    f"unsupported KQL type in {table_name}: {match.group(2)}"
-                )
+                raise ValueError(f"unsupported KQL type in {table_name}: {match.group(2)}")
             _add_unique(fields, match.group(1), match.group(2), table_name)
         _add_unique(schemas, table_name, fields, "KQL tables")
     if not schemas:
@@ -615,8 +589,7 @@ def driver_event_schemas(path: Path) -> DriverEventSchemas:
     if not isinstance(envelope_value, (list, tuple)):
         raise TypeError("ENVELOPE must be a sequence")
     envelope = tuple(
-        _physical_field(record, "ENVELOPE", with_source_name=False)
-        for record in envelope_value
+        _physical_field(record, "ENVELOPE", with_source_name=False) for record in envelope_value
     )
     _require_unique_fields(envelope, "ENVELOPE")
 
@@ -629,8 +602,7 @@ def driver_event_schemas(path: Path) -> DriverEventSchemas:
         if not isinstance(records, (list, tuple)) or not records:
             raise TypeError(f"EVENT_PAYLOADS[{event_type!r}] must be a sequence")
         fields = tuple(
-            _physical_field(record, event_type, with_source_name=True)
-            for record in records
+            _physical_field(record, event_type, with_source_name=True) for record in records
         )
         _require_unique_fields(fields, event_type)
         source_names = [field.source_name for field in fields]
@@ -816,9 +788,7 @@ def tmdl_active_table_schemas(path: Path) -> dict[str, TmdlTableSchema]:
             raise FileNotFoundError(f"active TMDL table source is missing: {table_path}")
         schema = _tmdl_table_schema(table_path)
         if schema.name != table_name:
-            raise ValueError(
-                f"TMDL ref/file table mismatch: {table_name!r} != {schema.name!r}"
-            )
+            raise ValueError(f"TMDL ref/file table mismatch: {table_name!r} != {schema.name!r}")
         _add_unique(tables, table_name, schema, "active TMDL tables")
     return tables
 
@@ -840,10 +810,7 @@ def _physical_field(
         or not name.isidentifier()
         or (
             with_source_name
-            and (
-                not isinstance(source_name, str)
-                or not source_name.isidentifier()
-            )
+            and (not isinstance(source_name, str) or not source_name.isidentifier())
         )
         or data_type not in KQL_TYPES
     ):
@@ -868,11 +835,7 @@ def _require_nullable_struct_fields(
         raise ValueError(f"{function_name} does not define StructField nullability")
     for call in calls:
         if keyword:
-            values = [
-                item.value
-                for item in call.keywords
-                if item.arg == "nullable"
-            ]
+            values = [item.value for item in call.keywords if item.arg == "nullable"]
         else:
             values = [call.args[2]] if len(call.args) > 2 else []
         if len(values) != 1 or not (
@@ -887,19 +850,14 @@ def _require_unique_fields(
     *,
     case_insensitive: bool = False,
 ) -> None:
-    names = [
-        field.name.casefold() if case_insensitive else field.name
-        for field in fields
-    ]
+    names = [field.name.casefold() if case_insensitive else field.name for field in fields]
     if len(set(names)) != len(names):
         raise ValueError(f"duplicate physical field in {context}")
 
 
 def _function_node(tree: ast.Module, name: str) -> ast.FunctionDef:
     matches = [
-        node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name == name
+        node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == name
     ]
     if len(matches) != 1:
         raise KeyError(name)
@@ -907,11 +865,7 @@ def _function_node(tree: ast.Module, name: str) -> ast.FunctionDef:
 
 
 def _named_call(node: ast.AST, name: str) -> bool:
-    return (
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == name
-    )
+    return isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == name
 
 
 def _string_constant(node: ast.AST, context: str) -> str:
@@ -952,8 +906,7 @@ def _local_literal(function: ast.FunctionDef, name: str) -> object:
     matches: list[ast.AST] = []
     for node in function.body:
         if isinstance(node, ast.Assign) and any(
-            isinstance(target, ast.Name) and target.id == name
-            for target in node.targets
+            isinstance(target, ast.Name) and target.id == name for target in node.targets
         ):
             matches.append(node.value)
         if (
@@ -1011,9 +964,7 @@ def _tmdl_table_schema(path: Path) -> TmdlTableSchema:
         _unquote_tmdl_identifier(lineage.group(2)),
     )
     if (source_schema, source_table) != lineage_binding:
-        raise ValueError(
-            f"Direct Lake binding disagrees with sourceLineageTag: {path}"
-        )
+        raise ValueError(f"Direct Lake binding disagrees with sourceLineageTag: {path}")
 
     fields: list[PhysicalField] = []
     index = 0
@@ -1079,9 +1030,7 @@ def _tmdl_direct_lake_binding(text: str, path: Path) -> tuple[str, str]:
         re.MULTILINE | re.DOTALL,
     )
     if len(partitions) != 1:
-        raise ValueError(
-            f"TMDL table must have one executable entity partition: {path}"
-        )
+        raise ValueError(f"TMDL table must have one executable entity partition: {path}")
     partition = partitions[0]
     modes = re.findall(
         r"^\t\tmode:\s+(\w+)\s*$",
@@ -1101,14 +1050,10 @@ def _tmdl_direct_lake_binding(text: str, path: Path) -> tuple[str, str]:
             re.MULTILINE,
         )
         if len(matches) != 1:
-            raise ValueError(
-                f"TMDL entity partition requires one {property_name}: {path}"
-            )
+            raise ValueError(f"TMDL entity partition requires one {property_name}: {path}")
         value = _unquote_tmdl_identifier(matches[0])
         if not value:
-            raise ValueError(
-                f"TMDL entity partition has empty {property_name}: {path}"
-            )
+            raise ValueError(f"TMDL entity partition has empty {property_name}: {path}")
         values.append(value)
     return values[0], values[1]
 

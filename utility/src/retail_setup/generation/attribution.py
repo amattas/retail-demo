@@ -381,9 +381,7 @@ def generate_attribution(
             F.concat(
                 F.lit("CAMP"),
                 F.date_format("_campaign_start", "yyyyMMdd"),
-                fixed_width_decimal(
-                    F.col("_campaign_index"), 2, "campaign archetype index"
-                ),
+                fixed_width_decimal(F.col("_campaign_index"), 2, "campaign archetype index"),
             ),
         )
     )

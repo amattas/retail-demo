@@ -9,9 +9,9 @@ from retail_setup.generation.runtime import seeded_draws
 
 def customer_visit_tickets(draws: seeded_draws, customer: Column) -> Column:
     """Persistent dimension-sized weights for heterogeneous shopping frequency."""
-    return F.ceil(
-        4.0 * F.exp(0.9 * draws.gauss([customer], "visit-propensity") - 0.405)
-    ).cast("int")
+    return F.ceil(4.0 * F.exp(0.9 * draws.gauss([customer], "visit-propensity") - 0.405)).cast(
+        "int"
+    )
 
 
 def repeat_purchase_probability(department: Column) -> Column:
@@ -43,30 +43,25 @@ def retail_basket_size(
     """Mission mixtures with a calibrated mean and persistent customer budgets."""
     trip = draws.u(purchase_keys, "retail-mission")
     mission = (
-        F.when(trip < 0.30, 0.30)
-        .when(trip < 0.70, 0.90)
-        .when(trip < 0.90, 1.60)
-        .otherwise(2.50)
+        F.when(trip < 0.30, 0.30).when(trip < 0.70, 0.90).when(trip < 0.90, 1.60).otherwise(2.50)
     ) / F.lit(1.02)
-    budget = F.exp(
-        0.35 * draws.gauss([customer], "retail-budget") - F.lit(0.35**2 / 2)
-    )
+    budget = F.exp(0.35 * draws.gauss([customer], "retail-budget") - F.lit(0.35**2 / 2))
     # Exposure is decided before demand: coupons increase additional-item demand.
     lift = (F.lit(1.0) + offer.cast("double") * 0.20) / (1.0 + promo_rate * 0.20)
     extra = F.greatest(mean - 1.0, F.lit(0.0)) * mission * budget * lift
     return (1 + draws.negative_binomial(purchase_keys, "retail-basket", extra, 3)).cast("int")
 
 
-def retail_catalog(
-    products: DataFrame, dates: DataFrame, draws: seeded_draws
-) -> DataFrame:
+def retail_catalog(products: DataFrame, dates: DataFrame, draws: seeded_draws) -> DataFrame:
     """One launch-eligible weighted product CDF per day and department.
 
     Popularity is persistent per SKU, with price sensitivity and a long tail.
     Arrays keep selection a bounded lookup rather than a receipt x catalog join.
     """
-    eligible = dates.select("event_date").distinct().join(
-        F.broadcast(products), F.col("launch_date") <= F.col("event_date")
+    eligible = (
+        dates.select("event_date")
+        .distinct()
+        .join(F.broadcast(products), F.col("launch_date") <= F.col("event_date"))
     )
     eligible = eligible.withColumn(
         "_popularity",
@@ -74,9 +69,7 @@ def retail_catalog(
         / F.pow(F.col("SalePrice"), 1.15),
     )
     group = Window.partitionBy("event_date", "department")
-    ordered = group.orderBy("product_id").rowsBetween(
-        Window.unboundedPreceding, Window.currentRow
-    )
+    ordered = group.orderBy("product_id").rowsBetween(Window.unboundedPreceding, Window.currentRow)
     eligible = (
         eligible.withColumn("_total_weight", F.sum("_popularity").over(group))
         .withColumn("_probability", F.col("_popularity") / F.col("_total_weight"))
@@ -88,15 +81,15 @@ def retail_catalog(
     )
     return eligible.groupBy("event_date", "department").agg(
         F.sort_array(
-            F.collect_list(
-                F.struct("_cdf", "product_id", "SalePrice", "taxability")
-            )
+            F.collect_list(F.struct("_cdf", "product_id", "SalePrice", "taxability"))
         ).alias("_catalog"),
         F.sum(F.col("_probability") * F.col("_unit_value")).alias("_expected_line_value"),
         F.sum(
-            F.col("_probability") * F.col("_unit_value")
+            F.col("_probability")
+            * F.col("_unit_value")
             * F.when(F.col("taxability") == "TAXABLE", 1.0)
-            .when(F.col("taxability") == "REDUCED_RATE", 0.5).otherwise(0.0)
+            .when(F.col("taxability") == "REDUCED_RATE", 0.5)
+            .otherwise(0.0)
         ).alias("_expected_taxable_value"),
     )
 
@@ -123,14 +116,20 @@ def pick_retail_product(catalog: Column, uniform: Column) -> Column:
 
 
 def calibrated_basket_mean(
-    expected_line: Column, expected_taxable: Column, tax_rate: Column,
-    target: float, promo_rate: float, nominal_lines: float,
+    expected_line: Column,
+    expected_taxable: Column,
+    tax_rate: Column,
+    target: float,
+    promo_rate: float,
+    nominal_lines: float,
 ) -> Column:
     affordable_lines = F.lit(target) / (
         (expected_line + expected_taxable * tax_rate) * (1.0 - promo_rate * 0.20)
     )
     return F.when(
-        (expected_line > 0) & (expected_line < float("inf"))
-        & (expected_taxable >= 0) & (tax_rate >= 0),
+        (expected_line > 0)
+        & (expected_line < float("inf"))
+        & (expected_taxable >= 0)
+        & (tax_rate >= 0),
         F.least(affordable_lines, F.lit(nominal_lines)),
     ).otherwise(F.raise_error("Basket calibration requires valid catalog prices and tax"))

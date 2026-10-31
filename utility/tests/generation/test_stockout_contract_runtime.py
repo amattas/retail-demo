@@ -16,14 +16,17 @@ GATE = ROOT / "fabric" / "lakehouse" / "15-validate-required-ml-contract.ipynb"
 
 def _tree(path):
     notebook = json.loads(path.read_text(encoding="utf-8"))
-    return ast.parse("\n".join(
-        "".join(cell["source"]) for cell in notebook["cells"] if cell["cell_type"] == "code"
-    ))
+    return ast.parse(
+        "\n".join(
+            "".join(cell["source"]) for cell in notebook["cells"] if cell["cell_type"] == "code"
+        )
+    )
 
 
 def _functions(path, names):
     nodes = [
-        node for node in _tree(path).body
+        node
+        for node in _tree(path).body
         if isinstance(node, ast.FunctionDef) and node.name in names
     ]
     namespace = {"F": F, "Window": Window, "LOOKBACK_DAYS": 30}
@@ -79,20 +82,31 @@ def test_signed_ledger_produces_nonnegative_features_accepted_by_real_gate(spark
 def test_unknown_balance_remains_unknown_and_is_rejected_before_training(spark):
     inventory = _inventory(spark).withColumn("balance", F.lit(None).cast("double"))
     producer = _functions(PRODUCER, {"build_end_of_day_inventory"})
-    assert producer["build_end_of_day_inventory"](inventory).filter(
-        F.col("current_inventory").isNotNull()
-    ).isEmpty()
+    assert (
+        producer["build_end_of_day_inventory"](inventory)
+        .filter(F.col("current_inventory").isNotNull())
+        .isEmpty()
+    )
     tree = _tree(PRODUCER)
     index = next(
-        index for index, node in enumerate(tree.body)
+        index
+        for index, node in enumerate(tree.body)
         if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "null_balance_count"
-                for target in node.targets)
+        and any(
+            isinstance(target, ast.Name) and target.id == "null_balance_count"
+            for target in node.targets
+        )
     )
     namespace = {"inventory_history": inventory, "F": F, "INVENTORY_TXN_TABLE": "inventory"}
     with pytest.raises(RuntimeError, match="contains null balances"):
-        exec(compile(ast.Module(body=tree.body[index:index + 2], type_ignores=[]),
-                     str(PRODUCER), "exec"), namespace)
+        exec(
+            compile(
+                ast.Module(body=tree.body[index : index + 2], type_ignores=[]),
+                str(PRODUCER),
+                "exec",
+            ),
+            namespace,
+        )
 
 
 def test_stockout_gate_reports_which_constraints_failed(spark):
@@ -108,8 +122,13 @@ def test_stockout_gate_reports_which_constraints_failed(spark):
     with pytest.raises(RuntimeError) as error:
         validator["_validate_stockout_risk"](invalid)
     for name in (
-        "negative_current_inventory", "negative_days_of_inventory",
-        "negative_demand_velocity", "invalid_class", "invalid_horizon",
-        "invalid_ranking", "inventory_after_prediction", "prediction_after_generation",
+        "negative_current_inventory",
+        "negative_days_of_inventory",
+        "negative_demand_velocity",
+        "invalid_class",
+        "invalid_horizon",
+        "invalid_ranking",
+        "inventory_after_prediction",
+        "prediction_after_generation",
     ):
         assert f"{name}=1" in str(error.value)

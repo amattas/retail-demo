@@ -450,14 +450,9 @@ def test_manifest_pages_and_workflow_paths_are_navigated() -> None:
     ):
         assert "workspace-inventory.md" in path.read_text(encoding="utf-8")
 
-    workflow = (ROOT / ".github" / "workflows" / "docs.yml").read_text(
+    # docs.yml publishes on every push to main through the shared workflow, so there are
+    # no path filters to keep in sync; the documentation tests run in the Checks workflow.
+    workflow = (ROOT / ".github" / "workflows" / "checks.yml").read_text(
         encoding="utf-8"
     )
-    for watched_path in (
-        "contracts/retail-demo.json",
-        "scripts/solution_manifest.py",
-        "utility/src/retail_setup/**",
-        "tests/docs/**",
-    ):
-        assert watched_path in workflow
     assert "python -m pytest tests/docs -q" in workflow

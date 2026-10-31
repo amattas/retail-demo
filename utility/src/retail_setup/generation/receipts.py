@@ -46,8 +46,13 @@ TENDERS = [
 ]
 BASE_DECLINE = 0.025
 DECLINE_REASONS = [
-    "INSUFFICIENT_FUNDS", "CARD_EXPIRED", "INVALID_CVV", "NETWORK_ERROR",
-    "FRAUD_SUSPECTED", "CARD_BLOCKED", "LIMIT_EXCEEDED",
+    "INSUFFICIENT_FUNDS",
+    "CARD_EXPIRED",
+    "INVALID_CVV",
+    "NETWORK_ERROR",
+    "FRAUD_SUSPECTED",
+    "CARD_BLOCKED",
+    "LIMIT_EXCEEDED",
 ]
 
 # Share of in-store receipts whose customer lives in the store's geography
@@ -64,20 +69,20 @@ CHURN_CUTOFF_MAX_MARGIN_DAYS = 60
 # table works across store types (datagen SeasonalPatterns category effects).
 SEASONAL_LIFT: dict[str, list[float]] = {
     "electronics": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.0, 1.0, 2.5, 2.0],
-    "seasonal":    [0.6, 0.7, 0.9, 1.0, 1.3, 1.5, 1.5, 1.2, 1.0, 1.4, 2.0, 2.5],
-    "garden":      [0.5, 0.6, 1.3, 1.8, 2.0, 1.8, 1.4, 1.0, 0.8, 0.6, 0.5, 0.5],
-    "home":        [0.8, 0.8, 1.2, 1.5, 1.6, 1.4, 1.2, 1.0, 0.9, 0.8, 1.0, 1.1],
-    "sport":       [0.9, 0.9, 1.1, 1.3, 1.5, 1.6, 1.6, 1.3, 1.1, 1.0, 1.1, 1.2],
-    "clothing":    [1.0, 0.9, 1.1, 1.1, 1.0, 1.0, 1.0, 1.4, 1.2, 1.0, 1.3, 1.5],
-    "apparel":     [1.0, 0.9, 1.1, 1.1, 1.0, 1.0, 1.0, 1.4, 1.2, 1.0, 1.3, 1.5],
-    "office":      [1.1, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.6, 1.4, 1.0, 1.0, 1.1],
-    "toys":        [0.8, 0.8, 0.8, 0.9, 0.9, 1.0, 1.0, 1.0, 1.0, 1.1, 2.0, 3.0],
-    "baby":        [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.2],
-    "grocery":     [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.05, 1.3, 1.4],
-    "fresh":       [1.0, 1.0, 1.0, 1.0, 1.05, 1.1, 1.1, 1.05, 1.0, 1.05, 1.3, 1.4],
-    "health":      [1.3, 1.05, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.05, 1.1],
-    "beauty":      [1.2, 1.05, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.05, 1.2, 1.5],
-    "automotive":  [1.0, 1.0, 1.05, 1.1, 1.2, 1.2, 1.2, 1.1, 1.0, 1.0, 1.0, 1.0],
+    "seasonal": [0.6, 0.7, 0.9, 1.0, 1.3, 1.5, 1.5, 1.2, 1.0, 1.4, 2.0, 2.5],
+    "garden": [0.5, 0.6, 1.3, 1.8, 2.0, 1.8, 1.4, 1.0, 0.8, 0.6, 0.5, 0.5],
+    "home": [0.8, 0.8, 1.2, 1.5, 1.6, 1.4, 1.2, 1.0, 0.9, 0.8, 1.0, 1.1],
+    "sport": [0.9, 0.9, 1.1, 1.3, 1.5, 1.6, 1.6, 1.3, 1.1, 1.0, 1.1, 1.2],
+    "clothing": [1.0, 0.9, 1.1, 1.1, 1.0, 1.0, 1.0, 1.4, 1.2, 1.0, 1.3, 1.5],
+    "apparel": [1.0, 0.9, 1.1, 1.1, 1.0, 1.0, 1.0, 1.4, 1.2, 1.0, 1.3, 1.5],
+    "office": [1.1, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.6, 1.4, 1.0, 1.0, 1.1],
+    "toys": [0.8, 0.8, 0.8, 0.9, 0.9, 1.0, 1.0, 1.0, 1.0, 1.1, 2.0, 3.0],
+    "baby": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.1, 1.2],
+    "grocery": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.05, 1.3, 1.4],
+    "fresh": [1.0, 1.0, 1.0, 1.0, 1.05, 1.1, 1.1, 1.05, 1.0, 1.05, 1.3, 1.4],
+    "health": [1.3, 1.05, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.05, 1.1],
+    "beauty": [1.2, 1.05, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.05, 1.2, 1.5],
+    "automotive": [1.0, 1.0, 1.05, 1.1, 1.2, 1.2, 1.2, 1.1, 1.0, 1.0, 1.0, 1.0],
 }
 
 # Named promo catalog (datagen promotion_utils parity): seasonal codes apply
@@ -86,11 +91,11 @@ SEASONAL_LIFT: dict[str, list[float]] = {
 # buy-one-get-one. (code, discount_pct, eligible_months | None, min_cents, kind)
 PROMO_CATALOG: list[tuple[str, int, list[int] | None, int, str]] = [
     ("SAVE10", 10, None, 0, "PCT"),
-    ("SAVE15", 15, None, 2500, "PCT"),      # min $25
-    ("SAVE20", 20, None, 5000, "PCT"),      # min $50
-    ("SAVE25", 25, None, 7500, "PCT"),      # min $75
+    ("SAVE15", 15, None, 2500, "PCT"),  # min $25
+    ("SAVE20", 20, None, 5000, "PCT"),  # min $50
+    ("SAVE25", 25, None, 7500, "PCT"),  # min $75
     ("CLEARANCE30", 30, None, 0, "PCT"),
-    ("BOGO50", 50, None, 0, "BOGO"),        # buy one get one 50% off (qty >= 2)
+    ("BOGO50", 50, None, 0, "BOGO"),  # buy one get one 50% off (qty >= 2)
     ("NEWYEAR15", 15, [1, 2], 0, "PCT"),
     ("SPRINGSALE20", 20, [3, 4, 5], 0, "PCT"),
     ("SUMMER25", 25, [6, 7, 8], 0, "PCT"),
@@ -101,12 +106,17 @@ PROMO_CATALOG: list[tuple[str, int, list[int] | None, int, str]] = [
 ]
 # Evergreen fallback: always eligible, no minimum, percentage only.
 EVERGREEN: list[tuple[str, int]] = [
-    ("SAVE10", 10), ("CLEARANCE30", 30), ("DEAL15", 15),
+    ("SAVE10", 10),
+    ("CLEARANCE30", 30),
+    ("DEAL15", 15),
 ]
 
 # Per-customer shopping segments (datagen CustomerJourney segment distribution).
 SEGMENT_WEIGHTS: list[tuple[str, float]] = [
-    ("BUDGET", 0.35), ("CONVENIENCE", 0.25), ("QUALITY", 0.20), ("BRAND_LOYAL", 0.20),
+    ("BUDGET", 0.35),
+    ("CONVENIENCE", 0.25),
+    ("QUALITY", 0.20),
+    ("BRAND_LOYAL", 0.20),
 ]
 
 
@@ -116,10 +126,12 @@ def _segment_price_skew(u: Column, seg: Column) -> Column:
     BUDGET biases to the low (cheap) end of a department's price-ranked
     catalog, QUALITY/BRAND_LOYAL to the high end, CONVENIENCE is neutral.
     """
-    return (F.when(seg == "BUDGET", u * u)
-            .when(seg == "QUALITY", F.lit(1.0) - (F.lit(1.0) - u) * (F.lit(1.0) - u))
-            .when(seg == "BRAND_LOYAL", F.pow(u, F.lit(0.85)))
-            .otherwise(u))
+    return (
+        F.when(seg == "BUDGET", u * u)
+        .when(seg == "QUALITY", F.lit(1.0) - (F.lit(1.0) - u) * (F.lit(1.0) - u))
+        .when(seg == "BRAND_LOYAL", F.pow(u, F.lit(0.85)))
+        .otherwise(u)
+    )
 
 
 # Weather simulation (datagen EventPatterns): a per-store-day weather state
@@ -155,17 +167,16 @@ def _cdf_pick_lit(u: Column, probs: list[float], values: list[float]) -> Column:
 
 def _weather_mult(u: Column, month: Column) -> Column:
     """Per-store-day weather traffic multiplier with seasonal weather odds."""
-    return (F.when(month.isin(12, 1, 2),
-                   _cdf_pick_lit(u, WEATHER_P_WINTER, WEATHER_MULTS))
-            .when(month.isin(6, 7, 8),
-                  _cdf_pick_lit(u, WEATHER_P_SUMMER, WEATHER_MULTS))
-            .otherwise(_cdf_pick_lit(u, WEATHER_P_SHOULDER, WEATHER_MULTS)))
+    return (
+        F.when(month.isin(12, 1, 2), _cdf_pick_lit(u, WEATHER_P_WINTER, WEATHER_MULTS))
+        .when(month.isin(6, 7, 8), _cdf_pick_lit(u, WEATHER_P_SUMMER, WEATHER_MULTS))
+        .otherwise(_cdf_pick_lit(u, WEATHER_P_SHOULDER, WEATHER_MULTS))
+    )
 
 
 def _trip_basket_mult(u: Column) -> Column:
     """Pick a shopping-trip archetype's basket-size multiplier (inverse-CDF)."""
-    return _cdf_pick_lit(u, [w for _, w, _ in TRIP_TYPES],
-                         [m for _, _, m in TRIP_TYPES])
+    return _cdf_pick_lit(u, [w for _, w, _ in TRIP_TYPES], [m for _, _, m in TRIP_TYPES])
 
 
 def _seasonal_factor(dept_name: str, month_col: Column) -> Column:
@@ -177,13 +188,17 @@ def _seasonal_factor(dept_name: str, month_col: Column) -> Column:
     expr: Column | None = None
     for m in range(1, 13):
         cond = month_col == F.lit(m)
-        expr = (F.when(cond, F.lit(lifts[m - 1])) if expr is None
-                else expr.when(cond, F.lit(lifts[m - 1])))
+        expr = (
+            F.when(cond, F.lit(lifts[m - 1]))
+            if expr is None
+            else expr.when(cond, F.lit(lifts[m - 1]))
+        )
     return expr.otherwise(F.lit(1.0))
 
 
-def _with_seasonal_department(df: DataFrame, u_col: Column,
-                              dept_weights: dict[str, float]) -> DataFrame:
+def _with_seasonal_department(
+    df: DataFrame, u_col: Column, dept_weights: dict[str, float]
+) -> DataFrame:
     """Pick a department per row via inverse-CDF over base weights scaled by the
     seasonal lift for the row's month.
 
@@ -197,8 +212,7 @@ def _with_seasonal_department(df: DataFrame, u_col: Column,
     month = F.month(F.col("event_date"))
     out = df
     for i, dn in enumerate(depts):
-        out = out.withColumn(
-            f"_w{i}", F.lit(float(dept_weights[dn])) * _seasonal_factor(dn, month))
+        out = out.withColumn(f"_w{i}", F.lit(float(dept_weights[dn])) * _seasonal_factor(dn, month))
     wt = F.col("_w0")
     for i in range(1, len(depts)):
         wt = wt + F.col(f"_w{i}")
@@ -214,13 +228,15 @@ def _with_seasonal_department(df: DataFrame, u_col: Column,
         expr = F.when(cond, F.lit(dn)) if expr is None else expr.when(cond, F.lit(dn))
     dept_col = expr.otherwise(F.lit(depts[-1])) if expr is not None else F.lit(depts[0])
     out = out.withColumn("department", dept_col)
-    drop_cols = ([f"_w{i}" for i in range(len(depts))] + ["_wt"]
-                 + [f"_c{i}" for i in range(len(depts) - 1)])
+    drop_cols = (
+        [f"_w{i}" for i in range(len(depts))] + ["_wt"] + [f"_c{i}" for i in range(len(depts) - 1)]
+    )
     return out.drop(*drop_cols)
 
 
-def _promo_eligible_expr(idx_col: Column, month_col: Column,
-                         ext_before: Column, qty: Column) -> Column:
+def _promo_eligible_expr(
+    idx_col: Column, month_col: Column, ext_before: Column, qty: Column
+) -> Column:
     """True when the catalog entry at idx_col is eligible: in-month, line value
     meets any minimum, and BOGO needs qty >= 2."""
     expr: Column | None = None
@@ -269,19 +285,18 @@ def _apply_churn_lifecycle(
         F.pmod(replacement_base, F.lit(CHURN_COHORT_MODULUS)) == 0,
         F.pmod(replacement_base, F.lit(customer_count)) + F.lit(1),
     ).otherwise(replacement_base)
-    is_post_churn = (
-        F.pmod(F.col("customer_id"), F.lit(CHURN_COHORT_MODULUS)) == 0
-    ) & (F.col("event_date") >= cutoff_date)
+    is_post_churn = (F.pmod(F.col("customer_id"), F.lit(CHURN_COHORT_MODULUS)) == 0) & (
+        F.col("event_date") >= cutoff_date
+    )
     return receipts.withColumn(
         "customer_id",
-        F.when(is_post_churn, replacement_customer).otherwise(
-            F.col("customer_id")
-        ),
+        F.when(is_post_churn, replacement_customer).otherwise(F.col("customer_id")),
     )
 
 
-def _assign_customers(receipts: DataFrame, dims: dict[str, DataFrame],
-                      d: seeded_draws, cfg: GenerationConfig) -> DataFrame:
+def _assign_customers(
+    receipts: DataFrame, dims: dict[str, DataFrame], d: seeded_draws, cfg: GenerationConfig
+) -> DataFrame:
     """Resolve each receipt's customer_id with store-geography affinity.
 
     With probability ``GEO_AFFINITY`` the customer is drawn from those living
@@ -290,7 +305,8 @@ def _assign_customers(receipts: DataFrame, dims: dict[str, DataFrame],
     network-wide pick when the store's geography has no customers.
     """
     customers = dims["dim_customers"].select(
-        F.col("ID").alias("customer_id"), F.col("GeographyID").alias("cust_geo_id"))
+        F.col("ID").alias("customer_id"), F.col("GeographyID").alias("cust_geo_id")
+    )
     # Replicated selection tickets give persistent, long-tailed visit propensity.
     # This dimension-sized expansion avoids receipt x customer inequality joins.
     customers = customers.withColumn(
@@ -306,33 +322,57 @@ def _assign_customers(receipts: DataFrame, dims: dict[str, DataFrame],
     global_size = customers.agg(F.count("*").alias("_global_size"))
 
     r = (
-        receipts
-        .join(geo_sizes, receipts["store_geo_id"] == geo_sizes["cust_geo_id"], "left")
+        receipts.join(geo_sizes, receipts["store_geo_id"] == geo_sizes["cust_geo_id"], "left")
         .drop("cust_geo_id")
         .withColumn("geo_cust_count", F.coalesce(F.col("geo_cust_count"), F.lit(0)))
         .crossJoin(global_size)
-        .withColumn("_global_rank", (d.h64(["receipt_id_ext"], "cust")
-                                      % F.col("_global_size") + 1).cast("int"))
+        .withColumn(
+            "_global_rank",
+            (d.h64(["receipt_id_ext"], "cust") % F.col("_global_size") + 1).cast("int"),
+        )
         .join(global_customers, "_global_rank")
-        .withColumn("want_local",
-                    (d.u(["receipt_id_ext"], "affinity") < F.lit(GEO_AFFINITY))
-                    & (F.col("geo_cust_count") > 0))
-        .withColumn("local_rank_target", F.when(
-            F.col("geo_cust_count") > 0,
-            (d.h64(["receipt_id_ext"], "localcust") % F.col("geo_cust_count") + 1))
-            .cast("long"))
+        .withColumn(
+            "want_local",
+            (d.u(["receipt_id_ext"], "affinity") < F.lit(GEO_AFFINITY))
+            & (F.col("geo_cust_count") > 0),
+        )
+        .withColumn(
+            "local_rank_target",
+            F.when(
+                F.col("geo_cust_count") > 0,
+                (d.h64(["receipt_id_ext"], "localcust") % F.col("geo_cust_count") + 1),
+            ).cast("long"),
+        )
     )
     local = cust_ranked.select(
-        F.col("cust_geo_id").alias("_lgeo"), F.col("local_rank").alias("_lrank"),
-        F.col("customer_id").alias("local_customer"))
+        F.col("cust_geo_id").alias("_lgeo"),
+        F.col("local_rank").alias("_lrank"),
+        F.col("customer_id").alias("local_customer"),
+    )
     assigned = (
-        r.join(local, (F.col("store_geo_id") == F.col("_lgeo"))
-               & (F.col("local_rank_target") == F.col("_lrank")), "left")
-        .withColumn("customer_id", F.when(
-            F.col("want_local") & F.col("local_customer").isNotNull(),
-            F.col("local_customer")).otherwise(F.col("global_customer")))
-        .drop("_lgeo", "_lrank", "local_customer", "global_customer",
-              "want_local", "local_rank_target", "geo_cust_count", "_global_rank", "_global_size")
+        r.join(
+            local,
+            (F.col("store_geo_id") == F.col("_lgeo"))
+            & (F.col("local_rank_target") == F.col("_lrank")),
+            "left",
+        )
+        .withColumn(
+            "customer_id",
+            F.when(
+                F.col("want_local") & F.col("local_customer").isNotNull(), F.col("local_customer")
+            ).otherwise(F.col("global_customer")),
+        )
+        .drop(
+            "_lgeo",
+            "_lrank",
+            "local_customer",
+            "global_customer",
+            "want_local",
+            "local_rank_target",
+            "geo_cust_count",
+            "_global_rank",
+            "_global_size",
+        )
     )
     return _apply_churn_lifecycle(assigned, d, cfg)
 
@@ -363,8 +403,7 @@ def _open_close_cols(operating_hours: Column) -> tuple[Column, Column]:
     return open_h, close_h
 
 
-def _pick_hour_static(u: Column, hourly_weights: list[float],
-                      open_h: int, close_h: int) -> Column:
+def _pick_hour_static(u: Column, hourly_weights: list[float], open_h: int, close_h: int) -> Column:
     """Inverse-CDF hour pick for a single, statically known operating window.
 
     Weights outside ``[open_h, close_h)`` are zeroed and the CDF renormalised
@@ -372,8 +411,7 @@ def _pick_hour_static(u: Column, hourly_weights: list[float],
     cumulative fractions are Python floats (not column arithmetic), keeping the
     generated expression small.
     """
-    masked = [w if open_h <= h < close_h else 0.0
-              for h, w in enumerate(hourly_weights)]
+    masked = [w if open_h <= h < close_h else 0.0 for h, w in enumerate(hourly_weights)]
     total = sum(masked) or 1.0
     chain: Column | None = None
     acc = 0.0
@@ -385,8 +423,9 @@ def _pick_hour_static(u: Column, hourly_weights: list[float],
     return F.lit(last_open) if chain is None else chain.otherwise(F.lit(last_open))
 
 
-def _pick_hour(u: Column, hourly_weights: list[float],
-               operating_hours: Column, patterns: list[str]) -> Column:
+def _pick_hour(
+    u: Column, hourly_weights: list[float], operating_hours: Column, patterns: list[str]
+) -> Column:
     """Masked inverse-CDF hour pick that respects each store's operating window.
 
     Operating hours come from a small fixed set of patterns, so the per-pattern
@@ -415,13 +454,17 @@ def generate_receipts_group(
     d = seeded_draws(cfg.seed)
 
     stores = dims["dim_stores"].select(
-        F.col("ID").alias("store_id"), "tax_rate", "daily_traffic_multiplier",
-        "operating_hours", F.col("GeographyID").alias("store_geo_id"))
-    grid = generate_hourly_visits(spark, dims["dim_stores"], profile, cfg).join(
-        stores, "store_id"
+        F.col("ID").alias("store_id"),
+        "tax_rate",
+        "daily_traffic_multiplier",
+        "operating_hours",
+        F.col("GeographyID").alias("store_geo_id"),
     )
-    earlier_hours = Window.partitionBy("store_id", "day").orderBy("hour").rowsBetween(
-        Window.unboundedPreceding, -1
+    grid = generate_hourly_visits(spark, dims["dim_stores"], profile, cfg).join(stores, "store_id")
+    earlier_hours = (
+        Window.partitionBy("store_id", "day")
+        .orderBy("hour")
+        .rowsBetween(Window.unboundedPreceding, -1)
     )
     grid = grid.withColumn(
         "_prior_receipts", F.coalesce(F.sum("n_receipts").over(earlier_hours), F.lit(0))
@@ -432,36 +475,52 @@ def generate_receipts_group(
         .withColumn("seq", F.col("_prior_receipts") + F.col("_hour_seq"))
         .withColumn("minute", (d.h64(["store_id", "day", "seq"], "min") % 60).cast("int"))
         .withColumn("second", (d.h64(["store_id", "day", "seq"], "sec") % 60).cast("int"))
-        .withColumn("event_ts", F.make_timestamp(
-            F.year("day"), F.month("day"), F.dayofmonth("day"),
-            F.col("hour"), F.col("minute"), F.col("second")))
+        .withColumn(
+            "event_ts",
+            F.make_timestamp(
+                F.year("day"),
+                F.month("day"),
+                F.dayofmonth("day"),
+                F.col("hour"),
+                F.col("minute"),
+                F.col("second"),
+            ),
+        )
         .withColumn("event_date", F.col("day"))
         # RCP(3) + yyyyMMddHHmm(12) + store(4) + seq(6) = 25 chars, unique by
         # construction (store_id, day, seq) is a key
-        .withColumn("receipt_id_ext", F.concat(
-            F.lit("RCP"), F.date_format("event_ts", "yyyyMMddHHmm"),
-            fixed_width_decimal(F.col("store_id"), 4, "receipt store ID"),
-            fixed_width_decimal(F.col("seq"), 6, "daily receipt sequence")))
+        .withColumn(
+            "receipt_id_ext",
+            F.concat(
+                F.lit("RCP"),
+                F.date_format("event_ts", "yyyyMMddHHmm"),
+                fixed_width_decimal(F.col("store_id"), 4, "receipt store ID"),
+                fixed_width_decimal(F.col("seq"), 6, "daily receipt sequence"),
+            ),
+        )
         .withColumn("trace_id", F.concat(F.lit("TRC"), F.col("receipt_id_ext")))
     )
 
     # geography affinity: resolve each receipt's customer (local vs network-wide)
     receipts = _assign_customers(receipts, dims, d, cfg)
 
-    receipts = (
-        receipts
-        .withColumn("_offer", d.u(["receipt_id_ext"], "offer") < F.lit(profile.promo_rate))
-        .withColumn("tender_type", d.pick_by_weights(
-            ["receipt_id_ext"], "tender", [(n, w) for n, w, _, _, _ in TENDERS]))
+    receipts = receipts.withColumn(
+        "_offer", d.u(["receipt_id_ext"], "offer") < F.lit(profile.promo_rate)
+    ).withColumn(
+        "tender_type",
+        d.pick_by_weights(["receipt_id_ext"], "tender", [(n, w) for n, w, _, _, _ in TENDERS]),
     )
 
     # --- lines: explode baskets, weighted department -> price-tiered product
     # within department, restricted to products already launched on the sale day
     # (IMP-010 no-pre-launch-sales invariant).
     products = dims["dim_products"].select(
-        F.col("ID").alias("product_id"), F.col("SalePrice"), F.col("taxability"),
+        F.col("ID").alias("product_id"),
+        F.col("SalePrice"),
+        F.col("taxability"),
         F.col("Department").alias("department"),
-        F.to_date("LaunchDate").alias("launch_date"))
+        F.to_date("LaunchDate").alias("launch_date"),
+    )
 
     product_departments = {r.department for r in products.select("department").distinct().collect()}
     unknown = set(profile.department_weights) - product_departments
@@ -482,31 +541,54 @@ def generate_receipts_group(
         ),
         F.lit(0.0),
     )
-    calibration = catalog.withColumn("_weight", department_weight).groupBy("event_date").agg(
-        (F.sum(F.col("_weight") * F.col("_expected_line_value")) / F.sum("_weight"))
-        .alias("_line_value"),
-        (F.sum(F.col("_weight") * F.col("_expected_taxable_value")) / F.sum("_weight"))
-        .alias("_taxable_value"),
+    calibration = (
+        catalog.withColumn("_weight", department_weight)
+        .groupBy("event_date")
+        .agg(
+            (F.sum(F.col("_weight") * F.col("_expected_line_value")) / F.sum("_weight")).alias(
+                "_line_value"
+            ),
+            (F.sum(F.col("_weight") * F.col("_expected_taxable_value")) / F.sum("_weight")).alias(
+                "_taxable_value"
+            ),
+        )
     )
-    receipts = receipts.join(calibration, "event_date").withColumn(
-        "_basket_mean",
-        calibrated_basket_mean(
-            F.col("_line_value"), F.col("_taxable_value"), F.col("tax_rate"),
-            profile.avg_ticket_target, profile.promo_rate, profile.basket_lambda,
-        ),
-    ).withColumn(
-        "basket_n",
-        retail_basket_size(
-            d, ["receipt_id_ext"], F.col("customer_id"), F.col("_basket_mean"),
-            F.col("_offer"), profile.promo_rate,
-        ),
+    receipts = (
+        receipts.join(calibration, "event_date")
+        .withColumn(
+            "_basket_mean",
+            calibrated_basket_mean(
+                F.col("_line_value"),
+                F.col("_taxable_value"),
+                F.col("tax_rate"),
+                profile.avg_ticket_target,
+                profile.promo_rate,
+                profile.basket_lambda,
+            ),
+        )
+        .withColumn(
+            "basket_n",
+            retail_basket_size(
+                d,
+                ["receipt_id_ext"],
+                F.col("customer_id"),
+                F.col("_basket_mean"),
+                F.col("_offer"),
+                profile.promo_rate,
+            ),
+        )
     )
 
-    exploded = (
-        receipts.select("receipt_id_ext", "event_ts", "event_date", "store_id",
-                        "tax_rate", "basket_n", "_offer", "customer_id")
-        .withColumn("line_num", F.explode(F.sequence(F.lit(1), F.col("basket_n"))))
-    )
+    exploded = receipts.select(
+        "receipt_id_ext",
+        "event_ts",
+        "event_date",
+        "store_id",
+        "tax_rate",
+        "basket_n",
+        "_offer",
+        "customer_id",
+    ).withColumn("line_num", F.explode(F.sequence(F.lit(1), F.col("basket_n"))))
     exploded = _with_seasonal_department(
         exploded,
         F.when(
@@ -516,81 +598,131 @@ def generate_receipts_group(
                 d.u(["customer_id"], "favorite-department"),
             ).otherwise(d.u(["receipt_id_ext"], "mission-department")),
         ).otherwise(d.u(["receipt_id_ext", "line_num"], "dept")),
-        profile.department_weights)
+        profile.department_weights,
+    )
 
     lines = (
-        exploded
-        .join(catalog, ["event_date", "department"])
-        .withColumn("_product", pick_retail_product(
-            F.col("_catalog"), d.u(["receipt_id_ext", "line_num"], "prod")
-        ))
+        exploded.join(catalog, ["event_date", "department"])
+        .withColumn(
+            "_product",
+            pick_retail_product(F.col("_catalog"), d.u(["receipt_id_ext", "line_num"], "prod")),
+        )
         .select("*", "_product.product_id", "_product.SalePrice", "_product.taxability")
         .drop("_product", "_catalog", "_expected_line_value", "_expected_taxable_value")
-        .withColumn("quantity", retail_quantity(
-            d, ["receipt_id_ext", "line_num"], F.col("department")
-        ))
+        .withColumn(
+            "quantity", retail_quantity(d, ["receipt_id_ext", "line_num"], F.col("department"))
+        )
         .withColumn("unit_cents", F.round(F.col("SalePrice") * 100).cast("long"))
         .withColumn("ext_before", F.col("unit_cents") * F.col("quantity"))
         .withColumn("has_promo", F.col("_offer"))
         # named promo code + matching discount (datagen promotion_utils parity):
         # a seasonal/min-purchase/BOGO code if eligible, else an evergreen code.
-        .withColumn("_pidx", (d.h64(["receipt_id_ext", "line_num"], "pcode")
-                              % F.lit(len(PROMO_CATALOG))).cast("int"))
-        .withColumn("_pcode", F.element_at(
-            F.array(*[F.lit(t[0]) for t in PROMO_CATALOG]), F.col("_pidx") + 1))
-        .withColumn("_ppct", F.element_at(
-            F.array(*[F.lit(t[1]) for t in PROMO_CATALOG]), F.col("_pidx") + 1))
-        .withColumn("_pkind", F.element_at(
-            F.array(*[F.lit(t[4]) for t in PROMO_CATALOG]), F.col("_pidx") + 1))
-        .withColumn("_pelig", _promo_eligible_expr(
-            F.col("_pidx"), F.month(F.col("event_date")),
-            F.col("ext_before"), F.col("quantity")))
-        .withColumn("_evidx", (d.h64(["receipt_id_ext", "line_num"], "pcodeev")
-                               % F.lit(len(EVERGREEN))).cast("int"))
-        .withColumn("_evcode", F.element_at(
-            F.array(*[F.lit(c) for c, _ in EVERGREEN]), F.col("_evidx") + 1))
-        .withColumn("_evpct", F.element_at(
-            F.array(*[F.lit(p) for _, p in EVERGREEN]), F.col("_evidx") + 1))
-        .withColumn("promo_code", F.when(F.col("has_promo"), F.when(
-            F.col("_pelig"), F.col("_pcode")).otherwise(F.col("_evcode"))))
-        .withColumn("_disc_pct", F.when(
-            F.col("_pelig"), F.col("_ppct")).otherwise(F.col("_evpct")))
-        .withColumn("_disc_kind", F.when(
-            F.col("_pelig"), F.col("_pkind")).otherwise(F.lit("PCT")))
-        .withColumn("discount_cents", F.when(F.col("has_promo"),
-            F.when(F.col("_disc_kind") == "BOGO",
-                   # buy-one-get-one: every 2nd item discounted at _disc_pct
-                   F.floor(F.floor(F.col("quantity") / F.lit(2))
-                           * F.col("unit_cents") * F.col("_disc_pct")
-                           / F.lit(100.0) + F.lit(0.5)).cast("long"))
-            .otherwise(F.floor(
-                F.col("ext_before") * F.col("_disc_pct") / F.lit(100.0)
-                + F.lit(0.5)).cast("long")))
-            .otherwise(F.lit(0).cast("long")))
-        .withColumn("ext_cents",
-                    F.greatest(F.lit(0).cast("long"),
-                               F.col("ext_before") - F.col("discount_cents")))
+        .withColumn(
+            "_pidx",
+            (d.h64(["receipt_id_ext", "line_num"], "pcode") % F.lit(len(PROMO_CATALOG))).cast(
+                "int"
+            ),
+        )
+        .withColumn(
+            "_pcode",
+            F.element_at(F.array(*[F.lit(t[0]) for t in PROMO_CATALOG]), F.col("_pidx") + 1),
+        )
+        .withColumn(
+            "_ppct",
+            F.element_at(F.array(*[F.lit(t[1]) for t in PROMO_CATALOG]), F.col("_pidx") + 1),
+        )
+        .withColumn(
+            "_pkind",
+            F.element_at(F.array(*[F.lit(t[4]) for t in PROMO_CATALOG]), F.col("_pidx") + 1),
+        )
+        .withColumn(
+            "_pelig",
+            _promo_eligible_expr(
+                F.col("_pidx"), F.month(F.col("event_date")), F.col("ext_before"), F.col("quantity")
+            ),
+        )
+        .withColumn(
+            "_evidx",
+            (d.h64(["receipt_id_ext", "line_num"], "pcodeev") % F.lit(len(EVERGREEN))).cast("int"),
+        )
+        .withColumn(
+            "_evcode", F.element_at(F.array(*[F.lit(c) for c, _ in EVERGREEN]), F.col("_evidx") + 1)
+        )
+        .withColumn(
+            "_evpct", F.element_at(F.array(*[F.lit(p) for _, p in EVERGREEN]), F.col("_evidx") + 1)
+        )
+        .withColumn(
+            "promo_code",
+            F.when(
+                F.col("has_promo"),
+                F.when(F.col("_pelig"), F.col("_pcode")).otherwise(F.col("_evcode")),
+            ),
+        )
+        .withColumn("_disc_pct", F.when(F.col("_pelig"), F.col("_ppct")).otherwise(F.col("_evpct")))
+        .withColumn("_disc_kind", F.when(F.col("_pelig"), F.col("_pkind")).otherwise(F.lit("PCT")))
+        .withColumn(
+            "discount_cents",
+            F.when(
+                F.col("has_promo"),
+                F.when(
+                    F.col("_disc_kind") == "BOGO",
+                    # buy-one-get-one: every 2nd item discounted at _disc_pct
+                    F.floor(
+                        F.floor(F.col("quantity") / F.lit(2))
+                        * F.col("unit_cents")
+                        * F.col("_disc_pct")
+                        / F.lit(100.0)
+                        + F.lit(0.5)
+                    ).cast("long"),
+                ).otherwise(
+                    F.floor(
+                        F.col("ext_before") * F.col("_disc_pct") / F.lit(100.0) + F.lit(0.5)
+                    ).cast("long")
+                ),
+            ).otherwise(F.lit(0).cast("long")),
+        )
+        .withColumn(
+            "ext_cents",
+            F.greatest(F.lit(0).cast("long"), F.col("ext_before") - F.col("discount_cents")),
+        )
         # tax: integer basis-point math, replicating datagen _tax_cents exactly
         .withColumn("rate_bps", F.round(F.col("tax_rate") * 10000).cast("long"))
-        .withColumn("tax_mult", F.when(F.col("taxability") == "TAXABLE", 100)
-                    .when(F.col("taxability") == "REDUCED_RATE", 50)
-                    .otherwise(0).cast("long"))
-        .withColumn("line_tax_cents", F.floor(
-            (F.col("ext_cents") * F.col("rate_bps") * F.col("tax_mult")
-             + F.lit(500_000)) / F.lit(1_000_000)).cast("long"))
+        .withColumn(
+            "tax_mult",
+            F.when(F.col("taxability") == "TAXABLE", 100)
+            .when(F.col("taxability") == "REDUCED_RATE", 50)
+            .otherwise(0)
+            .cast("long"),
+        )
+        .withColumn(
+            "line_tax_cents",
+            F.floor(
+                (F.col("ext_cents") * F.col("rate_bps") * F.col("tax_mult") + F.lit(500_000))
+                / F.lit(1_000_000)
+            ).cast("long"),
+        )
     )
 
     fact_receipt_lines = lines.select(
-        "receipt_id_ext", "event_ts", "event_date", "line_num", "product_id",
-        "quantity", _fmt(F.col("unit_cents")).alias("unit_price"), "unit_cents",
-        _fmt(F.col("ext_cents")).alias("ext_price"), "ext_cents", "promo_code",
+        "receipt_id_ext",
+        "event_ts",
+        "event_date",
+        "line_num",
+        "product_id",
+        "quantity",
+        _fmt(F.col("unit_cents")).alias("unit_price"),
+        "unit_cents",
+        _fmt(F.col("ext_cents")).alias("ext_price"),
+        "ext_cents",
+        "promo_code",
     ).select(*column_names("fact_receipt_lines"))
 
     # --- header rollup
     hdr = lines.groupBy("receipt_id_ext").agg(
         F.sum("ext_cents").alias("subtotal_cents"),
         F.sum("discount_cents").alias("discount_cents"),
-        F.sum("line_tax_cents").alias("tax_cents"))
+        F.sum("line_tax_cents").alias("tax_cents"),
+    )
     fact_receipts = (
         receipts.join(hdr, "receipt_id_ext")
         .withColumn("total_cents", F.col("subtotal_cents") + F.col("tax_cents"))
@@ -605,27 +737,41 @@ def generate_receipts_group(
         .withColumn("campaign_id", F.lit(None).cast("string"))
         .withColumn("impression_id_ext", F.lit(None).cast("string"))
         .select(
-            "receipt_id_ext", "trace_id", "event_ts", "event_date", "store_id",
-            "customer_id", "receipt_type", "tender_type", "subtotal_cents",
-            _fmt(F.col("discount_cents")).alias("discount_amount"), "tax_cents",
-            "total_cents", _fmt(F.col("subtotal_cents")).alias("subtotal_amount"),
+            "receipt_id_ext",
+            "trace_id",
+            "event_ts",
+            "event_date",
+            "store_id",
+            "customer_id",
+            "receipt_type",
+            "tender_type",
+            "subtotal_cents",
+            _fmt(F.col("discount_cents")).alias("discount_amount"),
+            "tax_cents",
+            "total_cents",
+            _fmt(F.col("subtotal_cents")).alias("subtotal_amount"),
             _fmt(F.col("tax_cents")).alias("tax_amount"),
-            _fmt(F.col("total_cents")).alias("total_amount"), "payment_method",
+            _fmt(F.col("total_cents")).alias("total_amount"),
+            "payment_method",
             # Legacy semantic-model column (sourceColumn: Subtotal); same value
             # as subtotal_amount per the TMDL contract.
             _fmt(F.col("subtotal_cents")).alias("Subtotal"),
-            "gross_subtotal_cents", "discount_cents", "attribution_journey_id",
-            "campaign_id", "impression_id_ext",
-        ).select(*column_names("fact_receipts"))
+            "gross_subtotal_cents",
+            "discount_cents",
+            "attribution_journey_id",
+            "campaign_id",
+            "impression_id_ext",
+        )
+        .select(*column_names("fact_receipts"))
     )
 
     # --- payments (one per receipt; in-store, so order_id_ext is NULL)
     u_dec = d.u(["receipt_id_ext"], "decline")
     decline_p: Column = F.lit(0.0)
     for name, _, mult, _, _ in TENDERS:
-        decline_p = F.when(
-            F.col("payment_method") == name, F.lit(BASE_DECLINE * mult)
-        ).otherwise(decline_p)
+        decline_p = F.when(F.col("payment_method") == name, F.lit(BASE_DECLINE * mult)).otherwise(
+            decline_p
+        )
     proc_lo: Column = F.lit(TENDERS[-1][3])
     proc_hi: Column = F.lit(TENDERS[-1][4])
     for name, _, _, lo, hi in TENDERS[:-1]:
@@ -633,25 +779,33 @@ def generate_receipts_group(
         proc_hi = F.when(F.col("payment_method") == name, F.lit(hi)).otherwise(proc_hi)
     reason_idx = (d.h64(["receipt_id_ext"], "reason") % len(DECLINE_REASONS)).cast("int")
     fact_payments = (
-        fact_receipts
-        .withColumn("order_id_ext", F.lit(None).cast("string"))
+        fact_receipts.withColumn("order_id_ext", F.lit(None).cast("string"))
         .withColumn("amount_cents", F.col("total_cents"))
-        .withColumn("transaction_id", F.concat(
-            F.lit("TXN_"), F.unix_timestamp("event_ts").cast("string"), F.lit("_"),
-            fixed_width_decimal(
-                d.h64(["receipt_id_ext"], "txn") % 1_000_000,
-                6,
-                "payment transaction suffix",
-            )))
-        .withColumn("status",
-                    F.when(u_dec < decline_p, "DECLINED").otherwise("APPROVED"))
-        .withColumn("decline_reason", F.when(
-            F.col("status") == "DECLINED",
-            F.element_at(F.array(*[F.lit(r) for r in DECLINE_REASONS]),
-                         reason_idx + 1)))
-        .withColumn("processing_time_ms",
-                    (proc_lo + d.u(["receipt_id_ext"], "proc")
-                     * (proc_hi - proc_lo)).cast("long"))
+        .withColumn(
+            "transaction_id",
+            F.concat(
+                F.lit("TXN_"),
+                F.unix_timestamp("event_ts").cast("string"),
+                F.lit("_"),
+                fixed_width_decimal(
+                    d.h64(["receipt_id_ext"], "txn") % 1_000_000,
+                    6,
+                    "payment transaction suffix",
+                ),
+            ),
+        )
+        .withColumn("status", F.when(u_dec < decline_p, "DECLINED").otherwise("APPROVED"))
+        .withColumn(
+            "decline_reason",
+            F.when(
+                F.col("status") == "DECLINED",
+                F.element_at(F.array(*[F.lit(r) for r in DECLINE_REASONS]), reason_idx + 1),
+            ),
+        )
+        .withColumn(
+            "processing_time_ms",
+            (proc_lo + d.u(["receipt_id_ext"], "proc") * (proc_hi - proc_lo)).cast("long"),
+        )
         .withColumn("amount", _fmt(F.col("amount_cents")))
         .select(*column_names("fact_payments"))
     )

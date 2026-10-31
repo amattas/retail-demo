@@ -93,8 +93,7 @@ STAGE_NOTEBOOK_TEXT = {
     ),
     "setup-05-generate-marketing": (
         "Setup 05 — Generate marketing",
-        "Builds background ad impressions. Needs only dimensions, so it runs "
-        "alongside setup-03.",
+        "Builds background ad impressions. Needs only dimensions, so it runs alongside setup-03.",
     ),
     "setup-06-generate-returns-and-promotions": (
         "Setup 06 — Generate returns and promotions",
@@ -178,9 +177,11 @@ def rewrite_engine_aliases(source: str) -> str:
 
 
 def build_engine_source() -> str:
-    parts = ["# ENGINE SOURCE (generated — do not edit)",
-             "# Built by scripts/build_notebooks.py from utility/src/retail_setup/.",
-             ""]
+    parts = [
+        "# ENGINE SOURCE (generated — do not edit)",
+        "# Built by scripts/build_notebooks.py from utility/src/retail_setup/.",
+        "",
+    ]
     for rel in ENGINE_MODULES:
         source = (SRC / rel).read_text(encoding="utf-8")
         source = strip_package_imports(source)
@@ -247,15 +248,19 @@ def _template_text(name: str, template_path: Path) -> str:
     if template_path.name != STAGE_TEMPLATE:
         return text
     title, summary = STAGE_NOTEBOOK_TEXT[name]
-    text = (text.replace("__SETUP_NOTEBOOK__", name)
-            .replace("__SETUP_TITLE__", title)
-            .replace("__SETUP_SUMMARY__", summary))
+    text = (
+        text.replace("__SETUP_NOTEBOOK__", name)
+        .replace("__SETUP_TITLE__", title)
+        .replace("__SETUP_SUMMARY__", summary)
+    )
     assert "__SETUP_" not in text, f"unreplaced stage placeholder in {name}"
     return text
 
 
 def render_notebook(
-    template_path: Path, engine_source: str | None, name: str | None = None,
+    template_path: Path,
+    engine_source: str | None,
+    name: str | None = None,
 ) -> dict:
     cells = []
     text = _template_text(name or template_path.stem, template_path)
@@ -335,8 +340,7 @@ def check() -> int:
         if not committed.exists() or committed.read_text(encoding="utf-8") != payload:
             drifted.append(committed)
     # A committed notebook no template builds (e.g. after a rename) is drift too.
-    drifted.extend(path for path in sorted(NOTEBOOKS_DIR.glob("*.ipynb"))
-                   if path.stem not in built)
+    drifted.extend(path for path in sorted(NOTEBOOKS_DIR.glob("*.ipynb")) if path.stem not in built)
     if drifted:
         print("notebook drift detected — re-run `python scripts/build_notebooks.py`:")
         for path in drifted:
@@ -348,10 +352,17 @@ def check() -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
-    parser.add_argument("--output-dir", type=Path, default=NOTEBOOKS_DIR,
-                        help="directory to write the .ipynb files (default: utility/notebooks)")
-    parser.add_argument("--check", action="store_true",
-                        help="rebuild to a temp dir and diff against committed notebooks")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=NOTEBOOKS_DIR,
+        help="directory to write the .ipynb files (default: utility/notebooks)",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="rebuild to a temp dir and diff against committed notebooks",
+    )
     args = parser.parse_args(argv)
     if args.check:
         return check()

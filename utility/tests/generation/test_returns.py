@@ -15,10 +15,17 @@ from retail_setup.generation.schemas import column_names
 
 @pytest.fixture(scope="module")
 def setup(spark):
-    cfg = GenerationConfig(store_type="grocery", start_date=date(2025, 12, 20),
-                           end_date=date(2025, 12, 28), store_count=3, dc_count=1,
-                           customer_count=300, seed=5, transactions_per_store_day=60,
-                           return_rate=0.05)
+    cfg = GenerationConfig(
+        store_type="grocery",
+        start_date=date(2025, 12, 20),
+        end_date=date(2025, 12, 28),
+        store_count=3,
+        dc_count=1,
+        customer_count=300,
+        seed=5,
+        transactions_per_store_day=60,
+        return_rate=0.05,
+    )
     dicts = load_dictionaries(default_dictionary_root(), "grocery")
     dims = generate_dimensions(spark, dicts, cfg)
     sales = generate_receipts_group(spark, dims, dicts.profile, cfg)
@@ -50,12 +57,7 @@ def test_return_semantics(setup):
 
 def test_returns_skip_christmas(setup):
     _, _, rets = setup
-    assert (
-        rets["fact_receipts"]
-        .filter(F.col("event_date") == date(2025, 12, 25))
-        .count()
-        == 0
-    )
+    assert rets["fact_receipts"].filter(F.col("event_date") == date(2025, 12, 25)).count() == 0
 
 
 def test_return_discount_amount_matches_cents(setup):
@@ -77,8 +79,10 @@ def test_return_lines_negative_and_linked(setup):
 
 def test_return_rate_and_dec26_spike(setup):
     cfg, sales, rets = setup
-    by_day_sales = {r["event_date"]: r["count"] for r in
-                    sales["fact_receipts"].groupBy("event_date").count().collect()}
+    by_day_sales = {
+        r["event_date"]: r["count"]
+        for r in sales["fact_receipts"].groupBy("event_date").count().collect()
+    }
     total_rets = rets["fact_receipts"].count()
     total_rate = total_rets / sum(by_day_sales.values())
     assert 0.02 < total_rate < 0.10  # 5% nominal incl. one 6x day, 10% cap
@@ -88,8 +92,9 @@ def test_return_rate_and_dec26_spike(setup):
     # it against the sale day via the return-header helper, which retains the
     # originating sale date.
     hdr = build_return_headers(sales, cfg)
-    by_sale_day = {r["orig_event_date"]: r["count"] for r in
-                   hdr.groupBy("orig_event_date").count().collect()}
+    by_sale_day = {
+        r["orig_event_date"]: r["count"] for r in hdr.groupBy("orig_event_date").count().collect()
+    }
     dec26 = date(2025, 12, 26)
     other = [by_sale_day.get(d, 0) / by_day_sales[d] for d in by_day_sales if d != dec26]
     assert by_sale_day.get(dec26, 0) / by_day_sales[dec26] > 2 * (sum(other) / len(other))
@@ -163,18 +168,27 @@ def test_low_volume_returns_accumulate_fractional_daily_rates(spark):
     ],
 )
 def test_christmas_adjustment_stays_within_purchase_and_history_window(
-    spark, monkeypatch, sale_date, end_date, expected,
+    spark,
+    monkeypatch,
+    sale_date,
+    end_date,
+    expected,
 ):
     max_delay = min(returns_module.RETURN_WINDOW_DAYS, (end_date - sale_date).days)
     holiday_delay = (date(2025, 12, 25) - sale_date).days
     draw = (holiday_delay - 0.5) / max_delay
     monkeypatch.setattr(
-        returns_module, "seeded_draws",
+        returns_module,
+        "seeded_draws",
         lambda _: SimpleNamespace(u=lambda _columns, _salt: F.lit(draw)),
     )
     cfg = GenerationConfig(
-        store_type="grocery", start_date=sale_date, end_date=end_date,
-        store_count=1, seed=1, return_rate=0.1,
+        store_type="grocery",
+        start_date=sale_date,
+        end_date=end_date,
+        store_count=1,
+        seed=1,
+        return_rate=0.1,
     )
     sales = spark.range(10).select(
         F.concat(F.lit("R"), F.col("id")).alias("receipt_id_ext"),

@@ -43,9 +43,7 @@ def sanitize_identifier(value: str) -> str:
     return _UNSAFE_IDENTIFIER.sub("_", value)
 
 
-def assert_historical_replacement_safe(
-    spark: SparkSession, lakehouse: str, silver_db: str
-) -> None:
+def assert_historical_replacement_safe(spark: SparkSession, lakehouse: str, silver_db: str) -> None:
     """Refuse to replace shared Silver data after streaming has initialized."""
 
     checkpoint_table = f"{lakehouse}.{silver_db}._watermarks"
@@ -166,7 +164,12 @@ class _FilesystemBackend:
     """
 
     def __init__(
-        self, spark, base_path: Path, fmt: str, run_id: str, sources: dict[tuple[str, str], DataFrame]
+        self,
+        spark,
+        base_path: Path,
+        fmt: str,
+        run_id: str,
+        sources: dict[tuple[str, str], DataFrame],
     ) -> None:
         self.spark = spark
         self.base_path = base_path
@@ -392,8 +395,7 @@ def write_all(
         )
     if outcome.state == COMPLETED_CLEANUP_FAILED:
         warnings.warn(
-            f"setup publication completed but staging cleanup needs attention: "
-            f"{outcome.error}",
+            f"setup publication completed but staging cleanup needs attention: {outcome.error}",
             RuntimeWarning,
             stacklevel=2,
         )

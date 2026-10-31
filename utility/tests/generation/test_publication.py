@@ -164,7 +164,9 @@ def test_validation_failure_leaves_targets_untouched():
 
     assert outcome.state == FAILED
     # every candidate staged fine; validation for "b" fails before any promote.
-    assert [op for op, _ in backend.calls if op in ("target_state", "promote", "restore", "drop")] == []
+    assert [
+        op for op, _ in backend.calls if op in ("target_state", "promote", "restore", "drop")
+    ] == []
     assert backend.promoted == []
     # all three were staged, so all three get cleaned up (evidence already logged).
     assert set(backend.cleaned) == {"a", "b", "c"}
@@ -181,8 +183,7 @@ def test_validation_failure_leaves_targets_untouched():
 def test_concurrent_mode_publishes_with_the_same_logged_sequence():
     backend, log = FakeBackend(), LogRecorder()
 
-    outcome = PublicationCoordinator(backend, log, max_workers=4).publish(
-        _targets("a", "b", "c"))
+    outcome = PublicationCoordinator(backend, log, max_workers=4).publish(_targets("a", "b", "c"))
 
     assert outcome.state == COMPLETED and outcome.promoted == ["a", "b", "c"]
     sequential = LogRecorder()
@@ -193,8 +194,7 @@ def test_concurrent_mode_publishes_with_the_same_logged_sequence():
 def test_concurrent_stage_failure_promotes_nothing_and_cleans_everything_staged():
     backend, log = FakeBackend(fail_stage=frozenset({"b"})), LogRecorder()
 
-    outcome = PublicationCoordinator(backend, log, max_workers=4).publish(
-        _targets("a", "b", "c"))
+    outcome = PublicationCoordinator(backend, log, max_workers=4).publish(_targets("a", "b", "c"))
 
     assert outcome.state == FAILED
     assert [op for op, _ in backend.calls if op not in ("stage", "cleanup")] == []
@@ -208,8 +208,7 @@ def test_concurrent_promotion_failure_rolls_back_every_target():
     backend = FakeBackend(existing=frozenset({"a"}), fail_promote=frozenset({"b"}))
     log = LogRecorder()
 
-    outcome = PublicationCoordinator(backend, log, max_workers=4).publish(
-        _targets("a", "b", "c"))
+    outcome = PublicationCoordinator(backend, log, max_workers=4).publish(_targets("a", "b", "c"))
 
     assert outcome.state == ROLLED_BACK
     assert set(backend.promoted) == {"a", "c"}
@@ -376,9 +375,7 @@ def test_duplicate_target_states_captured_before_any_promotion():
     assert promote_calls == ["a", "b"]
     # both target_state calls happen before the first promote call.
     first_promote_index = backend.calls.index(("promote", "a"))
-    last_state_index = max(
-        i for i, (op, _) in enumerate(backend.calls) if op == "target_state"
-    )
+    last_state_index = max(i for i, (op, _) in enumerate(backend.calls) if op == "target_state")
     assert last_state_index < first_promote_index
 
 

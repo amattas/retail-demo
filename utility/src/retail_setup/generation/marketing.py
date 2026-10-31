@@ -92,8 +92,7 @@ def generate_marketing(
             "campaign_start",
             F.date_add(
                 F.lit(cfg.start_date),
-                (F.col("day_offset") / F.col("duration")).cast("int")
-                * F.col("duration"),
+                (F.col("day_offset") / F.col("duration")).cast("int") * F.col("duration"),
             ),
         )
     )
@@ -114,30 +113,24 @@ def generate_marketing(
 
     # --- explode to impressions; build IDs
     imps = (
-        grid
-        .withColumn("seq", F.explode(F.sequence(F.lit(1), F.col("n_impressions"))))
+        grid.withColumn("seq", F.explode(F.sequence(F.lit(1), F.col("n_impressions"))))
         .withColumn(
             # campaign_id keyed on the campaign window so it spans multiple days
             "campaign_id",
             F.concat(
                 F.lit("CAMP"),
                 F.date_format("campaign_start", "yyyyMMdd"),
-                fixed_width_decimal(
-                    F.col("archetype_idx"), 2, "campaign archetype index"
-                ),
+                fixed_width_decimal(F.col("archetype_idx"), 2, "campaign archetype index"),
             ),
         )
         .withColumn(
             # impression id stays day-unique (campaign_id now repeats across days)
             "impression_id_ext",
             F.concat(
-                F.lit("IMP"), F.date_format("day", "yyyyMMdd"),
-                fixed_width_decimal(
-                    F.col("archetype_idx"), 2, "impression archetype index"
-                ),
-                fixed_width_decimal(
-                    F.col("seq"), 7, "daily impression sequence"
-                ),
+                F.lit("IMP"),
+                F.date_format("day", "yyyyMMdd"),
+                fixed_width_decimal(F.col("archetype_idx"), 2, "impression archetype index"),
+                fixed_width_decimal(F.col("seq"), 7, "daily impression sequence"),
             ),
         )
         # drops the 'IMP' prefix: CREAT + day + archetype + seq
@@ -154,9 +147,7 @@ def generate_marketing(
     imps = imps.withColumn("channel", F.element_at("channels", ch_idx + 1))
 
     # --- device pick (60/30/10) and cost multiplier
-    imps = imps.withColumn(
-        "device", d.pick_by_weights(key, "mk_device", DEVICE_WEIGHTS)
-    )
+    imps = imps.withColumn("device", d.pick_by_weights(key, "mk_device", DEVICE_WEIGHTS))
     mult = None
     for device, m in DEVICE_MULTIPLIERS.items():
         cond = F.col("device") == device
@@ -170,10 +161,8 @@ def generate_marketing(
         lo = F.when(cond, c_lo) if lo is None else lo.when(cond, c_lo)
         hi = F.when(cond, c_hi) if hi is None else hi.when(cond, c_hi)
     cost_dollars = (lo + d.u(key, "mk_cost") * (hi - lo)) * F.col("device_mult")
-    imps = (
-        imps
-        .withColumn("cost_cents", F.round(cost_dollars * 100).cast("long"))
-        .withColumn("cost", F.format_string("%.2f", cost_dollars))
+    imps = imps.withColumn("cost_cents", F.round(cost_dollars * 100).cast("long")).withColumn(
+        "cost", F.format_string("%.2f", cost_dollars)
     )
 
     # --- uniform customer per impression; ~5% CRM-matched (customer_id set)
@@ -195,33 +184,36 @@ def generate_marketing(
 
     # --- event_ts uniform within the day
     day_ts = F.unix_timestamp(F.col("day").cast("timestamp"))
-    event_ts = F.timestamp_seconds(
-        day_ts + F.floor(d.u(key, "mk_ts") * F.lit(86400))
-    )
+    event_ts = F.timestamp_seconds(day_ts + F.floor(d.u(key, "mk_ts") * F.lit(86400)))
 
-    out = imps.select(
-        event_ts.alias("event_ts"),
-        F.concat(F.lit("TRC-MKT-"), F.col("impression_id_ext")).alias("trace_id"),
-        "channel",
-        "campaign_id",
-        "creative_id",
-        "customer_ad_id",
-        "customer_id",
-        "cost_cents",
-        # TMDL-bound PascalCase duals: exact mirrors of the snake_case columns
-        F.col("customer_id").alias("CustomerId"),
-        F.col("cost_cents").alias("CostCents"),
-        "impression_id_ext",
-        "cost",
-        "device",
-        F.col("day").alias("event_date"),
-    ).withColumn(
-        "__index_level_0__",
-        legacy_index("impression_id_ext"),
-    ).withColumn(
-        # IMP-007: NULL for organic/background impressions. attribution.py
-        # unions in the two synthetic per-journey touches, which carry a
-        # non-NULL attribution_journey_id.
-        "attribution_journey_id", F.lit(None).cast("string"),
+    out = (
+        imps.select(
+            event_ts.alias("event_ts"),
+            F.concat(F.lit("TRC-MKT-"), F.col("impression_id_ext")).alias("trace_id"),
+            "channel",
+            "campaign_id",
+            "creative_id",
+            "customer_ad_id",
+            "customer_id",
+            "cost_cents",
+            # TMDL-bound PascalCase duals: exact mirrors of the snake_case columns
+            F.col("customer_id").alias("CustomerId"),
+            F.col("cost_cents").alias("CostCents"),
+            "impression_id_ext",
+            "cost",
+            "device",
+            F.col("day").alias("event_date"),
+        )
+        .withColumn(
+            "__index_level_0__",
+            legacy_index("impression_id_ext"),
+        )
+        .withColumn(
+            # IMP-007: NULL for organic/background impressions. attribution.py
+            # unions in the two synthetic per-journey touches, which carry a
+            # non-NULL attribution_journey_id.
+            "attribution_journey_id",
+            F.lit(None).cast("string"),
+        )
     )
     return out.select(*column_names("fact_marketing"))

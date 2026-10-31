@@ -9,9 +9,7 @@ runner = CliRunner()
 
 
 def _seed_deploy_config(root: Path):
-    manifest_source = (
-        Path(__file__).resolve().parents[2] / "contracts" / "retail-demo.json"
-    )
+    manifest_source = Path(__file__).resolve().parents[2] / "contracts" / "retail-demo.json"
     (root / "contracts").mkdir(parents=True)
     (root / "contracts" / "retail-demo.json").write_text(
         manifest_source.read_text(encoding="utf-8"),
@@ -114,9 +112,7 @@ def test_configure_writes_both_configs(tmp_path):
     assert env["lakehouse"]["name"] == "my_lh"
     assert env["deployment"]["profile"] == "core"
     assert "spark" not in env
-    gen = yaml.safe_load(
-        (tmp_path / "utility/config/environments/my-ws.yaml").read_text()
-    )
+    gen = yaml.safe_load((tmp_path / "utility/config/environments/my-ws.yaml").read_text())
     assert gen["store_type"] == "grocery"
     assert gen["months"] == 3
     assert gen["store_count"] == 10
@@ -177,12 +173,8 @@ def test_configure_keeps_generation_settings_isolated_by_environment(tmp_path):
 
     assert first.exit_code == 0, first.output
     assert second.exit_code == 0, second.output
-    dev = yaml.safe_load(
-        (tmp_path / "utility/config/environments/dev.yaml").read_text()
-    )
-    prod = yaml.safe_load(
-        (tmp_path / "utility/config/environments/prod.yaml").read_text()
-    )
+    dev = yaml.safe_load((tmp_path / "utility/config/environments/dev.yaml").read_text())
+    prod = yaml.safe_load((tmp_path / "utility/config/environments/prod.yaml").read_text())
     assert (dev["store_count"], dev["seed"]) == (5, 1)
     assert (prod["store_count"], prod["seed"]) == (20, 2)
 
@@ -232,9 +224,7 @@ def test_configure_migrates_legacy_profile_controlled_overrides(tmp_path):
     assert result.exit_code == 0, result.output
     migrated = yaml.safe_load(env_path.read_text())
     assert "spark" not in migrated
-    assert migrated["notebooks"] == {
-        "default_lakehouse_name": "retail_lakehouse"
-    }
+    assert migrated["notebooks"] == {"default_lakehouse_name": "retail_lakehouse"}
     assert migrated["deployment"]["profile"] == "core"
 
 
@@ -253,9 +243,7 @@ def test_configure_prompts_show_defaults_and_store_types(tmp_path):
     assert "Random seed [42]" in result.output
     assert "Estimated records" in result.output
 
-    gen = yaml.safe_load(
-        (tmp_path / "utility/config/environments/retail-demo.yaml").read_text()
-    )
+    gen = yaml.safe_load((tmp_path / "utility/config/environments/retail-demo.yaml").read_text())
     assert gen == {
         "store_type": "supercenter",
         "months": 3,
@@ -299,9 +287,7 @@ def test_configure_selects_full_demo_custom_spark_pool(tmp_path):
     assert result.exit_code == 0, result.output
     env = yaml.safe_load((tmp_path / "deploy/config/environments/my-ws.yml").read_text())
     assert env["deployment"]["profile"] == "full-demo"
-    generation = yaml.safe_load(
-        (tmp_path / "utility/config/environments/my-ws.yaml").read_text()
-    )
+    generation = yaml.safe_load((tmp_path / "utility/config/environments/my-ws.yaml").read_text())
     assert generation["months"] == 18
     config = yaml.safe_load((tmp_path / "deploy/config/deploy.yml").read_text())
     assert config["deployment"]["profile"] == "core"
@@ -395,9 +381,7 @@ def test_configure_rejects_short_history_for_reporting_profile(tmp_path):
 
     assert result.exit_code == 1
     assert "requires at least 540 days of history" in result.output
-    assert not (
-        tmp_path / "utility/config/environments/my-ws.yaml"
-    ).exists()
+    assert not (tmp_path / "utility/config/environments/my-ws.yaml").exists()
 
 
 def test_configure_rejects_legacy_custom_pool_override(tmp_path):

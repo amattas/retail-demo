@@ -118,19 +118,13 @@ class SolutionManifest(ManifestModel):
                 )
         defaults = [profile.deployment_name for profile in self.profiles if profile.default]
         if len(defaults) != 1:
-            errors.append(
-                "manifest must define exactly one default executable profile"
-            )
+            errors.append("manifest must define exactly one default executable profile")
         profile_names = [profile.deployment_name for profile in self.profiles]
         duplicate_profile_names = sorted(
-            name
-            for name, count in Counter(profile_names).items()
-            if count > 1
+            name for name, count in Counter(profile_names).items() if count > 1
         )
         if duplicate_profile_names:
-            errors.append(
-                f"profile deployment names must be unique: {duplicate_profile_names}"
-            )
+            errors.append(f"profile deployment names must be unique: {duplicate_profile_names}")
         profile_ids = {profile.id for profile in self.profiles}
         for expectation in self.readiness_expectations:
             for profile_id in expectation.profile_refs:
@@ -207,9 +201,7 @@ def _validate_path_references(
 ) -> None:
     assets = {asset.id: asset for asset in manifest.assets}
     event_owners = {
-        event.id: contract.id
-        for contract in manifest.data_contracts
-        for event in contract.events
+        event.id: contract.id for contract in manifest.data_contracts for event in contract.events
     }
     event_ids = set(event_owners)
     exception_ids = {exception.id for exception in manifest.exceptions}
@@ -259,11 +251,7 @@ def _validate_path_references(
                 f"{path.id}.contract_ids must identify the event, historical, "
                 "and semantic-model contracts"
             )
-        source_kind = (
-            "streaming-notebook"
-            if path.path_kind == "emitted"
-            else "eventhouse"
-        )
+        source_kind = "streaming-notebook" if path.path_kind == "emitted" else "eventhouse"
         _require_asset_kind(
             errors,
             path.id,
@@ -271,9 +259,7 @@ def _validate_path_references(
             assets.get(path.source_asset_id),
             source_kind,
         )
-        has_semantic_target = any(
-            target.layer == "semantic" for target in path.targets
-        )
+        has_semantic_target = any(target.layer == "semantic" for target in path.targets)
         target_kind = "semantic-model" if has_semantic_target else "lakehouse"
         _require_asset_kind(
             errors,
@@ -292,9 +278,7 @@ def _validate_path_references(
                 path.terminal_exception_id,
                 exception_ids,
             )
-            terminal_events.setdefault(path.terminal_exception_id, set()).update(
-                path.event_ids
-            )
+            terminal_events.setdefault(path.terminal_exception_id, set()).update(path.event_ids)
             terminal_targets.setdefault(
                 path.terminal_exception_id,
                 set(),
@@ -302,59 +286,38 @@ def _validate_path_references(
             exception = exceptions.get(path.terminal_exception_id)
             if exception is not None and exception.kind != "streaming-only":
                 errors.append(
-                    f"{path.id}.terminal_exception_id must reference a "
-                    "streaming-only exception"
+                    f"{path.id}.terminal_exception_id must reference a streaming-only exception"
                 )
 
     for exception in manifest.exceptions:
         covered_events = terminal_events.get(exception.id, set())
-        if (
-            exception.event_ids or exception.id in terminal_events
-        ) and set(exception.event_ids) != covered_events:
-            errors.append(
-                f"{exception.id}.event_ids must equal terminal path coverage"
-            )
+        if (exception.event_ids or exception.id in terminal_events) and set(
+            exception.event_ids
+        ) != covered_events:
+            errors.append(f"{exception.id}.event_ids must equal terminal path coverage")
         if exception.id in terminal_targets:
             if set(exception.target_names) != terminal_targets[exception.id]:
-                errors.append(
-                    f"{exception.id}.target_names must equal terminal path coverage"
-                )
+                errors.append(f"{exception.id}.target_names must equal terminal path coverage")
 
     paired_paths = [
-        path
-        for path in manifest.event_paths
-        if path.mode == "paired-lifecycle-to-silver"
+        path for path in manifest.event_paths if path.mode == "paired-lifecycle-to-silver"
     ]
     paired_routes = Counter(
         (
-            tuple(
-                target.name
-                for target in path.targets
-                if target.layer == "silver"
-            ),
-            tuple(
-                target.name
-                for target in path.targets
-                if target.layer == "gold"
-            ),
+            tuple(target.name for target in path.targets if target.layer == "silver"),
+            tuple(target.name for target in path.targets if target.layer == "gold"),
         )
         for path in paired_paths
     )
     if any(count != 2 for count in paired_routes.values()):
-        errors.append(
-            "paired-lifecycle-to-silver paths must occur in route-identical pairs"
-        )
+        errors.append("paired-lifecycle-to-silver paths must occur in route-identical pairs")
 
 
 def _validate_event_contract_sources(
     manifest: SolutionManifest,
     errors: list[str],
 ) -> None:
-    event_contracts = [
-        contract
-        for contract in manifest.data_contracts
-        if contract.kind == "event"
-    ]
+    event_contracts = [contract for contract in manifest.data_contracts if contract.kind == "event"]
     if len(event_contracts) != 1:
         errors.append("manifest must define exactly one event data contract")
         return
@@ -362,19 +325,10 @@ def _validate_event_contract_sources(
     assert contract.envelope is not None
     envelope_source = contract.envelope.source
     selector = envelope_source.selector
-    if (
-        selector is None
-        or selector.kind != "python_symbol"
-        or selector.value != "ENVELOPE"
-    ):
-        errors.append(
-            f"{contract.envelope.id}.source must select the ENVELOPE symbol"
-        )
+    if selector is None or selector.kind != "python_symbol" or selector.value != "ENVELOPE":
+        errors.append(f"{contract.envelope.id}.source must select the ENVELOPE symbol")
     if envelope_source not in contract.sources:
-        errors.append(
-            f"{contract.envelope.id}.source must also appear in "
-            f"{contract.id}.sources"
-        )
+        errors.append(f"{contract.envelope.id}.source must also appear in {contract.id}.sources")
     payload_sources = [
         source
         for source in contract.sources
@@ -383,25 +337,15 @@ def _validate_event_contract_sources(
         and source.selector.value == "EVENT_PAYLOADS"
     ]
     if len(payload_sources) != 1:
-        errors.append(
-            f"{contract.id}.sources must select EVENT_PAYLOADS exactly once"
-        )
+        errors.append(f"{contract.id}.sources must select EVENT_PAYLOADS exactly once")
     elif payload_sources[0].path != envelope_source.path:
-        errors.append(
-            f"{contract.id} envelope and payload symbols must share one source"
-        )
+        errors.append(f"{contract.id} envelope and payload symbols must share one source")
 
-    stream_assets = [
-        asset for asset in manifest.assets if asset.kind == "streaming-notebook"
-    ]
+    stream_assets = [asset for asset in manifest.assets if asset.kind == "streaming-notebook"]
     if len(stream_assets) != 1:
-        errors.append(
-            "manifest must define exactly one streaming-notebook asset"
-        )
+        errors.append("manifest must define exactly one streaming-notebook asset")
     elif payload_sources and payload_sources[0] not in stream_assets[0].sources:
-        errors.append(
-            f"{stream_assets[0].id}.sources must own the event payload source"
-        )
+        errors.append(f"{stream_assets[0].id}.sources must own the event payload source")
 
 
 def _require_asset_kind(
@@ -412,9 +356,7 @@ def _require_asset_kind(
     expected_kind: str,
 ) -> None:
     if asset is not None and asset.kind != expected_kind:
-        errors.append(
-            f"{path_id}.{field} must reference an {expected_kind!r} asset"
-        )
+        errors.append(f"{path_id}.{field} must reference an {expected_kind!r} asset")
 
 
 def _validate_path_mode(path: EventPath, errors: list[str]) -> None:
@@ -422,10 +364,7 @@ def _validate_path_mode(path: EventPath, errors: list[str]) -> None:
     has_exception = path.terminal_exception_id is not None
     if path.mode == "derived-last-touch-7d":
         if path.path_kind != "derived" or not has_semantic or has_exception:
-            errors.append(
-                f"{path.id}.mode derived-last-touch-7d requires a derived "
-                "semantic route"
-            )
+            errors.append(f"{path.id}.mode derived-last-touch-7d requires a derived semantic route")
         return
     if path.path_kind != "emitted":
         errors.append(f"{path.id}.mode is not valid for a derived path")
@@ -439,9 +378,7 @@ def _validate_path_mode(path: EventPath, errors: list[str]) -> None:
             )
         return
     if not has_semantic or has_exception:
-        errors.append(
-            f"{path.id}.mode requires a semantic terminal without an exception"
-        )
+        errors.append(f"{path.id}.mode requires a semantic terminal without an exception")
 
 
 def _validate_exception_references(
@@ -450,9 +387,7 @@ def _validate_exception_references(
     inventory_ids: set[str],
 ) -> None:
     owner_ids = {owner.id for owner in manifest.source_owners}
-    event_ids = {
-        event.id for contract in manifest.data_contracts for event in contract.events
-    }
+    event_ids = {event.id for contract in manifest.data_contracts for event in contract.events}
     for exception in manifest.exceptions:
         _require_reference(
             errors,

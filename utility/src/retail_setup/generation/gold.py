@@ -53,8 +53,7 @@ def _latest_inventory_position(
         F.desc("trace_id"),
     )
     return (
-        transactions
-        .withColumn("rn", F.row_number().over(latest))
+        transactions.withColumn("rn", F.row_number().over(latest))
         .filter(F.col("rn") == 1)
         .select(
             node_column,
@@ -81,25 +80,19 @@ def generate_campaign_performance(
         )
     )
     campaign_conversions = (
-        fact_marketing_attribution.filter(
-            F.col("attribution_status") == "ATTRIBUTED"
-        )
+        fact_marketing_attribution.filter(F.col("attribution_status") == "ATTRIBUTED")
         .withColumn("day", F.to_date("touch_ts"))
         .groupBy("campaign_id", "channel", "day")
         .agg(
             F.countDistinct("attribution_id").alias("conversions"),
-            F.sum("attributed_revenue_cents")
-            .cast("long")
-            .alias("attributed_revenue_cents"),
+            F.sum("attributed_revenue_cents").cast("long").alias("attributed_revenue_cents"),
             F.sum("discount_cents").cast("long").alias("discount_cents"),
             F.sum("tax_cents").cast("long").alias("tax_cents"),
             F.sum("payment_cents").cast("long").alias("payment_cents"),
         )
     )
     return (
-        campaign_spend.join(
-            campaign_conversions, ["campaign_id", "channel", "day"], "left"
-        )
+        campaign_spend.join(campaign_conversions, ["campaign_id", "channel", "day"], "left")
         .fillna(
             0,
             subset=[
@@ -126,9 +119,7 @@ def generate_campaign_performance(
     )
 
 
-def generate_gold(
-    spark: SparkSession, tables: dict[str, DataFrame]
-) -> dict[str, DataFrame]:
+def generate_gold(spark: SparkSession, tables: dict[str, DataFrame]) -> dict[str, DataFrame]:
     """Build the 10 Gold aggregate frames from the generated fact tables."""
     gold: dict[str, DataFrame] = {}
 
@@ -184,9 +175,9 @@ def generate_gold(
         .withColumn("day", F.to_date("event_ts"))
         .withColumn(
             "site",
-            F.when(F.col("store_id").isNotNull(),
-                   F.concat(F.lit("STORE_"), F.col("store_id")))
-            .otherwise(F.concat(F.lit("DC_"), F.col("dc_id"))),
+            F.when(
+                F.col("store_id").isNotNull(), F.concat(F.lit("STORE_"), F.col("store_id"))
+            ).otherwise(F.concat(F.lit("DC_"), F.col("dc_id"))),
         )
         .withColumn(
             "dwell_min",

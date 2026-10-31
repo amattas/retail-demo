@@ -87,17 +87,21 @@ def test_yaml_round_trip(tmp_path: Path):
 
 
 def test_scale_defaults_derive_from_store_count():
-    cfg = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31),
-                           store_count=40)
-    assert cfg.dc_count == 4          # ~1 DC per 10 stores, min 1
+    cfg = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31), store_count=40)
+    assert cfg.dc_count == 4  # ~1 DC per 10 stores, min 1
     assert cfg.customer_count == 40_000  # 1000 per store
     assert cfg.transactions_per_store_day == 400
 
 
 def test_scale_overrides_respected():
-    cfg = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31),
-                           store_count=40, dc_count=2, customer_count=8000,
-                           transactions_per_store_day=50)
+    cfg = GenerationConfig(
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 1, 31),
+        store_count=40,
+        dc_count=2,
+        customer_count=8000,
+        transactions_per_store_day=50,
+    )
     assert (cfg.dc_count, cfg.customer_count, cfg.transactions_per_store_day) == (2, 8000, 50)
 
 
@@ -105,16 +109,15 @@ def test_customer_count_floored_at_minimum():
     from retail_setup.config.generation import MIN_CUSTOMER_COUNT
 
     # Small store counts derive fewer than the minimum -> floored.
-    small = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31),
-                             store_count=1)
+    small = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31), store_count=1)
     assert small.customer_count == MIN_CUSTOMER_COUNT  # 1 * 1000 -> floored
     # An explicitly tiny override is lifted too, so the churn model can train.
-    explicit = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31),
-                                store_count=1, customer_count=10)
+    explicit = GenerationConfig(
+        start_date=date(2025, 1, 1), end_date=date(2025, 1, 31), store_count=1, customer_count=10
+    )
     assert explicit.customer_count == MIN_CUSTOMER_COUNT
     # The floor is a no-op once the derived value reaches it (store_count >= 5).
-    big = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31),
-                           store_count=50)
+    big = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31), store_count=50)
     assert big.customer_count == 50_000
 
 
@@ -132,8 +135,12 @@ def test_explicit_dictionary_root(tmp_path):
     profile["store_type"] = "mini"
     (tmp_path / "mini" / "profile.json").write_text(json.dumps(profile))
 
-    cfg = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31),
-                           store_type="mini", dictionary_root=str(tmp_path))
+    cfg = GenerationConfig(
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 1, 31),
+        store_type="mini",
+        dictionary_root=str(tmp_path),
+    )
     assert cfg.store_type == "mini"
     assert cfg.resolved_dictionary_root == tmp_path
 
@@ -141,5 +148,9 @@ def test_explicit_dictionary_root(tmp_path):
 def test_unknown_type_in_explicit_root_rejected(tmp_path):
     (tmp_path / "_shared").mkdir()
     with pytest.raises(ValidationError, match="store_type"):
-        GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31),
-                         store_type="grocery", dictionary_root=str(tmp_path))
+        GenerationConfig(
+            start_date=date(2025, 1, 1),
+            end_date=date(2025, 1, 31),
+            store_type="grocery",
+            dictionary_root=str(tmp_path),
+        )

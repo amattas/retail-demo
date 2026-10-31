@@ -13,8 +13,15 @@ from typing import Any
 _TOKEN_RE = re.compile(r"\{\{(\w+)\}\}")
 
 REQUIRED_TOKENS = [
-    "LAKEHOUSE_NAME", "SILVER_DB", "GOLD_DB", "STORE_TYPE", "START_DATE",
-    "END_DATE", "STORE_COUNT", "SEED", "DICTIONARY_REF",
+    "LAKEHOUSE_NAME",
+    "SILVER_DB",
+    "GOLD_DB",
+    "STORE_TYPE",
+    "START_DATE",
+    "END_DATE",
+    "STORE_COUNT",
+    "SEED",
+    "DICTIONARY_REF",
 ]
 SETUP_NOTEBOOKS = [
     "setup-01-seed-dictionaries",
@@ -133,9 +140,7 @@ def render_notebooks(
         requested_dir = Path(notebook_dir)
         packaged_dir = _packaged_notebook_dir()
         src_dir = (
-            requested_dir
-            if requested_dir.is_dir() or not packaged_dir.is_dir()
-            else packaged_dir
+            requested_dir if requested_dir.is_dir() or not packaged_dir.is_dir() else packaged_dir
         )
     selected = tuple(notebook_names) if notebook_names is not None else tuple(NOTEBOOKS)
     if len(selected) != len(set(selected)):

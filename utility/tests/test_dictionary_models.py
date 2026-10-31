@@ -28,9 +28,7 @@ def test_product_entry_parses_string_price():
 
 def test_product_entry_rejects_nonpositive_price():
     with pytest.raises(ValidationError):
-        ProductEntry(
-            ProductName="X", BasePrice="0", Department="D", Category="C", Subcategory="S"
-        )
+        ProductEntry(ProductName="X", BasePrice="0", Department="D", Category="C", Subcategory="S")
 
 
 def test_geography_entry_normalizes_state():
@@ -44,7 +42,9 @@ def test_geography_entry_rejects_bad_zip():
 
 
 def test_tax_rate_bounds():
-    t = TaxJurisdictionEntry(StateCode="oh", County="Cuyahoga", City="Cleveland", CombinedRate="0.08")
+    t = TaxJurisdictionEntry(
+        StateCode="oh", County="Cuyahoga", City="Cleveland", CombinedRate="0.08"
+    )
     assert t.StateCode == "OH"
     assert t.CombinedRate == Decimal("0.08")
     with pytest.raises(ValidationError):
@@ -167,5 +167,4 @@ def test_profile_rejects_zero_department_weight():
     # IMP-010: a zero-weight department is an unused control that silently
     # excludes the department from every basket.
     with pytest.raises(ValidationError):
-        StoreTypeProfile(**_profile_kwargs(
-            department_weights={"Grocery": 1.0, "Deli": 0.0}))
+        StoreTypeProfile(**_profile_kwargs(department_weights={"Grocery": 1.0, "Deli": 0.0}))

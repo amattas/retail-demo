@@ -14,7 +14,11 @@ from retail_setup.generation.schemas import TABLES
 
 TMDL_DIR = (
     Path(__file__).resolve().parents[3]
-    / "fabric" / "powerbi" / "retail_model.SemanticModel" / "definition" / "tables"
+    / "fabric"
+    / "powerbi"
+    / "retail_model.SemanticModel"
+    / "definition"
+    / "tables"
 )
 
 # TMDL dataType -> acceptable spark types in schemas.py
@@ -26,6 +30,7 @@ TYPE_COMPAT = {
     "dateTime": {"timestamp", "date"},
     "decimal": {"double"},
 }
+
 
 def parse_tmdl_columns(text: str) -> list[tuple[str, str]]:
     """Return [(sourceColumn, dataType)] for every column block in a TMDL file.
@@ -43,9 +48,7 @@ def parse_tmdl_columns(text: str) -> list[tuple[str, str]]:
             raise ValueError(f"TMDL column {name!r} is missing dataType")
         data_type = dt.group(1)
         if data_type not in TYPE_COMPAT:
-            raise ValueError(
-                f"TMDL column {name!r} has unsupported dataType {data_type!r}"
-            )
+            raise ValueError(f"TMDL column {name!r} has unsupported dataType {data_type!r}")
         # DAX calculated columns have no physical sourceColumn — skip them
         if sc is None and re.search(r"^\t\t(?:expression\s*=|\s*=)", block, re.MULTILINE):
             continue
@@ -55,11 +58,7 @@ def parse_tmdl_columns(text: str) -> list[tuple[str, str]]:
 
 
 def test_parse_tmdl_columns_rejects_missing_data_type():
-    text = (
-        "table Example\n"
-        "\tcolumn MissingType\n"
-        "\t\tsourceColumn: MissingType\n"
-    )
+    text = "table Example\n\tcolumn MissingType\n\t\tsourceColumn: MissingType\n"
 
     with pytest.raises(ValueError, match="MissingType.*missing dataType"):
         parse_tmdl_columns(text)
