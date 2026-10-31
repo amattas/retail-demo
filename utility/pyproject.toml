@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling==1.27.0"]
+requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"
 
 [project]
@@ -18,7 +18,7 @@ dev = ["pytest>=9.0.3", "ruff>=0.4", "mypy>=1.8", "pyspark>=3.5.2,<4.3", "pyarro
 deploy = [
     "azure-identity>=1.25.3,<2",
     "azure-kusto-data>=6.0.4,<7",
-    "fabric-cicd==1.3.0",
+    "fabric-cicd==1.4.0",
     "mssql-python>=1.12,<2; sys_platform != 'darwin'",
     "pyodbc>=5.1,<6",
 ]
