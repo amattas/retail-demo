@@ -10,7 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 FULL_COMMIT_SHA = re.compile(r"^[0-9a-fA-F]{40}$")
 # Shared reusable workflows are deliberately consumed from the default branch
-# (mattas-net/.github STANDARD.md); the shared repo's own self-test gates changes.
+# (fleet standard: mattas-net/standards, private; ci-cd/shared-workflows); the shared repo's own self-test gates changes.
 SHARED_WORKFLOW = re.compile(r"^mattas-net/\.github/\.github/workflows/[\w.-]+\.yml@main$")
 
 
