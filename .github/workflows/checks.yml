@@ -1,6 +1,6 @@
 # Checks — automatic on push to main; PR runs wait at `approve` until a reviewer approves in the
 # `approval` environment. Release requires a successful run on main HEAD.
-# Required checks (default-branch ruleset): "checks" and "security". See mattas-net/.github STANDARD.md.
+# Required checks (default-branch ruleset): "checks" and "security". See the fleet standard (mattas-net/standards, private; ci-cd/ci-workflows).
 # python-service without an image: the shared `python` job covers lint, type-check, the fast
 # utility tests, the notebook drift check, the repo contract tests and the dependency audit.
 # The repo-specific jobs (Spark shards, local E2E, Windows, documentation) feed the `checks`

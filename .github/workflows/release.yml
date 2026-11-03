@@ -2,7 +2,7 @@
 # utility/pyproject.toml on main already carries (bump it on a dev/* branch first). Tags main,
 # creates the GitHub Release, then publishes the docs for that version. No image: retail-demo is
 # deployed from the release tag, so there is no docker-build-push job.
-# Shape and inputs: mattas-net/.github STANDARD.md ("release.yml").
+# Shape and inputs: fleet standard (mattas-net/standards, private; ci-cd/releases-and-tags).
 name: Release
 on:
   workflow_dispatch:
