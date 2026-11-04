@@ -1,0 +1,4131 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for the Microsoft Fabric retail demo.">
+      
+      
+        <meta name="author" content="Retail Demo contributors">
+      
+      
+        <link rel="canonical" href="https://amattas.github.io/retail-demo/latest/design/specifications/modules/generation/data-contract/">
+      
+      
+        <link rel="prev" href="../../deployment/framework/">
+      
+      
+        <link rel="next" href="../../streaming/event-contract/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.59">
+    
+    
+      
+        <title>Data contract - Microsoft Fabric Retail Demo</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../../../../assets/stylesheets/modern/main.5da3a30f.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../../../../../assets/stylesheets/modern/palette.812a03bb.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#historical-data-contract" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../../../.." title="Microsoft Fabric Retail Demo" class="md-header__button md-logo" aria-label="Microsoft Fabric Retail Demo" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18H6v-4h6m9 0v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6m0-10H4v2h16z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Microsoft Fabric Retail Demo
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Data contract
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M216.5 362.5c-66-8-112.5-55.5-112.5-117 0-25 9-52 24-70-6.5-16.5-5.5-51.5 2-66 20-2.5 47 8 63 22.5 19-6 39-9 63.5-9s44.5 3 62.5 8.5c15.5-14 43-24.5 63-22 7 13.5 8 48.5 1.5 65.5 16 19 24.5 44.5 24.5 70.5 0 61.5-46.5 108-113.5 116.5 17 11 28.5 35 28.5 62.5v52c0 15 12.5 23.5 27.5 17.5C441 459.5 512 369 512 257 512 115.5 397 0 255.5 0S0 115.5 0 257c0 111 70.5 203 165.5 237.5 13.5 5 26.5-4 26.5-17.5v-40c-7 3-16 5-24 5-33 0-52.5-18-66.5-51.5-5.5-13.5-11.5-21.5-23-23-6-.5-8-3-8-6 0-6 10-10.5 20-10.5 14.5 0 27 9 40 27.5 10 14.5 20.5 21 33 21s20.5-4.5 32-16c8.5-8.5 15-16 21-21"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../../.." title="Microsoft Fabric Retail Demo" class="md-nav__button md-logo" aria-label="Microsoft Fabric Retail Demo" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18H6v-4h6m9 0v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6m0-10H4v2h16z"/></svg>
+
+    </a>
+    Microsoft Fabric Retail Demo
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M216.5 362.5c-66-8-112.5-55.5-112.5-117 0-25 9-52 24-70-6.5-16.5-5.5-51.5 2-66 20-2.5 47 8 63 22.5 19-6 39-9 63.5-9s44.5 3 62.5 8.5c15.5-14 43-24.5 63-22 7 13.5 8 48.5 1.5 65.5 16 19 24.5 44.5 24.5 70.5 0 61.5-46.5 108-113.5 116.5 17 11 28.5 35 28.5 62.5v52c0 15 12.5 23.5 27.5 17.5C441 459.5 512 369 512 257 512 115.5 397 0 255.5 0S0 115.5 0 257c0 111 70.5 203 165.5 237.5 13.5 5 26.5-4 26.5-17.5v-40c-7 3-16 5-24 5-33 0-52.5-18-66.5-51.5-5.5-13.5-11.5-21.5-23-23-6-.5-8-3-8-6 0-6 10-10.5 20-10.5 14.5 0 27 9 40 27.5 10 14.5 20.5 21 33 21s20.5-4.5 32-16c8.5-8.5 15-16 21-21"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Home
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../../../guides/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Start here
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Start here
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Plain-language glossary
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Getting started
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/workspace-inventory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Workspace and profiles
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Explore the demo
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Explore the demo
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployed walkthrough
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Deployed walkthrough
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/deployed-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/deployed-data-platform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data platform
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/deployed-analytics-ai/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Analytics and AI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/demo-script/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Presenter demo
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/cio-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  CIO walkthrough
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/sample-retail-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Evaluation questions
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/presenter-journeys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Presenter journeys
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/use-cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Use cases
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deploy and operate
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Deploy and operate
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployment
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Design Documentation
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Design Documentation
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../../requirements/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Requirements
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/core/demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Core demo
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/traceability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Traceability
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_4" id="__nav_5_2_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Setup
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Setup
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/setup/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/setup/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_5" id="__nav_5_2_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployment
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Deployment
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/deployment/deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/deployment/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_6" id="__nav_5_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Generation
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Generation
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/generation/generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/generation/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_7" id="__nav_5_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Streaming
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/streaming/streaming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/streaming/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_8" id="__nav_5_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Analytics
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Analytics
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/analytics/analytics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/analytics/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_9" id="__nav_5_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ML and AI
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  ML and AI
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/ml-ai/ml-ai/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/ml-ai/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_10" id="__nav_5_2_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Power BI
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Power BI
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/power-bi/power-bi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/power-bi/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_11" id="__nav_5_2_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Operations
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/operations/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/operations/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_12" id="__nav_5_2_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Security
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Security
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/security/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/security/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_13" id="__nav_5_2_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Documentation
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Documentation
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/documentation/documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/documentation/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Specifications
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Specifications
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../core/conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Conventions
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../core/solution-manifest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Solution manifest
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Setup CLI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployment framework
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data contract
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data contract
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#authority" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Authority
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#base-silver-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Base Silver output
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Base Silver output">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dimensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Dimensions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#facts" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Facts
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operational-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Operational output
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gold-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Gold output
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generation-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Generation order
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Generation order">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#execution-performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Execution performance
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#retail-behavior-and-calibration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Retail behavior and calibration
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inventory-feedback-and-unfulfilled-demand" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Inventory feedback and unfulfilled demand
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#historicallive-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Historical/live boundary
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#statistical-acceptance" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Statistical acceptance
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#invariants" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Invariants
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#naming-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Naming compatibility
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#store-profiles-and-derived-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Store profiles and derived defaults
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#removed-active-path-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Removed active-path behavior
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Verification
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../streaming/event-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Event contract
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analytics/fabric-analytics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fabric analytics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml-ai/model-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ML and AI contracts
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml-ai/decision-experience/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Decision experience
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml-ai/routing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Application routing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../power-bi/semantic-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Semantic model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/runbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations runbook
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/connected-twins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Connected operational twins
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/access-control/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Access control
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation/site/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Documentation site
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Architecture
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Architecture
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Infrastructure
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../architecture/data-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data flow
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../architecture/data-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data schema
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../architecture/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Security boundaries
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../architecture/agentic-application/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Agentic application
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Security
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Security
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Threat model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../security/controls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Controls
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#authority" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Authority
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#base-silver-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Base Silver output
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Base Silver output">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dimensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Dimensions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#facts" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Facts
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operational-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Operational output
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gold-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Gold output
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generation-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Generation order
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Generation order">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#execution-performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Execution performance
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#retail-behavior-and-calibration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Retail behavior and calibration
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inventory-feedback-and-unfulfilled-demand" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Inventory feedback and unfulfilled demand
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#historicallive-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Historical/live boundary
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#statistical-acceptance" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Statistical acceptance
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#invariants" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Invariants
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#naming-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Naming compatibility
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#store-profiles-and-derived-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Store profiles and derived defaults
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#removed-active-path-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Removed active-path behavior
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Verification
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../../../../.." class="md-path__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../../../../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Design Documentation
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../../../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Specifications
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+    <a href="https://github.com/amattas/retail-demo/edit/main/docs/design/specifications/modules/generation/data-contract.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-file-pen" viewBox="0 0 24 24"><path d="M12.659 22H18a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v9.34"/><path d="M14 2v5a1 1 0 0 0 1 1h5M10.378 12.622a1 1 0 0 1 3 3.003L8.36 20.637a2 2 0 0 1-.854.506l-2.867.837a.5.5 0 0 1-.62-.62l.836-2.869a2 2 0 0 1 .506-.853z"/></svg>
+    </a>
+  
+  
+    
+      
+    
+    <a href="https://github.com/amattas/retail-demo/raw/main/docs/design/specifications/modules/generation/data-contract.md" title="View source of this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-file-code-2" viewBox="0 0 24 24"><path d="M4 12.15V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2h-3.35"/><path d="M14 2v5a1 1 0 0 0 1 1h5M5 16l-3 3 3 3M9 22l3-3-3-3"/></svg>
+    </a>
+  
+
+
+<h1 id="historical-data-contract">Historical data contract<a class="headerlink" href="#historical-data-contract" title="Permanent link">&para;</a></h1>
+<h2 id="authority">Authority<a class="headerlink" href="#authority" title="Permanent link">&para;</a></h2>
+<p><code>utility/src/retail_setup/generation/schemas.py</code> defines the base Lakehouse
+tables, columns, and types. <code>engine.py</code> orchestrates generation,
+<code>invariants.py</code> validates relationships across tables, <code>writer.py</code> publishes
+outputs, and <code>gold.py</code> builds the ten aggregates.</p>
+<h2 id="base-silver-output">Base Silver output<a class="headerlink" href="#base-silver-output" title="Permanent link">&para;</a></h2>
+<h3 id="dimensions">Dimensions<a class="headerlink" href="#dimensions" title="Permanent link">&para;</a></h3>
+<p><code>dim_geographies</code>, <code>dim_stores</code>, <code>dim_distribution_centers</code>, <code>dim_trucks</code>,
+<code>dim_customers</code>, <code>dim_products</code>, and <code>dim_date</code>.</p>
+<h3 id="facts">Facts<a class="headerlink" href="#facts" title="Permanent link">&para;</a></h3>
+<p><code>fact_receipts</code>, <code>fact_receipt_lines</code>, <code>fact_payments</code>, <code>fact_store_ops</code>,
+<code>fact_foot_traffic</code>, <code>fact_ble_pings</code>, <code>fact_customer_zone_changes</code>,
+<code>fact_marketing</code>, <code>fact_marketing_attribution</code>, <code>fact_promotions</code>,
+<code>fact_promo_lines</code>,
+<code>fact_online_order_headers</code>, <code>fact_online_order_lines</code>, <code>fact_reorders</code>,
+<code>fact_truck_moves</code>, <code>fact_truck_inventory</code>, <code>fact_dc_inventory_txn</code>,
+<code>fact_store_inventory_txn</code>, and <code>fact_stockouts</code>.</p>
+<h3 id="operational-output">Operational output<a class="headerlink" href="#operational-output" title="Permanent link">&para;</a></h3>
+<p><code>setup_run_log</code> appends a unique setup-attempt record, table-level completion
+records, and a final completion or failure record. Reusing an existing <code>run_id</code>
+is rejected so retries cannot create ambiguous duplicate history.</p>
+<p>Setup-02 generates and validates dimensions without publishing them. Setup-03
+through setup-09 regenerate the same deterministic dimensions and generate the
+facts as handoff tables. Setup-10 (<code>setup-10-publish-silver</code>) is the single
+Silver publication boundary. <code>write_all</code> stages every candidate under a
+run-scoped <code>&lt;schema&gt;_stage</code> schema, validates schema and row counts, captures
+existing Delta versions, then promotes. An attempted promotion failure restores
+pre-existing targets and drops newly created targets in reverse order.</p>
+<p>Terminal publication states distinguish data recovery from staging cleanup:
+<code>COMPLETED</code>, <code>FAILED</code>, <code>ROLLED_BACK</code>, <code>ROLLBACK_FAILED</code>,
+<code>COMPLETED_CLEANUP_FAILED</code>, and <code>ROLLED_BACK_CLEANUP_FAILED</code>.</p>
+<p><code>COMPLETED_CLEANUP_FAILED</code> means data promotion succeeded: the writer returns
+success with a warning and logs retained staging artifacts. Readiness reports
+cleanup as degradation, not failed historical data. Rollback states still
+represent failed publication attempts even when restoration succeeded.</p>
+<p>Historical Silver replacement is blocked once the configured
+<code>&lt;lakehouse&gt;.&lt;silver_db&gt;._watermarks</code> table exists, even if it has no rows.
+Stop writers and use coordinated Silver/checkpoint recovery before rebuilding
+history; deleting watermarks alone would allow replay to corrupt rebuilt data.
+The writer guard is not a distributed lock, so operators must serialize
+historical and streaming writers.</p>
+<p>The retained historical loader must materialize the exact ordered <code>TABLES</code>
+field names and types, not sampled/inferred Parquet schemas. Synthetic fixture
+data must not silently stand in for a missing or incompatible historical
+source.</p>
+<h2 id="gold-output">Gold output<a class="headerlink" href="#gold-output" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>sales_minute_store</code></li>
+<li><code>top_products_15m</code></li>
+<li><code>inventory_position_current</code></li>
+<li><code>dc_inventory_position_current</code></li>
+<li><code>truck_dwell_daily</code></li>
+<li><code>online_sales_daily</code></li>
+<li><code>zone_dwell_minute</code></li>
+<li><code>marketing_cost_daily</code></li>
+<li><code>campaign_performance_daily</code></li>
+<li><code>tender_mix_daily</code></li>
+</ul>
+<p>ML output tables are not part of this base contract.</p>
+<p>The source-derived live-route check compares this inventory with declared
+event paths. Seven dimensions, <code>fact_promo_lines</code>,
+<code>fact_online_order_lines</code>, <code>fact_truck_inventory</code>,
+<code>fact_dc_inventory_txn</code>, and <code>dc_inventory_position_current</code> are the named
+historical-only boundary. The manifest records those targets and rationale;
+<code>schemas.py</code> continues to own their fields, types, nullability behavior, and
+mixed-case compatibility.</p>
+<h2 id="generation-order">Generation order<a class="headerlink" href="#generation-order" title="Permanent link">&para;</a></h2>
+<p>The engine creates dimensions and date context, then candidate store demand.
+It resolves inventory-constrained fulfillment before publishing sales, returns,
+payments, promotions, attribution, sensors, and stock ledgers. Online orders,
+marketing, store activity, and Gold output retain their related contracts.
+Reusable intermediate data is cached where repeated calculations would
+otherwise recompute it.</p>
+<h3 id="execution-performance">Execution performance<a class="headerlink" href="#execution-performance" title="Permanent link">&para;</a></h3>
+<p>Generation is a dependency graph of stages (<code>STAGES</code> in
+<code>generation/engine.py</code>). Each stage names its inputs, its outputs, and the
+setup notebook that runs it:</p>
+<table>
+<thead>
+<tr>
+<th>Notebook</th>
+<th>Stages</th>
+<th>Waits for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>setup-03-generate-sales</code></td>
+<td>candidate receipts, fulfillment plan</td>
+<td>setup-01</td>
+</tr>
+<tr>
+<td><code>setup-04-generate-online-orders</code></td>
+<td>online orders</td>
+<td>setup-01</td>
+</tr>
+<tr>
+<td><code>setup-05-generate-marketing</code></td>
+<td>background impressions</td>
+<td>setup-01</td>
+</tr>
+<tr>
+<td><code>setup-06-generate-returns-and-promotions</code></td>
+<td>returns, promotions</td>
+<td>setup-03</td>
+</tr>
+<tr>
+<td><code>setup-07-generate-store-activity</code></td>
+<td>store operations, foot traffic, BLE</td>
+<td>setup-03</td>
+</tr>
+<tr>
+<td><code>setup-08-generate-inventory</code></td>
+<td>inventory, logistics, and stockout ledgers</td>
+<td>setup-03</td>
+</tr>
+<tr>
+<td><code>setup-09-attribute-marketing</code></td>
+<td>last-touch attribution</td>
+<td>setup-03 to 06</td>
+</tr>
+<tr>
+<td><code>setup-10-publish-silver</code></td>
+<td>invariants and atomic Silver publication</td>
+<td>setup-02 to 04, 06 to 09</td>
+</tr>
+</tbody>
+</table>
+<p><code>setup-pipeline</code> follows the same dependency graph at notebook level; a test
+checks that the two graphs agree. Independent notebooks run in separate
+Spark sessions. At most six run at once, within the session concurrency that
+capacity sizing reserves for required ML.
+Setup-10 runs its invariant checks and per-table staging, validation, and
+promotion concurrently; every phase still completes for all tables before the
+next starts, and any promotion failure rolls back every table.</p>
+<p>Gold (<code>setup-11-build-gold</code>) runs in <code>ml-required</code> alongside model training.
+It shares a lane with customer segmentation, keeping that pipeline within
+six sessions.
+Inside a notebook, up to six ready stages run concurrently. A stage writes
+its own outputs one after another so related cached plans are never built
+concurrently. Completion order and the notebook split do not change the output;
+a test compares the notebook path with single-session <code>generate_all</code> row for row.</p>
+<p>Stage outputs that a later notebook needs are written as <code>gen__&lt;stage&gt;__&lt;output&gt;</code>
+Delta tables in the Silver staging schema. Each records the generation
+fingerprint (a hash of the generation configuration) in its Delta commit, and
+loading a handoff produced for another configuration fails. Setup-10 promotes
+single-handoff facts directly from their handoffs and drops every handoff only
+after publication succeeds, so a failed publication can be retried without
+regenerating. Within a notebook, other stage frames are checkpointed under
+<code>Files/setup/_checkpoints/&lt;notebook&gt;</code> in the Lakehouse rather than on
+executors. Later steps therefore do not depend on an executor's local data
+surviving autoscaling or executor loss. <code>generate_all</code> (local tests) runs the
+whole graph in one session with the same checkpoints, which stay on the
+executors when no folder is given.</p>
+<p>Generation output never depends on Spark partitioning, so each notebook sizes
+<code>spark.sql.shuffle.partitions</code> to the configured receipt-line volume (about
+one million lines per partition, between 200 and 8,192) and lets adaptive
+execution coalesce small shuffles. Materializing each stage before dependants
+consume it also means later plans start from small leaves instead of
+re-analyzing the full upstream lineage on the driver. The inventory policy
+runs in Python workers through <code>mapInArrow</code>, which moves demand and events in
+Arrow column batches rather than pickling each row. BLE zone selection, ping
+sequencing, and zone changes are per-visit array operations, so the ping
+stream is never shuffled.</p>
+<h3 id="retail-behavior-and-calibration">Retail behavior and calibration<a class="headerlink" href="#retail-behavior-and-calibration" title="Permanent link">&para;</a></h3>
+<p>Historical store demand starts with open-hour visitors. A seeded
+negative-binomial count controls arrival variability; each visitor has a
+purchase decision using store/hour conversion propensity. Footfall uses this
+same visitor grid, not receipts divided by a fixed conversion percentage.
+The existing five zone counts conserve hourly visitors exactly. These are
+allocated sensor counts, not a physical trajectory model.</p>
+<p>Customer selection has persistent, long-tailed visit propensities and
+geography affinity. Continuous customer spending propensity and quick,
+regular, family, and bulk shopping missions shape basket sizes. Most lines
+share the trip's department preference; others permit cross-department
+shopping. Product popularity is persistent, price-sensitive, and uneven.
+Catalog selection excludes products not yet launched.</p>
+<p><code>avg_ticket_target</code> calibrates expected line counts against actual eligible
+catalog prices, category quantities, tax, and expected discounts.
+<code>basket_lambda</code> limits the nominal mean line count; neither setting changes
+catalog prices or forces every ticket to the target. One-line minimums and
+expensive catalogs can make a target unattainable. Report distributions and
+calibration error rather than truncating individual tickets. Consumables and
+durables use different geometric quantity distributions, with single units
+most common and no artificial four-unit maximum.</p>
+<p>Promotion exposure precedes basket-size sampling and raises additional-item
+demand. Discounts still precede tax, and receipt/payment amounts reconcile in
+integer cents. This models coupon-driven basket expansion, not fitted causal
+price elasticity or a market-basket model learned from real transactions.</p>
+<p>The shared draw implementation uses Box-Muller normal draws and an exact
+integer-shape negative-binomial distribution (sum of geometric draws).
+All decisions retain stable key/seed salts, independent of Spark partitioning.
+The changed simulation intentionally produces different data from older code
+with the same seed; reproducibility requires the same code, dictionaries,
+configuration, and date window.</p>
+<h3 id="inventory-feedback-and-unfulfilled-demand">Inventory feedback and unfulfilled demand<a class="headerlink" href="#inventory-feedback-and-unfulfilled-demand" title="Permanent link">&para;</a></h3>
+<p>The replenishment policy covers every selling store/SKU. It learns from past
+attempted demand, considers on-hand and pending deliveries/accepted restocks,
+and orders case-pack quantities against coverage and safety-stock targets.
+Opening stock is seeded independently of future transactions. Deterministic
+delivery delays allow depletion and recovery rather than permanent negative
+balances or a blanket zero floor.</p>
+<p>A candidate line is fulfilled in full only when its stock is available.
+Rejected lines are omitted from realized receipts; empty receipts disappear.
+Receipt totals, discounts, tax, payments, and refunds are reconciled against
+fulfilled lines. The return plan preserves sampled dates and identities while
+only actual fulfilled/refunded units can be restocked. Dependent promotions
+and attribution consume realized sales, not attempted demand.</p>
+<p><code>fact_store_inventory_txn</code> appends two <code>long</code> audit columns after the existing
+schema: <code>requested_quantity</code> and <code>unfulfilled_quantity</code>. <code>LOST_SALE</code> rows
+record rejected demand with zero physical <code>quantity</code>; they must not decrement
+stock. Store/DC/truck transfers share the fulfillment plan, and inventory
+positions exclude deliveries outside the requested history. Physical-stock
+invariants verify nonnegative balances, running-sum conservation, opening
+stock, receipt/refund mirrors, demand accounting, and transfer conservation.</p>
+<p>Streaming replay preserves historical demand-audit fields. Older ledgers
+without these columns derive fulfilled requested quantities from negative
+<code>SALE</code> movements and use zero unfulfilled demand, because the older producer
+did not record lost sales. This is read-side compatibility only: writes still
+require the declared target schema. Regenerate historical setup or explicitly
+migrate the target before resuming streaming against an older table.
+Live deltas have zero unfulfilled demand; this is
+not evidence of measured lost demand in the live scenario generator.</p>
+<p>The current baseline assumes unlimited just-in-time supply at the DC and
+SKU-specific shipments. It does not optimize fleet routing or simulate
+supplier capacity constraints. Historical online orders retain their separate
+synthetic fulfillment model; do not interpret its statuses as reservations
+against the store policy.</p>
+<h3 id="historicallive-boundary">Historical/live boundary<a class="headerlink" href="#historicallive-boundary" title="Permanent link">&para;</a></h3>
+<p>The stream notebook embeds the shared basket/catalog/quantity code at build
+time. It emits a variable-length receipt-line array with matching item counts,
+promotion products, line discounts, tax, header totals, and payments. Online
+live headers retain their existing no-discount contract. Missing store tax or
+an empty/missing eligible catalog is an error, not a synthetic <code>$9.99</code> price.</p>
+<p>Live catalog launch eligibility is snapshotted when the stream starts; restart
+the stream to pick up newly launched products or changed catalog/profile data.
+The rate source remains an operator-controlled demonstration pace, not the
+historical visitor-arrival process. Live event scenarios and historical online
+fulfillment retain their explicitly synthetic scheduling assumptions; shared
+basket behavior does not imply a persistent live supply-chain simulator.</p>
+<h3 id="statistical-acceptance">Statistical acceptance<a class="headerlink" href="#statistical-acceptance" title="Permanent link">&para;</a></h3>
+<p>Use multiple seeds and short and multi-year windows. Check ticket and basket
+percentiles, customer purchase-frequency dispersion, SKU concentration,
+conversion variability, stockout duration/recovery, inventory conservation,
+and historical/live basket distributions. Keep legitimate price points,
+integer quantities, business constraints, and calibrated model-score plateaus;
+do not add jitter to hide them. Local synthetic calibration targets are demo
+assumptions, not claims about measured industry distributions.</p>
+<h2 id="invariants">Invariants<a class="headerlink" href="#invariants" title="Permanent link">&para;</a></h2>
+<p>Current invariant checks include:</p>
+<ul>
+<li>key uniqueness and required foreign keys;</li>
+<li>non-null event dates;</li>
+<li>online-order header/line integrity;</li>
+<li>pricing, tax, and promotion consistency;</li>
+<li>seven-day last-touch uniqueness and impression/purchase linkage;</li>
+<li>attributed revenue, discount, tax, total, and payment reconciliation;</li>
+<li>stockout location exclusivity;</li>
+<li>physical stock, transfer conservation, and explicit unfulfilled-demand accounting;</li>
+<li>truck timing and inventory relationships;</li>
+<li>sales only within each store's operating hours;</li>
+<li>no receipt line sold before its product's launch date;</li>
+<li>returns posted strictly after the originating sale (never same-day);</li>
+<li>product lifecycle dates present (no degenerate lifecycles).</li>
+</ul>
+<p><code>utility/src/retail_setup/generation/invariants.py</code> enforces the shared
+live/batch invariants: operating hours, product launch eligibility, return
+timing, lifecycle presence, and validated profile controls.</p>
+<h2 id="naming-compatibility">Naming compatibility<a class="headerlink" href="#naming-compatibility" title="Permanent link">&para;</a></h2>
+<p>New columns use <code>snake_case</code>, but current TMDL compatibility requires explicit
+legacy exceptions such as <code>ID</code>, <code>StoreNumber</code>, <code>CustomerId</code>, <code>StoreID</code>,
+<code>ReceiptId</code>, <code>Source</code>, <code>Subtotal</code>, and <code>__index_level_0__</code>. These exceptions are
+documented in <code>schemas.py</code> and must not be silently normalized in a transform.</p>
+<h2 id="store-profiles-and-derived-defaults">Store profiles and derived defaults<a class="headerlink" href="#store-profiles-and-derived-defaults" title="Permanent link">&para;</a></h2>
+<p>Supported profiles are <code>supercenter</code>, <code>grocery</code>, <code>hardware</code>, and <code>luxury</code>.
+Current derived defaults include:</p>
+<ul>
+<li><code>silver_db = ag</code></li>
+<li><code>gold_db = au</code></li>
+<li><code>dc_count = max(1, store_count // 10)</code></li>
+<li><code>customer_count = max(store_count * 1000, 5000)</code></li>
+<li><code>online_orders_per_day = store_count * 8</code></li>
+<li><code>transactions_per_store_day = 400</code></li>
+<li><code>return_rate = 0.01</code></li>
+<li><code>brands_per_product = 3</code></li>
+<li><code>truck_capacity = 15000</code></li>
+</ul>
+<p>In-store customer assignment reserves a deterministic 10% cohort whose
+purchases stop at seeded, staggered dates inside the generation window.
+Post-cutoff receipts are reassigned to active customers. This preserves
+pre-churn behavior while guaranteeing forward-looking churn labels across
+chronological ML splits.</p>
+<h2 id="removed-active-path-behavior">Removed active-path behavior<a class="headerlink" href="#removed-active-path-behavior" title="Permanent link">&para;</a></h2>
+<p>Local FastAPI control, DuckDB persistence, parquet export, Blob upload, Event
+Hubs, outbox, dead-letter queue (DLQ), and Prometheus services are not part of
+the supported Fabric-native contract.</p>
+<h2 id="verification">Verification<a class="headerlink" href="#verification" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>utility/tests/generation/test_schema_contract.py</code></li>
+<li><code>utility/tests/generation/test_engine.py</code></li>
+<li><code>utility/tests/generation/test_gold.py</code></li>
+<li>module-specific generation tests</li>
+<li><code>utility/tests/test_notebook_build.py</code></li>
+<li><code>utility/tests/contracts/test_live_data_contract.py</code></li>
+<li><code>python scripts/check_data_contracts.py</code></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../../deployment/framework/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Deployment framework">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Deployment framework
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../streaming/event-contract/" class="md-footer__link md-footer__link--next" aria-label="Next: Event contract">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Event contract
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 Retail Demo contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../../../..","features":["content.action.edit","content.action.view","content.code.copy","content.tooltips","navigation.footer","navigation.indexes","navigation.instant","navigation.path","navigation.top","navigation.tracking","search.highlight"],"search":"../../../../../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"default":"latest","provider":"mike"}}</script>
+    
+    
+      <script src="../../../../../assets/javascripts/bundle.6970bfe9.min.js"></script>
+      
+    
+  </body>
+</html>
