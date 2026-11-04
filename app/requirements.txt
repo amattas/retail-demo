@@ -1,4 +1,4 @@
-fastapi>=0.111
-uvicorn[standard]>=0.30
-requests>=2.31
-azure-identity>=1.16
+fastapi>=0.162.0
+uvicorn[standard]>=0.54.0
+requests>=2.34.2
+azure-identity>=1.26.0
