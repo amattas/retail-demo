@@ -277,11 +277,17 @@ def publish(
     if len(models) != 1:
         raise NativeItemError("Expected exactly one deployed retail semantic model.")
     plan_definition = None
+    model_binding_warning = None
     if not operations_only:
         from deploy.scripts._plan_definition import render_plan_definition
 
         validate_plan_connection(session, connection_id)
-        validate_model_connections(session, workspace_id, models[0]["id"])
+        try:
+            validate_model_connections(session, workspace_id, models[0]["id"])
+        except NativeItemError as exc:
+            # SSO keeps the twins report working; Plan visuals may need fixed credentials.
+            model_binding_warning = str(exc)
+            console.warn(f"{exc} Publishing the Plan anyway; verify its visuals load.")
         plan_definition = render_plan_definition(
             workspace_id=workspace_id,
             workspace_name=config.workspace.name,
@@ -434,6 +440,8 @@ def publish(
             "connection_id": connection_id,
             "state": "DEFINITION_PUBLISHED",
         }
+        if model_binding_warning:
+            report["plan"]["model_binding_warning"] = model_binding_warning
         write_report_atomic(report_path, report)
     return report
 
