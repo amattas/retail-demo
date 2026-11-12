@@ -305,7 +305,7 @@ class SetupApp(App[int]):
     def compose(self) -> ComposeResult:
         self._header = Static(id="header")
         self._task_list = TaskList(self.state, id="tasks")
-        self._log = RichLog(
+        self._output = RichLog(
             id="log",
             wrap=True,
             min_width=20,
@@ -319,7 +319,7 @@ class SetupApp(App[int]):
         yield self._header
         with Horizontal(id="body"):
             yield self._task_list
-            yield self._log
+            yield self._output
         with Horizontal(id="footer"):
             yield self._progress
             yield self._keys
@@ -348,12 +348,17 @@ class SetupApp(App[int]):
 
         self._pending = (done, box)
         try:
-            self.call_from_thread(lambda: self.push_screen(make_screen(), dismissed))
+            self.call_from_thread(self._push_blocking, make_screen, dismissed)
         except RuntimeError:
             return None
         done.wait()
         self._pending = None
         return box.get("value")
+
+    def _push_blocking(
+        self, make_screen: Callable[[], Screen[Any]], dismissed: Callable[[Any], None]
+    ) -> None:
+        self.push_screen(make_screen(), dismissed)
 
     # Called from the runner thread once the packages the page needs exist.
     def _choose_target_blocking(self) -> TargetChoice | None:
@@ -407,7 +412,7 @@ class SetupApp(App[int]):
         selected = self._selected_task(rows)
         filter_key = selected.key if self.filter_selected and selected else None
 
-        log = self._log
+        log = self._output
         fresh = self.state.drain_pending_log()
         if filter_key != self._shown_filter:
             log.clear()

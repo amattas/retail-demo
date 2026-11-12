@@ -3452,7 +3452,7 @@ def deploy(
     if dry_run:
         # Under the setup interface, publish the plan as pending tasks so the
         # Deploy phase lists every step before it runs.
-        preview = []
+        preview: list[dict[str, object]] = []
         if not skip_login and tenant_id:
             preview.append({"id": "sign-in", "label": "Sign in to the configured Azure tenant"})
         preview += [
