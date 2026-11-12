@@ -21,6 +21,7 @@ deploy = [
     "fabric-cicd==1.3.0",
     "mssql-python>=1.12,<2; sys_platform != 'darwin'",
     "pyodbc>=5.1,<6",
+    "textual>=3.0",
 ]
 spark = [
     "numpy>=1.26",

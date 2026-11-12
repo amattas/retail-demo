@@ -37,12 +37,17 @@ Change the owning input (`requirements-*.in`, `utility/pyproject.toml`, or
 `deploy/terraform/providers.tf`) before regenerating its reviewed lock:
 
 ```powershell
-python -m pip install uv==0.11.29
-python -m uv pip compile requirements-docs.in --universal --generate-hashes --output-file requirements-docs.txt
-python -m uv pip compile requirements-test.in --universal --generate-hashes --output-file requirements-test.txt
-python -m uv pip compile utility/pyproject.toml --extra deploy --universal --generate-hashes --output-file utility/requirements-deploy.txt
-python -m uv pip compile utility/pyproject.toml --extra dev --extra deploy --universal --generate-hashes --output-file utility/requirements-ci.txt
+python scripts/compile_locks.py
 ```
+
+The script regenerates `requirements-docs.txt`, `requirements-test.txt`,
+`utility/requirements-deploy.txt`, and `utility/requirements-ci.txt`. To
+regenerate only some of them, pass their paths. If `uv` is missing, the script
+installs `uv==0.11.29` with pip. It passes the package index configured for pip
+to uv, including corporate feed proxies set in `pip.ini`/`pip.conf` or
+`PIP_INDEX_URL`. It then removes any non-SHA-256 hashes that a proxy publishes,
+so the locks stay SHA-256-only. Each lock header still records the plain
+`uv pip compile` command.
 
 After changing the Fabric provider version, regenerate all supported platform
 checksums:
