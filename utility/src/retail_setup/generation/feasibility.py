@@ -58,6 +58,8 @@ def assess(cfg: GenerationConfig, *, ml_required: bool, profile_name: str) -> li
     """Return errors (block deployment) and warnings (allowed, with a caution)."""
 
     findings: list[Finding] = []
+    # GenerationConfig's validators always resolve both dates.
+    assert cfg.start_date is not None and cfg.end_date is not None
     days = (cfg.end_date - cfg.start_date).days + 1
     receipts = cfg.store_count * days * cfg.transactions_per_store_day
     expectations = catalog_expectations(cfg)

@@ -99,8 +99,10 @@ def format_log_entry(entry: LogEntry, *, show_task: bool) -> RenderableType:
     return grid
 
 
-class TaskList(Widget, can_focus=True):
+class TaskList(Widget):
     """Installation pipeline: phases with their nested deploy steps."""
+
+    can_focus = True
 
     def __init__(self, state: SetupState, **kwargs: object) -> None:
         super().__init__(**kwargs)  # type: ignore[arg-type]

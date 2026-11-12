@@ -240,8 +240,7 @@ class SetupRunner:
         if code == _PIPELINE_MONITOR_DETACHED_EXIT_CODE:
             self.log(
                 "deploy",
-                "Fabric pipeline work is still running. Reattach later with: "
-                f"{later} --resume",
+                f"Fabric pipeline work is still running. Reattach later with: {later} --resume",
             )
         elif code and not self.cancelled:
             self.log("deploy", f"Resume after fixing the cause with: {later} --resume")
@@ -312,9 +311,7 @@ class SetupRunner:
             self.log(key, f"Failed with exit code {code}.")
         return code
 
-    def _run(
-        self, key: str, command: list[str], *, capture: list[str] | None = None
-    ) -> int:
+    def _run(self, key: str, command: list[str], *, capture: list[str] | None = None) -> int:
         """Run one command; with `capture`, keep plain output out of the log."""
         environment = {
             **os.environ,
@@ -325,11 +322,11 @@ class SetupRunner:
             # waiting for an answer the operator never sees.
             "TF_INPUT": "0",
         }
-        isolation: dict[str, Any] = (
-            {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
-            if os.name == "nt"
-            else {"start_new_session": True}
-        )
+        isolation: dict[str, Any]
+        if sys.platform == "win32":
+            isolation = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+        else:
+            isolation = {"start_new_session": True}
         try:
             process = subprocess.Popen(
                 command,
@@ -451,14 +448,14 @@ def _redacted(command: list[str]) -> list[str]:
 
 
 def _terminate_tree(process: subprocess.Popen[str]) -> None:
-    if os.name == "nt":
+    if sys.platform == "win32":
         subprocess.run(
             ["taskkill", "/T", "/F", "/PID", str(process.pid)],
             capture_output=True,
             check=False,
         )
-        return
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except (ProcessLookupError, PermissionError):
-        process.terminate()
+    else:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except (ProcessLookupError, PermissionError):
+            process.terminate()

@@ -132,9 +132,7 @@ class ConfigScreen(Screen[TargetChoice | None]):
                         )
                 with Vertical(classes="cfg-section", id="sec-profile") as section:
                     section.border_title = "Deployment"
-                    options = [
-                        (f"{p.name} ({name})", name) for name, p in self.profiles.items()
-                    ]
+                    options = [(f"{p.name} ({name})", name) for name, p in self.profiles.items()]
                     yield from self._row(
                         "profile",
                         "Profile",

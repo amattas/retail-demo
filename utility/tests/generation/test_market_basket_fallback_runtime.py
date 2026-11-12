@@ -25,7 +25,9 @@ def _cooccurrence_rules():
         if isinstance(node, ast.FunctionDef) and node.name == "cooccurrence_rules"
     )
     namespace = {"F": F}
-    exec(compile(ast.Module(body=[function], type_ignores=[]), str(NOTEBOOK_PATH), "exec"), namespace)
+    exec(
+        compile(ast.Module(body=[function], type_ignores=[]), str(NOTEBOOK_PATH), "exec"), namespace
+    )
     return namespace["cooccurrence_rules"]
 
 
@@ -44,10 +46,7 @@ def test_small_baskets_still_yield_valid_recommendation_rules(spark):
 
     rules = _cooccurrence_rules()(baskets, 5, 2)
 
-    rows = {
-        (row.antecedent[0], row.consequent[0]): row
-        for row in rules.collect()
-    }
+    rows = {(row.antecedent[0], row.consequent[0]): row for row in rules.collect()}
     # Only the pair bought together twice qualifies, in both directions.
     assert set(rows) == {(1, 2), (2, 1)}
     rule = rows[(1, 2)]

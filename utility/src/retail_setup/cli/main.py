@@ -704,7 +704,8 @@ def configure_defaults(repo_root: Path, workspace_name: str) -> ConfigureDefault
         lakehouse_name=text("lakehouse.name"),
         eventhouse_name=text("eventhouse.name"),
         kql_database_name=text("eventhouse.kql_database_name"),
-        profile=text("deployment.profile") or _default_deployment_profile(repo_root).deployment_name,
+        profile=text("deployment.profile")
+        or _default_deployment_profile(repo_root).deployment_name,
         store_type=str(generation.get("store_type", fields["store_type"].default)),
         saved_months=int(generation["months"]) if "months" in generation else None,
         store_count=int(generation.get("store_count", fields["store_count"].default)),
@@ -903,8 +904,10 @@ def configure(
         for warning in warnings:
             typer.echo(f"Warning: {warning}")
         estimate += [f"Warning: {warning}" for warning in warnings]
-        if not interactive or yes or interaction.confirm(
-            "Use these settings?", default=True, detail="\n".join(estimate)
+        if (
+            not interactive
+            or yes
+            or interaction.confirm("Use these settings?", default=True, detail="\n".join(estimate))
         ):
             break
         # Re-enter every generation value on the next loop iteration.
@@ -3451,9 +3454,7 @@ def deploy(
         # Deploy phase lists every step before it runs.
         preview = []
         if not skip_login and tenant_id:
-            preview.append(
-                {"id": "sign-in", "label": "Sign in to the configured Azure tenant"}
-            )
+            preview.append({"id": "sign-in", "label": "Sign in to the configured Azure tenant"})
         preview += [
             {"id": step.step_id, "label": step.description, "required": step.required}
             for step in plan

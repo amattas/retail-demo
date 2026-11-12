@@ -152,7 +152,9 @@ class SetupState:
         """
 
         with self.lock:
-            listed = {self.child_key(parent, task_id): index for index, task_id in enumerate(task_ids)}
+            listed = {
+                self.child_key(parent, task_id): index for index, task_id in enumerate(task_ids)
+            }
             kept = 0
             for child in self.children(parent):
                 if child.key in listed:
