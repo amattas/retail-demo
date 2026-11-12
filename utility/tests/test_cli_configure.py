@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 import yaml
 from typer.testing import CliRunner
 
@@ -382,6 +383,57 @@ def test_configure_rejects_short_history_for_reporting_profile(tmp_path):
     assert result.exit_code == 1
     assert "requires at least 540 days of history" in result.output
     assert not (tmp_path / "utility/config/environments/my-ws.yaml").exists()
+
+
+@pytest.mark.parametrize(("profile", "accepted"), [("standard", False), ("core", True)])
+def test_configure_rejects_single_item_store_type_only_for_required_ml(
+    tmp_path, monkeypatch, profile, accepted
+):
+    _seed_deploy_config(tmp_path)
+    # A store type whose ticket target is below one item's cost.
+    from retail_setup.generation.estimate import CatalogExpectations
+
+    monkeypatch.setattr(
+        "retail_setup.generation.feasibility.catalog_expectations",
+        lambda _cfg: CatalogExpectations(basket_mean=0.8, top_sku_unit_share=0.01),
+    )
+    result = runner.invoke(
+        app,
+        [
+            "configure",
+            "--repo-root",
+            str(tmp_path),
+            "--tenant-id",
+            "11111111-1111-1111-1111-111111111111",
+            "--workspace-name",
+            "my-ws",
+            "--capacity-name",
+            "F64",
+            "--lakehouse-name",
+            "my_lh",
+            "--eventhouse-name",
+            "my_eh",
+            "--kql-database-name",
+            "my_eh",
+            "--profile",
+            profile,
+            "--store-type",
+            "luxury",
+            "--months",
+            "18",
+            "--store-count",
+            "3",
+            "--seed",
+            "67",
+        ],
+    )
+
+    if accepted:
+        assert result.exit_code == 0, result.output
+    else:
+        assert result.exit_code == 1
+        assert "'luxury' generates single-item baskets" in result.output
+        assert not (tmp_path / "utility/config/environments/my-ws.yaml").exists()
 
 
 def test_configure_rejects_legacy_custom_pool_override(tmp_path):

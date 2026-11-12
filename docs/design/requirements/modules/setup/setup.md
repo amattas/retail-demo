@@ -19,7 +19,11 @@ explicit Git reference.
 
 ### REQ-SETUP-004 - Observable execution
 
-Guided setup and deploy output shall be linear and copyable. It shall separate
-each step and command and report failures explicitly.
+Guided setup and deploy shall show each step, its status, and its output,
+and shall report failures explicitly. The interactive setup interface shall
+show the step list and live output side by side. It shall ask questions in a
+dialog box and write the complete output to a setup log. Plain output
+(`--plain` or a non-interactive terminal) and the setup log shall be linear
+and copyable, with each step and command separated.
 
 See [the CLI specification](../../../specifications/modules/setup/cli.md).

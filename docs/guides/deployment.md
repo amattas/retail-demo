@@ -446,8 +446,10 @@ sign in to the configured tenant before deploying (`az login --tenant`, or
 `Connect-AzAccount` for `auth.mode: azure_powershell`). If the Windows account
 broker fails to store keys, sign-in is retried once in the browser. Pass
 `--skip-login` to reuse your current sign-in. Non-interactive runs, such as
-CI, don't sign in; they only check that the active tenant matches. To sign in
-manually:
+CI, don't sign in; they only check that the active tenant matches. In the
+full-screen setup interface, the deploy phase signs in. The browser opens as
+usual, and the step list shows **Sign in to the configured Azure tenant**.
+To sign in manually:
 
 ```powershell
 az login --tenant 00000000-0000-0000-0000-000000000000
@@ -722,6 +724,7 @@ Deployment writes or refreshes:
 | `deploy/.generated/<env>/terraform-output.json` | Captured live Fabric item identifiers | Ignored |
 | `deploy/.generated/<env>/database.kql` | Combined ordered KQL script | Ignored |
 | `deploy/.generated/<env>/workspace/` | Staged Fabric item folders, including post-ontology | Ignored |
+| `deploy/.generated/<env>/setup-<timestamp>.log` | Full output of a guided setup interface run | Ignored |
 
 Terraform operations for different environments use different backend and data
 paths. Generation configuration, rendered notebooks, and staged publication
@@ -1048,6 +1051,12 @@ state and output evidence must survive cleanup.
 
 | Symptom | Action |
 | --- | --- |
+| Setup interface doesn't open | Setup falls back to line-by-line output when the terminal isn't interactive, with `--plain` or `--dry-run`, or when Textual can't be installed from the locked package set. Check that pip can reach your package index (pip's configured index, such as a corporate feed proxy, is used automatically). |
+| Need the full output from the setup interface | Open `deploy/.generated/<env>/setup-<timestamp>.log`; the path is shown below the live-output pane. |
+| A step failed in the setup interface | Select the step with `↑`/`↓` to read its output, fix the cause, then run `retail-setup deploy --env <env> --resume` or rerun setup. |
+| Render says dictionaries have local changes that aren't pushed | Setup notebooks download dictionaries from GitHub at a pinned commit. Commit and push dictionary changes to any branch, or pass `--ref` with a pushed commit. |
+| Configure rejects a store type as single-item baskets | The store type's `avg_ticket_target` is below the cost of one item, so required market-basket ML can't be produced. Choose another store type, the `core` profile, or raise the target in its `profile.json`. |
+| A Fabric API call times out | Item creates wait up to 120 seconds and, after a timeout, adopt an item Fabric created anyway instead of creating it twice. Check the Fabric service status during an outage, then rerun the failed step. |
 | Azure CLI tenant mismatch | Rerun `retail-setup deploy` interactively without `--skip-login`, or run `az login --tenant <configured-tenant>` and confirm `az account show`. |
 | Azure PowerShell Terraform boundary | Use validated `--skip-terraform` outputs, switch to Azure CLI, or configure exactly one provider-supported service-principal, OIDC, or managed-identity credential. |
 | Capacity not found or inactive | Confirm the capacity display name, state, tenant, and operator access. |

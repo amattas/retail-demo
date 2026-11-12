@@ -1145,6 +1145,59 @@ def test_deletion_wait_dry_run_shows_step_but_makes_no_request(monkeypatch, tmp_
     assert called == []
 
 
+def test_recreate_destroys_the_managed_workspace_with_its_items(monkeypatch, tmp_path):
+    calls = []
+    state = [
+        "data.fabric_capacity.main[0]",
+        "fabric_eventhouse.main[0]",
+        "fabric_lakehouse.main",
+        "fabric_workspace.main[0]",
+        'fabric_workspace_role_assignment.main["User-x-Admin"]',
+    ]
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        stdout = "\n".join(state) if command[2:4] == ["state", "list"] else ""
+        return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    cli._recreate_destroy(tmp_path, "dev")
+
+    assert calls[1][2:4] == ["state", "rm"]
+    assert sorted(calls[1][4:]) == sorted(
+        [state[1], state[2], state[4]]
+    )  # workspace and data sources stay; Fabric deletes items with the workspace
+    assert calls[2][2] == "destroy" and "-input=false" in calls[2]
+
+
+def test_recreate_destroy_keeps_items_when_workspace_is_not_managed(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        listing = "data.fabric_workspace.existing[0]\nfabric_lakehouse.main"
+        stdout = listing if "list" in command else ""
+        return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    cli._recreate_destroy(tmp_path, "dev")
+
+    assert [command[2] for command in calls] == ["state", "destroy"]
+
+
+def test_recreate_destroy_failure_fails_the_step(monkeypatch, tmp_path):
+    def fake_run(command, **kwargs):
+        code = 1 if "destroy" in command else 0
+        return subprocess.CompletedProcess(command, code, stdout="", stderr="")
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    with pytest.raises(RuntimeError, match="terraform destroy failed"):
+        cli._recreate_destroy(tmp_path, "dev")
+
+
 def test_terraform_steps_auto_approve_to_avoid_double_prompt():
     plan = _deploy_plan("dev", skip_terraform=False, recreate=True)
     tf = [s for s in plan if s.cmd and s.cmd[0] == "terraform"]
