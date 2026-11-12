@@ -87,7 +87,17 @@ explicit `--recreate` workflow, including its destroy confirmation.
 | `--yes` | Pre-confirms gated Terraform steps and existing-workspace handling; it never skips required pipeline gates. |
 | `--skip-terraform` | Omits Terraform only after captured outputs match the selected environment, workspace, resource names, and non-placeholder IDs. |
 | `--resume` | Reuses a compatible incomplete journal's contiguous `SUCCEEDED` prefix, then retries from the first other state. |
-| `--recreate` | Runs destroy, polls Fabric until the workspace name is absent (bounded at 180 seconds), then applies and publishes. |
+| `--recreate` | Deletes the Terraform-managed workspace (Fabric deletes its items with it), polls Fabric until the workspace name is absent (bounded at 180 seconds), then applies and publishes. |
+
+The recreate destroy first removes the Lakehouse, Eventhouse, Spark pool,
+Spark settings, and role assignments from Terraform state, and then destroys
+only `fabric_workspace.main`. Destroying those items one by one fails once
+other items depend on them. For example, Fabric refuses to delete an
+Eventhouse referenced by the ontology, Operations Agent, querysets, or
+shortcuts. Deleting the workspace removes everything at once. When the
+workspace is reused through `existing_workspace_id`, Terraform doesn't own it,
+so the managed items are destroyed individually as before. Terraform runs with
+`-input=false`.
 
 `--recreate` and `--skip-terraform` are mutually exclusive. A normal
 interactive run detects an existing workspace by display name and offers
@@ -319,7 +329,13 @@ closed if any required Reporting table is unavailable.
 `deploy/scripts/workspace_folders.py` owns the shared object-type policy.
 Staging uses that policy, and the final deploy step reconciles native and
 Terraform-created items against the live folder inventory. Standalone
-publishers also reconcile after success. Moves preserve item IDs and
+publishers also reconcile after success. Those publishers run in parallel, so
+each reconciliation holds the per-environment
+`deploy/.generated/<env>/.workspace-folders.lock` file lock. Two publishers
+therefore never create the same folder or move the same item at once. If
+creating a folder still returns `409 Conflict` (for example, a folder created
+in the portal meanwhile), the folder list is reread and the existing top-level
+folder is used. Moves preserve item IDs and
 task-flow bindings; they do not run notebooks or change data. Only empty
 retired `Setup`, `Streaming`, `Reporting`, and `ML` folders are removed.
 
