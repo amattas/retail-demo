@@ -168,7 +168,10 @@ Catalog selection excludes products not yet launched.
 catalog prices, category quantities, tax, and expected discounts.
 `basket_lambda` limits the nominal mean line count; neither setting changes
 catalog prices or forces every ticket to the target. One-line minimums and
-expensive catalogs can make a target unattainable. Report distributions and
+expensive catalogs can make a target unattainable. A target below the cost of
+one line produces only single-item receipts, so each store type's target must
+allow multi-item baskets: required market-basket recommendations depend on
+them. Report distributions and
 calibration error rather than truncating individual tickets. Consumables and
 durables use different geometric quantity distributions, with single units
 most common and no artificial four-unit maximum.

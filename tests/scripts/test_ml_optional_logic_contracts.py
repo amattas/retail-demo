@@ -81,6 +81,15 @@ def test_market_basket_uses_union_frequency_and_replaces_empty_outputs() -> None
     assert "Skipping: no rules to create recommendations" not in source
 
 
+def test_market_basket_falls_back_to_observed_pairs_when_thresholds_yield_no_rules() -> None:
+    source = _source("market_basket")
+
+    assert 'MIN_PAIR_BASKETS = int(get_env("MIN_PAIR_BASKETS", default="2"))' in source
+    assert "fallback_rules = cooccurrence_rules(baskets, total_baskets, MIN_PAIR_BASKETS)" in source
+    assert 'RULE_SOURCE = "cooccurrence"' in source
+    assert '"rule_source": RULE_SOURCE,' in source
+
+
 def test_promotion_logic_uses_exact_grain_calendar_and_correct_ols_se() -> None:
     source = _source("promotion")
     episode_key_cols = _literal_assignment(source, "episode_key_cols")
