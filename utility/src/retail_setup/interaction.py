@@ -127,24 +127,24 @@ def choose(
 
     if default not in options:
         raise ValueError(f"default {default!r} is not one of {options!r}")
+    lowered = {option.lower(): option for option in options}
     if not events_enabled():
-        import click
         import typer
 
         if detail:
             typer.echo(detail)
-        answer = typer.prompt(
-            message,
-            default=default,
-            show_default=True,
-            type=click.Choice(options, case_sensitive=False),
-        )
+        while True:
+            answer = typer.prompt(
+                f"{message} [{'/'.join(options)}]", default=default, show_default=True
+            )
+            if str(answer).strip().lower() in lowered:
+                break
+            typer.echo(f"Choose one of: {', '.join(options)}")
     else:
         extra: dict[str, Any] = {"options": options}
         if title:
             extra["title"] = title
         answer = _ask("choice", message, default=default, detail=detail, **extra)
-    lowered = {option.lower(): option for option in options}
     return lowered.get(str(answer).strip().lower(), default)
 
 

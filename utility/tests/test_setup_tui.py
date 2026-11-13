@@ -115,6 +115,15 @@ def test_child_prompt_round_trips_through_the_operator_answer(tmp_path):
     assert "pick Skip" in output
 
 
+def test_plain_choice_reasks_until_the_answer_is_an_option(monkeypatch):
+    monkeypatch.delenv("RETAIL_SETUP_EVENTS", raising=False)
+    answers = iter(["later", "sKiP"])
+    monkeypatch.setattr("typer.prompt", lambda *_args, **_kwargs: next(answers))
+
+    assert interaction.choose("Next?", ["Retry", "Skip"], default="Retry") == "Skip"
+    assert next(answers, None) is None
+
+
 def test_cancelled_prompt_stops_the_child_and_setup(tmp_path):
     runner = _runner(tmp_path, ask=lambda _request: None)
     script = "from retail_setup import interaction\ninteraction.confirm('Go?')\n"
