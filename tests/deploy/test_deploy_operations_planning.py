@@ -190,6 +190,71 @@ def test_operations_only_persists_stopped_items_without_plan_or_action_execution
     session.post.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    "model_error",
+    [None, deploy.NativeItemError("The Direct Lake model uses Automatic/SSO.")],
+)
+def test_plan_publication_persists_nonblocking_model_binding_warning(
+    publication, monkeypatch, tmp_path, capsys, model_error,
+):
+    session, publish_item = publication
+    monkeypatch.setattr(deploy, "validate_plan_connection", Mock())
+    monkeypatch.setattr(
+        deploy, "validate_model_connections", Mock(side_effect=model_error),
+    )
+    monkeypatch.setattr(deploy, "validate_planning_measures", Mock())
+
+    result = deploy.publish(
+        repo_root=tmp_path,
+        config=config(plan_connection_id=ID, plan_billing_acknowledged=True),
+        outputs={"workspace_id": ID, "lakehouse_id": ID, "kql_database_id": ID},
+    )
+
+    assert [call.kwargs["item_type"] for call in publish_item.call_args_list] == [
+        "Notebook", "OperationsAgent", "Plan",
+    ]
+    assert result["plan"]["state"] == "DEFINITION_PUBLISHED"
+    warning = capsys.readouterr().err
+    if model_error is not None:
+        assert result["plan"]["model_binding_warning"] == str(model_error)
+        assert str(model_error) in warning
+    else:
+        assert "model_binding_warning" not in result["plan"]
+        assert warning == ""
+    persisted = (
+        tmp_path / "deploy" / ".generated" / "dev" / "operations-planning-report.json"
+    )
+    assert json.loads(persisted.read_text()) == result
+    session.post.assert_not_called()
+    session.patch.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "validator,error",
+    [
+        ("validate_plan_connection", deploy.NativeItemError("Unsupported Plan connection")),
+        ("validate_model_connections", deploy.RequestException("Connection inspection failed")),
+    ],
+)
+def test_plan_connection_and_binding_api_errors_still_block_publication(
+    publication, monkeypatch, tmp_path, validator, error,
+):
+    _session, publish_item = publication
+    monkeypatch.setattr(deploy, "validate_plan_connection", Mock())
+    monkeypatch.setattr(deploy, "validate_model_connections", Mock())
+    monkeypatch.setattr(deploy, validator, Mock(side_effect=error))
+
+    with pytest.raises(type(error)):
+        deploy.publish(
+            repo_root=tmp_path,
+            config=config(plan_connection_id=ID, plan_billing_acknowledged=True),
+            outputs={"workspace_id": ID, "lakehouse_id": ID, "kql_database_id": ID},
+        )
+
+    publish_item.assert_not_called()
+    deploy.execute_database_script.assert_not_called()
+
+
 def test_invalid_source_retains_supporting_assets_without_seeding_or_agent_creation(
     publication, monkeypatch, tmp_path
 ):

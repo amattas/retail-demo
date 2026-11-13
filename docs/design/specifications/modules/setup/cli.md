@@ -20,7 +20,7 @@ its minimum Python version against the manifest and utility package constraint.
 
 The guided bootstrap checks Git, Terraform, and Azure CLI, then installs the
 editable utility plus `azure-identity`, `azure-kusto-data`, `fabric-cicd`,
-`mssql-python`, and `pyodbc`.
+`mssql-python`, `pyodbc`, and `textual`.
 The lower-level deploy framework supports Azure PowerShell for Python Fabric
 clients only. Terraform still requires Azure CLI or a separately configured
 provider credential; alternatively, reuse validated outputs with
@@ -67,6 +67,88 @@ failure of the browser retry stops before any deployment command.
 `tests/scripts/test_setup_bootstrap.py` covers the fallback, scope,
 interactive output, and fail-closed behavior.
 
+### Guided setup interface
+
+`scripts/setup.py` checks the prerequisites using only the standard library.
+Missing tools are installed in plain output, because package managers and
+`sudo` need the real terminal. On an interactive terminal, it then installs only
+the setup interface's packages: Textual and its dependencies, taken from
+`utility/requirements-deploy.txt` with the same pins and SHA-256 hashes. That
+takes about a second when they're already present, or about 20 seconds in a new
+environment. It then starts `python -m retail_setup.cli.setup_tui` from source
+(`PYTHONPATH=utility/src`). The interface runs **Install Python packages** (the
+full deploy lock, then the editable `retail-setup` install) as a live phase,
+then opens the configuration page, then runs configure, render, and deploy.
+Modules that need the full package set, such as the configuration page and the
+CLI, are imported only after that phase. Setup falls back to line-by-line
+output when `--plain` or `--dry-run` is set, when stdin or stdout isn't a
+terminal, or when the interface can't be installed or imported. The
+interface's exit code becomes the setup exit code. `130` means the operator
+cancelled setup. When the interface is expected, `scripts/setup.py` doesn't
+ask for the workspace name; the configuration page collects it.
+
+The configuration page (`retail_setup.cli._tui_config`) uses the same defaults
+as `configure`, through `configure_defaults`. It evaluates the same settings
+feasibility checks, through `preview_generation`, described under
+[Settings feasibility](#settings-feasibility). Every error is listed and
+disables **Start setup**. Warnings are listed in yellow and don't block. The
+estimate panel stays visible either way. When the
+workspace name changes, the page reloads that environment's saved settings
+into fields the operator hasn't edited. It rejects names whose environment
+belongs to another workspace. **Start setup** passes the values to
+`retail-setup configure` as flags, together with `--yes`, which skips the
+generation confirmation already shown on the page. `configure` is still the
+only code that writes configuration. The page's deploy choice replaces the
+post-render deploy question. `--yes` skips the page and uses the defaults.
+
+The page asks what happens **After configuration**: deploy to Microsoft Fabric
+(the default) or stop after rendering. The Start button's label follows that
+choice. When deploying, the runner runs `retail-setup deploy --dry-run` right
+after `configure`. Under the interface, a dry run emits the plan as pending
+`tasks`, so every deploy step, including the sign-in and readiness
+verification, is listed under **Deploy** before it runs. When the real deploy
+journal reports its steps, the list follows the actual plan: steps added by an
+existing-workspace reset appear in plan order, and preview steps that never
+ran are dropped. Steps still pending when deploy ends are marked skipped.
+
+Approvals during deploy (resetting an existing workspace, gated Terraform
+destroy/apply steps showing the step number and command, the preflight
+recheck, and the Azure CLI sign-in offer) use `retail_setup.interaction` and
+open as dialog boxes. Phase commands run with `TF_INPUT=0`, so Terraform fails
+with an error instead of waiting for a native prompt the operator can't see.
+
+Each phase is a `retail-setup` subprocess started with
+`RETAIL_SETUP_EVENTS=1`. Its protocol is defined in `retail_setup.interaction`:
+
+- An event is one stdout line: the `EVENT_PREFIX` marker followed by JSON.
+  Other lines are plain log output for the phase.
+- The `tasks` event, emitted on every deploy-journal write, carries all deploy
+  steps with their status, so the steps appear nested under **Deploy**. The
+  `task` event reports one task, such as the deploy sign-in.
+- Under the interface, deploy-step subprocesses run with piped output. Each
+  output line is emitted as a `log` event tagged with its step, so the
+  interface can filter output for one step. Nested protocol lines, including
+  prompts from deploy scripts, are forwarded unchanged.
+- A `prompt` event (`confirm`, `text`, or `int`) opens a dialog box. The answer
+  is written back as one JSON stdin line that echoes the prompt `id`. Nested
+  commands inherit that stdin. Cancelling the dialog box with `Esc` sends a
+  cancellation, which raises `PromptCancelled` in the prompting process and
+  stops setup.
+
+Without the variable, prompts use the original `typer`/`input()` behavior, and
+deploy steps keep inherited stdio. In the interface, `retail-setup deploy`
+signs in with its own configured-tenant login, including the same one-time
+Windows broker-recovery retry, instead of the bootstrap login plus
+`--skip-login`. Quitting asks for confirmation, then terminates the running
+command's process tree. A partial deployment resumes with
+`retail-setup deploy --env <env> --resume`. The interface log is written to the
+ignored `deploy/.generated/<env>/setup-<timestamp>.log`.
+`utility/tests/test_setup_tui.py` covers prompt round trips, cancellation,
+nested-step attribution, journal events, the dialog box, package installation
+before the configuration page, and configuration-page defaults, validation, and
+the `configure` flags it produces. `tests/scripts/test_setup_bootstrap.py`
+checks that the interface bootstrap installs only Textual's locked dependencies.
+
 ## `configure`
 
 `retail-setup configure --workspace-name <name> --profile <profile>` writes:
@@ -95,13 +177,49 @@ The active non-interactive inputs include:
 - store type: `supercenter`, `grocery`, `hardware`, or `luxury`;
 - history `months`, store count, and deterministic seed.
 
+When a value is missing on an interactive terminal, `configure` prompts for it.
+After the generation values, it shows a record-count estimate and asks
+`Use these settings?`. `--yes` accepts the generation settings without that
+question; the setup interface passes it because its configuration page has
+already shown the estimate. Prompts go through `retail_setup.interaction`, so
+under the setup interface they open as dialog boxes.
+
 The CLI derives `start_date` and `end_date` from `months` with an end date of
 yesterday. The configuration model still accepts explicit dates for backward
 compatibility, but public examples use `--months`. `core` defaults to three
-months. Profiles with required ML/Reporting default to 18 months and reject
-windows shorter than 540 days because the required churn feature window,
-90-day forward labels, and purged train/calibration/test partitions cannot be
-trained coherently on shorter history.
+months. Profiles with required ML/Reporting default to 18 months.
+
+### Settings feasibility
+
+`retail_setup.generation.feasibility.assess` checks the store type, months,
+store count, and the counts derived from them (customers, products, receipts,
+and basket sizes) for combinations known to fail a deployment.
+`configure` and `render` fail on any error and print warnings. The setup
+interface's configuration page lists them and disables **Start setup** on any
+error. The checks don't need Spark. They use expectations that mirror the
+generator's catalog popularity, pricing, and ticket calibration, from
+`retail_setup.generation.estimate`.
+
+| Check | Applies to | Level | Reason |
+| --- | --- | --- | --- |
+| History shorter than 540 days | Profiles with required ML | Error | Churn feature window, 90-day forward labels, and purged train/calibration/test splits |
+| Calibrated basket averages under 0.1 extra items | Profiles with required ML | Error | The ticket target is below one item's cost, so receipts are single-item and market basket has nothing to mine |
+| Fewer than 1,000 expected multi-item baskets | Profiles with required ML | Error | Market basket needs repeated product pairs |
+| Best store/product sells under 0.5 units a day | Profiles with required ML | Error | Demand forecasting (`MIN_DAILY_SALES`) has no eligible store/product |
+| Receipt lines above twice what a 16-node pool generates in 12 hours | All profiles | Error | Exceeds the 12-hour notebook activity limit on any capacity |
+| Receipt lines above what an F64 (2-node) pool generates in 12 hours | All profiles | Warning | May time out on a small capacity |
+
+Throughput uses a measured 3.5 million receipt lines per Spark node-hour, from
+a live full-demo run. Some failure modes aren't checked:
+
+- Segmentation and churn class balance are guaranteed by the generator's
+  floor of 5,000 customers.
+- Stockout label balance depends on the simulated inventory.
+- Fixed-width IDs can't overflow within the allowed ranges (`store_count` ≤
+  2,000 and `months` ≤ 120).
+
+`utility/tests/test_feasibility.py` checks that the smallest required-ML
+configuration of every shipped store type passes, and covers each check.
 
 ## `render`
 

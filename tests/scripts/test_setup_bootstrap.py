@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import json
 import os
 import subprocess
 import sys
@@ -281,6 +282,67 @@ def test_run_retail_setup_recreate_passes_recreate_flag(monkeypatch):
     deploy_cmd = commands[-1]
     assert "--recreate" in deploy_cmd
     assert deploy_cmd.index("--recreate") < deploy_cmd.index("--yes")
+
+
+def test_guided_setup_hands_off_to_the_interface_on_a_terminal(monkeypatch):
+    commands = []
+
+    class Terminal(io.StringIO):
+        def isatty(self):
+            return True
+
+    def fake_run(command, **_kwargs):
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(setup.subprocess, "run", fake_run)
+    monkeypatch.setattr(setup.sys, "stdin", Terminal())
+    monkeypatch.setattr(setup.sys, "stdout", Terminal())
+    env = setup.PythonEnv(Path("python"), "test")
+    args = setup.argparse.Namespace(plain=False, dry_run=False)
+
+    assert setup._tui_available(args, env)
+    code = setup.run_tui(
+        env,
+        workspace_name="retail-demo-qa",
+        profile="core",
+        assume_yes=False,
+        deploy_requested=True,
+        recreate=False,
+        completed={"prereqs": ("SKIPPED", 0.0), "python": ("SUCCEEDED", 12.34)},
+    )
+
+    assert code == 0
+    assert commands[-1][1:3] == ["-m", "retail_setup.cli.setup_tui"]
+    install = json.loads(commands[-1][commands[-1].index("--python-install") + 1])
+    assert install == [cmd for _label, cmd in setup.python_install_commands(env, quiet=False)]
+    tail = commands[-1][commands[-1].index("--workspace-name") :]
+    assert tail == [
+        "--workspace-name",
+        "retail-demo-qa",
+        "--deploy",
+        "--completed",
+        "prereqs=SKIPPED:0.0",
+        "--completed",
+        "python=SUCCEEDED:12.3",
+    ]
+    plain = setup.argparse.Namespace(plain=True, dry_run=False)
+    assert not setup._tui_available(plain, env)
+
+
+def test_interface_bootstrap_installs_only_textual_closure_from_the_lock():
+    lock = setup.DEPLOY_LOCK.read_text(encoding="utf-8")
+
+    requirements = setup.interface_requirements(lock)
+
+    names = {
+        line.split("==")[0]
+        for line in requirements.splitlines()
+        if line and not line[0].isspace()
+    }
+    assert {"textual", "rich", "markdown-it-py", "pygments"} <= names
+    assert not names & {"azure-core", "fabric-cicd", "pydantic", "typer"}
+    assert requirements.count("--hash=sha256:") >= 2 * len(names)
 
 
 def test_workspace_environment_name_uses_workspace_suffix():

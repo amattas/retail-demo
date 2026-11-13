@@ -15,6 +15,13 @@ import requests
 from deploy.scripts.fabric_runtime import decode_definition_parts, paginated_get
 
 API = "https://api.fabric.microsoft.com/v1"
+# (connect, read) seconds for item create/update. Fabric can take longer than
+# 30 seconds to answer an Operations Agent create; a short read timeout turns a
+# successful create into an ambiguous failure.
+_MUTATION_TIMEOUT = (30, 120)
+# After a create gets no response, wait this long for the item to appear.
+_AMBIGUOUS_CREATE_ATTEMPTS = 24
+_AMBIGUOUS_CREATE_DELAY_SECONDS = 5.0
 COLLECTIONS = {
     "OperationsAgent": "operationsAgents",
     "Plan": "plans",
@@ -261,10 +268,35 @@ def _update_definition(
         f"{collection_url}/{item_id}/updateDefinition",
         params=update_params,
         json={"definition": update_definition},
-        timeout=30,
+        timeout=_MUTATION_TIMEOUT,
         allow_redirects=False,
     )
     complete_operation(session, response, operation_name=f"Update {item_type}")
+
+
+def _find_created_item(
+    session: requests.Session,
+    collection_url: str,
+    display_name: str,
+    *,
+    attempts: int,
+    delay_seconds: float,
+) -> str | None:
+    """Return the single item named `display_name` once it is listed, else None."""
+
+    for attempt in range(attempts):
+        matches = [
+            item
+            for item in paginated_get(session, collection_url, timeout=30)
+            if item.get("displayName", "").casefold() == display_name.casefold()
+        ]
+        if len(matches) > 1:
+            raise NativeItemError(f"Created item {display_name!r} has ambiguous identity.")
+        if matches:
+            return _guid(matches[0]["id"])
+        if attempt < attempts - 1:
+            time.sleep(delay_seconds)
+    return None
 
 
 def _delete_created_item(
@@ -325,41 +357,45 @@ def ensure_native_item(
         )
     else:
         create_with_definition = item_type != "OperationsAgent"
-        response = session.post(
-            collection_url,
-            json={
-                "displayName": display_name,
-                "description": description,
-                **({"definition": definition} if create_with_definition else {}),
-            },
-            timeout=30,
-            allow_redirects=False,
-        )
-        complete_operation(session, response, operation_name=f"Create {item_type}")
-        body = response.json() if response.status_code == 201 else {}
-        item_id = body.get("id")
-        if item_id:
-            item_id = _guid(item_id)
-        else:
-            for attempt in range(5):
-                matches = [
-                    item
-                    for item in paginated_get(session, collection_url, timeout=30)
-                    if item.get("displayName", "").casefold() == display_name.casefold()
-                ]
-                if len(matches) == 1:
-                    item_id = _guid(matches[0]["id"])
-                    break
-                if len(matches) > 1:
-                    raise NativeItemError(
-                        f"Created {item_type} has ambiguous identity."
-                    )
-                if attempt < 4:
-                    time.sleep(2)
+        try:
+            response = session.post(
+                collection_url,
+                json={
+                    "displayName": display_name,
+                    "description": description,
+                    **({"definition": definition} if create_with_definition else {}),
+                },
+                timeout=_MUTATION_TIMEOUT,
+                allow_redirects=False,
+            )
+        except (requests.Timeout, requests.ConnectionError) as error:
+            # The create may still complete in Fabric; never replay it blindly.
+            item_id = _find_created_item(
+                session,
+                collection_url,
+                display_name,
+                attempts=_AMBIGUOUS_CREATE_ATTEMPTS,
+                delay_seconds=_AMBIGUOUS_CREATE_DELAY_SECONDS,
+            )
             if not item_id:
                 raise NativeItemError(
-                    f"Created {item_type} is not visible; inspect before retrying."
+                    f"Create {item_type} {display_name!r} got no response ({error}) and "
+                    "the item did not appear; inspect the workspace before retrying."
+                ) from error
+        else:
+            complete_operation(session, response, operation_name=f"Create {item_type}")
+            body = response.json() if response.status_code == 201 else {}
+            item_id = body.get("id")
+            if item_id:
+                item_id = _guid(item_id)
+            else:
+                item_id = _find_created_item(
+                    session, collection_url, display_name, attempts=5, delay_seconds=2
                 )
+                if not item_id:
+                    raise NativeItemError(
+                        f"Created {item_type} is not visible; inspect before retrying."
+                    )
         created_item = True
         if not create_with_definition:
             try:

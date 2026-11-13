@@ -113,6 +113,50 @@ def test_type_folders_include_new_assets_and_keep_children_with_parent():
     assert len(session.folders) == initial_folder_count
 
 
+def test_folder_created_concurrently_by_another_publisher_is_reused():
+    class RacingSession(Session):
+        def post(self, url, *, json, **kwargs):
+            if url.endswith("/folders") and json["displayName"] == "Reports":
+                # Another publisher created the folder after our inventory.
+                self.folders.append({"id": guid("Reports"), "displayName": "Reports"})
+                self.posts.append((url, json))
+                return response(409, {"errorCode": "FolderDisplayNameAlreadyInUse"})
+            return super().post(url, json=json, **kwargs)
+
+    session = RacingSession()
+    session.add("retail-twins", "Report")
+
+    report = organize_workspace(session, guid("workspace"))
+
+    assert report["folder_counts"] == {"Reports": 1}
+    assert [folder["displayName"] for folder in session.folders].count("Reports") == 1
+
+
+def test_folder_conflict_without_a_matching_folder_still_fails():
+    class ConflictSession(Session):
+        def post(self, url, *, json, **kwargs):
+            if url.endswith("/folders"):
+                return response(409, {"errorCode": "Conflict"})
+            return super().post(url, json=json, **kwargs)
+
+    session = ConflictSession()
+    session.add("retail-twins", "Report")
+    with pytest.raises(HTTPError):
+        organize_workspace(session, guid("workspace"))
+
+
+def test_parallel_organizers_take_turns(tmp_path):
+    from deploy.scripts.workspace_folders import _exclusive
+
+    lock = tmp_path / ".workspace-folders.lock"
+    with _exclusive(lock):
+        with pytest.raises(WorkspaceFolderError, match="Timed out waiting"):
+            with _exclusive(lock, timeout_seconds=0.6):
+                pass
+    with _exclusive(lock, timeout_seconds=0.6):
+        pass
+
+
 def test_unknown_types_fail_before_creating_folders_or_moving_items():
     session = Session()
     session.add("new-preview", "UnrecognizedType")

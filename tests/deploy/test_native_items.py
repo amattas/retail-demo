@@ -91,6 +91,59 @@ def test_create_uses_returned_identity_and_reads_definition(monkeypatch):
     }
 
 
+def test_create_timeout_adopts_the_item_fabric_created_without_reposting(monkeypatch):
+    import requests
+
+    session = Mock()
+    listings = iter([[], [], [{"id": ITEM, "displayName": "Agent"}]])
+    monkeypatch.setattr(native, "paginated_get", lambda *a, **k: next(listings))
+    monkeypatch.setattr(native.time, "sleep", lambda _seconds: None)
+    session.post.side_effect = [
+        requests.ReadTimeout("Read timed out. (read timeout=120)"),
+        response(200),
+        response(body={"definition": definition()}),
+    ]
+
+    assert (
+        native.ensure_native_item(
+            session,
+            workspace_id=WS,
+            item_type="OperationsAgent",
+            display_name="Agent",
+            description="Stopped",
+            definition=definition(),
+        )
+        == ITEM
+    )
+    creates = [
+        call for call in session.post.call_args_list
+        if call.args[0].endswith("/operationsAgents")
+    ]
+    assert len(creates) == 1  # the ambiguous create is never replayed
+    assert creates[0].kwargs["timeout"] == native._MUTATION_TIMEOUT
+    session.delete.assert_not_called()
+
+
+def test_create_timeout_without_a_visible_item_fails_without_reposting(monkeypatch):
+    import requests
+
+    session = Mock()
+    monkeypatch.setattr(native, "paginated_get", lambda *a, **k: [])
+    monkeypatch.setattr(native.time, "sleep", lambda _seconds: None)
+    session.post.side_effect = requests.ReadTimeout("Read timed out.")
+
+    with pytest.raises(native.NativeItemError, match="did not appear"):
+        native.ensure_native_item(
+            session,
+            workspace_id=WS,
+            item_type="OperationsAgent",
+            display_name="Agent",
+            description="Stopped",
+            definition=definition(),
+        )
+    assert session.post.call_count == 1
+
+
 def test_agent_definition_failure_removes_only_new_blank_shell(monkeypatch):
     session = Mock()
     monkeypatch.setattr(native, "paginated_get", lambda *a, **k: [])

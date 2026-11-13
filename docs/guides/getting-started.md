@@ -78,21 +78,21 @@ capacity has room.
 
 ## 2. Clone the repository
 
-Clone the `1.1.0` release tag, or
-[download the 1.1.0 archive](https://github.com/amattas/retail-demo/archive/refs/tags/1.1.0.zip)
+Clone the `1.2.0` release tag, or
+[download the 1.2.0 archive](https://github.com/amattas/retail-demo/archive/refs/tags/1.2.0.zip)
 and extract it. Do not deploy from `main`; it carries unreleased changes.
 
 === "Windows PowerShell"
 
     ```powershell
-    git clone --branch 1.1.0 https://github.com/amattas/retail-demo.git
+    git clone --branch 1.2.0 https://github.com/amattas/retail-demo.git
     Set-Location retail-demo
     ```
 
 === "macOS or Linux"
 
     ```bash
-    git clone --branch 1.1.0 https://github.com/amattas/retail-demo.git
+    git clone --branch 1.2.0 https://github.com/amattas/retail-demo.git
     cd retail-demo
     ```
 
@@ -120,16 +120,63 @@ Use this path for a first deployment.
 
 The wrapper performs these steps:
 
-1. Uses or creates a Python environment.
+1. Activates the `retail-demo` Conda environment, creating it with Python 3.13
+   if needed. Without Conda, it uses `.venv` in the repository with an
+   installed Python 3.11+. If neither is available on Windows, it installs
+   Miniforge and creates the Conda environment.
 2. Checks Git, Terraform, and Azure CLI.
 3. Installs `retail-setup`, version-locked Fabric libraries such as
    `azure-identity`, `azure-kusto-data`, and `fabric-cicd`, plus the SQL
    connectivity package supported by the operating system. The complete pinned
    package list is in `utility/requirements-deploy.txt`.
-4. Runs interactive configuration.
+4. Collects the configuration: on the configuration page in the interface
+   described below, or through prompts in plain mode.
 5. Renders twelve workspace-specific notebooks: setup 01–11 plus
    `stream-events.ipynb`.
-6. Offers to deploy.
+6. Deploys, if you chose it on the configuration page (the default) or passed
+   `--deploy`. In plain mode, setup asks first.
+
+On an interactive terminal, the full-screen setup interface opens as soon as
+its own small package set (Textual, from the same hashed lock) is installed.
+Only the Python environment, the tool check, and any tool installation run
+before it in plain output.
+
+The interface has two panes. The left column lists the setup phases and their
+subtasks, with each one's status and duration. The right column streams the
+live output. Step 3 runs there first. When the packages are installed, a
+configuration page opens. It has:
+
+- fields for the workspace, tenant, capacity, and item names, filled in from
+  the workspace's saved settings;
+- a profile picker that shows each profile's description;
+- fields for the data volume, with a live record-count estimate;
+- an **After configuration** choice: **Deploy to Microsoft Fabric** (the
+  default) or **Stop after rendering notebooks**.
+
+The Start button (**Configure and deploy** or **Configure only**) stays
+disabled while any value is invalid or the settings combination is known to
+fail a deployment. For example, a profile with required ML needs at least 18
+months of history, and very large store and month counts can exceed Fabric's
+12-hour notebook limit. Each problem is listed with what to change. Warnings,
+such as a volume that may be slow on a small capacity, are shown in yellow and
+don't block. When deploying, every deploy-plan step is
+listed under **Deploy** as soon as the configuration is written. Approvals,
+such as resetting an existing workspace or applying Terraform changes, open in
+dialog boxes. Press `↑`/`↓` to show one step's output, `F` to switch between
+that step and all output, and `Q` to quit.
+The complete log is saved to `deploy/.generated/<env>/setup-<timestamp>.log`;
+the live-output pane shows the path along its bottom edge. The log includes
+everything from the pane, including output from before the configuration page.
+Add `--plain` for line-by-line output. Setup uses plain output automatically
+when the terminal isn't interactive.
+
+If a step fails, it's marked in the left column, and its output stays
+available: select it with `↑`/`↓`. A failed optional step doesn't stop the
+rest of the deployment; a failed required step stops the steps that depend on
+it. After fixing the cause, continue the deployment with
+`retail-setup deploy --env <env> --resume` from the same Python environment, or
+run setup again. Quitting with `Q` asks for confirmation, stops the running
+command, and leaves any Fabric jobs that already started running.
 
 On Windows and Linux, the locked dependency set includes `mssql-python` for
 live Lakehouse freshness verification. If Microsoft ODBC Driver 17 or 18 is
@@ -154,12 +201,14 @@ Useful bootstrap flags:
 
 | Flag | Behavior |
 | --- | --- |
-| `--workspace-name <name>` | Names the Fabric workspace and derives its local environment key. |
+| `--workspace-name <name>` | Names the Fabric workspace and derives its local environment key. In the interface, it pre-fills the configuration page. |
 | `--profile <name>` | Selects `core`, `standard`, or `full-demo`; guided wrappers default to `full-demo`. |
 | `--deploy` | Runs deploy after configure and render. |
+| `--yes` | Accepts defaults without asking: skips the configuration page and pre-confirms gated deploy steps such as Terraform apply. |
 | `--dry-run` | Previews setup-engine commands; the wrapper may still prepare or activate Python first. |
 | `--skip-prereqs` | Skips package-manager installation of Git, Terraform, and Azure CLI. |
 | `--verbose` | Shows full package-install output; commands are printed in either mode. |
+| `--plain` | Uses line-by-line output instead of the full-screen setup interface. |
 | `--recreate` | Deploys in destructive clean-slate mode. |
 
 ### Manually managed Python environment

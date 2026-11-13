@@ -26,6 +26,7 @@ import typer
 import yaml
 from pydantic import ValidationError
 
+from retail_setup import interaction
 from retail_setup.cli import _deploy_journal, _deploy_resume
 from retail_setup.config.generation import GenerationConfig, load_generation_config
 from retail_setup.dictionaries.loader import (
@@ -64,7 +65,6 @@ _PROFILE_CONTROLLED_ENV_OVERRIDES = (
 )
 _DEFAULT_MONTHS = 3
 _DEFAULT_ML_MONTHS = 18
-_MIN_REQUIRED_ML_HISTORY_DAYS = 540
 _RENDER_MANIFEST = "render-manifest.json"
 
 # After a recreate destroy, Fabric needs time to release the workspace name and
@@ -237,24 +237,22 @@ def _config_default(base: dict[str, Any], overlay: dict[str, Any], dotted: str) 
 def _prompt_str(name: str, value: str | None, *, default: Any = None) -> str:
     if value is not None:
         return value
-    if default is None:
-        return typer.prompt(name)
-    return typer.prompt(name, default=str(default), show_default=True)
+    return interaction.prompt_text(name, default=None if default is None else str(default))
 
 
 def _prompt_int(name: str, value: int | None, *, default: int) -> int:
     if value is not None:
         return value
-    return typer.prompt(name, default=default, show_default=True, type=int)
+    return interaction.prompt_int(name, default=default)
 
 
 def _prompt_bool(name: str, value: bool | None, *, default: bool) -> bool:
     """Resolve a yes/no value: explicit flag wins; prompt only when interactive."""
     if value is not None:
         return value
-    if not sys.stdin.isatty():
+    if not interaction.is_interactive():
         return default
-    return typer.confirm(name, default=default)
+    return interaction.confirm(name, default=default)
 
 
 def _available_store_types() -> list[str]:
@@ -264,21 +262,27 @@ def _available_store_types() -> list[str]:
         return []
 
 
-def _print_record_estimate(generation: GenerationConfig) -> None:
-    """Show an approximate record-count breakdown for the chosen settings."""
-
+def _record_estimate_lines(generation: GenerationConfig) -> list[str]:
     from retail_setup.generation.estimate import estimate_record_counts
 
     counts = estimate_record_counts(generation)
+    return [
+        f"  Estimated records for {generation.start_date} to {generation.end_date} "
+        f"({generation.store_count} stores):",
+        *(f"    {name:<20} ~ {value:>15,}" for name, value in counts.items()),
+    ]
+
+
+def _print_record_estimate(generation: GenerationConfig) -> list[str]:
+    """Show an approximate record-count breakdown for the chosen settings."""
+
+    lines = _record_estimate_lines(generation)
     typer.echo("")
     _hr("-")
-    typer.echo(
-        f"  Estimated records for {generation.start_date} to {generation.end_date} "
-        f"({generation.store_count} stores):"
-    )
-    for name, value in counts.items():
-        typer.echo(f"    {name:<20} ~ {value:>15,}")
+    for line in lines:
+        typer.echo(line)
     _hr("-")
+    return lines
 
 
 def _load_deploy_environment(repo_root: Path, env: str):
@@ -317,20 +321,22 @@ def _manifest_deployment_profile(repo_root: Path, deployment_name: str) -> Profi
     )
 
 
-def _validate_required_ml_history(
+def _validate_generation_feasibility(
     generation: GenerationConfig, profile: ResolvedProfile | Profile
-) -> None:
-    """Reject generation windows too short for the required churn model."""
+) -> list[str]:
+    """Raise ValueError for settings known to fail; return non-blocking warnings."""
 
-    if profile.reporting_gate_pipeline_ref is None:
-        return
-    history_days = (generation.end_date - generation.start_date).days + 1
-    if history_days < _MIN_REQUIRED_ML_HISTORY_DAYS:
-        raise ValueError(
-            f"profile {profile.deployment_name!r} requires at least "
-            f"{_MIN_REQUIRED_ML_HISTORY_DAYS} days of history for required ML; "
-            f"the configured window has {history_days}. Use --months 18 or more."
-        )
+    from retail_setup.generation.feasibility import assess
+
+    findings = assess(
+        generation,
+        ml_required=profile.reporting_gate_pipeline_ref is not None,
+        profile_name=profile.deployment_name,
+    )
+    errors = [finding.message for finding in findings if finding.level == "error"]
+    if errors:
+        raise ValueError("\n".join(errors))
+    return [finding.message for finding in findings if finding.level == "warning"]
 
 
 def _active_azure_cli_tenant() -> str:
@@ -376,7 +382,7 @@ def _run_tee_stderr(command: list[str]) -> tuple[int, str]:
 
 
 def _interactive_terminal() -> bool:
-    return sys.stdin.isatty()
+    return interaction.is_interactive()
 
 
 def _sign_in_configured_tenant(repo_root: Path, env: str) -> None:
@@ -463,7 +469,7 @@ def _validate_azure_cli_tenant(repo_root: Path, env: str) -> None:
         return
     if active_tenant:
         typer.echo("Azure CLI tenant does not match deploy config tenant_id.", err=True)
-    if sys.stdin.isatty() and typer.confirm(
+    if interaction.is_interactive() and interaction.confirm(
         "Sign in to the configured tenant with Azure CLI now?", default=True
     ):
         if _azure_cli_login(config.tenant_id):
@@ -636,6 +642,106 @@ def _validate_terraform_state_location(repo_root: Path, env: str) -> None:
         )
 
 
+@dataclass(frozen=True)
+class ConfigureDefaults:
+    """Defaults `configure` offers for one workspace (shared with the setup TUI)."""
+
+    env: str
+    existing_workspace: str | None
+    tenant_id: str | None
+    capacity_name: str | None
+    lakehouse_name: str | None
+    eventhouse_name: str | None
+    kql_database_name: str | None
+    profile: str
+    store_type: str
+    saved_months: int | None
+    store_count: int
+    seed: int
+
+    def months_for(self, ml_history_required: bool) -> int:
+        """Saved months, raised to the ML minimum when the profile requires it."""
+
+        minimum = _DEFAULT_ML_MONTHS if ml_history_required else _DEFAULT_MONTHS
+        saved = self.saved_months if self.saved_months is not None else minimum
+        return max(saved, minimum) if ml_history_required else saved
+
+
+def default_workspace_name(repo_root: Path) -> str:
+    base = _load_yaml_mapping(repo_root / "deploy" / "config" / "deploy.yml")
+    return str(_get_by_path(base, "workspace.name") or "retail-demo")
+
+
+def profile_requires_ml_history(repo_root: Path, deployment_name: str) -> bool:
+    profile = _manifest_deployment_profile(repo_root, deployment_name)
+    return profile.reporting_gate_pipeline_ref is not None
+
+
+def configure_defaults(repo_root: Path, workspace_name: str) -> ConfigureDefaults:
+    """Resolve defaults from shared config plus the workspace's saved overlays.
+
+    Raises ValueError when the workspace name has no usable environment key.
+    """
+
+    base = _load_yaml_mapping(repo_root / "deploy" / "config" / "deploy.yml")
+    env = _environment_name_for_workspace(repo_root, workspace_name)
+    env_yml = repo_root / "deploy" / "config" / "environments" / f"{env}.yml"
+    overlay = _load_yaml_mapping(env_yml) if env_yml.is_file() else {}
+    generation_path = _resolve_generation_config_path(repo_root, env)
+    generation = _load_yaml_mapping(generation_path) if generation_path.is_file() else {}
+    existing_workspace = _get_by_path(overlay, "workspace.name")
+    fields = GenerationConfig.model_fields
+
+    def text(dotted: str) -> str | None:
+        value = _config_default(base, overlay, dotted)
+        return None if value is None else str(value)
+
+    return ConfigureDefaults(
+        env=env,
+        existing_workspace=None if existing_workspace is None else str(existing_workspace),
+        tenant_id=text("tenant_id"),
+        capacity_name=text("workspace.capacity_name"),
+        lakehouse_name=text("lakehouse.name"),
+        eventhouse_name=text("eventhouse.name"),
+        kql_database_name=text("eventhouse.kql_database_name"),
+        profile=text("deployment.profile")
+        or _default_deployment_profile(repo_root).deployment_name,
+        store_type=str(generation.get("store_type", fields["store_type"].default)),
+        saved_months=int(generation["months"]) if "months" in generation else None,
+        store_count=int(generation.get("store_count", fields["store_count"].default)),
+        seed=int(generation.get("seed", fields["seed"].default)),
+    )
+
+
+def preview_generation(
+    profile: Profile,
+    *,
+    store_type: str,
+    months: int,
+    store_count: int,
+    seed: int,
+) -> tuple[GenerationConfig, dict[str, int], list[Any]]:
+    """Validate generation settings as `configure` does, without raising for feasibility.
+
+    Returns the settings, their record estimates, and every feasibility finding
+    (``retail_setup.generation.feasibility.Finding``; errors block deployment).
+    Raises ValueError (pydantic ValidationError) only for invalid field values.
+    """
+
+    from retail_setup.generation.estimate import estimate_record_counts
+    from retail_setup.generation.feasibility import assess
+
+    generation = GenerationConfig(
+        store_type=store_type, months=months, store_count=store_count, seed=seed
+    )
+    findings = assess(
+        generation,
+        ml_required=profile.reporting_gate_pipeline_ref is not None,
+        profile_name=profile.deployment_name,
+    )
+    return generation, estimate_record_counts(generation), findings
+
+
 @app.command()
 def configure(
     repo_root: Path = typer.Option(
@@ -675,6 +781,11 @@ def configure(
     ),
     store_count: Optional[int] = typer.Option(None, "--store-count", help="Store count."),
     seed: Optional[int] = typer.Option(None, "--seed", help="Random seed."),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        help="Accept the generation settings without the confirmation prompt.",
+    ),
 ) -> None:
     """Configure one workspace-scoped deployment and local generation settings."""
     repo_root = repo_root.resolve()
@@ -691,7 +802,6 @@ def configure(
         )
         raise typer.Exit(code=1)
 
-    base_config = _load_yaml_mapping(deploy_yml)
     store_types = _available_store_types()
     store_type_prompt = (
         f"Store type (available: {', '.join(store_types)})" if store_types else "Store type"
@@ -710,7 +820,7 @@ def configure(
         store_count,
         seed,
     )
-    if any(value is None for value in _prompted_values) and sys.stdin.isatty():
+    if any(value is None for value in _prompted_values) and interaction.is_interactive():
         typer.echo("")
         typer.echo("=" * 70)
         typer.echo("  INPUT REQUIRED: review each value; press Enter to accept [default]")
@@ -719,54 +829,34 @@ def configure(
     workspace_name = _prompt_str(
         "Fabric workspace name",
         workspace_name,
-        default=_get_by_path(base_config, "workspace.name") or "retail-demo",
+        default=default_workspace_name(repo_root),
     )
-    env = _environment_name_for_workspace(repo_root, workspace_name)
+    defaults = configure_defaults(repo_root, workspace_name)
+    env = defaults.env
     env_yml = repo_root / "deploy" / "config" / "environments" / f"{env}.yml"
     gen_path = _generation_config_path(repo_root, env)
-    existing_generation_path = _resolve_generation_config_path(repo_root, env)
-    existing_generation: dict[str, Any] = {}
-    if existing_generation_path.is_file():
-        existing_generation = _load_yaml_mapping(existing_generation_path)
-    env_config = _load_yaml_mapping(env_yml) if env_yml.is_file() else {}
-    existing_workspace = _get_by_path(env_config, "workspace.name")
-    if existing_workspace is not None and str(existing_workspace) != workspace_name:
+    if defaults.existing_workspace is not None and defaults.existing_workspace != workspace_name:
         typer.echo(
             f"Workspace name {workspace_name!r} collides with existing environment "
-            f"{env!r} for workspace {existing_workspace!r}."
+            f"{env!r} for workspace {defaults.existing_workspace!r}."
         )
         raise typer.Exit(code=1)
 
-    tenant_id = _prompt_str(
-        "Entra tenant ID",
-        tenant_id,
-        default=_config_default(base_config, env_config, "tenant_id"),
-    )
+    tenant_id = _prompt_str("Entra tenant ID", tenant_id, default=defaults.tenant_id)
     capacity_name = _prompt_str(
-        "Fabric capacity name",
-        capacity_name,
-        default=_config_default(base_config, env_config, "workspace.capacity_name"),
+        "Fabric capacity name", capacity_name, default=defaults.capacity_name
     )
-    lakehouse_name = _prompt_str(
-        "Lakehouse name",
-        lakehouse_name,
-        default=_config_default(base_config, env_config, "lakehouse.name"),
-    )
+    lakehouse_name = _prompt_str("Lakehouse name", lakehouse_name, default=defaults.lakehouse_name)
     eventhouse_name = _prompt_str(
-        "Eventhouse name",
-        eventhouse_name,
-        default=_config_default(base_config, env_config, "eventhouse.name"),
+        "Eventhouse name", eventhouse_name, default=defaults.eventhouse_name
     )
     kql_database_name = _prompt_str(
-        "KQL database name",
-        kql_database_name,
-        default=_config_default(base_config, env_config, "eventhouse.kql_database_name"),
+        "KQL database name", kql_database_name, default=defaults.kql_database_name
     )
     profile = _prompt_str(
         "Deployment profile (full-demo, standard, or core)",
         profile,
-        default=_config_default(base_config, env_config, "deployment.profile")
-        or _default_deployment_profile(repo_root).deployment_name,
+        default=defaults.profile,
     )
     available_profiles = _available_deployment_profiles(repo_root)
     if profile not in available_profiles:
@@ -781,27 +871,11 @@ def configure(
     # interactive) offer to change them before committing. Validation happens
     # before any file writes (the deploy YAMLs are written next and restored if
     # framework validation later rejects them).
-    interactive = sys.stdin.isatty()
-    store_type_default = existing_generation.get(
-        "store_type", GenerationConfig.model_fields["store_type"].default
-    )
-    default_months = (
-        _DEFAULT_ML_MONTHS
-        if manifest_profile.reporting_gate_pipeline_ref is not None
-        else _DEFAULT_MONTHS
-    )
-    saved_months = int(existing_generation.get("months", default_months))
-    months_default = (
-        max(saved_months, default_months)
-        if manifest_profile.reporting_gate_pipeline_ref is not None
-        else saved_months
-    )
-    store_count_default = int(
-        existing_generation.get("store_count", GenerationConfig.model_fields["store_count"].default)
-    )
-    seed_default = int(
-        existing_generation.get("seed", GenerationConfig.model_fields["seed"].default)
-    )
+    interactive = interaction.is_interactive()
+    store_type_default = defaults.store_type
+    months_default = defaults.months_for(manifest_profile.reporting_gate_pipeline_ref is not None)
+    store_count_default = defaults.store_count
+    seed_default = defaults.seed
     while True:
         store_type = _prompt_str(store_type_prompt, store_type, default=store_type_default)
         months = _prompt_int(
@@ -818,7 +892,7 @@ def configure(
                 store_count=store_count,
                 seed=seed,
             )
-            _validate_required_ml_history(generation, manifest_profile)
+            warnings = _validate_generation_feasibility(generation, manifest_profile)
         except (ValidationError, ValueError) as exc:
             typer.echo(f"Invalid generation settings:\n{exc}")
             if interactive:
@@ -826,8 +900,15 @@ def configure(
                 continue
             raise typer.Exit(code=1)
 
-        _print_record_estimate(generation)
-        if not interactive or typer.confirm("Use these settings?", default=True):
+        estimate = _print_record_estimate(generation)
+        for warning in warnings:
+            typer.echo(f"Warning: {warning}")
+        estimate += [f"Warning: {warning}" for warning in warnings]
+        if (
+            not interactive
+            or yes
+            or interaction.confirm("Use these settings?", default=True, detail="\n".join(estimate))
+        ):
             break
         # Re-enter every generation value on the next loop iteration.
         store_type = months = store_count = seed = None
@@ -994,6 +1075,84 @@ def _wait_for_workspace_deletion(
         timeout_seconds=_DELETION_WAIT_TIMEOUT_SECONDS,
         poll_interval_seconds=_DELETION_WAIT_INTERVAL_SECONDS,
     )
+
+
+# Items inside the Terraform-managed workspace. Deleting the workspace deletes
+# them with it; destroying them one by one first can fail when other items
+# depend on them (Fabric refuses to delete an Eventhouse referenced by an
+# ontology, Operations Agent, querysets, or shortcuts).
+_WORKSPACE_ITEM_RESOURCES = (
+    "fabric_lakehouse.",
+    "fabric_eventhouse.",
+    "fabric_spark_custom_pool.",
+    "fabric_spark_workspace_settings.",
+    "fabric_workspace_role_assignment.",
+)
+_MANAGED_WORKSPACE_ADDRESS = "fabric_workspace.main[0]"
+
+
+def _step_echo(step_id: str, text: str) -> None:
+    """Print step output; under the setup interface, attribute it to the step."""
+
+    if interaction.events_enabled():
+        interaction.emit("log", task=step_id, text=text)
+    else:
+        typer.echo(text)
+
+
+def _recreate_destroy(repo_root: Path, env: str) -> None:
+    """Destroy the workspace for a recreate, deleting its items with it."""
+
+    step_id = "terraform-destroy-recreate"
+    environment = os.environ.copy()
+    environment["TF_DATA_DIR"] = str(
+        (repo_root / "deploy" / ".generated" / env / ".terraform").resolve()
+    )
+    terraform = ["terraform", "-chdir=deploy/terraform"]
+    listed = subprocess.run(
+        [*terraform, "state", "list"],
+        cwd=repo_root,
+        env=environment,
+        capture_output=True,
+        text=True,
+    )
+    if listed.returncode != 0:
+        raise RuntimeError(listed.stderr.strip() or "terraform state list failed")
+    addresses = listed.stdout.split()
+    if _MANAGED_WORKSPACE_ADDRESS in addresses:
+        children = [
+            address for address in addresses if address.startswith(_WORKSPACE_ITEM_RESOURCES)
+        ]
+        if children:
+            _step_echo(
+                step_id,
+                "Deleting the workspace deletes every item in it, so these are removed "
+                "from Terraform state instead of being destroyed one by one: "
+                + ", ".join(children),
+            )
+            removed = subprocess.run(
+                [*terraform, "state", "rm", *children],
+                cwd=repo_root,
+                env=environment,
+                capture_output=True,
+                text=True,
+            )
+            if removed.returncode != 0:
+                raise RuntimeError(removed.stderr.strip() or "terraform state rm failed")
+    result = _run_step_command(
+        [
+            *terraform,
+            "destroy",
+            "-auto-approve",
+            "-input=false",
+            f"-var-file=../.generated/{env}/terraform.tfvars",
+        ],
+        cwd=repo_root,
+        step_id=step_id,
+        env=environment,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"terraform destroy failed (exit {result.returncode})")
 
 
 def _terraform_plan_guard(repo_root: Path, env: str) -> None:
@@ -1167,7 +1326,8 @@ def render(
     deploy_config = _load_deploy_environment(repo_root, env)
     profile = deploy_config.profile
     try:
-        _validate_required_ml_history(generation, profile)
+        for warning in _validate_generation_feasibility(generation, profile):
+            typer.echo(f"Warning: {warning}", err=True)
     except ValueError as exc:
         typer.echo(f"Invalid {gen_path} for this profile: {exc}", err=True)
         raise typer.Exit(code=1) from None
@@ -1771,11 +1931,13 @@ def _deploy_plan(
                         "-chdir=deploy/terraform",
                         "destroy",
                         "-auto-approve",
+                        "-input=false",
                         f"-var-file={var_file}",
                     ],
                     needs_confirmation=True,
                     description="Terraform destroy (recreate - DESTROYS the workspace and all items)",
                     step_id="terraform-destroy-recreate",
+                    action=lambda root: _recreate_destroy(root, env),
                     process_environment=terraform_environment,
                 ),
                 DeployStep(
@@ -2681,6 +2843,40 @@ def _reattach_running_pipeline_steps(
     return reattached
 
 
+def _run_step_command(
+    command: list[str],
+    *,
+    cwd: Path,
+    step_id: str,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[Any]:
+    """Run one deploy step; under the setup TUI, tag each output line with its step."""
+
+    if not interaction.events_enabled():
+        return subprocess.run(command, cwd=cwd, **({"env": env} if env else {}))
+    with subprocess.Popen(
+        command,
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        bufsize=1,
+    ) as process:
+        assert process.stdout is not None
+        for line in process.stdout:
+            text = line.rstrip("\r\n")
+            if interaction.parse_event(text) is not None:
+                # Nested prompts travel to the TUI unchanged; the nested command
+                # inherits this process's stdin to read the reply.
+                interaction.emit_line(text)
+            else:
+                interaction.emit("log", task=step_id, text=text)
+        return subprocess.CompletedProcess(command, process.wait())
+
+
 def _run_plan_plain(
     repo_root: Path,
     env: str,
@@ -2749,10 +2945,11 @@ def _run_plan_plain(
                 elif result.stderr:
                     typer.echo(result.stderr, err=True)
             else:
-                result = subprocess.run(
+                result = _run_step_command(
                     step.cmd,
                     cwd=repo_root,
-                    **({"env": process_environment} if process_environment else {}),
+                    step_id=step.step_id,
+                    env=process_environment,
                 )
             if (
                 result is not None
@@ -2947,7 +3144,10 @@ def _run_plan_plain(
                     step.cmd,
                 )
                 if step.needs_confirmation and not yes:
-                    if not typer.confirm(f"Proceed with: {step.description}?"):
+                    if not interaction.confirm(
+                        f"Proceed with: {step.description}?",
+                        detail=f"Step {index}/{total}\n{_display_command(step.cmd)}",
+                    ):
                         typer.echo("Aborted by user.")
                         with journal_lock:
                             _deploy_journal.mark_failed(
@@ -3191,7 +3391,18 @@ def deploy(
             raise typer.Exit(code=1) from exc
     if not dry_run:
         if not skip_login and _interactive_terminal():
-            _sign_in_configured_tenant(repo_root, env)
+            sign_in = {
+                "parent": "deploy",
+                "id": "sign-in",
+                "label": "Sign in to the configured Azure tenant",
+            }
+            interaction.emit("task", **sign_in, status="RUNNING")
+            try:
+                _sign_in_configured_tenant(repo_root, env)
+            except typer.Exit:
+                interaction.emit("task", **sign_in, status="FAILED")
+                raise
+            interaction.emit("task", **sign_in, status="SUCCEEDED")
         _validate_azure_cli_tenant(repo_root, env)
         # Auto-detect a prior deployment so the user doesn't need to remember
         # --recreate. If the workspace exists, offer a clean-slate reset.
@@ -3199,10 +3410,11 @@ def deploy(
             if _workspace_exists(repo_root, ws_name):
                 typer.echo("")
                 typer.echo(f"Workspace '{ws_name}' already exists from a previous deploy.")
-                if typer.confirm(
+                if interaction.confirm(
                     "Reset it? This DESTROYS the workspace and ALL items in it, "
                     "then redeploys from scratch",
                     default=False,
+                    detail=f"Workspace '{ws_name}' already exists from a previous deploy.",
                 ):
                     recreate = True
                 else:
@@ -3219,7 +3431,7 @@ def deploy(
         semantic_model_name=semantic_model,
         report_name=report_name,
         profile=profile,
-        interactive_preflight=sys.stdin.isatty() and not yes,
+        interactive_preflight=interaction.is_interactive() and not yes,
         repo_root=repo_root,
         operations_planning_enabled=native.enabled if native is not None else False,
         include_native_plan=native.include_plan if native is not None else False,
@@ -3238,6 +3450,24 @@ def deploy(
     _echo_profile_inventory(profile)
 
     if dry_run:
+        # Under the setup interface, publish the plan as pending tasks so the
+        # Deploy phase lists every step before it runs.
+        preview: list[dict[str, object]] = []
+        if not skip_login and tenant_id:
+            preview.append({"id": "sign-in", "label": "Sign in to the configured Azure tenant"})
+        preview += [
+            {"id": step.step_id, "label": step.description, "required": step.required}
+            for step in plan
+        ]
+        if profile.post_deploy_pipeline_ref is not None:
+            preview.append(
+                {"id": "verify-readiness", "label": "Verify live readiness and freshness"}
+            )
+        interaction.emit(
+            "tasks",
+            parent="deploy",
+            tasks=[{"status": "PENDING", "required": True, **item} for item in preview],
+        )
         for i, step in enumerate(plan, start=1):
             _echo_step(i, total, step)
         return
@@ -3646,7 +3876,7 @@ def _verify_readiness_after_deploy(
     typer.echo("    " + _display_command(cmd))
     _deploy_journal.mark_running(journal, "verify-readiness")
     _deploy_journal.write(repo_root, journal)
-    result = subprocess.run(cmd, cwd=repo_root)
+    result = _run_step_command(cmd, cwd=repo_root, step_id="verify-readiness")
     if result.returncode == 0:
         _deploy_journal.mark_succeeded(
             journal,

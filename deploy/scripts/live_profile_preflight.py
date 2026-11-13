@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from retail_setup import interaction
+
 from deploy.scripts import _output as console
 from deploy.scripts.capacity_sizing import (
     CapacitySizingError,
@@ -331,7 +333,7 @@ def main() -> int:
         type=Path,
         help="Write validated custom-pool sizing evidence to this path.",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(sys.argv[1:])
     if not math.isfinite(args.capacity_timeout_seconds) or args.capacity_timeout_seconds <= 0:
         parser.error("--capacity-timeout-seconds must be a positive finite number")
 
@@ -401,11 +403,11 @@ def main() -> int:
             console.error(str(exc))
             if (
                 not args.interactive
-                or not sys.stdin.isatty()
+                or not interaction.is_interactive()
                 or not exc.tenant_settings_fixable
             ):
                 return 1
-            response = input(
+            response = interaction.read_line(
                 "After a Fabric admin changes the listed settings, enter R to "
                 "recheck (or press Enter to stop): "
             )

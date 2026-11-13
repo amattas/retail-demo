@@ -108,7 +108,17 @@ blocked.
 Optional and experimental corrections are also contract-bound:
 
 - recommendation support, confidence, and lift come from one singleton-pair
-  market-basket rule;
+  market-basket rule. When no FP-Growth rule meets `MIN_SUPPORT` and
+  `MIN_CONFIDENCE`, the producer instead uses the pairs bought together in at
+  least `MIN_PAIR_BASKETS` (default 2) multi-item baskets. Those pairs use the
+  same support, confidence, and lift definitions, and MLflow records
+  `rule_source` (`fpgrowth` or `cooccurrence`). Required recommendations still
+  need multi-item baskets. `configure`, the setup interface's configuration
+  page, and `render` therefore reject a store type whose calibrated basket
+  averages less than 0.1 extra items, for profiles with required ML. Every
+  shipped store type passes; `utility/tests/test_estimate.py` keeps it that way.
+  Luxury's target was raised from $1,450, which was below the cost of one item
+  and made every receipt single-line, to $3,000;
 - promotion prices use net extended cents per unit and comparisons include only
   episodes with complete baseline and post windows inside each store's observed
   receipt range;

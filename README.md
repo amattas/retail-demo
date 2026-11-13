@@ -71,8 +71,13 @@ cd retail-demo
 ./scripts/setup.sh --workspace-name retail-demo-alice
 ```
 
-The bootstrap prepares Python, configures the target, renders notebooks, and
-offers to deploy. To proceed directly to deployment after configuration:
+The bootstrap prepares Python, then opens a full-screen setup interface. Its
+configuration page collects the target and data volume. The interface then
+renders notebooks and, if you choose, deploys, showing each step's progress
+and output. The full output is saved under
+`deploy/.generated/<env>/setup-<timestamp>.log`. Add `--plain` for
+line-by-line prompts and output. To proceed directly to deployment after
+configuration:
 
 ```powershell
 .\scripts\setup.ps1 --workspace-name retail-demo-alice --deploy

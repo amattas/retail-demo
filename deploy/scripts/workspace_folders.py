@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import time
 from collections import Counter
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -105,6 +109,21 @@ def organize_workspace(
             timeout=30,
             allow_redirects=False,
         )
+        if response.status_code == 409:
+            # Another publisher (or the portal) created it after our inventory.
+            created = next(
+                (
+                    folder
+                    for folder in paginated_get(session, f"{base}/folders", timeout=30)
+                    if not folder.get("parentFolderId")
+                    and str(folder["displayName"]).casefold() == name.casefold()
+                ),
+                None,
+            )
+            if created is None:
+                response.raise_for_status()
+            folder_ids[name] = _guid(created["id"])
+            return folder_ids[name]
         response.raise_for_status()
         if response.status_code != 201:
             raise WorkspaceFolderError(f"Unexpected folder-create response for {name}.")
@@ -266,11 +285,49 @@ def organize_environment(repo_root: Path, environment: str) -> dict[str, Any]:
     response.raise_for_status()
     if response.json().get("displayName") != config.workspace.name:
         raise WorkspaceFolderError("Live workspace differs from the configured target.")
-    report = organize_workspace(session, workspace_id)
+    # Publishers run in parallel and each reorganizes the whole workspace;
+    # serialize them so two never create the same folder or move the same item.
+    with _exclusive(generated / ".workspace-folders.lock"):
+        report = organize_workspace(session, workspace_id)
     (generated / "workspace-folder-report.json").write_text(
         json.dumps(report, indent=2) + "\n", encoding="utf-8"
     )
     return report
+
+
+@contextmanager
+def _exclusive(path: Path, *, timeout_seconds: float = 900.0) -> Iterator[None]:
+    """Hold a cross-process lock on `path` for one environment's organizers."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + timeout_seconds
+    with path.open("a+b") as handle:
+        while True:
+            try:
+                _lock_file(handle, lock=True)
+                break
+            except OSError:
+                if time.monotonic() >= deadline:
+                    raise WorkspaceFolderError(
+                        "Timed out waiting for another workspace folder organization."
+                    ) from None
+                time.sleep(0.5)
+        try:
+            yield
+        finally:
+            _lock_file(handle, lock=False)
+
+
+def _lock_file(handle: Any, *, lock: bool) -> None:
+    if os.name == "nt":
+        import msvcrt
+
+        handle.seek(0)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK if lock else msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+
+        fcntl.flock(handle, (fcntl.LOCK_EX | fcntl.LOCK_NB) if lock else fcntl.LOCK_UN)
 
 
 def main() -> int:

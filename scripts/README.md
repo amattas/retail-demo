@@ -14,7 +14,11 @@
 
 The bootstrap prepares a Python environment, installs required dependencies,
 runs `retail-setup configure` and `render`, authenticates to the configured
-tenant, and optionally deploys.
+tenant, and optionally deploys. On an interactive terminal, a full-screen
+interface opens as soon as its own packages are installed. It installs the
+remaining packages, opens a configuration page, and then runs configure,
+render, and deploy. Tasks are on the left, live output is on the right, and
+questions open in a dialog box.
 
 The guided prerequisite check installs or requires Git, Terraform, and Azure
 CLI. The lower-level framework supports Azure PowerShell for Python Fabric
@@ -28,9 +32,11 @@ Common flags:
 | --- | --- |
 | `--workspace-name <name>` | Name the Fabric workspace and its local deployment environment. |
 | `--deploy` | Continue from configure/render into deploy. |
+| `--yes` | Accept defaults: skip the configuration page and pre-confirm gated deploy steps. |
 | `--dry-run` | Preview setup-engine commands after the wrapper prepares Python. |
 | `--skip-prereqs` | Skip package-manager prerequisite installation. |
 | `--verbose` | Show full command and package output. |
+| `--plain` | Use line-by-line output instead of the full-screen setup interface. |
 | `--recreate` | Destroy and rebuild the configured workspace. |
 
 The Windows and macOS/Linux wrappers pass `--profile full-demo` to the guided

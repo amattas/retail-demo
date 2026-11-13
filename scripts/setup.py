@@ -9,12 +9,15 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import os
 import platform
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -412,37 +415,120 @@ def _pip_flags() -> list[str]:
     return [] if VERBOSE else ["-q", "--progress-bar", "off"]
 
 
+DEPLOY_LOCK = REPO_ROOT / "utility" / "requirements-deploy.txt"
+# The interface package; installed (with its locked dependencies) before the
+# rest of the deploy lock so the setup interface can start early.
+INTERFACE_PACKAGE = "textual"
+
+
+def python_install_commands(
+    env: PythonEnv, *, quiet: bool = True
+) -> list[tuple[str, list[str]]]:
+    """Return the labelled pip commands that install the demo's Python packages.
+
+    The setup interface passes ``quiet=False`` so its log pane shows each
+    package as pip resolves and installs it.
+    """
+
+    flags = _pip_flags() if quiet else ["--progress-bar", "off"]
+    pip = [str(env.python), "-m", "pip", "install", "--disable-pip-version-check", *flags]
+    return [
+        (
+            "Installing locked Python dependencies",
+            [*pip, "--require-hashes", "-r", str(DEPLOY_LOCK)],
+        ),
+        (
+            "Installing the retail-setup tool",
+            [*pip, "--no-deps", "-e", str(REPO_ROOT / "utility")],
+        ),
+    ]
+
+
 def install_python_dependencies(env: PythonEnv, *, dry_run: bool) -> None:
     _emit("Installing the Python packages required by the demo.")
-    flags = _pip_flags()
-    run_command(
-        [
-            str(env.python),
-            "-m",
-            "pip",
-            "install",
-            *flags,
-            "--require-hashes",
-            "-r",
-            str(REPO_ROOT / "utility" / "requirements-deploy.txt"),
-        ],
-        dry_run=dry_run,
-        label="Installing locked Python dependencies",
-    )
-    run_command(
-        [
-            str(env.python),
-            "-m",
-            "pip",
-            "install",
-            *flags,
-            "--no-deps",
-            "-e",
-            str(REPO_ROOT / "utility"),
-        ],
-        dry_run=dry_run,
-        label="Installing the retail-setup tool",
-    )
+    for label, command in python_install_commands(env):
+        run_command(command, dry_run=dry_run, label=label)
+
+
+def _lock_blocks(text: str) -> dict[str, tuple[str, set[str]]]:
+    """Map each locked package to (requirement block, packages that require it)."""
+
+    blocks: dict[str, tuple[str, set[str]]] = {}
+    current: list[str] = []
+
+    def finish() -> None:
+        if not current:
+            return
+        name = re.split(r"[=\s;\[]", current[0].strip(), maxsplit=1)[0].lower()
+        parents: set[str] = set()
+        via_started = False
+        for line in current[1:]:
+            stripped = line.strip()
+            if stripped.startswith("# via"):
+                via_started = True
+                rest = stripped.removeprefix("# via").strip()
+                if rest:
+                    parents.add(rest.split()[0].lower())
+            elif via_started and stripped.startswith("#"):
+                parents.add(stripped.lstrip("#").strip().split()[0].lower())
+        body = "\n".join(line for line in current if not line.strip().startswith("#"))
+        blocks[name] = (body, parents)
+
+    for line in text.splitlines():
+        if line and not line[0].isspace() and not line.startswith("#"):
+            finish()
+            current = [line]
+        elif current:
+            current.append(line)
+    finish()
+    return blocks
+
+
+def interface_requirements(lock_text: str, package: str = INTERFACE_PACKAGE) -> str:
+    """Return the hashed lock entries for one package and its locked dependencies."""
+
+    blocks = _lock_blocks(lock_text)
+    if package not in blocks:
+        raise KeyError(f"{package} is not in the deploy lock")
+    needed = {package}
+    pending = [package]
+    while pending:
+        parent = pending.pop()
+        for name, (_, parents) in blocks.items():
+            if parent in parents and name not in needed:
+                needed.add(name)
+                pending.append(name)
+    return "\n".join(blocks[name][0] for name in sorted(needed)) + "\n"
+
+
+def install_interface_packages(env: PythonEnv) -> bool:
+    """Install only the setup interface's locked packages; False if that fails."""
+
+    try:
+        requirements = interface_requirements(DEPLOY_LOCK.read_text(encoding="utf-8"))
+    except (OSError, KeyError):
+        return False
+    with tempfile.TemporaryDirectory(prefix="retail-setup-") as directory:
+        path = Path(directory) / "interface-requirements.txt"
+        path.write_text(requirements, encoding="utf-8")
+        result = subprocess.run(
+            [
+                str(env.python),
+                "-m",
+                "pip",
+                "install",
+                "-q",
+                "--progress-bar",
+                "off",
+                "--disable-pip-version-check",
+                "--require-hashes",
+                "-r",
+                str(path),
+            ],
+            cwd=REPO_ROOT,
+            check=False,
+        )
+    return result.returncode == 0
 
 
 def _resolve_az() -> str | None:
@@ -640,6 +726,74 @@ def run_retail_setup(
         _emit(f"  Docs: {DOCS_URL}")
 
 
+def _interface_environment() -> dict[str, str]:
+    """Run the interface from source; the editable install happens inside it."""
+
+    source = str(REPO_ROOT / "utility" / "src")
+    existing = os.environ.get("PYTHONPATH")
+    return {
+        **os.environ,
+        "PYTHONPATH": source + (os.pathsep + existing if existing else ""),
+    }
+
+
+def _tui_available(args: argparse.Namespace, env: PythonEnv) -> bool:
+    """Use the full-screen interface only on an interactive terminal."""
+
+    if args.plain or args.dry_run:
+        return False
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return False
+    probe = subprocess.run(
+        [str(env.python), "-c", "import textual, retail_setup.cli.setup_tui"],
+        cwd=REPO_ROOT,
+        env=_interface_environment(),
+        capture_output=True,
+        check=False,
+    )
+    return probe.returncode == 0
+
+
+def run_tui(
+    env: PythonEnv,
+    *,
+    workspace_name: str | None,
+    profile: str,
+    assume_yes: bool,
+    deploy_requested: bool,
+    recreate: bool,
+    completed: dict[str, tuple[str, float]],
+) -> int:
+    """Install packages, configure, render, and deploy inside the interface."""
+
+    command = [
+        str(env.python),
+        "-m",
+        "retail_setup.cli.setup_tui",
+        "--repo-root",
+        str(REPO_ROOT),
+        "--profile",
+        profile,
+        "--python-install",
+        json.dumps(
+            [cmd for _label, cmd in python_install_commands(env, quiet=False)]
+        ),
+    ]
+    if workspace_name:
+        command.extend(["--workspace-name", workspace_name])
+    if deploy_requested:
+        command.append("--deploy")
+    if recreate:
+        command.append("--recreate")
+    if assume_yes:
+        command.append("--yes")
+    for phase, (status, seconds) in completed.items():
+        command.extend(["--completed", f"{phase}={status}:{seconds:.1f}"])
+    return subprocess.run(
+        command, cwd=REPO_ROOT, env=_interface_environment(), check=False
+    ).returncode
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Guided retail-demo setup")
     parser.add_argument(
@@ -684,19 +838,27 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Show full package-install output.",
     )
+    parser.add_argument(
+        "--plain",
+        action="store_true",
+        help=(
+            "Use line-by-line output instead of the full-screen setup interface "
+            "(automatic when the terminal is not interactive)."
+        ),
+    )
     return parser.parse_args()
 
 
 def _run_guided(args: argparse.Namespace) -> int:
     """Run the four guided setup steps."""
     workspace_name = args.workspace_name
-    if not workspace_name:
-        if args.yes or args.dry_run:
-            workspace_name = "retail-demo"
-        else:
-            workspace_name = (
-                input("Fabric workspace name [retail-demo]: ").strip() or "retail-demo"
-            )
+    # On an interactive terminal the setup interface's configuration page
+    # collects the workspace name, so ask only for plain line-by-line output.
+    interface_expected = (
+        not args.plain and not args.dry_run and sys.stdin.isatty() and sys.stdout.isatty()
+    )
+    if not workspace_name and (args.yes or args.dry_run):
+        workspace_name = "retail-demo"
 
     _banner(
         [
@@ -709,17 +871,27 @@ def _run_guided(args: argparse.Namespace) -> int:
             "  4. Optionally deploy to Microsoft Fabric",
         ]
     )
-    _emit(f"Workspace:   {workspace_name}   (change with --workspace-name)")
-    _emit(f"Environment: {workspace_environment_name(workspace_name)}")
+    if workspace_name:
+        _emit(f"Workspace:   {workspace_name}   (change with --workspace-name)")
+        _emit(f"Environment: {workspace_environment_name(workspace_name)}")
+    else:
+        _emit("Workspace:   chosen in step 3")
     _emit(f"Profile:     {args.profile}")
     _emit(f"Manifest:    {BOOTSTRAP_MANIFEST.version}")
     _emit(f"Project:     {REPO_ROOT}")
     if not args.verbose:
         _emit("Add --verbose for full package-install output.")
+    if interface_expected:
+        _emit(
+            "Steps 2-4 run in a full-screen interface once it is installed; "
+            "add --plain for line output."
+        )
     if args.dry_run:
         _emit("Dry run: printing commands without running them.")
 
     total = 4
+    completed: dict[str, tuple[str, float]] = {}
+    started = time.monotonic()
     if not args.skip_prereqs:
         _section(1, total, "Checking the required tools")
         install_prerequisites(
@@ -728,13 +900,35 @@ def _run_guided(args: argparse.Namespace) -> int:
             dry_run=args.dry_run,
             assume_yes=args.yes,
         )
+        prereq_status = "DEGRADED" if missing_prerequisites() else "SUCCEEDED"
     else:
         _section(1, total, "Checking the required tools (skipped)")
+        prereq_status = "SKIPPED"
+    completed["prereqs"] = (prereq_status, time.monotonic() - started)
+
+    env = current_python_env()
+    if interface_expected:
+        _emit("")
+        _emit("Starting the setup interface...")
+        if install_interface_packages(env) and _tui_available(args, env):
+            return run_tui(
+                env,
+                workspace_name=workspace_name,
+                profile=args.profile,
+                assume_yes=args.yes,
+                deploy_requested=args.deploy or args.recreate,
+                recreate=args.recreate,
+                completed=completed,
+            )
+        _emit("The setup interface is unavailable; continuing with plain output.")
 
     _section(2, total, "Installing the Python packages")
-    env = current_python_env()
     install_python_dependencies(env, dry_run=args.dry_run)
 
+    if not workspace_name:
+        workspace_name = (
+            input("Fabric workspace name [retail-demo]: ").strip() or "retail-demo"
+        )
     run_retail_setup(
         env,
         workspace_name=workspace_name,

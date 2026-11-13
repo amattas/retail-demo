@@ -2,7 +2,7 @@
   "store_type": "luxury",
   "display_name": "Luxury",
   "basket_lambda": 1.6,
-  "avg_ticket_target": 1450.0,
+  "avg_ticket_target": 3000.0,
   "hourly_weights": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2, 0.8, 1.6,
                      2.2, 2.6, 2.8, 2.8, 2.6, 2.2, 1.6, 0.8, 0.2, 0.0, 0.0, 0.0],
   "daily_weights": [0.8, 0.8, 0.9, 1.0, 1.2, 1.6, 1.3],

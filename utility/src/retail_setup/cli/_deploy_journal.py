@@ -25,6 +25,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
+from retail_setup import interaction
+
 StepStatus = Literal[
     "PENDING",
     "RUNNING",
@@ -330,6 +332,20 @@ def write(repo_root: Path, journal: DeployJournal) -> None:
                     previous.to_dict(),
                 )
         _write_atomic(path, journal.to_dict())
+        interaction.emit(
+            "tasks",
+            parent="deploy",
+            tasks=[
+                {
+                    "id": step.step_id,
+                    "label": step.description,
+                    "status": step.status,
+                    "required": step.classification == "required",
+                    "detail": step.error,
+                }
+                for step in journal.steps
+            ],
+        )
 
 
 def _write_atomic(path: Path, payload: dict[str, object]) -> None:
