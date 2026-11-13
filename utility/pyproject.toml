@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling==1.27.0"]
+requires = ["hatchling==1.33.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -14,11 +14,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=9.0.3", "ruff>=0.4", "mypy>=1.8", "pyspark>=3.5.2,<4.3", "pyarrow>=14", "pandas>=2.0", "numpy>=1.26"]
+dev = ["pytest>=9.0.3", "ruff>=0.4", "mypy>=1.8", "pyspark>=3.5.2,<4.4", "pyarrow>=14", "pandas>=2.0", "numpy>=1.26"]
 deploy = [
     "azure-identity>=1.25.3,<2",
     "azure-kusto-data>=6.0.4,<7",
-    "fabric-cicd==1.3.0",
+    "fabric-cicd==1.4.0",
     "mssql-python>=1.12,<2; sys_platform != 'darwin'",
     "pyodbc>=5.1,<6",
     "textual>=3.0",
@@ -26,7 +26,7 @@ deploy = [
 spark = [
     "numpy>=1.26",
     "pyarrow>=14",
-    "pyspark>=3.5.2,<4.3",
+    "pyspark>=3.5.2,<4.4",
 ]  # local testing; Fabric provides Spark at runtime
 
 [project.scripts]
