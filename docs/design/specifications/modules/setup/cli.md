@@ -129,7 +129,8 @@ Each phase is a `retail-setup` subprocess started with
   output line is emitted as a `log` event tagged with its step, so the
   interface can filter output for one step. Nested protocol lines, including
   prompts from deploy scripts, are forwarded unchanged.
-- A `prompt` event (`confirm`, `text`, or `int`) opens a dialog box. The answer
+- A `prompt` event (`confirm`, `text`, `int`, or `choice`) opens a dialog box.
+  A `choice` prompt lists its `options` as buttons. The answer
   is written back as one JSON stdin line that echoes the prompt `id`. Nested
   commands inherit that stdin. Cancelling the dialog box with `Esc` sends a
   cancellation, which raises `PromptCancelled` in the prompting process and
@@ -148,6 +149,26 @@ nested-step attribution, journal events, the dialog box, package installation
 before the configuration page, and configuration-page defaults, validation, and
 the `configure` flags it produces. `tests/scripts/test_setup_bootstrap.py`
 checks that the interface bootstrap installs only Textual's locked dependencies.
+
+#### Failed steps and the dependency graph
+
+When a phase fails, the interface asks **Retry**, **Skip**, or **Stop**.
+Retry runs the phase again. Skip marks the phase skipped.
+Stop ends setup with the phase's exit code. The phases depend on each other in a
+chain: configure needs the Python packages, render needs configure, and deploy
+needs render. Every phase that depends on a skipped phase, directly or through
+a blocked phase, is marked **not runnable** (`BLOCKED`, shown as `[⊘]`)
+and never starts. Its pending child steps are blocked too. A deploy retry adds
+`--resume` and drops `--recreate` once the journal has a succeeded step, so it
+never deletes the workspace again or reruns finished work.
+
+Inside deploy, a failed step asks the same question at step level, as
+described under
+[Operator recovery](../deployment/framework.md#operator-recovery). Deploy
+handles those answers itself, so the interface doesn't ask again for
+deploy exit codes `5` (stopped) or `6` (steps skipped). When any phase or step
+was skipped, setup ends with exit code `6` and the footer reads
+**Setup finished with skipped steps**.
 
 ## `configure`
 
