@@ -74,7 +74,14 @@ def parse_event(line: str) -> dict[str, Any] | None:
     return payload
 
 
-def _ask(kind: str, message: str, *, default: str | None, detail: str | None) -> str:
+def _ask(
+    kind: str,
+    message: str,
+    *,
+    default: str | None,
+    detail: str | None,
+    **extra: Any,
+) -> str:
     prompt_id = uuid.uuid4().hex
     with _PROMPT_LOCK:
         emit(
@@ -84,6 +91,7 @@ def _ask(kind: str, message: str, *, default: str | None, detail: str | None) ->
             message=message,
             default=default,
             detail=detail,
+            **extra,
         )
         reply = sys.stdin.readline()
     if not reply:
@@ -105,6 +113,39 @@ def confirm(message: str, *, default: bool = False, detail: str | None = None) -
 
         return typer.confirm(message, default=default)
     return _ask("confirm", message, default="yes" if default else "no", detail=detail) == "yes"
+
+
+def choose(
+    message: str,
+    options: list[str],
+    *,
+    default: str,
+    detail: str | None = None,
+    title: str | None = None,
+) -> str:
+    """Ask the operator to pick one of `options` (case-insensitive)."""
+
+    if default not in options:
+        raise ValueError(f"default {default!r} is not one of {options!r}")
+    lowered = {option.lower(): option for option in options}
+    if not events_enabled():
+        import typer
+
+        if detail:
+            typer.echo(detail)
+        while True:
+            answer = typer.prompt(
+                f"{message} [{'/'.join(options)}]", default=default, show_default=True
+            )
+            if str(answer).strip().lower() in lowered:
+                break
+            typer.echo(f"Choose one of: {', '.join(options)}")
+    else:
+        extra: dict[str, Any] = {"options": options}
+        if title:
+            extra["title"] = title
+        answer = _ask("choice", message, default=default, detail=detail, **extra)
+    return lowered.get(str(answer).strip().lower(), default)
 
 
 def prompt_text(message: str, *, default: str | None = None) -> str:

@@ -2650,6 +2650,91 @@ def test_optional_failure_allows_join_and_independent_sibling(monkeypatch, tmp_p
     assert _deploy_journal.compute_status(journal) == "DEGRADED"
 
 
+def _interactive_plan(monkeypatch, answers, failures):
+    """Run a three-step plan where the operator answers each failed step."""
+
+    commands: list[str] = []
+    asked: list[tuple[str, list[str]]] = []
+
+    def fake_run(command, **_kwargs):
+        commands.append(command[0])
+        remaining = failures.get(command[0], 0)
+        failures[command[0]] = max(remaining - 1, 0)
+        return SimpleNamespace(returncode=9 if remaining else 0)
+
+    def fake_choose(message, options, **_kwargs):
+        asked.append((message, list(options)))
+        return answers.pop(0)
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli.interaction, "is_interactive", lambda: True)
+    monkeypatch.setattr(cli.interaction, "choose", fake_choose)
+    plan = [
+        cli.DeployStep(cmd=["root"], step_id="root", description="Root"),
+        cli.DeployStep(cmd=["child"], step_id="child", depends_on=("root",)),
+        cli.DeployStep(cmd=["grandchild"], step_id="grandchild", depends_on=("child",)),
+        cli.DeployStep(cmd=["independent"], step_id="independent"),
+    ]
+    journal = _deploy_journal.start_run("dev", targets={})
+    for step in plan:
+        _deploy_journal.add_step(journal, step.step_id, step.step_id, required=True)
+    return plan, journal, commands, asked
+
+
+def test_operator_retry_reruns_a_failed_step(monkeypatch, tmp_path):
+    plan, journal, commands, asked = _interactive_plan(monkeypatch, ["Retry"], {"root": 1})
+
+    cli._run_plan_plain(tmp_path, "dev", plan, len(plan), yes=False, journal=journal)
+
+    assert commands.count("root") == 2
+    assert asked == [("Root failed. What next?", ["Retry", "Skip", "Stop"])]
+    assert {step.status for step in journal.steps} == {"SUCCEEDED"}
+
+
+def test_operator_skip_blocks_all_dependents_but_not_independent_steps(monkeypatch, tmp_path):
+    plan, journal, commands, _ = _interactive_plan(monkeypatch, ["Skip"], {"root": 1})
+
+    with pytest.raises(typer.Exit) as exc:
+        cli._run_plan_plain(tmp_path, "dev", plan, len(plan), yes=False, journal=journal)
+
+    assert exc.value.exit_code == cli._OPERATOR_SKIPPED_EXIT_CODE
+    assert sorted(commands) == ["independent", "root"]
+    steps = {step.step_id: step for step in journal.steps}
+    assert steps["root"].status == "SKIPPED" and steps["root"].blocked_by == []
+    assert steps["child"].blocked_by == ["root"]
+    assert steps["grandchild"].blocked_by == ["child"]
+    assert steps["independent"].status == "SUCCEEDED"
+    assert _deploy_journal.compute_status(journal) == "FAILED"
+
+
+def test_operator_stop_starts_no_new_steps(monkeypatch, tmp_path):
+    plan, journal, commands, _ = _interactive_plan(monkeypatch, ["Stop"], {"root": 1})
+
+    with pytest.raises(typer.Exit) as exc:
+        cli._run_plan_plain(tmp_path, "dev", plan, len(plan), yes=False, journal=journal)
+
+    assert exc.value.exit_code == cli._OPERATOR_STOPPED_EXIT_CODE
+    assert "child" not in commands
+    statuses = {step.step_id: step.status for step in journal.steps}
+    assert statuses["root"] == "FAILED"
+    assert statuses["child"] == statuses["grandchild"] == "SKIPPED"
+
+
+def test_retry_is_withheld_while_a_pipeline_run_may_still_be_active():
+    step = cli.DeployStep(cmd=["x"], step_id="x", description="Run setup pipeline")
+    offered: list[list[str]] = []
+
+    def fake_choose(_message, options, **_kwargs):
+        offered.append(list(options))
+        return options[0]
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(cli.interaction, "choose", fake_choose)
+        assert cli._ask_failed_step(step, 1, 1, 1, "run is InProgress") == "Skip"
+
+    assert offered == [["Skip", "Stop"]]
+
+
 def test_no_premature_complete_banner_on_required_step_failure(monkeypatch, tmp_path):
     """The 'Deploy complete' banner never prints before required work finishes."""
     _seed_deploy_config(tmp_path, profile="full-demo")

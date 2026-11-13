@@ -31,8 +31,18 @@ PHASES: list[tuple[str, str]] = [
     ("render", "Render workspace notebooks"),
     ("deploy", "Deploy to Microsoft Fabric"),
 ]
+# Each phase needs the output of these earlier phases. A phase skipped after a
+# failure makes everything that depends on it, directly or not, BLOCKED.
+PHASE_DEPENDENCIES: dict[str, tuple[str, ...]] = {
+    "configure": ("python",),
+    "render": ("configure",),
+    "deploy": ("render",),
+}
 CANCELLED_EXIT_CODE = 130
 _PIPELINE_MONITOR_DETACHED_EXIT_CODE = 4
+# `retail-setup deploy` exit codes after the operator answered a failed step.
+_DEPLOY_STOPPED_EXIT_CODE = 5
+SKIPPED_STEPS_EXIT_CODE = 6
 
 Ask = Callable[[PromptRequest], "str | None"]
 
@@ -99,6 +109,8 @@ class SetupRunner:
         self._cancelled = threading.Event()
         self._process: subprocess.Popen[str] | None = None
         self._log_file: IO[str] | None = None
+        # Phases skipped after a failure or blocked by one; their dependents cannot run.
+        self._unusable: set[str] = set()
 
     @property
     def cancelled(self) -> bool:
@@ -166,7 +178,9 @@ class SetupRunner:
 
         if "python" not in options.completed:
             if options.python_install:
-                code = self._phase("python", *[list(cmd) for cmd in options.python_install])
+                code = self._recoverable(
+                    "python", lambda: [list(cmd) for cmd in options.python_install]
+                )
                 if code:
                     return code
                 # Packages installed by this phase become importable in this
@@ -174,6 +188,11 @@ class SetupRunner:
                 importlib.invalidate_caches()
             else:
                 self.state.set_status("python", "SKIPPED")
+        if self._block_if_unrunnable("configure"):
+            # Without the packages nothing else can run, including the page.
+            for key in ("render", "deploy"):
+                self._block_if_unrunnable(key)
+            return self._final_code()
         code = self._resolve_target()
         if code:
             return code
@@ -191,7 +210,7 @@ class SetupRunner:
         ]
         if options.configure_args:
             configure.extend([*options.configure_args, "--yes"])
-        code = self._phase("configure", configure)
+        code = self._recoverable("configure", lambda: [configure])
         if code:
             return code
 
@@ -201,13 +220,17 @@ class SetupRunner:
             deploy_command.append("--recreate")
         deploy = options.deploy or options.recreate
         decided = deploy or options.yes or not options.ask_deploy
-        if deploy:
+        if deploy and "configure" not in self._unusable:
             self._preview_deploy(deploy_command)
 
-        code = self._phase("render", [*cli, "render", "--env", options.env])
-        if code:
-            self.state.skip_pending_children("deploy")
-            return code
+        if not self._block_if_unrunnable("render"):
+            code = self._recoverable("render", lambda: [[*cli, "render", "--env", options.env]])
+            if code:
+                self.state.skip_pending_children("deploy")
+                return code
+
+        if self._block_if_unrunnable("deploy"):
+            return self._final_code()
 
         if not decided:
             answer = self.ask(
@@ -231,20 +254,111 @@ class SetupRunner:
         if not deploy:
             self.state.set_status("deploy", "SKIPPED")
             self.log("deploy", f"Deployment skipped. Run it later with: {later}")
-            return 0
+            return self._final_code()
 
         if options.yes:
             deploy_command.append("--yes")
-        code = self._phase("deploy", deploy_command)
+        attempts = 0
+
+        def deploy_commands() -> list[list[str]]:
+            nonlocal attempts
+            attempts += 1
+            return [deploy_command if attempts == 1 else self._deploy_retry(deploy_command)]
+
+        code = self._recoverable(
+            "deploy",
+            deploy_commands,
+            settled={_PIPELINE_MONITOR_DETACHED_EXIT_CODE, _DEPLOY_STOPPED_EXIT_CODE},
+        )
         self.state.skip_pending_children("deploy")
         if code == _PIPELINE_MONITOR_DETACHED_EXIT_CODE:
             self.log(
                 "deploy",
                 f"Fabric pipeline work is still running. Reattach later with: {later} --resume",
             )
+        elif code == SKIPPED_STEPS_EXIT_CODE:
+            self.log("deploy", f"Complete the skipped steps later with: {later} --resume")
         elif code and not self.cancelled:
             self.log("deploy", f"Resume after fixing the cause with: {later} --resume")
-        return code
+        return code or self._final_code()
+
+    def _final_code(self) -> int:
+        return SKIPPED_STEPS_EXIT_CODE if self._unusable else 0
+
+    def _block_if_unrunnable(self, key: str) -> bool:
+        """Mark `key` BLOCKED when a phase it depends on was skipped or blocked."""
+
+        missing = [dep for dep in PHASE_DEPENDENCIES.get(key, ()) if dep in self._unusable]
+        if not missing:
+            return False
+        labels = ", ".join(self.state.tasks[dep].label for dep in missing)
+        reason = f"needs {labels}"
+        self.state.set_status(key, "BLOCKED", detail=reason)
+        self.state.block_pending_children(key, reason)
+        self.log(key, f"Not runnable: it needs {labels}, which did not complete.")
+        self._unusable.add(key)
+        return True
+
+    def _recoverable(
+        self,
+        key: str,
+        commands: Callable[[], list[list[str]]],
+        *,
+        settled: set[int] | None = None,
+    ) -> int:
+        """Run a phase; on failure let the operator retry it, skip it, or stop.
+
+        Returns 0 when the phase succeeded or was skipped (its dependents are
+        then BLOCKED), otherwise the exit code that ends setup. Codes in
+        `settled` already reflect an operator decision and are returned as-is.
+        """
+
+        settled = (settled or set()) | {CANCELLED_EXIT_CODE, SKIPPED_STEPS_EXIT_CODE}
+        while True:
+            code = self._phase(key, *commands())
+            if code == 0 or code in settled or self.cancelled:
+                return code
+            label = self.state.tasks[key].label
+            answer = self.ask(
+                PromptRequest(
+                    kind="choice",
+                    message=f"{label} failed. What next?",
+                    default="Retry",
+                    options=("Retry", "Skip", "Stop"),
+                    detail=(
+                        f"It exited with code {code}; the output pane shows why.\n"
+                        "Skip marks the steps that depend on it as not runnable."
+                    ),
+                    title="Step failed",
+                )
+            )
+            if answer is None:
+                self._cancelled.set()
+                return CANCELLED_EXIT_CODE
+            if answer == "Retry":
+                self.log(key, "Retrying.")
+                self.state.reset(key)
+                continue
+            if answer == "Skip":
+                self.state.set_status(key, "SKIPPED", detail="skipped after failure")
+                self.log(key, "Skipped by the operator; steps that depend on it will not run.")
+                self._unusable.add(key)
+                return 0
+            return code
+
+    def _deploy_retry(self, command: list[str]) -> list[str]:
+        """Rerun deploy, resuming after its succeeded steps when the journal allows."""
+
+        from retail_setup.cli import _deploy_journal
+
+        try:
+            journal = _deploy_journal.read(self.options.repo_root, self.options.env)
+        except (OSError, ValueError):
+            return command
+        if not any(step.status == "SUCCEEDED" for step in journal.steps):
+            return command
+        # Resume keeps the journaled recreate identity; the flags cannot combine.
+        return [part for part in command if part != "--recreate"] + ["--resume"]
 
     def _preview_deploy(self, deploy_command: list[str]) -> None:
         """List the deploy plan's steps as pending tasks before deploy runs."""
@@ -306,6 +420,10 @@ class SetupRunner:
             self.state.set_status(key, "FAILED", detail="cancelled")
             self.log(key, "Cancelled by the operator.")
             return CANCELLED_EXIT_CODE
+        if code == SKIPPED_STEPS_EXIT_CODE:
+            self.state.set_status(key, "DEGRADED", detail="some steps were skipped")
+            self.log(key, "Finished with skipped steps.")
+            return code
         self.state.set_status(key, "SUCCEEDED" if code == 0 else "FAILED")
         if code:
             self.log(key, f"Failed with exit code {code}.")
@@ -404,6 +522,9 @@ class SetupRunner:
             return
         if task.status == "RUNNING":
             self.log(task.key, f"▶ {task.label}")
+        elif task.status == "BLOCKED":
+            reason = f": {task.detail}" if task.detail else ""
+            self.log(task.key, f"Not runnable - {task.label}{reason}")
         elif task.status in {"FAILED", "SKIPPED", "DEGRADED"}:
             reason = f": {task.detail}" if task.detail else ""
             self.log(task.key, f"{task.status.title()} - {task.label}{reason}")
@@ -411,11 +532,15 @@ class SetupRunner:
     def _answer(self, key: str, event: dict[str, Any], reply_to: IO[str] | None) -> None:
         default = event.get("default")
         detail = event.get("detail")
+        title = event.get("title")
+        options = event.get("options")
         request = PromptRequest(
             kind=str(event.get("kind") or "text"),
             message=str(event.get("message") or ""),
             default=None if default is None else str(default),
             detail=detail if isinstance(detail, str) and detail else None,
+            title=title if isinstance(title, str) and title else "Input required",
+            options=(tuple(str(option) for option in options) if isinstance(options, list) else ()),
         )
         self.log(key, f"? {request.message}")
         answer = None if self.cancelled else self.ask(request)

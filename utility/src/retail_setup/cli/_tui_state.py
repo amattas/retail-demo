@@ -7,7 +7,7 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 
-TERMINAL_STATUSES = frozenset({"SUCCEEDED", "DEGRADED", "SKIPPED", "FAILED"})
+TERMINAL_STATUSES = frozenset({"SUCCEEDED", "DEGRADED", "SKIPPED", "FAILED", "BLOCKED"})
 MAX_LOG_ENTRIES = 20_000
 
 
@@ -38,11 +38,12 @@ class LogEntry:
 
 @dataclass(frozen=True)
 class PromptRequest:
-    kind: str  # confirm | text | int
+    kind: str  # confirm | text | int | choice
     message: str
     default: str | None = None
     detail: str | None = None
     title: str = "Input required"
+    options: tuple[str, ...] = ()  # the buttons for a choice prompt
 
 
 def matches_task(entry_task: str, key: str) -> bool:
@@ -170,6 +171,21 @@ class SetupState:
             for child in self.children(parent):
                 if child.status == "PENDING":
                     self.set_status(child.key, "SKIPPED")
+
+    def block_pending_children(self, parent: str, reason: str) -> None:
+        with self.lock:
+            for child in self.children(parent):
+                if child.status == "PENDING":
+                    self.set_status(child.key, "BLOCKED", detail=reason)
+
+    def reset(self, key: str) -> None:
+        """Return a finished phase to PENDING so it can run again (a retry)."""
+
+        with self.lock:
+            task = self.tasks[key]
+            task.status = "PENDING"
+            task.started = task.ended = None
+            task.detail = None
 
     def phase_fraction(self, key: str) -> float:
         with self.lock:

@@ -119,6 +119,8 @@ class JournalStep:
     error: str | None = None
     evidence_path: str | None = None
     evidence_id: str | None = None
+    # Prerequisites that did not succeed, when this step was SKIPPED because of them.
+    blocked_by: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -274,11 +276,31 @@ def mark_degraded(
     step.ended_at = _utc_now()
 
 
-def mark_skipped(journal: DeployJournal, step_id: str, *, reason: str | None = None) -> None:
+def mark_skipped(
+    journal: DeployJournal,
+    step_id: str,
+    *,
+    reason: str | None = None,
+    blocked_by: list[str] | None = None,
+) -> None:
     step = _find_step(journal, step_id)
     step.status = "SKIPPED"
     step.error = _redact(reason)
+    step.blocked_by = list(blocked_by or [])
     step.ended_at = _utc_now()
+
+
+def mark_pending(journal: DeployJournal, step_id: str) -> None:
+    """Reset a finished step so the scheduler runs it again (an operator retry)."""
+
+    step = _find_step(journal, step_id)
+    step.status = "PENDING"
+    step.started_at = None
+    step.ended_at = None
+    step.exit_code = None
+    step.error = None
+    step.evidence_id = None
+    step.blocked_by = []
 
 
 def mark_failed(
@@ -302,13 +324,16 @@ def compute_status(journal: DeployJournal) -> RunStatus:
     """Derive the overall run status from its steps' status/classification.
 
     A required step's failure always fails the run. Otherwise the run stays
-    RUNNING while any step is still pending/running, degrades if an optional
-    step failed, and succeeds otherwise.
+    RUNNING while any step is still pending/running. A required step that was
+    skipped (by the operator, or because a prerequisite did not succeed) fails
+    the run; an optional failure degrades it, and it succeeds otherwise.
     """
     if any(s.status == "FAILED" and s.classification == "required" for s in journal.steps):
         return "FAILED"
     if any(s.status in ("PENDING", "RUNNING") for s in journal.steps):
         return "RUNNING"
+    if any(s.status == "SKIPPED" and s.classification == "required" for s in journal.steps):
+        return "FAILED"
     if any(
         s.status == "DEGRADED" or (s.status == "FAILED" and s.classification == "optional")
         for s in journal.steps
@@ -339,9 +364,13 @@ def write(repo_root: Path, journal: DeployJournal) -> None:
                 {
                     "id": step.step_id,
                     "label": step.description,
-                    "status": step.status,
+                    # The interface shows steps a skip made unrunnable as BLOCKED.
+                    "status": (
+                        "BLOCKED" if step.status == "SKIPPED" and step.blocked_by else step.status
+                    ),
                     "required": step.classification == "required",
                     "detail": step.error,
+                    "blocked_by": list(step.blocked_by),
                 }
                 for step in journal.steps
             ],
