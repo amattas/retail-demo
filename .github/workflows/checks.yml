@@ -3,8 +3,9 @@
 # Required checks (default-branch ruleset): "checks" and "security". See the fleet standard (mattas-net/standards, private; ci-cd/ci-workflows).
 # python-service without an image: the shared `python` job covers lint, type-check, the fast
 # utility tests, the notebook drift check, the repo contract tests and the dependency audit.
-# The repo-specific jobs (Spark shards, local E2E, Windows, documentation) feed the `checks`
-# alias, which requires all of them.
+# The repo-specific jobs (local E2E, Windows, documentation) feed the `checks` alias, which
+# requires all of them. The Spark shards are optional: they run on every PR and push but
+# continue on error and do not gate `checks` or a release.
 name: Checks
 
 on:
@@ -59,6 +60,8 @@ jobs:
   spark-tests:
     needs: approve
     if: always() && needs.approve.result != 'failure' && needs.approve.result != 'cancelled'
+    # Optional: the full Spark shards are informational and do not gate `checks` or a release.
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -216,22 +219,20 @@ jobs:
           python scripts/publish_versioned_docs.py --branch docs-version-ci
 
   checks:
-    needs: [python, spark-tests, spark-e2e, windows-tests, docs-tests]
+    needs: [python, spark-e2e, windows-tests, docs-tests]
     if: always()   # a skipped required check counts as passing, so always run and assert
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Require the shared checks job and every repo-specific test job
+      - name: Require the shared checks job and every required repo-specific test job
         env:
           PYTHON_RESULT: ${{ needs.python.outputs.checks-result }}
-          SPARK_RESULT: ${{ needs.spark-tests.result }}
           E2E_RESULT: ${{ needs.spark-e2e.result }}
           WINDOWS_RESULT: ${{ needs.windows-tests.result }}
           DOCS_RESULT: ${{ needs.docs-tests.result }}
         run: |
           for result in \
             "$PYTHON_RESULT" \
-            "$SPARK_RESULT" \
             "$E2E_RESULT" \
             "$WINDOWS_RESULT" \
             "$DOCS_RESULT"; do

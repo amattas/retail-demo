@@ -168,11 +168,18 @@ def test_taskflow_read_retries_transient_network_errors(monkeypatch):
     monkeypatch.setattr(
         taskflow, "get_taskflow", lambda *_args: {"tasks": [], "edges": []}
     )
+    monkeypatch.setattr(
+        taskflow, "dataset_numeric_ids", lambda *_args: {"retail_model": "42"}
+    )
     adapter = object.__new__(FabricReadinessAdapter)
     adapter.credential = object()
     adapter.workspace_id = "workspace"
 
-    assert adapter.get_taskflow() == {"tasks": [], "edges": []}
+    assert adapter.get_taskflow() == {
+        "tasks": [],
+        "edges": [],
+        "datasetIds": {"retail_model": "42"},
+    }
     assert waits == [5.0]
 
 

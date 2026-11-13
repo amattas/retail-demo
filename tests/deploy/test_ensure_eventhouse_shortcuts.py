@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+import yaml
 
 from deploy.scripts import deploy_config
 from deploy.scripts import ensure_eventhouse_shortcuts as shortcuts
@@ -14,8 +15,23 @@ from deploy.scripts import ensure_eventhouse_shortcuts as shortcuts
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _config() -> deploy_config.DeployConfig:
-    config = deploy_config.load_environment("retail-demo")
+def _config(tmp_path: Path) -> deploy_config.DeployConfig:
+    # Environment files are gitignored, so build one instead of reading a local file.
+    environments_root = tmp_path / "environments"
+    environments_root.mkdir()
+    (environments_root / "retail-demo.yml").write_text(
+        yaml.safe_dump(
+            {
+                "tenant_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                "workspace": {"name": "retail-demo"},
+                "deployment": {"profile": "standard"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    config = deploy_config.load_environment(
+        "retail-demo", environments_root=environments_root
+    )
     return replace(
         config,
         streaming_shortcuts=deploy_config.StreamingShortcutsConfig(enabled=True),
@@ -84,7 +100,7 @@ def test_malformed_shortcut_response_fails_validation():
 
 
 def test_missing_eventhouse_table_stops_before_shortcut_or_mirror_writes(
-    monkeypatch,
+    monkeypatch, tmp_path
 ):
     _prepare_common_reads(
         monkeypatch,
@@ -96,13 +112,13 @@ def test_missing_eventhouse_table_stops_before_shortcut_or_mirror_writes(
     monkeypatch.setattr(shortcuts, "_ensure_mirroring", ensure_mirroring)
 
     with pytest.raises(shortcuts.ShortcutProvisionError, match="receipt_created"):
-        shortcuts.ensure_shortcuts(REPO_ROOT, _config(), _outputs())
+        shortcuts.ensure_shortcuts(REPO_ROOT, _config(tmp_path), _outputs())
 
     ensure_mirroring.assert_not_called()
 
 
 def test_disabled_mirroring_policy_is_enabled_even_when_policy_has_other_values(
-    monkeypatch,
+    monkeypatch, tmp_path
 ):
     policy = {"IsEnabled": False, "Backfill": True}
     _prepare_common_reads(
@@ -115,14 +131,14 @@ def test_disabled_mirroring_policy_is_enabled_even_when_policy_has_other_values(
     ensure_mirroring = MagicMock(return_value=enabled_policy)
     monkeypatch.setattr(shortcuts, "_ensure_mirroring", ensure_mirroring)
 
-    report = shortcuts.ensure_shortcuts(REPO_ROOT, _config(), _outputs())
+    report = shortcuts.ensure_shortcuts(REPO_ROOT, _config(tmp_path), _outputs())
 
     ensure_mirroring.assert_called_once()
     assert report["status"] == "SUCCEEDED"
     assert report["tables"][0]["mirroring_enabled"] is True
 
 
-def test_enabled_mirroring_without_backfill_fails_before_mutation(monkeypatch):
+def test_enabled_mirroring_without_backfill_fails_before_mutation(monkeypatch, tmp_path):
     _prepare_common_reads(
         monkeypatch,
         live_tables={"receipt_created"},
@@ -133,6 +149,6 @@ def test_enabled_mirroring_without_backfill_fails_before_mutation(monkeypatch):
     monkeypatch.setattr(shortcuts, "_ensure_mirroring", ensure_mirroring)
 
     with pytest.raises(shortcuts.ShortcutProvisionError, match="Backfill"):
-        shortcuts.ensure_shortcuts(REPO_ROOT, _config(), _outputs())
+        shortcuts.ensure_shortcuts(REPO_ROOT, _config(tmp_path), _outputs())
 
     ensure_mirroring.assert_not_called()
