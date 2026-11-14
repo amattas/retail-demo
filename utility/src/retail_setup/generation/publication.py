@@ -162,6 +162,17 @@ class PublicationBackend(Protocol):
 LogFn = Callable[[str, str, "int | None", "str | None"], None]
 
 
+def _same_thread(function: Callable[..., Any]) -> Callable[..., Any]:
+    return function
+
+
+def _first_error(
+    results: Sequence[tuple[TableTarget, Any, Exception | None]],
+) -> tuple[TableTarget, Exception] | None:
+    """The first target that failed a concurrent phase, with its error."""
+    return next(((target, error) for target, _, error in results if error is not None), None)
+
+
 class PublicationCoordinator:
     """Runs the stage -> validate -> promote (-> rollback) state machine.
 
@@ -247,14 +258,15 @@ class PublicationCoordinator:
         """Run ``operation`` for every target concurrently; results in target order."""
         from concurrent.futures import ThreadPoolExecutor
 
+        in_thread: Callable[[Callable[..., Any]], Callable[..., Any]]
         try:
             # Keep the caller's Spark local properties (job group, Fabric run
             # tagging) on jobs started from worker threads.
-            from pyspark import inheritable_thread_target as in_thread
-        except ImportError:  # the coordinator itself does not need Spark
+            from pyspark import inheritable_thread_target
 
-            def in_thread(function: Callable[..., Any]) -> Callable[..., Any]:
-                return function
+            in_thread = inheritable_thread_target
+        except ImportError:  # the coordinator itself does not need Spark
+            in_thread = _same_thread
 
         with ThreadPoolExecutor(self.max_workers) as pool:
             futures = [(target, pool.submit(in_thread(operation), target)) for target in targets]
@@ -284,25 +296,25 @@ class PublicationCoordinator:
         for target, count, error in stage_results:
             if error is None:
                 self.log(target.name, "STAGED", count, None)
-        first_failure = next((r for r in stage_results if r[2] is not None), None)
+        first_failure = _first_error(stage_results)
         if first_failure is not None:
-            return self._fail(first_failure[0], first_failure[2], staged)
+            return self._fail(*first_failure, staged)
 
         # Phase 2 — validate every staged table before any promotion.
         validate_results = self._run_all(
             lambda target: self.backend.validate(target, staged_counts[target]),
             targets,
         )
-        first_failure = next((r for r in validate_results if r[2] is not None), None)
+        first_failure = _first_error(validate_results)
         if first_failure is not None:
-            return self._fail(first_failure[0], first_failure[2], staged)
+            return self._fail(*first_failure, staged)
         self.log("__run__", "VALIDATED", None, None)
 
         # Phase 3 — snapshot every target's pre-promotion state.
         state_results = self._run_all(self.backend.target_state, targets)
-        first_failure = next((r for r in state_results if r[2] is not None), None)
+        first_failure = _first_error(state_results)
         if first_failure is not None:
-            return self._fail(first_failure[0], first_failure[2], staged)
+            return self._fail(*first_failure, staged)
         target_states = {target: state for target, state, _ in state_results}
 
         # Phase 4 — promote concurrently; any failure rolls back every target.

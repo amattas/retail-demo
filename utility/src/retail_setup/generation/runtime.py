@@ -2,6 +2,7 @@
 
 import hashlib
 import math
+from collections.abc import Iterable
 from datetime import date
 
 from pyspark.sql import Column, DataFrame, SparkSession
@@ -112,6 +113,16 @@ def legacy_index(*key_cols):
     from pyspark.sql import functions as F
 
     return F.pmod(F.xxhash64(*key_cols, F.lit("__legacy_index__")), F.lit(2**62))
+
+
+def case_when(branches: Iterable[tuple[Column, object]]) -> Column:
+    """Chain `F.when` over `(condition, value)` branches (at least one)."""
+    expr: Column | None = None
+    for condition, value in branches:
+        expr = F.when(condition, value) if expr is None else expr.when(condition, value)
+    if expr is None:
+        raise ValueError("case_when needs at least one branch")
+    return expr
 
 
 def fixed_width_decimal(value: Column, width: int, label: str) -> Column:

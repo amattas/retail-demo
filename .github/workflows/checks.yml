@@ -45,9 +45,8 @@ jobs:
         python -m pip install --require-hashes -r requirements-ci.txt
         python -m pip install --no-deps -e .
       lint-paths: src tests scripts
-      # mypy backlog (147 errors in src at the time of onboarding): report, do not block.
       typecheck: python -m mypy src
-      typecheck-blocking: false
+      typecheck-blocking: true
       test: python -m pytest -q -m "not spark"
       extra-checks: |
         python scripts/build_notebooks.py --check

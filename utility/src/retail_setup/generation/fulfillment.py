@@ -300,6 +300,9 @@ def resolve_fulfillment(
     )
     # A theoretical basket prior, not a look-ahead at generated demand.
     spark = sales_group["fact_receipts"].sparkSession
+    time_zone = spark.conf.get("spark.sql.session.timeZone")
+    if time_zone is None:
+        raise RuntimeError("spark.sql.session.timeZone is not set")
     worker = partial(
         _simulate_arrow_partition,
         start_date=cfg.start_date,
@@ -307,7 +310,7 @@ def resolve_fulfillment(
         seed=cfg.seed,
         capacity=cfg.truck_capacity,
         daily_prior=cfg.transactions_per_store_day * 10.0 / n_products,
-        time_zone=spark.conf.get("spark.sql.session.timeZone"),
+        time_zone=time_zone,
     )
     events = (
         ordered.select(*_DEMAND_COLUMNS)

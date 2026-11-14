@@ -731,8 +731,9 @@ def preview_generation(
     from retail_setup.generation.estimate import estimate_record_counts
     from retail_setup.generation.feasibility import assess
 
-    generation = GenerationConfig(
-        store_type=store_type, months=months, store_count=store_count, seed=seed
+    # The window and scale defaults are derived by GenerationConfig's validator.
+    generation = GenerationConfig.model_validate(
+        {"store_type": store_type, "months": months, "store_count": store_count, "seed": seed}
     )
     findings = assess(
         generation,
@@ -886,11 +887,13 @@ def configure(
         store_count = _prompt_int("Store count", store_count, default=store_count_default)
         seed = _prompt_int("Random seed", seed, default=seed_default)
         try:
-            generation = GenerationConfig(
-                store_type=store_type,
-                months=months,
-                store_count=store_count,
-                seed=seed,
+            generation = GenerationConfig.model_validate(
+                {
+                    "store_type": store_type,
+                    "months": months,
+                    "store_count": store_count,
+                    "seed": seed,
+                }
             )
             warnings = _validate_generation_feasibility(generation, manifest_profile)
         except (ValidationError, ValueError) as exc:
@@ -2166,6 +2169,7 @@ def _deploy_plan(
         )
     if reporting_is_gated:
         assert profile.post_deploy_pipeline_ref is not None
+        assert profile.reporting_gate_pipeline_ref is not None
         setup_name = Path(profile.post_deploy_pipeline_ref).stem
         required_ml_name = Path(profile.reporting_gate_pipeline_ref).stem
 
@@ -2853,7 +2857,9 @@ def _run_step_command(
     """Run one deploy step; under the setup TUI, tag each output line with its step."""
 
     if not interaction.events_enabled():
-        return subprocess.run(command, cwd=cwd, **({"env": env} if env else {}))
+        if env:
+            return subprocess.run(command, cwd=cwd, env=env)
+        return subprocess.run(command, cwd=cwd)
     with subprocess.Popen(
         command,
         cwd=cwd,
@@ -2932,13 +2938,16 @@ def _run_plan_plain(
             elif step.output_file:
                 out_path = repo_root / step.output_file
                 out_path.parent.mkdir(parents=True, exist_ok=True)
-                result = subprocess.run(
-                    step.cmd,
-                    cwd=repo_root,
-                    capture_output=True,
-                    text=True,
-                    **({"env": process_environment} if process_environment else {}),
-                )
+                if process_environment:
+                    result = subprocess.run(
+                        step.cmd,
+                        cwd=repo_root,
+                        capture_output=True,
+                        text=True,
+                        env=process_environment,
+                    )
+                else:
+                    result = subprocess.run(step.cmd, cwd=repo_root, capture_output=True, text=True)
                 if result.returncode == 0:
                     out_path.write_text(result.stdout, encoding="utf-8")
                     typer.echo(f"Wrote output to {step.output_file}")

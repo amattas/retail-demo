@@ -30,7 +30,10 @@ _FINGERPRINT_MARKER = "_retail_generation"
 
 def delete_lakehouse_path(spark: SparkSession, path: str) -> None:
     """Recursively delete a path on the session's default filesystem (if present)."""
-    hadoop_path = spark._jvm.org.apache.hadoop.fs.Path(path)
+    jvm = spark._jvm
+    if jvm is None:
+        raise RuntimeError("the Spark session has no JVM gateway")
+    hadoop_path = jvm.org.apache.hadoop.fs.Path(path)
     hadoop_path.getFileSystem(spark._jsc.hadoopConfiguration()).delete(hadoop_path, True)
 
 
