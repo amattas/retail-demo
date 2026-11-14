@@ -8,7 +8,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeGuard
 
 KQL_TYPES = frozenset({"bool", "datetime", "dynamic", "int", "long", "real", "string"})
 SPARK_TYPES = frozenset({"boolean", "date", "double", "int", "long", "string", "timestamp"})
@@ -214,6 +214,7 @@ def _validate_ml_output_write_sites(
 def _validated_ml_assignment(
     statement: ast.stmt,
 ) -> tuple[ast.Call, str, str] | None:
+    value: ast.expr | None
     if isinstance(statement, ast.Assign):
         if len(statement.targets) != 1 or not isinstance(statement.targets[0], ast.Name):
             return None
@@ -228,7 +229,6 @@ def _validated_ml_assignment(
         return None
     if not _named_call(value, "validate_ml_output"):
         return None
-    assert isinstance(value, ast.Call)
     if (
         len(value.args) < 2
         or not isinstance(value.args[0], ast.Name)
@@ -282,7 +282,11 @@ def _top_level_assignments(tree: ast.Module) -> dict[str, ast.AST]:
             target = statement.targets[0]
             if isinstance(target, ast.Name):
                 assignments[target.id] = statement.value
-        elif isinstance(statement, ast.AnnAssign) and isinstance(statement.target, ast.Name):
+        elif (
+            isinstance(statement, ast.AnnAssign)
+            and isinstance(statement.target, ast.Name)
+            and statement.value is not None
+        ):
             assignments[statement.target.id] = statement.value
     return assignments
 
@@ -449,7 +453,7 @@ def _python_symbol_from_tree(tree: ast.Module, name: str) -> Any:
         if isinstance(node, ast.Assign):
             if any(isinstance(target, ast.Name) and target.id == name for target in node.targets):
                 return ast.literal_eval(node.value)
-        if isinstance(node, ast.AnnAssign):
+        if isinstance(node, ast.AnnAssign) and node.value is not None:
             if isinstance(node.target, ast.Name) and node.target.id == name:
                 return ast.literal_eval(node.value)
         if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -864,7 +868,7 @@ def _function_node(tree: ast.Module, name: str) -> ast.FunctionDef:
     return matches[0]
 
 
-def _named_call(node: ast.AST, name: str) -> bool:
+def _named_call(node: ast.AST | None, name: str) -> TypeGuard[ast.Call]:
     return isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == name
 
 
@@ -913,6 +917,7 @@ def _local_literal(function: ast.FunctionDef, name: str) -> object:
             isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
             and node.target.id == name
+            and node.value is not None
         ):
             matches.append(node.value)
     if len(matches) != 1:

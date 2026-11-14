@@ -140,7 +140,7 @@ def _truck_lookup(
             pool.append(int(r.ID))
         else:
             assigned.setdefault(int(r.DCID), []).append(int(r.ID))
-    rows = []
+    rows: list[tuple[int, int, int, int]] = []
     for dc in range(1, cfg.dc_count + 1):
         # Fall back to pool trucks for DCs with no assigned trucks (documented).
         fleet = sorted(assigned.get(dc) or pool)

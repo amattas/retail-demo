@@ -234,14 +234,16 @@ def simulate_sku(
             )
             for shipment in shipment_events(seed, store_id, product_id, day, quantity, capacity):
                 yield shipment
+                if shipment.unloading_ts is None:
+                    raise RuntimeError(f"shipment {shipment.source} has no unloading time")
                 delivery = InventoryEvent(
                     store_id,
                     product_id,
                     shipment.unloading_ts,
-                    f"TRC-SI-{shipment.shipment_id}-{product_id}",
+                    f"TRC-SI-{shipment.source}-{product_id}",
                     "INBOUND_SHIPMENT",
                     shipment.quantity,
-                    shipment.shipment_id,
+                    shipment.source,
                 )
                 heappush(pending, (delivery.event_ts, delivery.trace_id, delivery))
                 inbound += delivery.quantity
