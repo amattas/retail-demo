@@ -131,6 +131,36 @@ staging, including post-ontology artifacts. A successful build record does not
 prove that temporary local files remain intact. Resume is not a substitute
 for live target validation or readiness evidence.
 
+### Operator recovery
+
+When deploy runs interactively (a terminal or the setup interface) without
+`--yes`, a failed step asks what to do next. Steps already running continue
+while the question is open; no new step starts until it's answered.
+
+| Step | Choices |
+| --- | --- |
+| Required | **Retry**, **Skip**, or **Stop** |
+| Optional | **Retry**, **Continue**, or **Stop** |
+
+- **Retry** returns the step to `PENDING` and schedules it again.
+- **Skip** records the step as `SKIPPED`. Every step that depends on it,
+  directly or through another blocked step, is then skipped with `blocked_by`
+  naming the steps it was waiting for. The setup interface shows those steps
+  as **not runnable** (`BLOCKED`). Steps that don't depend on the skipped step
+  still run.
+- **Continue** keeps the optional failure, which leaves the run `DEGRADED`.
+- **Stop** lets running steps finish, starts nothing new, marks every pending
+  step skipped, and exits with code `5`.
+
+Retry is withheld for a pipeline gate whose evidence can't be read or whose
+recorded Fabric run hasn't reached a terminal status (`Failed`, `Cancelled`,
+`Deduped`, or `Skipped`), because retrying could submit a second run while the
+first is still active. A skipped required step makes the journal `FAILED`, and
+deploy exits with code `6`. Use `--resume` to run the skipped and blocked steps
+after fixing the cause. Under `--yes`, or without an interactive terminal,
+nothing is asked: a failed required step blocks its dependents, independent
+steps still run, and deploy exits with the failed step's code.
+
 ## Workspace-scoped environments
 
 `configure` derives one environment key from the Fabric workspace name. It

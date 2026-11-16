@@ -14,6 +14,7 @@ from retail_setup.cli import _deploy_journal
 from retail_setup.cli._tui_runner import (
     CANCELLED_EXIT_CODE,
     PHASES,
+    SKIPPED_STEPS_EXIT_CODE,
     SetupOptions,
     SetupRunner,
 )
@@ -88,12 +89,14 @@ def test_deploy_dry_run_publishes_the_plan_as_pending_tasks(monkeypatch):
 
 def test_child_prompt_round_trips_through_the_operator_answer(tmp_path):
     asked: list[PromptRequest] = []
-    answers = {"confirm": "yes", "int": "7"}
+    answers = {"confirm": "yes", "int": "7", "choice": "skip"}
     runner = _runner(tmp_path, ask=lambda request: asked.append(request) or answers[request.kind])
     script = (
         "from retail_setup import interaction\n"
         "print('answer', interaction.confirm('Go?', default=False, detail='context'))\n"
         "print('count', interaction.prompt_int('Stores', default=3))\n"
+        "print('pick', interaction.choose('Next?', ['Retry', 'Skip'], default='Retry',"
+        " title='Step failed'))\n"
     )
 
     code = runner._run("configure", [sys.executable, "-c", script])
@@ -102,11 +105,23 @@ def test_child_prompt_round_trips_through_the_operator_answer(tmp_path):
     assert [(request.kind, request.message, request.default) for request in asked] == [
         ("confirm", "Go?", "no"),
         ("int", "Stores", "3"),
+        ("choice", "Next?", "Retry"),
     ]
     assert asked[0].detail == "context"
+    assert (asked[2].options, asked[2].title) == (("Retry", "Skip"), "Step failed")
     output = [entry.text for entry in runner.state.log_for("configure")]
     assert "answer True" in output
     assert "count 7" in output
+    assert "pick Skip" in output
+
+
+def test_plain_choice_reasks_until_the_answer_is_an_option(monkeypatch):
+    monkeypatch.delenv("RETAIL_SETUP_EVENTS", raising=False)
+    answers = iter(["later", "sKiP"])
+    monkeypatch.setattr("typer.prompt", lambda *_args, **_kwargs: next(answers))
+
+    assert interaction.choose("Next?", ["Retry", "Skip"], default="Retry") == "Skip"
+    assert next(answers, None) is None
 
 
 def test_cancelled_prompt_stops_the_child_and_setup(tmp_path):
@@ -169,6 +184,61 @@ def test_packages_install_inside_the_interface_before_the_configuration_page(tmp
     assert runner.state.tasks["configure"].status == "PENDING"
 
 
+def _install_runner(tmp_path: Path, script: str, answers: list[str]) -> SetupRunner:
+    options = SetupOptions(
+        repo_root=tmp_path,
+        workspace_name="",
+        env="",
+        profile="",
+        completed={"prereqs": ("SUCCEEDED", 0.1)},
+        python_install=((sys.executable, "-c", script),),
+        show_config=True,
+    )
+    return SetupRunner(
+        options,
+        SetupState(phases=PHASES),
+        lambda request: answers.pop(0) if request.kind == "choice" else None,
+        choose_target=lambda: None,
+    )
+
+
+def test_failed_phase_retry_reruns_it(tmp_path):
+    marker = tmp_path / "attempted"
+    script = (
+        f"import pathlib, sys\np = pathlib.Path({str(marker)!r})\n"
+        "first = not p.exists()\np.touch()\nsys.exit(3 if first else 0)\n"
+    )
+    runner = _install_runner(tmp_path, script, ["Retry"])
+
+    # The retried install succeeds; the configuration page is then cancelled.
+    assert runner.run() == CANCELLED_EXIT_CODE
+    assert runner.state.tasks["python"].status == "SUCCEEDED"
+    assert "Retrying." in [entry.text for entry in runner.state.log_for("python")]
+
+
+def test_skipped_phase_blocks_every_phase_that_depends_on_it(tmp_path):
+    runner = _install_runner(tmp_path, "import sys; sys.exit(3)", ["Skip"])
+
+    assert runner.run() == SKIPPED_STEPS_EXIT_CODE
+    statuses = {key: runner.state.tasks[key].status for key, _ in PHASES}
+    assert statuses == {
+        "prereqs": "SUCCEEDED",
+        "python": "SKIPPED",
+        "configure": "BLOCKED",
+        "render": "BLOCKED",
+        "deploy": "BLOCKED",
+    }
+    assert runner.state.tasks["render"].detail == "needs Configure the project"
+
+
+def test_failed_phase_stop_ends_setup_with_its_exit_code(tmp_path):
+    runner = _install_runner(tmp_path, "import sys; sys.exit(3)", ["Stop"])
+
+    assert runner.run() == 3
+    assert runner.state.tasks["python"].status == "FAILED"
+    assert runner.state.tasks["configure"].status == "PENDING"
+
+
 def test_journal_writes_publish_step_status_only_under_the_tui(tmp_path, monkeypatch, capsys):
     journal = _deploy_journal.start_run("demo", targets={})
     _deploy_journal.add_step(journal, "tf", "Terraform apply", required=True)
@@ -188,6 +258,7 @@ def test_journal_writes_publish_step_status_only_under_the_tui(tmp_path, monkeyp
             "status": "RUNNING",
             "required": True,
             "detail": None,
+            "blocked_by": [],
         }
     ]
 
@@ -282,6 +353,10 @@ def test_prompt_modal_answers_the_runner_thread(tmp_path):
     def fake_run() -> int:
         request = PromptRequest(kind="confirm", message="Proceed?", default="yes")
         answers.append(app.runner.ask(request))
+        choice = PromptRequest(
+            kind="choice", message="Next?", default="Retry", options=("Retry", "Skip", "Stop")
+        )
+        answers.append(app.runner.ask(choice))
         with app.state.lock:
             app.state.finished = True
             app.state.exit_code = 0
@@ -289,18 +364,23 @@ def test_prompt_modal_answers_the_runner_thread(tmp_path):
 
     app.runner.run = fake_run  # type: ignore[method-assign]
 
+    async def wait_for_prompt(pilot) -> None:
+        for _ in range(100):
+            await pilot.pause(0.05)
+            if isinstance(app.screen, PromptScreen):
+                return
+        raise AssertionError("no prompt shown")
+
     async def scenario() -> None:
         async with app.run_test(size=(120, 30)) as pilot:
-            for _ in range(100):
-                await pilot.pause(0.05)
-                if isinstance(app.screen, PromptScreen):
-                    break
-            assert isinstance(app.screen, PromptScreen)
+            await wait_for_prompt(pilot)
             await pilot.press("n")
+            await wait_for_prompt(pilot)
+            await pilot.click("#choice-1")
             for _ in range(100):
                 await pilot.pause(0.05)
-                if answers:
+                if len(answers) == 2:
                     break
 
     asyncio.run(scenario())
-    assert answers == ["no"]
+    assert answers == ["no", "Skip"]
