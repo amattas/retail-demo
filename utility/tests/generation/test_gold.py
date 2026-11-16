@@ -22,6 +22,7 @@ from retail_setup.generation.gold import (
     _latest_inventory_position,
     generate_campaign_performance,
     generate_gold,
+    generate_truck_dwell_daily,
 )
 from retail_setup.generation.schemas import column_names
 
@@ -45,11 +46,38 @@ def setup(spark):
 
 
 def test_all_gold_tables(setup):
-    _, gold = setup
+    tables, gold = setup
     assert set(gold) == set(GOLD_TABLES)
     for name, df in gold.items():
         assert df.columns == column_names(name), name
-        assert df.count() > 0, name
+        if name == "truck_dwell_daily":
+            # Three days of opening stock never reach a reorder point, so the
+            # window has no deliveries; dwell is covered by a focused test.
+            assert (df.count() > 0) == (tables["fact_truck_moves"].count() > 0)
+        else:
+            assert df.count() > 0, name
+
+
+def test_truck_dwell_daily_averages_unload_dwell_per_site(spark):
+    eta = datetime(2025, 10, 6, 8)
+    moves = spark.createDataFrame(
+        [
+            (eta, 1, None, 5, eta, datetime(2025, 10, 6, 8, 30)),
+            (eta, 2, None, 5, eta, datetime(2025, 10, 6, 9)),
+            (eta, 3, 9, None, eta, datetime(2025, 10, 6, 8, 20)),
+            (eta, 4, None, 5, eta, None),
+        ],
+        "event_ts timestamp, truck_id long, dc_id long, store_id long, "
+        "eta timestamp, etd timestamp",
+    )
+
+    rows = {r.site: r for r in generate_truck_dwell_daily(moves).collect()}
+
+    assert set(rows) == {"STORE_5", "DC_9"}
+    assert rows["STORE_5"].avg_dwell_min == 45
+    assert rows["STORE_5"].trucks == 2
+    assert rows["DC_9"].avg_dwell_min == 20
+    assert rows["DC_9"].day == date(2025, 10, 6)
 
 
 def test_sales_minute_store_totals(setup):
