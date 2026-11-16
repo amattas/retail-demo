@@ -82,6 +82,11 @@ _PROVIDER_TENANT_VARIABLES = ("FABRIC_TENANT_ID", "ARM_TENANT_ID")
 _DEFAULT_NON_SPARK_WORKERS = 4
 _DEFAULT_SPARK_WORKERS = 1
 _PIPELINE_MONITOR_DETACHED_EXIT_CODE = 4
+# The operator chose Stop after a failed deploy step.
+_OPERATOR_STOPPED_EXIT_CODE = 5
+# Deploy finished, but the operator skipped required steps after they failed.
+_OPERATOR_SKIPPED_EXIT_CODE = 6
+_PIPELINE_TERMINAL_FAILURES = frozenset({"Failed", "Cancelled", "Deduped", "Skipped"})
 
 
 def _default_repo_root() -> Path:
@@ -2877,6 +2882,35 @@ def _run_step_command(
         return subprocess.CompletedProcess(command, process.wait())
 
 
+def _ask_failed_step(
+    step: DeployStep,
+    index: int,
+    total: int,
+    return_code: int,
+    unretryable_reason: str | None,
+) -> str:
+    """Ask whether to retry, skip, or stop after a deploy step fails."""
+
+    if step.required:
+        options = ["Retry", "Skip", "Stop"]
+        consequence = "Skip marks the steps that depend on it as not runnable."
+    else:
+        options = ["Retry", "Continue", "Stop"]
+        consequence = "This step is optional; Continue keeps going without it."
+    detail = [f"Step {index}/{total} exited with code {return_code}.", consequence]
+    if unretryable_reason:
+        options.remove("Retry")
+        detail.append(f"Retry is unavailable: {unretryable_reason}")
+    detail.append("Stop lets running steps finish and starts nothing new.")
+    return interaction.choose(
+        f"{step.description} failed. What next?",
+        options,
+        default=options[0],
+        detail="\n".join(detail),
+        title="Step failed",
+    )
+
+
 def _run_plan_plain(
     repo_root: Path,
     env: str,
@@ -2902,6 +2936,9 @@ def _run_plan_plain(
 
     journal_lock = threading.RLock()
     monitor_detached_steps: set[str] = set()
+    # Failed steps whose retry could duplicate external work, with the reason.
+    unretryable: dict[str, str] = {}
+    ask_on_failure = not yes and interaction.is_interactive()
     pending = {
         step.step_id: step
         for step in plan
@@ -2998,6 +3035,7 @@ def _run_plan_plain(
             try:
                 evidence = _pipeline_step_evidence(repo_root, step)
             except (OSError, json.JSONDecodeError, ValueError) as exc:
+                unretryable[step.step_id] = f"Its pipeline run evidence is unreadable: {exc}"
                 _deploy_journal.mark_failed(
                     journal,
                     step.step_id,
@@ -3034,6 +3072,11 @@ def _run_plan_plain(
                 )
                 monitor_detached_steps.add(step.step_id)
             else:
+                if evidence and evidence.get("status") not in _PIPELINE_TERMINAL_FAILURES:
+                    unretryable[step.step_id] = (
+                        f"Fabric pipeline run {evidence_id} has status "
+                        f"{evidence.get('status')!r}; resume later to reattach to it."
+                    )
                 _deploy_journal.mark_failed(
                     journal,
                     step.step_id,
@@ -3048,7 +3091,7 @@ def _run_plan_plain(
                 f"(exit {return_code}): {_display_command(step.cmd)}",
                 err=True,
             )
-            if not step.required:
+            if not step.required and not ask_on_failure:
                 typer.echo(
                     "Continuing because this post-Reporting step is optional.",
                     err=True,
@@ -3057,6 +3100,8 @@ def _run_plan_plain(
 
     running: dict[Future[int], DeployStep] = {}
     required_failure_code: int | None = None
+    stopped = False
+    operator_skipped = False
     terminal = {"SUCCEEDED", "DEGRADED", "SKIPPED", "FAILED"}
     with (
         ThreadPoolExecutor(
@@ -3109,10 +3154,20 @@ def _run_plan_plain(
                             reason=(
                                 "required prerequisite did not succeed: " + ", ".join(blocked_by)
                             ),
+                            blocked_by=blocked_by,
                         )
                         _deploy_journal.write(repo_root, journal)
                     del pending[step_id]
                     progressed = True
+
+            if stopped:
+                with journal_lock:
+                    for step_id in list(pending):
+                        _deploy_journal.mark_skipped(
+                            journal, step_id, reason="Deployment stopped by the operator"
+                        )
+                        del pending[step_id]
+                    _deploy_journal.write(repo_root, journal)
 
             with journal_lock:
                 live_preflight = next(
@@ -3168,19 +3223,64 @@ def _run_plan_plain(
                 for future in done:
                     step = running.pop(future)
                     return_code = future.result()
-                    if (
-                        return_code != 0
-                        and step.required
-                        and step.step_id not in monitor_detached_steps
-                    ):
+                    if return_code == 0 or step.step_id in monitor_detached_steps:
+                        continue
+                    decision = (
+                        _ask_failed_step(
+                            step,
+                            positions[step.step_id],
+                            total,
+                            return_code,
+                            unretryable.get(step.step_id),
+                        )
+                        if ask_on_failure and not stopped
+                        else None
+                    )
+                    if decision == "Retry":
+                        typer.echo(f"Retrying step {positions[step.step_id]}/{total}.")
+                        with journal_lock:
+                            _deploy_journal.mark_pending(journal, step.step_id)
+                            _deploy_journal.write(repo_root, journal)
+                        pending[step.step_id] = step
+                        continue
+                    if decision == "Skip":
+                        typer.echo(
+                            f"Skipped step {positions[step.step_id]}/{total}; "
+                            "steps that depend on it will not run."
+                        )
+                        with journal_lock:
+                            _deploy_journal.mark_skipped(
+                                journal,
+                                step.step_id,
+                                reason=f"Skipped by the operator after exit code {return_code}",
+                            )
+                            _deploy_journal.write(repo_root, journal)
+                        operator_skipped = True
+                        continue
+                    if decision == "Stop":
+                        typer.echo(
+                            "Stopping: no new steps will start; running steps will finish.",
+                            err=True,
+                        )
+                        stopped = True
+                    if step.required:
                         required_failure_code = required_failure_code or return_code
                 continue
             if pending and not progressed:
                 unresolved = ", ".join(sorted(pending))
                 raise ValueError(f"Deploy dependency graph cannot make progress: {unresolved}")
 
+    if stopped:
+        raise typer.Exit(code=_OPERATOR_STOPPED_EXIT_CODE)
     if required_failure_code is not None:
         raise typer.Exit(code=required_failure_code)
+    if operator_skipped and _deploy_journal.compute_status(journal) == "FAILED":
+        typer.echo(
+            "Deploy finished with skipped required steps. Run it again with --resume "
+            "to complete them.",
+            err=True,
+        )
+        raise typer.Exit(code=_OPERATOR_SKIPPED_EXIT_CODE)
     if monitor_detached_steps:
         typer.echo(
             "Local monitoring ended while Fabric pipeline work remains active. "

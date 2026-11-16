@@ -35,6 +35,7 @@ from textual.widgets import Button, Input, ProgressBar, RichLog, Static
 from retail_setup.cli._tui_runner import (
     CANCELLED_EXIT_CODE,
     PHASES,
+    SKIPPED_STEPS_EXIT_CODE,
     SetupOptions,
     SetupRunner,
     TargetChoice,
@@ -55,6 +56,7 @@ ICONS = {
     "DEGRADED": ("[!]", "bold #f9e2af"),
     "SKIPPED": ("[–]", "#f9e2af"),
     "FAILED": ("[✗]", "bold #f38ba8"),
+    "BLOCKED": ("[⊘]", "#6c7086"),
 }
 SELECTED_STYLE = "bold #1e1e2e on #89dceb"
 MAX_VISIBLE_LOG_LINES = 5_000
@@ -142,7 +144,7 @@ class TaskList(Widget):
             bar.append(f" {done}/{len(children)}", style="grey62")
             return bar
         duration = task.duration(now)
-        if duration is None or task.status == "SKIPPED":
+        if duration is None or task.status in {"SKIPPED", "BLOCKED"}:
             return Text("")
         if task.status == "RUNNING":
             return Text(format_duration(duration), style="#89dceb")
@@ -163,6 +165,8 @@ class TaskList(Widget):
         label = Text(prefix + task.label, style=style if task.status != "PENDING" else "grey62")
         if task.parent is not None and not task.required:
             label.append(" (optional)", style="grey50")
+        if task.status == "BLOCKED":
+            label.append(" (not runnable)", style="grey50")
         label.truncate(label_width, overflow="ellipsis", pad=True)
         line = Text(icon, style=style)
         line.append(" ")
@@ -199,6 +203,14 @@ class PromptScreen(ModalScreen[str | None]):
                 with Horizontal(id="dialog-buttons"):
                     yield Button("Yes", id="yes", variant="primary" if default_yes else "default")
                     yield Button("No", id="no", variant="default" if default_yes else "primary")
+            elif request.kind == "choice":
+                with Horizontal(id="dialog-buttons"):
+                    for index, option in enumerate(request.options):
+                        yield Button(
+                            option,
+                            id=f"choice-{index}",
+                            variant="primary" if option == request.default else "default",
+                        )
             else:
                 yield Input(
                     value=request.default or "",
@@ -214,14 +226,21 @@ class PromptScreen(ModalScreen[str | None]):
         self.app.bell()
         if self.request.kind == "confirm":
             self.query_one("#yes" if self.request.default == "yes" else "#no", Button).focus()
+        elif self.request.kind == "choice":
+            options = self.request.options
+            index = options.index(self.request.default) if self.request.default in options else 0
+            self.query_one(f"#choice-{index}", Button).focus()
         else:
             self.query_one("#dialog-input", Input).focus()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "ok":
+        button_id = event.button.id or ""
+        if button_id == "ok":
             self.dismiss(self.query_one("#dialog-input", Input).value)
-        elif event.button.id in {"yes", "no"}:
-            self.dismiss(event.button.id)
+        elif button_id in {"yes", "no"}:
+            self.dismiss(button_id)
+        elif button_id.startswith("choice-"):
+            self.dismiss(self.request.options[int(button_id.removeprefix("choice-"))])
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         self.dismiss(event.value)
@@ -468,6 +487,8 @@ class SetupApp(App[int]):
             code = self.state.exit_code or 0
             if code == 0:
                 keys.append("Setup finished ", style="bold #a6e3a1")
+            elif code == SKIPPED_STEPS_EXIT_CODE:
+                keys.append("Setup finished with skipped steps ", style="bold #f9e2af")
             elif code == CANCELLED_EXIT_CODE:
                 keys.append("Setup cancelled ", style="bold #f9e2af")
             else:
@@ -601,7 +622,11 @@ def main(argv: list[str] | None = None) -> int:
     app = SetupApp(options, version=_manifest_version(repo_root), show_config=not args.yes)
     result = app.run()
     code = result if isinstance(result, int) else CANCELLED_EXIT_CODE
-    status = {0: "finished", CANCELLED_EXIT_CODE: "cancelled"}.get(code, f"failed (exit {code})")
+    status = {
+        0: "finished",
+        CANCELLED_EXIT_CODE: "cancelled",
+        SKIPPED_STEPS_EXIT_CODE: "finished with skipped steps",
+    }.get(code, f"failed (exit {code})")
     final_log = app.options.log_path
     print(f"Setup {status}." + (f" Full log: {final_log}" if final_log else ""))
     return code
