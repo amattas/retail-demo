@@ -3,9 +3,10 @@
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from functools import partial
 
 from pyspark import inheritable_thread_target
-from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import DataFrame, Row, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
@@ -58,7 +59,7 @@ class InvariantReport:
                 ]
                 results = [(name, future.result()) for name, future in futures]
         for name, bad_count in results:
-            if name is _ROW_COUNT:
+            if not isinstance(name, str):  # a queued row count
                 continue
             self._checks.append(name)
             if bad_count:
@@ -67,6 +68,14 @@ class InvariantReport:
 
 def _check(report: InvariantReport, name: str, bad_count: Callable[[], int]) -> None:
     report._pending.append((name, bad_count))
+
+
+def _single_row(df: DataFrame) -> Row:
+    """The one row of a global aggregate."""
+    row = df.first()
+    if row is None:
+        raise RuntimeError("global aggregate returned no row")
+    return row
 
 
 def _check_count(report: InvariantReport, name: str, df: DataFrame) -> None:
@@ -132,7 +141,7 @@ def run_invariants(
         _check(
             r,
             f"{tbl} -> dim_products FK",
-            lambda tbl=tbl: t[tbl].join(products, "product_id", "left_anti").count(),
+            t[tbl].join(products, "product_id", "left_anti").count,
         )
 
     stores = t["dim_stores"].select(F.col("ID").alias("store_id"))
@@ -147,7 +156,7 @@ def run_invariants(
         _check(
             r,
             f"{tbl} -> dim_stores FK",
-            lambda tbl=tbl: t[tbl].join(stores, "store_id", "left_anti").count(),
+            t[tbl].join(stores, "store_id", "left_anti").count,
         )
 
     for tbl, df in t.items():
@@ -155,7 +164,7 @@ def run_invariants(
             _check(
                 r,
                 f"{tbl}.event_date not null",
-                lambda df=df: df.filter(F.col("event_date").isNull()).count(),
+                df.filter(F.col("event_date").isNull()).count,
             )
 
     oh, ol = t["fact_online_order_headers"], t["fact_online_order_lines"]
@@ -209,12 +218,10 @@ def run_invariants(
         _check(
             r,
             f"{dim} -> dim_geographies FK",
-            lambda dim=dim: (
-                t[dim]
-                .select(F.col("GeographyID").alias("geo_id"))
-                .join(geo_ids, "geo_id", "left_anti")
-                .count()
-            ),
+            t[dim]
+            .select(F.col("GeographyID").alias("geo_id"))
+            .join(geo_ids, "geo_id", "left_anti")
+            .count,
         )
 
     # --- DC coverage on facts that reference a distribution center
@@ -223,13 +230,11 @@ def run_invariants(
         _check(
             r,
             f"{tbl} -> dim_distribution_centers FK",
-            lambda tbl=tbl: (
-                t[tbl]
-                .filter(F.col("dc_id").isNotNull())
-                .select("dc_id")
-                .join(dc_ids, "dc_id", "left_anti")
-                .count()
-            ),
+            t[tbl]
+            .filter(F.col("dc_id").isNotNull())
+            .select("dc_id")
+            .join(dc_ids, "dc_id", "left_anti")
+            .count,
         )
 
     # --- truck coverage on logistics facts
@@ -238,13 +243,11 @@ def run_invariants(
         _check(
             r,
             f"{tbl} -> dim_trucks FK",
-            lambda tbl=tbl: (
-                t[tbl]
-                .filter(F.col("truck_id").isNotNull())
-                .select("truck_id")
-                .join(truck_ids, "truck_id", "left_anti")
-                .count()
-            ),
+            t[tbl]
+            .filter(F.col("truck_id").isNotNull())
+            .select("truck_id")
+            .join(truck_ids, "truck_id", "left_anti")
+            .count,
         )
 
     # --- truck timing: arrival (eta) must not be after completion (etd)
@@ -263,13 +266,11 @@ def run_invariants(
         _check(
             r,
             f"{tbl} -> dim_customers FK",
-            lambda tbl=tbl: (
-                t[tbl]
-                .filter(F.col("customer_id").isNotNull())
-                .select("customer_id")
-                .join(customer_ids, "customer_id", "left_anti")
-                .count()
-            ),
+            t[tbl]
+            .filter(F.col("customer_id").isNotNull())
+            .select("customer_id")
+            .join(customer_ids, "customer_id", "left_anti")
+            .count,
         )
     # fact_marketing.customer_id is a nullable double (low resolution rate); cast.
     _check(
@@ -493,20 +494,22 @@ def _inventory_balance_checks(
         | F.col("balance").isNull()
         | (F.col("balance") < 0)
     )
-    counts = checked.agg(
-        F.count(F.when(invalid, 1)).alias("physical"),
-        F.count(F.when(~F.col("balance").eqNullSafe(F.col("_expected_balance")), 1)).alias(
-            "conservation"
-        ),
-        F.count(
-            F.when(
-                (F.col("_initial_count") != 1)
-                | ((F.col("_position") == 1) & ~F.col("txn_type").eqNullSafe(F.lit("INITIAL"))),
-                1,
-            )
-        ).alias("opening"),
-        (F.count("*") - F.countDistinct("trace_id")).alias("duplicate_traces"),
-    ).first()
+    counts = _single_row(
+        checked.agg(
+            F.count(F.when(invalid, 1)).alias("physical"),
+            F.count(F.when(~F.col("balance").eqNullSafe(F.col("_expected_balance")), 1)).alias(
+                "conservation"
+            ),
+            F.count(
+                F.when(
+                    (F.col("_initial_count") != 1)
+                    | ((F.col("_position") == 1) & ~F.col("txn_type").eqNullSafe(F.lit("INITIAL"))),
+                    1,
+                )
+            ).alias("opening"),
+            (F.count("*") - F.countDistinct("trace_id")).alias("duplicate_traces"),
+        )
+    )
     _check(report, f"{table} nonnegative physical balances", lambda: counts.physical)
     _check(report, f"{table} running quantity conservation", lambda: counts.conservation)
     _check(report, f"{table} exactly one opening INITIAL", lambda: counts.opening)
@@ -607,7 +610,7 @@ def _run_inventory_invariants(r: InvariantReport, t: dict[str, DataFrame]) -> No
         _check(
             r,
             f"truck {action} <-> {node} ledger conservation",
-            lambda actual=actual, expected=expected: _inventory_mirror_violations(actual, expected),
+            partial(_inventory_mirror_violations, actual, expected),
         )
 
     valid_cargo = (
@@ -629,14 +632,13 @@ def _run_inventory_invariants(r: InvariantReport, t: dict[str, DataFrame]) -> No
         .orderBy("event_ts", "trace_id")
         .rowsBetween(Window.unboundedPreceding, Window.currentRow)
     )
-    cargo_counts = (
+    cargo_counts = _single_row(
         truck.withColumn(
             "_cargo_balance",
             F.sum(
                 F.when(F.col("action") == "LOAD", F.col("quantity")).otherwise(-F.col("quantity"))
             ).over(cargo_order),
-        )
-        .agg(
+        ).agg(
             F.count(F.when(~F.coalesce(valid_cargo, F.lit(False)), 1)).alias("invalid"),
             F.count(F.when(F.col("_cargo_balance") < 0, 1)).alias("negative"),
             (F.count("*") - F.countDistinct("trace_id")).alias("duplicate_traces"),
@@ -644,7 +646,6 @@ def _run_inventory_invariants(r: InvariantReport, t: dict[str, DataFrame]) -> No
                 "duplicate_actions"
             ),
         )
-        .first()
     )
     _check(r, "truck cargo positive with valid action and location", lambda: cargo_counts.invalid)
     _check(r, "truck nonnegative cargo balances", lambda: cargo_counts.negative)

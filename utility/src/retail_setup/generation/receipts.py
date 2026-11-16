@@ -31,6 +31,7 @@ from retail_setup.generation.behavior import (
     retail_quantity,
 )
 from retail_setup.generation.runtime import (
+    case_when,
     fixed_width_decimal,
     seeded_draws,
 )
@@ -185,14 +186,7 @@ def _seasonal_factor(dept_name: str, month_col: Column) -> Column:
     lifts = next((m for token, m in SEASONAL_LIFT.items() if token in key), None)
     if lifts is None:
         return F.lit(1.0)
-    expr: Column | None = None
-    for m in range(1, 13):
-        cond = month_col == F.lit(m)
-        expr = (
-            F.when(cond, F.lit(lifts[m - 1]))
-            if expr is None
-            else expr.when(cond, F.lit(lifts[m - 1]))
-        )
+    expr = case_when((month_col == F.lit(m), F.lit(lifts[m - 1])) for m in range(1, 13))
     return expr.otherwise(F.lit(1.0))
 
 
@@ -239,16 +233,15 @@ def _promo_eligible_expr(
 ) -> Column:
     """True when the catalog entry at idx_col is eligible: in-month, line value
     meets any minimum, and BOGO needs qty >= 2."""
-    expr: Column | None = None
+    branches: list[tuple[Column, object]] = []
     for i, (_, _, months, min_cents, kind) in enumerate(PROMO_CATALOG):
         e = F.lit(True) if months is None else month_col.isin(*months)
         if min_cents:
             e = e & (ext_before >= F.lit(min_cents))
         if kind == "BOGO":
             e = e & (qty >= F.lit(2))
-        cond = idx_col == F.lit(i)
-        expr = F.when(cond, e) if expr is None else expr.when(cond, e)
-    return expr.otherwise(F.lit(False))
+        branches.append((idx_col == F.lit(i), e))
+    return case_when(branches).otherwise(F.lit(False))
 
 
 def _apply_churn_lifecycle(

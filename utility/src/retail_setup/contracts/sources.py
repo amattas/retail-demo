@@ -134,6 +134,7 @@ def derive_inventory(
     path = _resolve_path(pointer, repo_root)
     selector_value = _selector_value(pointer)
 
+    items: Iterable[object]
     try:
         if declaration.derivation == "python_dict_keys":
             value = _python_symbol(path, selector_value)
@@ -197,16 +198,17 @@ def _selector_value(pointer: SourcePointer) -> str:
 
 def _inventory_set(items: Iterable[object], inventory_id: str) -> frozenset[str]:
     values = list(items)
-    if not all(isinstance(item, str) and item for item in values):
+    strings = [item for item in values if isinstance(item, str) and item]
+    if len(strings) != len(values):
         raise TypeError(f"inventory {inventory_id!r} contains a non-string item")
-    duplicates = sorted({item for item in values if values.count(item) > 1})
+    duplicates = sorted({item for item in strings if strings.count(item) > 1})
     if duplicates:
         raise ValueError(f"inventory {inventory_id!r} contains duplicates: {duplicates}")
-    return frozenset(values)
+    return frozenset(strings)
 
 
 def _validate_event_schema(agreement: SourceAgreement, repo_root: Path) -> None:
-    pointers = {
+    pointers: dict[tuple[str | None, str | None], SourcePointer] = {
         (
             source.selector.kind if source.selector else None,
             source.selector.value if source.selector else None,

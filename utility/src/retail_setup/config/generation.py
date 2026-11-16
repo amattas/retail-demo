@@ -3,6 +3,7 @@
 import calendar
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field, model_validator
@@ -37,8 +38,8 @@ class GenerationConfig(BaseModel):
     # ``start_date``/``end_date`` may be provided explicitly instead (back-compat);
     # they are derived from ``months`` only when not both already supplied.
     months: int | None = Field(default=None, ge=1, le=120)
-    start_date: date | None = None
-    end_date: date | None = None
+    start_date: date
+    end_date: date
     store_count: int = Field(default=50, gt=0, le=2000)
     seed: int = 42
     silver_db: str = "ag"
@@ -48,9 +49,9 @@ class GenerationConfig(BaseModel):
     # lakehouse Files mount) without mutating the package data directory.
     dictionary_root: str | None = None
 
-    # scale knobs; None -> derived from store_count in the validator below
-    dc_count: int | None = Field(default=None, gt=0, le=999)
-    customer_count: int | None = Field(default=None, gt=0)
+    # scale knobs; omitted or None -> derived from store_count before validation
+    dc_count: int = Field(gt=0, le=999)
+    customer_count: int = Field(gt=0)
     # base in-store transactions per store-day at multiplier 1.0; profiles'
     # hourly/daily/monthly weights shape it, store daily_traffic_multiplier scales it
     transactions_per_store_day: int = Field(default=400, gt=0)
@@ -59,13 +60,40 @@ class GenerationConfig(BaseModel):
     # values near the ceiling flatten the spike - keep this small (~0.01)
     return_rate: float = Field(default=0.01, ge=0.0, le=0.10)
     # network-wide online orders per day at multiplier 1.0; None -> store_count * 8
-    online_orders_per_day: int | None = Field(default=None, gt=0)
+    online_orders_per_day: int = Field(gt=0)
     # number of category-matched branded SKUs generated per base catalog product
     # (datagen combinatorial SKUs); 1 = one SKU per dictionary row
     brands_per_product: int = Field(default=3, ge=1, le=10)
     # truck load capacity in units; a store-day shipment exceeding this is split
     # across multiple truck legs (datagen multi-truck shipments)
     truck_capacity: int = Field(default=15000, gt=0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _derive_defaults(cls, data: Any) -> Any:
+        """Fill the date window and scale knobs that derive from other settings."""
+
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        months = data.get("months")
+        if months is not None and not (data.get("start_date") and data.get("end_date")):
+            # Invalid months are left for field validation to report.
+            if isinstance(months, int) and not isinstance(months, bool) and months >= 1:
+                end = date.today() - timedelta(days=1)
+                data["end_date"] = end
+                data["start_date"] = _subtract_months(end, months)
+        elif data.get("start_date") is None or data.get("end_date") is None:
+            raise ValueError("provide `months`, or both `start_date` and `end_date`")
+        store_count = data.get("store_count", cls.model_fields["store_count"].default)
+        if isinstance(store_count, int) and not isinstance(store_count, bool):
+            if data.get("dc_count") is None:
+                data["dc_count"] = max(1, store_count // 10)
+            if data.get("customer_count") is None:
+                data["customer_count"] = store_count * 1000
+            if data.get("online_orders_per_day") is None:
+                data["online_orders_per_day"] = store_count * 8
+        return data
 
     @model_validator(mode="after")
     def _known_store_type(self) -> "GenerationConfig":
@@ -81,35 +109,17 @@ class GenerationConfig(BaseModel):
         return Path(self.dictionary_root) if self.dictionary_root else default_dictionary_root()
 
     @model_validator(mode="after")
-    def _derive_date_range(self) -> "GenerationConfig":
-        """Derive start/end from ``months`` (window ends yesterday) when needed."""
-
-        if self.months is not None and not (self.start_date and self.end_date):
-            end = date.today() - timedelta(days=1)
-            self.end_date = end
-            self.start_date = _subtract_months(end, self.months)
-        if self.start_date is None or self.end_date is None:
-            raise ValueError("provide `months`, or both `start_date` and `end_date`")
-        return self
-
-    @model_validator(mode="after")
     def _date_order(self) -> "GenerationConfig":
         if self.end_date < self.start_date:
             raise ValueError("end_date must be on or after start_date")
         return self
 
     @model_validator(mode="after")
-    def _derive_scale_defaults(self) -> "GenerationConfig":
-        if self.dc_count is None:
-            self.dc_count = max(1, self.store_count // 10)
-        if self.customer_count is None:
-            self.customer_count = self.store_count * 1000
+    def _customer_floor(self) -> "GenerationConfig":
         # Guarantee enough customers for the churn model's two-class train/test
         # split; see MIN_CUSTOMER_COUNT above. Applied to the final value so an
         # explicitly small customer_count is lifted too.
         self.customer_count = max(self.customer_count, MIN_CUSTOMER_COUNT)
-        if self.online_orders_per_day is None:
-            self.online_orders_per_day = self.store_count * 8
         return self
 
 

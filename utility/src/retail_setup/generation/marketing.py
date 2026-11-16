@@ -25,6 +25,7 @@ from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.generation.runtime import (
+    case_when,
     date_grid,
     fixed_width_decimal,
     legacy_index,
@@ -148,18 +149,13 @@ def generate_marketing(
 
     # --- device pick (60/30/10) and cost multiplier
     imps = imps.withColumn("device", d.pick_by_weights(key, "mk_device", DEVICE_WEIGHTS))
-    mult = None
-    for device, m in DEVICE_MULTIPLIERS.items():
-        cond = F.col("device") == device
-        mult = F.when(cond, m) if mult is None else mult.when(cond, m)
+    mult = case_when((F.col("device") == device, m) for device, m in DEVICE_MULTIPLIERS.items())
     imps = imps.withColumn("device_mult", mult)
 
     # --- cost: uniform within the channel band, times the device multiplier
-    lo, hi = None, None
-    for channel, (c_lo, c_hi) in CHANNEL_COSTS.items():
-        cond = F.col("channel") == channel
-        lo = F.when(cond, c_lo) if lo is None else lo.when(cond, c_lo)
-        hi = F.when(cond, c_hi) if hi is None else hi.when(cond, c_hi)
+    channel = F.col("channel")
+    lo = case_when((channel == name, c_lo) for name, (c_lo, _) in CHANNEL_COSTS.items())
+    hi = case_when((channel == name, c_hi) for name, (_, c_hi) in CHANNEL_COSTS.items())
     cost_dollars = (lo + d.u(key, "mk_cost") * (hi - lo)) * F.col("device_mult")
     imps = imps.withColumn("cost_cents", F.round(cost_dollars * 100).cast("long")).withColumn(
         "cost", F.format_string("%.2f", cost_dollars)

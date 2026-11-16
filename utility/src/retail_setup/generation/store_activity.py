@@ -14,7 +14,7 @@ from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.loader import load_dictionaries
-from retail_setup.generation.runtime import seeded_draws, store_day_grid
+from retail_setup.generation.runtime import case_when, seeded_draws, store_day_grid
 from retail_setup.generation.schemas import column_names
 from retail_setup.generation.traffic import generate_hourly_visits
 
@@ -66,11 +66,9 @@ def generate_store_ops(
     )
 
     # operating_hours -> open/close hour via a F.when chain over known formats
-    open_hour, close_hour = None, None
-    for literal, (o, c) in OPERATING_HOURS_MAP.items():
-        cond = F.col("operating_hours") == literal
-        open_hour = F.when(cond, o) if open_hour is None else open_hour.when(cond, o)
-        close_hour = F.when(cond, c) if close_hour is None else close_hour.when(cond, c)
+    hours = F.col("operating_hours")
+    open_hour = case_when((hours == literal, o) for literal, (o, _) in OPERATING_HOURS_MAP.items())
+    close_hour = case_when((hours == literal, c) for literal, (_, c) in OPERATING_HOURS_MAP.items())
     # unknown formats fall back to standard hours instead of silent NULL event_ts
     grid = grid.withColumn("open_hour", open_hour.otherwise(6)).withColumn(
         "close_hour", close_hour.otherwise(22)
@@ -129,13 +127,14 @@ def generate_foot_traffic(
     # per-format share column for each zone, then explode the 5-zone structs
     zone_structs = []
     for i, zone in enumerate(ZONES):
-        lower = None
-        upper = None
-        for fmt, shares in FORMAT_ZONE_SHARES.items():
-            cond = F.col("store_format") == fmt
-            lo_share, hi_share = sum(shares[:i]), sum(shares[: i + 1])
-            lower = F.when(cond, lo_share) if lower is None else lower.when(cond, lo_share)
-            upper = F.when(cond, hi_share) if upper is None else upper.when(cond, hi_share)
+        store_format = F.col("store_format")
+        lower = case_when(
+            (store_format == fmt, sum(shares[:i])) for fmt, shares in FORMAT_ZONE_SHARES.items()
+        )
+        upper = case_when(
+            (store_format == fmt, sum(shares[: i + 1]))
+            for fmt, shares in FORMAT_ZONE_SHARES.items()
+        )
         lo, hi = ZONE_DWELL[zone]
         zone_structs.append(
             F.struct(

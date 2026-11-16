@@ -340,7 +340,7 @@ def generate_all(
     owns deleting the directory once the tables are no longer needed.
     """
     reliable = checkpoint_dir is not None
-    if reliable:
+    if checkpoint_dir is not None:
         spark.sparkContext.setCheckpointDir(checkpoint_dir)
     # Every builder reads the dimensions; materialize them once instead of
     # re-serializing their driver-built rows from Python for each consumer.
@@ -384,7 +384,7 @@ def run_generation_notebook(
     if not stages:
         raise ValueError(f"no generation stages run in notebook {notebook!r}")
     reliable = checkpoint_dir is not None
-    if reliable:
+    if checkpoint_dir is not None:
         spark.sparkContext.setCheckpointDir(checkpoint_dir)
     dims = _checkpoint_frames(generate_dimension_frames(spark, dicts, cfg), reliable)
     ctx = GenerationContext(spark, dicts, cfg, dims)
@@ -420,7 +420,7 @@ def load_publication(
     instead of copying it to a second staging table.
     """
     reliable = checkpoint_dir is not None
-    if reliable:
+    if checkpoint_dir is not None:
         spark.sparkContext.setCheckpointDir(checkpoint_dir)
     tables = _checkpoint_frames(generate_dimension_frames(spark, dicts, cfg), reliable)
     prestaged: dict[str, str] = {}

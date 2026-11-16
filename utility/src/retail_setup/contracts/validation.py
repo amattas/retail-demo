@@ -23,6 +23,7 @@ from .sources import (
 from .source_parsers import (
     MlValidationRule,
     PhysicalField,
+    TmdlTableSchema,
     notebook_ml_output_schemas,
     notebook_ml_source_tables,
     notebook_ml_validation_rules,
@@ -142,9 +143,7 @@ def iter_inventory_declarations(
     """Return every inventory declaration in stable manifest order."""
 
     return tuple(
-        inventory
-        for entry in (*manifest.assets, *manifest.data_contracts)
-        for inventory in entry.inventories
+        inventory for entry in manifest.inventory_entries for inventory in entry.inventories
     )
 
 
@@ -183,7 +182,7 @@ def _validate_inventory_rules(
     manifest: SolutionManifest,
     inventories: dict[str, frozenset[str]],
 ) -> None:
-    for entry in (*manifest.assets, *manifest.data_contracts):
+    for entry in manifest.inventory_entries:
         for rule in entry.inventory_rules:
             _validate_relationship(rule, inventories, rule.id)
 
@@ -213,7 +212,7 @@ def _validate_ml_contracts(
     source_cache: dict[Path, tuple[str, ...]] = {}
     validator_cache: dict[Path, dict[str, tuple[PhysicalField, ...]]] = {}
     validator_rule_cache: dict[Path, dict[str, MlValidationRule]] = {}
-    model_cache: dict[Path, object] = {}
+    model_cache: dict[Path, dict[str, TmdlTableSchema]] = {}
 
     for contract in manifest.ml_contracts:
         table_name = contract.output.table
@@ -299,7 +298,7 @@ def _validate_ml_contracts(
             model_path,
             tmdl_active_table_schemas(model_path),
         )
-        model_table = model_tables.get(table_name)  # type: ignore[union-attr]
+        model_table = model_tables.get(table_name)
         if model_table is None:
             raise ManifestSourceError(
                 f"required ML output {table_name!r} is not active in model.tmdl"

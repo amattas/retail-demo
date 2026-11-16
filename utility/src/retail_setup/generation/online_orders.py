@@ -81,7 +81,10 @@ def generate_online_orders(
     # Destination-based tax: per-customer-geography rate (mean store tax_rate in
     # that geography), with the network mean as the fallback for geographies
     # that have no store.
-    mean_rate = dims["dim_stores"].agg(F.avg("tax_rate")).first()[0]
+    mean_row = dims["dim_stores"].agg(F.avg("tax_rate")).first()
+    if mean_row is None or mean_row[0] is None:
+        raise ValueError("dim_stores has no tax_rate to derive the online tax fallback")
+    mean_rate = mean_row[0]
     mean_bps = int(round(float(mean_rate) * 10000))
     geo_rate = dims["dim_stores"].groupBy("GeographyID").agg(F.avg("tax_rate").alias("geo_rate"))
     cust_rate = (

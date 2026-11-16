@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import Counter
 import hashlib
 import json
-from typing import Self
+from typing import Protocol, Self
 
 from pydantic import model_validator
 
@@ -27,6 +27,11 @@ from .models import (
 )
 
 
+class _Identified(Protocol):
+    @property
+    def id(self) -> str: ...
+
+
 class SolutionManifest(ManifestModel):
     """Canonical solution manifest with frozen top-level sections."""
 
@@ -43,6 +48,13 @@ class SolutionManifest(ManifestModel):
     ml_contracts: tuple[MlContract, ...]
     source_owners: tuple[SourceOwner, ...]
 
+    @property
+    def inventory_entries(self) -> tuple[Asset | DataContract, ...]:
+        """Assets and data contracts, the records that declare inventories."""
+
+        entries: list[Asset | DataContract] = [*self.assets, *self.data_contracts]
+        return tuple(entries)
+
     @model_validator(mode="after")
     def _validate_ids_and_references(self) -> Self:
         identified = list(_identified_records(self))
@@ -56,9 +68,7 @@ class SolutionManifest(ManifestModel):
 
         owner_ids = {owner.id for owner in self.source_owners}
         inventory_ids = {
-            inventory.id
-            for entry in (*self.assets, *self.data_contracts)
-            for inventory in entry.inventories
+            inventory.id for entry in self.inventory_entries for inventory in entry.inventories
         }
         asset_ids = {asset.id for asset in self.assets}
         contract_ids = {contract.id for contract in self.data_contracts}
@@ -79,7 +89,7 @@ class SolutionManifest(ManifestModel):
         for entry in owned:
             _require_reference(errors, entry.id, "owner", entry.owner, owner_ids)
 
-        for entry in (*self.assets, *self.data_contracts):
+        for entry in self.inventory_entries:
             for rule in entry.inventory_rules:
                 _require_inventory_relationship(errors, rule, inventory_ids)
         for asset in self.assets:
@@ -149,8 +159,8 @@ class SolutionManifest(ManifestModel):
         return self
 
 
-def _identified_records(manifest: SolutionManifest) -> tuple[ManifestModel, ...]:
-    records: list[ManifestModel] = [
+def _identified_records(manifest: SolutionManifest) -> tuple[_Identified, ...]:
+    records: list[_Identified] = [
         manifest.metadata,
         *manifest.prerequisites,
         *manifest.commands,
@@ -163,7 +173,7 @@ def _identified_records(manifest: SolutionManifest) -> tuple[ManifestModel, ...]
         *manifest.ml_contracts,
         *manifest.source_owners,
     ]
-    for entry in (*manifest.assets, *manifest.data_contracts):
+    for entry in manifest.inventory_entries:
         records.extend(entry.inventories)
         records.extend(entry.inventory_rules)
     for profile in manifest.profiles:

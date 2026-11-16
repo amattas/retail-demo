@@ -131,6 +131,8 @@ def derive_data_contract_snapshot(
         None,
         repo_root,
     )
+    if event_contract.envelope is None:
+        raise ManifestSourceError("the event data contract must declare an envelope")
     envelope_path = resolve_source_path(event_contract.envelope.source, repo_root)
     if envelope_path != driver_path:
         raise ManifestSourceError("event envelope and payload declarations must share one source")
@@ -429,24 +431,27 @@ def _validate_paths(
         raise ManifestSourceError("derived path inventory differs from Silver")
     derived_by_target = {_single_target(path, "silver"): path for path in derived}
     for route in snapshot.silver.derived_routes.values():
-        path = derived_by_target.get(route.target_table)
-        if path is None:
+        derived_path = derived_by_target.get(route.target_table)
+        if derived_path is None:
             raise ManifestSourceError(f"derived Silver target {route.target_table!r} has no path")
         source_silver = {
-            _single_target(emitted_by_event[event_id], "silver") for event_id in path.event_ids
+            _single_target(emitted_by_event[event_id], "silver")
+            for event_id in derived_path.event_ids
         }
         if source_silver != set(route.source_tables):
-            raise ManifestSourceError(f"{path.id!r} derived source coverage differs from Silver")
-        path_sources = snapshot.path_sources[path.id]
+            raise ManifestSourceError(
+                f"{derived_path.id!r} derived source coverage differs from Silver"
+            )
+        path_sources = snapshot.path_sources[derived_path.id]
         own_routes = {
             item.target_table: item for item in path_sources.silver.derived_routes.values()
         }
         own_route = own_routes.get(route.target_table)
         if own_route is None or own_route.source_tables != route.source_tables:
             raise ManifestSourceError(
-                f"{path.id!r} source does not declare its derived Silver route"
+                f"{derived_path.id!r} source does not declare its derived Silver route"
             )
-        _validate_downstream_targets(path, path_sources, route.target_table)
+        _validate_downstream_targets(derived_path, path_sources, route.target_table)
 
 
 def _validate_downstream_targets(
