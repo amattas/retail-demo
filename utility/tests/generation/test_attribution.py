@@ -79,16 +79,18 @@ def pre(spark, cfg, dicts):
     spark.conf.set(setting, "-1")
     try:
         t = _build_pre_attribution(spark, cfg, dicts)
-        for name in t:
-            t[name] = t[name].cache()
-        yield t
+        # cache() keeps each frame's full upstream plan, and attribution plans
+        # over those plans exhaust the test heap while Spark serializes them.
+        # Eager local checkpoints materialize the snapshot and truncate lineage.
+        yield {name: df.localCheckpoint() for name, df in t.items()}
     finally:
         spark.conf.set(setting, previous)
 
 
 @pytest.fixture(scope="module")
 def attr(spark, cfg, pre):
-    return attribution.generate_attribution(spark, pre, cfg)
+    result = attribution.generate_attribution(spark, pre, cfg)
+    return {name: df.localCheckpoint() for name, df in result.items()}
 
 
 @pytest.fixture(scope="module")

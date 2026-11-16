@@ -119,6 +119,34 @@ def generate_campaign_performance(
     )
 
 
+def generate_truck_dwell_daily(fact_truck_moves: DataFrame) -> DataFrame:
+    """Average unload dwell (`etd - eta`) per site and day.
+
+    Empty when the window produced no completed deliveries, e.g. a short
+    history whose opening stock never reaches a reorder point.
+    """
+    return (
+        fact_truck_moves.withColumn("day", F.to_date("event_ts"))
+        .withColumn(
+            "site",
+            F.when(
+                F.col("store_id").isNotNull(), F.concat(F.lit("STORE_"), F.col("store_id"))
+            ).otherwise(F.concat(F.lit("DC_"), F.col("dc_id"))),
+        )
+        .withColumn(
+            "dwell_min",
+            (F.unix_timestamp("etd") - F.unix_timestamp("eta")) / 60,
+        )
+        .filter(F.col("dwell_min").isNotNull() & (F.col("dwell_min") > 0))
+        .groupBy("site", "day")
+        .agg(
+            F.avg("dwell_min").alias("avg_dwell_min"),
+            F.countDistinct("truck_id").alias("trucks"),
+        )
+        .select(*column_names("truck_dwell_daily"))
+    )
+
+
 def generate_gold(spark: SparkSession, tables: dict[str, DataFrame]) -> dict[str, DataFrame]:
     """Build the 10 Gold aggregate frames from the generated fact tables."""
     gold: dict[str, DataFrame] = {}
@@ -170,27 +198,7 @@ def generate_gold(spark: SparkSession, tables: dict[str, DataFrame]) -> dict[str
     )
 
     # Truck dwell time daily
-    gold["truck_dwell_daily"] = (
-        tables["fact_truck_moves"]
-        .withColumn("day", F.to_date("event_ts"))
-        .withColumn(
-            "site",
-            F.when(
-                F.col("store_id").isNotNull(), F.concat(F.lit("STORE_"), F.col("store_id"))
-            ).otherwise(F.concat(F.lit("DC_"), F.col("dc_id"))),
-        )
-        .withColumn(
-            "dwell_min",
-            (F.unix_timestamp("etd") - F.unix_timestamp("eta")) / 60,
-        )
-        .filter(F.col("dwell_min").isNotNull() & (F.col("dwell_min") > 0))
-        .groupBy("site", "day")
-        .agg(
-            F.avg("dwell_min").alias("avg_dwell_min"),
-            F.countDistinct("truck_id").alias("trucks"),
-        )
-        .select(*column_names("truck_dwell_daily"))
-    )
+    gold["truck_dwell_daily"] = generate_truck_dwell_daily(tables["fact_truck_moves"])
 
     # Online sales daily
     gold["online_sales_daily"] = (
