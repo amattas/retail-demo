@@ -197,13 +197,15 @@ def test_checks_workflow_covers_supported_surfaces_and_windows() -> None:
         "Build current and versioned documentation",
     } <= docs_step_names
     # The `checks` alias is the single required context: it must wait for every
-    # required repo-specific job as well as the shared python job. The Spark shards
-    # are optional and must not fail the run.
+    # required repo-specific job, including every Spark shard, as well as the shared
+    # python job.
     assert set(jobs["checks"]["needs"]) == {
         "python",
+        "spark-tests",
         "spark-e2e",
         "windows-tests",
         "docs-tests",
     }
-    assert jobs["spark-tests"]["continue-on-error"] is True
+    assert "continue-on-error" not in jobs["spark-tests"]
+    assert "SPARK_RESULT" in jobs["checks"]["steps"][0]["env"]
     assert jobs["security"]["needs"] == "python"
