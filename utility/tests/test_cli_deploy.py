@@ -2691,6 +2691,42 @@ def test_operator_retry_reruns_a_failed_step(monkeypatch, tmp_path):
     assert {step.status for step in journal.steps} == {"SUCCEEDED"}
 
 
+def test_retry_survives_a_sibling_finishing_before_the_failure_is_handled(monkeypatch, tmp_path):
+    plan, journal, commands, _ = _interactive_plan(monkeypatch, ["Retry"], {"root": 1})
+    root_journaled = threading.Event()
+    real_mark_failed = _deploy_journal.mark_failed
+
+    def signalling_mark_failed(journal_, step_id, **kwargs):
+        real_mark_failed(journal_, step_id, **kwargs)
+        if step_id == "root":
+            root_journaled.set()
+
+    real_display = cli._display_command
+
+    def lingering_display(command):
+        # Root's worker reports its failure after releasing the journal lock;
+        # keep its future open there while the sibling completes.
+        if command == ["root"] and threading.current_thread() is not threading.main_thread():
+            time.sleep(0.5)
+        return real_display(command)
+
+    real_run = cli.subprocess.run
+
+    def ordered_run(command, **kwargs):
+        if command[0] == "independent":
+            root_journaled.wait(5)
+        return real_run(command, **kwargs)
+
+    monkeypatch.setattr(cli._deploy_journal, "mark_failed", signalling_mark_failed)
+    monkeypatch.setattr(cli, "_display_command", lingering_display)
+    monkeypatch.setattr(cli.subprocess, "run", ordered_run)
+
+    cli._run_plan_plain(tmp_path, "dev", plan, len(plan), yes=False, journal=journal)
+
+    assert commands.count("root") == 2
+    assert {step.status for step in journal.steps} == {"SUCCEEDED"}
+
+
 def test_operator_skip_blocks_all_dependents_but_not_independent_steps(monkeypatch, tmp_path):
     plan, journal, commands, _ = _interactive_plan(monkeypatch, ["Skip"], {"root": 1})
 

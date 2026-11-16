@@ -3124,10 +3124,16 @@ def _run_plan_plain(
     ):
         while pending or running:
             progressed = False
+            # A worker journals its outcome before its future completes. Until
+            # this loop handles that future (and the operator chooses Retry or
+            # Skip), the step's journaled failure is provisional.
+            in_flight = {running_step.step_id for running_step in running.values()}
             for step_id, step in list(pending.items()):
                 with journal_lock:
                     blocked_by = []
                     for dependency in step.depends_on:
+                        if dependency in in_flight:
+                            continue
                         dependency_step = _deploy_journal.get_step(
                             journal,
                             dependency,
@@ -3153,6 +3159,7 @@ def _run_plan_plain(
                         step_id not in {"profile-preflight", "live-profile-preflight"}
                         and live_preflight is not None
                         and live_preflight.status == "FAILED"
+                        and "live-profile-preflight" not in in_flight
                     ):
                         blocked_by.append("live-profile-preflight")
                 if blocked_by:
@@ -3196,7 +3203,8 @@ def _run_plan_plain(
                         or live_preflight.status == "SUCCEEDED"
                     )
                     if all(
-                        _deploy_journal.get_step(journal, dependency).status in terminal
+                        dependency not in in_flight
+                        and _deploy_journal.get_step(journal, dependency).status in terminal
                         for dependency in step.depends_on
                     )
                 ]
