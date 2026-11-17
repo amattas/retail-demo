@@ -99,6 +99,23 @@ as-of timestamps. Its stockout error reports per-rule violation counts.
 `utility/tests/generation/test_stockout_contract_runtime.py` executes the
 producer feature functions and the downstream domain validator together.
 
+### Stockout model
+
+Stockouts are rare (about 0.4% of store/product days stock out within the
+three-day horizon), and most of the risk sits in the few low-stock positions.
+Notebook 12 therefore fits a Spark `LogisticRegression` on the physical driver
+of a stockout: log-scaled current stock, demand velocity, and stock cover over
+the horizon (current stock divided by expected horizon demand, capped at 999),
+plus demand trend and day of week. Day of month and week of year are excluded
+because, with about a year of history, they identify individual dates rather
+than a repeatable pattern. The held-out isotonic calibrator is unchanged.
+
+The earlier depth-5 gradient-boosted ensemble memorized the few low-stock
+examples and calendar dates. Against observed history it scored a one-unit
+position at about 20% when roughly 60% stocked out within three days. On the
+same held-out window the logistic model is calibrated in every stock band and
+ranks better (AUC about 0.98 versus 0.93).
+
 Churn retains hidden nullable `is_churned_actual` solely as a deprecated
 compatibility projection and always writes it as null. All formerly exposed
 required columns remain present, so a failed required-ML gate can leave the

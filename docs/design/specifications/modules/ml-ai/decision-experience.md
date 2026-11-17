@@ -44,9 +44,15 @@ instead of a nonexistent Plan. Readiness excludes the unselected Plan.
 Use this mode when organizational policy prohibits fixed credentials; native
 Planning is unsupported in that environment, not silently simulated.
 
-The bounded **Protect weekend availability** scenario uses store IDs 1-5 and
-product IDs 1-20 in both the agent and Plan. It takes current `au.stockout_risk`, joins the next seven
-forecast days from `au.demand_forecast`, and resolves product names through
+The bounded **Protect weekend availability** scenario seeds a watchlist of at
+most 20 of the network's riskiest observed positions. Positions that meet an
+agent alert rule (`stockout_probability >= 0.7` or `days_of_inventory < 3`)
+rank first, then the positions closest to one. Nothing is relabeled; when no
+position is at risk, the agent has nothing to alert on. When the native Plan
+is selected, the watchlist stays inside the Plan's locked cohort (store IDs 1-5,
+product IDs 1-20) so every case can be reviewed there. The scenario takes
+current `au.stockout_risk`, keeps positions with a complete seven-day forecast
+from `au.demand_forecast`, and resolves product names through
 `ag.dim_products`. Missing, non-finite, negative forecast, duplicate-grain,
 out-of-scope, stale, and future evidence fail closed. A known negative stock
 ledger is not inbound supply; the available-stock measure has a zero floor.

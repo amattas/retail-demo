@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -7,7 +8,12 @@ from deploy.scripts._operations_definition import (
     render_operations_definition,
 )
 from deploy.scripts._operations_scenario import (
+    HIGH_STOCKOUT_PROBABILITY,
+    LOW_DAYS_OF_INVENTORY,
+    MAX_SIGNALS,
+    PLAN_PRODUCT_IDS,
     scenario_signals,
+    scenario_sql,
     signal_ingestion_query,
     validate_signal_readback,
 )
@@ -89,8 +95,46 @@ def test_slow_moving_sku_keeps_its_last_movement_when_the_snapshot_is_current():
 def test_duplicate_source_and_out_of_scope_batches_are_rejected():
     with pytest.raises(ValueError, match="unique"):
         scenario_signals([source_row(), source_row()], NOW)
-    with pytest.raises(ValueError, match="five stores"):
-        scenario_signals([source_row(store_id=i) for i in range(6)], NOW)
+    with pytest.raises(ValueError, match=f"1-{MAX_SIGNALS}"):
+        scenario_signals(
+            [source_row(product_id=i) for i in range(1, MAX_SIGNALS + 2)], NOW
+        )
+    with pytest.raises(ValueError, match="positive"):
+        scenario_signals([source_row(store_id=0)], NOW)
+
+
+def test_any_network_position_can_be_seeded_without_a_plan():
+    # Risk, not a fixed ID range, selects which positions the agent watches.
+    signal = scenario_signals([source_row(store_id=12, product_id=1828)], NOW)[0]
+    assert (signal["store_id"], signal["product_id"]) == (12, 1828)
+    assert "BETWEEN 1 AND" not in scenario_sql(plan_cohort=False)
+
+
+def test_plan_reviewed_signals_stay_inside_the_locked_plan_cohort():
+    outside = source_row(product_id=PLAN_PRODUCT_IDS.stop)
+    with pytest.raises(ValueError, match="Plan cohort"):
+        scenario_signals([outside], NOW, plan_cohort=True)
+    assert scenario_signals([source_row()], NOW, plan_cohort=True)
+    query = scenario_sql(plan_cohort=True)
+    assert "risk.store_id BETWEEN 1 AND 5" in query
+    assert "risk.product_id BETWEEN 1 AND 20" in query
+
+
+def test_watchlist_ranks_positions_that_meet_the_agent_rules_first():
+    instructions = (
+        Path(__file__).resolve().parents[2]
+        / "fabric"
+        / "operations"
+        / "availability.instructions.md"
+    ).read_text(encoding="utf-8")
+    assert f"stockout_probability >= {HIGH_STOCKOUT_PROBABILITY}" in instructions
+    assert f"days_of_inventory < {LOW_DAYS_OF_INVENTORY}" in instructions
+    for plan_cohort in (False, True):
+        query = scenario_sql(plan_cohort=plan_cohort)
+        ranking = query.split("ORDER BY")[-1]
+        assert f"stockout_probability >= {HIGH_STOCKOUT_PROBABILITY}" in ranking
+        assert f"days_of_inventory < {LOW_DAYS_OF_INVENTORY}" in ranking
+        assert f"TOP ({MAX_SIGNALS})" in query
 
 
 def test_kql_quotes_strings_and_keeps_nonempty_batch():

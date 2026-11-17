@@ -29,8 +29,8 @@ from deploy.scripts._operations_definition import (
     render_operations_instructions,
 )
 from deploy.scripts._operations_scenario import (
-    SCENARIO_SQL,
     scenario_signals,
+    scenario_sql,
     signal_ingestion_query,
     validate_signal_readback,
 )
@@ -139,6 +139,8 @@ def _source_rows(
     outputs: dict[str, Any],
     config: DeployConfig,
     credential: Any,
+    *,
+    plan_cohort: bool,
 ) -> list[dict[str, Any]]:
     response = session.get(
         f"{API}/workspaces/{outputs['workspace_id']}/lakehouses/{outputs['lakehouse_id']}",
@@ -158,7 +160,7 @@ def _source_rows(
         _connect_lakehouse_sql(server, config.lakehouse.name, credential)
     ) as connection:
         cursor = connection.cursor()
-        cursor.execute(SCENARIO_SQL)
+        cursor.execute(scenario_sql(plan_cohort=plan_cohort))
         columns = [column[0] for column in cursor.description]
         return [dict(zip(columns, row, strict=True)) for row in cursor.fetchall()]
 
@@ -361,8 +363,11 @@ def publish(
     write_report_atomic(report_path, report)
     try:
         signals = scenario_signals(
-            _source_rows(session, outputs, config, credential),
+            _source_rows(
+                session, outputs, config, credential, plan_cohort=not operations_only
+            ),
             datetime.now(UTC),
+            plan_cohort=not operations_only,
         )
         execute_database_script(
             kusto_uri,
