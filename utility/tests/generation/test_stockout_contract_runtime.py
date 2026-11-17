@@ -2,6 +2,7 @@
 
 import ast
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -77,6 +78,24 @@ def test_signed_ledger_produces_nonnegative_features_accepted_by_real_gate(spark
         assert inventory.filter("balance < 0").count() == 1
     finally:
         output.unpersist()
+
+
+def test_model_features_rank_low_stock_cover_first_without_nulls(spark):
+    features = ["log_inventory", "log_velocity", "log_horizon_cover"]
+    namespace = _functions(PRODUCER, {"prepare_model_frame"})
+    namespace.update(FORECAST_HORIZON_DAYS=3, MAX_HORIZON_COVER=999.0, feature_cols=features)
+    frame = spark.createDataFrame(
+        [(1, 1, 2.0), (2, 20, 2.0), (3, 5, 0.0), (4, 0, 1.0)],
+        "product_id long, current_inventory long, demand_velocity_daily double",
+    )
+
+    rows = {row.product_id: row for row in namespace["prepare_model_frame"](frame).collect()}
+
+    assert rows[1].log_horizon_cover < rows[2].log_horizon_cover
+    assert rows[4].log_horizon_cover == 0.0
+    # No demand means no stockout pressure: cover is capped, not infinite or null.
+    assert rows[3].log_horizon_cover == pytest.approx(math.log1p(999.0))
+    assert all(getattr(row, name) is not None for row in rows.values() for name in features)
 
 
 def test_unknown_balance_remains_unknown_and_is_rejected_before_training(spark):
