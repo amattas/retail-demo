@@ -8,36 +8,59 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
-SCENARIO_SQL = """
-WITH selected_stores AS (
-    SELECT ID FROM [ag].[dim_stores] WHERE ID BETWEEN 1 AND 5
-),
-selected_products AS (
-    SELECT ID AS product_id FROM [ag].[dim_products] WHERE ID BETWEEN 1 AND 20
-),
-demand AS (
+# The agent's alert rules (fabric/operations/availability.instructions.md).
+HIGH_STOCKOUT_PROBABILITY = 0.7
+LOW_DAYS_OF_INVENTORY = 3
+MAX_SIGNALS = 20
+# The native Plan's locked synthetic cohort (fabric/planning/retail-replenishment.Plan).
+PLAN_STORE_IDS = range(1, 6)
+PLAN_PRODUCT_IDS = range(1, 21)
+
+
+def scenario_sql(*, plan_cohort: bool) -> str:
+    """Select a watchlist of the riskiest observed store/product positions.
+
+    Every position that meets an agent alert rule ranks first, then the
+    positions closest to one. Nothing is relabeled or invented: when no
+    position is at risk, the agent has nothing to alert on. Only positions with
+    a complete seven-day forecast qualify. With ``plan_cohort`` the watchlist
+    stays inside the native Plan's locked cohort so every case can be reviewed
+    there.
+    """
+
+    cohort = (
+        f"AND risk.store_id BETWEEN {PLAN_STORE_IDS.start} AND {PLAN_STORE_IDS.stop - 1}\n"
+        f"  AND risk.product_id BETWEEN {PLAN_PRODUCT_IDS.start} AND {PLAN_PRODUCT_IDS.stop - 1}"
+        if plan_cohort
+        else ""
+    )
+    return f"""
+WITH demand AS (
     SELECT store_id, product_id, SUM(predicted_units) AS forecast_units_7d,
            MIN(source_as_of) AS forecast_as_of, COUNT(DISTINCT forecast_date) AS forecast_days,
            COUNT(*) AS forecast_rows, COUNT(DISTINCT source_as_of) AS forecast_versions
     FROM [au].[demand_forecast]
     WHERE forecast_date > CAST(source_as_of AS date)
       AND forecast_date <= DATEADD(day, 7, CAST(source_as_of AS date))
-      AND store_id IN (SELECT ID FROM selected_stores)
-      AND product_id IN (SELECT product_id FROM selected_products)
     GROUP BY store_id, product_id
 )
-SELECT risk.store_id, risk.product_id, product.ProductName AS product_name,
+SELECT TOP ({MAX_SIGNALS})
+       risk.store_id, risk.product_id, product.ProductName AS product_name,
        risk.current_inventory, demand.forecast_units_7d,
        risk.stockout_probability, risk.days_of_inventory,
        risk.forecast_horizon_days AS risk_horizon_days,
        risk.inventory_as_of AS source_as_of, demand.forecast_as_of, demand.forecast_days,
        demand.forecast_rows, demand.forecast_versions
 FROM [au].[stockout_risk] AS risk
-JOIN selected_stores AS store ON store.ID = risk.store_id
-JOIN selected_products AS selected ON selected.product_id = risk.product_id
 JOIN [ag].[dim_products] AS product ON product.ID = risk.product_id
 JOIN demand ON demand.store_id = risk.store_id AND demand.product_id = risk.product_id
-ORDER BY risk.store_id, risk.product_id
+WHERE demand.forecast_days = 7 AND demand.forecast_rows = 7 AND demand.forecast_versions = 1
+  {cohort}
+ORDER BY
+    CASE WHEN risk.stockout_probability >= {HIGH_STOCKOUT_PROBABILITY}
+           OR risk.days_of_inventory < {LOW_DAYS_OF_INVENTORY} THEN 0 ELSE 1 END,
+    risk.stockout_probability DESC, risk.days_of_inventory ASC,
+    risk.store_id, risk.product_id
 """
 
 FIELDS = (
@@ -60,26 +83,23 @@ FIELDS = (
 
 
 def scenario_signals(
-    rows: list[dict[str, Any]], observed_at: datetime
+    rows: list[dict[str, Any]], observed_at: datetime, *, plan_cohort: bool = False
 ) -> list[dict[str, Any]]:
-    if not rows or len(rows) > 100:
+    if not rows or len(rows) > MAX_SIGNALS:
         raise ValueError(
-            "Availability scenario requires 1-100 real store/product source rows."
+            f"Availability scenario requires 1-{MAX_SIGNALS} real store/product source rows."
         )
     if observed_at.tzinfo is None:
         raise ValueError("Scenario monitoring time must be timezone-aware.")
-    if (
-        len({row["store_id"] for row in rows}) > 5
-        or len({row["product_id"] for row in rows}) > 20
-    ):
-        raise ValueError(
-            "Availability scenario is limited to five stores and twenty products."
-        )
     result = []
     keys = set()
     for row in rows:
         store_id, product_id = int(row["store_id"]), int(row["product_id"])
-        if not 1 <= store_id <= 5 or not 1 <= product_id <= 20:
+        if store_id < 1 or product_id < 1:
+            raise ValueError("Availability identifiers must be positive source IDs.")
+        if plan_cohort and (
+            store_id not in PLAN_STORE_IDS or product_id not in PLAN_PRODUCT_IDS
+        ):
             raise ValueError("Availability identifiers are outside the fixed Plan cohort.")
         key = (store_id, product_id)
         if key in keys:

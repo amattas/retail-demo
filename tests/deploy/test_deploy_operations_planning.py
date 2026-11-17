@@ -135,9 +135,9 @@ def publication(monkeypatch):
     monkeypatch.setattr(
         deploy, "list_items", lambda *a: [{"id": ID, "displayName": "retail_model"}]
     )
-    monkeypatch.setattr(deploy, "_source_rows", lambda *a: [])
+    monkeypatch.setattr(deploy, "_source_rows", lambda *a, **k: [])
     monkeypatch.setattr(deploy, "_ensure_native_capacity", Mock())
-    monkeypatch.setattr(deploy, "scenario_signals", lambda *a: [{"case_id": ID}])
+    monkeypatch.setattr(deploy, "scenario_signals", lambda *a, **k: [{"case_id": ID}])
     monkeypatch.setattr(
         deploy, "resolve_kql_database", lambda *a: ("https://kusto.test", "retail")
     )
@@ -153,6 +153,32 @@ def publication(monkeypatch):
         Mock(return_value={"dataSources": {ID: {}}, "actions": {"prepareCase": {}}}),
     )
     return session, publish_item
+
+
+@pytest.mark.parametrize("operations_only", [False, True])
+def test_signals_stay_in_the_plan_cohort_only_when_a_plan_is_published(
+    publication, monkeypatch, tmp_path, operations_only,
+):
+    cohorts = []
+    monkeypatch.setattr(
+        deploy, "_source_rows", lambda *a, plan_cohort: cohorts.append(plan_cohort) or []
+    )
+    monkeypatch.setattr(
+        deploy,
+        "scenario_signals",
+        lambda *a, plan_cohort: cohorts.append(plan_cohort) or [{"case_id": ID}],
+    )
+    for name in (
+        "validate_plan_connection", "validate_model_connections", "validate_planning_measures",
+    ):
+        monkeypatch.setattr(deploy, name, Mock())
+    deploy.publish(
+        repo_root=tmp_path,
+        config=config(plan_connection_id=ID, plan_billing_acknowledged=True),
+        operations_only=operations_only,
+        outputs={"workspace_id": ID, "lakehouse_id": ID, "kql_database_id": ID},
+    )
+    assert cohorts == [not operations_only, not operations_only]
 
 
 @pytest.mark.parametrize("configured_operations_only", [False, True])
