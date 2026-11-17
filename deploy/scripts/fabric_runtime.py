@@ -218,6 +218,23 @@ def schedule_document(parts: dict[str, bytes]) -> dict[str, Any] | None:
     return normalize_schedule_document(document)
 
 
+def configured_schedule_document(
+    document: dict[str, Any], *, enabled: bool
+) -> dict[str, Any]:
+    """Return a schedule document with every schedule switched on or left as committed.
+
+    Deployment configuration only ever enables committed schedules; a pipeline
+    that is not selected keeps its source state, so ``enabled=False`` is a no-op.
+    """
+
+    if not enabled:
+        return document
+    return {
+        **document,
+        "schedules": [{**item, "enabled": True} for item in document["schedules"]],
+    }
+
+
 def normalize_schedule_document(document: Any) -> dict[str, Any]:
     """Return the comparable schedule contract, excluding only its schema URI."""
 

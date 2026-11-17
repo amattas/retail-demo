@@ -16,6 +16,21 @@ operations_planning:
   activate_agent: true
 # Connected twins publish whenever the profile includes Reporting.
 twins: {}
+# Committed pipeline schedules to enable; each applies only when the profile
+# deploys that pipeline. Scheduled runs fail while the capacity is paused.
+schedules:
+  # Nightly Delta OPTIMIZE/VACUUM at 00:00 Eastern (about 10 minutes on F64).
+  daily_maintenance: true
+  # Streaming Silver/Gold refresh every 30 minutes; useful only while
+  # stream-events is producing events.
+  streaming_data_load: false
+# Start the live stream-events notebook after deployment. A running stream holds
+# a Spark session (and capacity) until it stops.
+stream:
+  start_after_deploy: false
+  rows_per_second: 5
+  # 0 runs until the notebook job is cancelled in Fabric.
+  run_seconds: 0
 auth:
   mode: azure_cli
 workspace:

@@ -176,6 +176,38 @@ class StreamingShortcutsConfig:
 
 
 @dataclass(frozen=True)
+class SchedulesConfig:
+    """Which committed pipeline schedules the deployment enables.
+
+    A flag applies only when the profile deploys that pipeline; every other
+    source schedule keeps its committed state.
+    """
+
+    daily_maintenance: bool = True
+    streaming_data_load: bool = False
+
+    def enabled_pipelines(self) -> tuple[str, ...]:
+        return tuple(
+            name
+            for name, enabled in (
+                ("daily-maintenance", self.daily_maintenance),
+                ("streaming-data-load", self.streaming_data_load),
+            )
+            if enabled
+        )
+
+
+@dataclass(frozen=True)
+class StreamConfig:
+    """Optional start of the live ``stream-events`` notebook after deployment."""
+
+    start_after_deploy: bool = False
+    rows_per_second: int = 5
+    # 0 runs until the notebook job is cancelled in Fabric.
+    run_seconds: int = 0
+
+
+@dataclass(frozen=True)
 class DeployConfig:
     """Canonical deployment configuration for one environment."""
 
@@ -194,6 +226,8 @@ class DeployConfig:
     operations_planning: OperationsPlanningConfig = OperationsPlanningConfig()
     twins: TwinsConfig = TwinsConfig()
     streaming_shortcuts: StreamingShortcutsConfig = StreamingShortcutsConfig()
+    schedules: SchedulesConfig = SchedulesConfig()
+    stream: StreamConfig = StreamConfig()
 
 
 @dataclass(frozen=True)
@@ -317,6 +351,25 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
         raise ValueError("twins must be a mapping")
     if not isinstance(streaming_shortcuts, dict):
         raise ValueError("streaming_shortcuts must be a mapping")
+    schedules = {} if data.get("schedules") is None else data["schedules"]
+    stream = {} if data.get("stream") is None else data["stream"]
+    if not isinstance(schedules, dict):
+        raise ValueError("schedules must be a mapping")
+    if not isinstance(stream, dict):
+        raise ValueError("stream must be a mapping")
+    for flag in ("daily_maintenance", "streaming_data_load"):
+        if flag in schedules and not isinstance(schedules[flag], bool):
+            raise ValueError(f"schedules.{flag} must be a boolean")
+    if "start_after_deploy" in stream and not isinstance(stream["start_after_deploy"], bool):
+        raise ValueError("stream.start_after_deploy must be a boolean")
+    rows_per_second = stream.get("rows_per_second", 5)
+    run_seconds = stream.get("run_seconds", 0)
+    if isinstance(rows_per_second, bool) or not isinstance(rows_per_second, int) or not (
+        1 <= rows_per_second <= 1000
+    ):
+        raise ValueError("stream.rows_per_second must be an integer from 1 to 1000")
+    if isinstance(run_seconds, bool) or not isinstance(run_seconds, int) or run_seconds < 0:
+        raise ValueError("stream.run_seconds must be a non-negative integer (0 = until stopped)")
     for flag in ("enabled", "include_plan", "plan_billing_acknowledged", "activate_agent"):
         if flag in native and not isinstance(native[flag], bool):
             raise ValueError(f"operations_planning.{flag} must be a boolean")
@@ -408,6 +461,12 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
         raise ValueError(
             "streaming_shortcuts.enabled requires a profile that provisions Eventhouse."
         )
+    start_stream = bool(stream.get("start_after_deploy", False))
+    if start_stream and "stream" not in profile.notebook_groups:
+        raise ValueError(
+            "stream.start_after_deploy requires a profile that deploys the "
+            "stream-events notebook (standard or full-demo)."
+        )
     min_node_count = _bounded_node_count(
         spark.get("min_node_count"),
         "spark.min_node_count",
@@ -442,6 +501,15 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
         ),
         streaming_shortcuts=StreamingShortcutsConfig(
             enabled=streaming_shortcuts_enabled,
+        ),
+        schedules=SchedulesConfig(
+            daily_maintenance=bool(schedules.get("daily_maintenance", True)),
+            streaming_data_load=bool(schedules.get("streaming_data_load", False)),
+        ),
+        stream=StreamConfig(
+            start_after_deploy=start_stream,
+            rows_per_second=rows_per_second,
+            run_seconds=run_seconds,
         ),
         workspace=WorkspaceConfig(
             name=str(workspace["name"]),

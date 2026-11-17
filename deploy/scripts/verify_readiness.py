@@ -41,6 +41,7 @@ from deploy.scripts.deploy_config import (
 from deploy.scripts.export_items import FABRIC_API, build_session, get_definition
 from deploy.scripts.fabric_runtime import (
     FabricDefinitionError,
+    configured_schedule_document,
     decode_definition_parts,
     json_definition_part,
     normalize_schedule_document,
@@ -1760,8 +1761,11 @@ class ReadinessRunner:
         errors: list[str] = []
         for source_path in self._source_schedule_paths():
             name = source_path.parent.stem
-            source = normalize_schedule_document(
-                json.loads(source_path.read_text(encoding="utf-8"))
+            source = configured_schedule_document(
+                normalize_schedule_document(
+                    json.loads(source_path.read_text(encoding="utf-8"))
+                ),
+                enabled=name in self.context.config.schedules.enabled_pipelines(),
             )
             live = schedule_document(
                 decode_definition_parts(
@@ -1775,7 +1779,7 @@ class ReadinessRunner:
                 "Live schedule definitions differ for: " + ", ".join(errors)
             )
         return Observation(
-            "Live enabled and disabled schedules match source definitions.",
+            "Live enabled and disabled schedules match configured definitions.",
             {"scheduled_pipeline_count": len(self._source_schedule_paths())},
         )
 

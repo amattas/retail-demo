@@ -733,6 +733,44 @@ def test_stage_pipelines_injects_configured_lakehouse_parameter(
     }
 
 
+def test_stage_pipelines_enables_only_configured_committed_schedules(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    disabled = {"schedules": [{"enabled": False, "jobType": "Execute", "configuration": {}}]}
+    for name in ("daily-maintenance", "streaming-data-load"):
+        _write_pipeline(repo, name, ["05-maintain-delta-tables"])
+        _write_json(repo / "fabric" / "pipelines" / f"{name}.DataPipeline" / ".schedules", disabled)
+    output = tmp_path / "workspace"
+    output.mkdir()
+
+    build_artifacts.stage_pipelines(
+        repo,
+        output,
+        ["daily-maintenance.DataPipeline", "streaming-data-load.DataPipeline"],
+        {"05-maintain-delta-tables"},
+        enabled_schedules=("daily-maintenance", "not-deployed"),
+    )
+
+    def staged(name: str) -> list[bool]:
+        path = output / "Pipelines" / f"{name}.DataPipeline" / ".schedules"
+        return [item["enabled"] for item in json.loads(path.read_text())["schedules"]]
+
+    assert staged("daily-maintenance") == [True]
+    assert staged("streaming-data-load") == [False]
+    source = repo / "fabric" / "pipelines" / "daily-maintenance.DataPipeline" / ".schedules"
+    assert json.loads(source.read_text()) == disabled
+
+
+def test_committed_streaming_schedule_cannot_outpace_its_runs() -> None:
+    schedules = json.loads(
+        (
+            REPO_ROOT / "fabric" / "pipelines" / "streaming-data-load.DataPipeline" / ".schedules"
+        ).read_text(encoding="utf-8")
+    )["schedules"]
+    # One run (Silver then Gold) took about 16 minutes on F64; with concurrency 1
+    # a shorter interval queues runs without bound.
+    assert all(item["configuration"]["interval"] >= 30 for item in schedules)
+
+
 def test_staged_pipelines_never_share_the_workspace_sentinel_logical_id(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     _write_pipeline(repo, "streaming-data-load", ["03-streaming-to-silver"])

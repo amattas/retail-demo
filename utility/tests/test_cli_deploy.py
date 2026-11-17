@@ -469,6 +469,41 @@ def test_operations_only_plan_skips_planning_prerequisites(profile):
     assert native.description == "Publish and start Operations Agent"
 
 
+def test_build_steps_enable_the_configured_pipeline_schedules():
+    plan = _deploy_plan(
+        "dev",
+        True,
+        profile=_profile("standard"),
+        repo_root=REPO_ROOT,
+        enabled_schedules=("daily-maintenance",),
+    )
+    build = next(step for step in plan if step.step_id == "build-infrastructure")
+    flag = build.cmd.index("--enable-schedule")
+    assert build.cmd[flag + 1] == "daily-maintenance"
+    assert build.cmd.count("--enable-schedule") == 1
+
+
+@pytest.mark.parametrize("exit_code,status", [(0, "SUCCEEDED"), (1, "FAILED")])
+def test_stream_start_is_journaled_and_never_fails_the_deployment(
+    monkeypatch, tmp_path, exit_code, status
+):
+    journal = _deploy_journal.start_run("dev", targets={})
+    _deploy_journal.add_step(journal, "start-stream", "Start stream", required=False)
+    commands = []
+
+    def fake_run(command, **_kwargs):
+        commands.append(command)
+        return SimpleNamespace(returncode=exit_code)
+
+    monkeypatch.setattr(cli, "_run_step_command", fake_run)
+
+    cli._start_stream_after_deploy(tmp_path, "dev", journal=journal)
+
+    assert commands[0][2] == "deploy.scripts.start_stream"
+    assert _deploy_journal.get_step(journal, "start-stream").status == status
+    assert _deploy_journal.compute_status(journal) in {"SUCCEEDED", "DEGRADED"}
+
+
 def test_operations_only_cli_dry_run_respects_policy_without_plan_credentials(
     monkeypatch, tmp_path
 ):

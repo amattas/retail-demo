@@ -234,6 +234,58 @@ def test_native_pack_starts_the_agent_unless_told_to_leave_it_stopped(tmp_path):
     assert stopped.operations_planning.activate_agent is False
 
 
+def _load_automation_config(tmp_path: Path, settings: dict, profile: str = "standard"):
+    _load_config(tmp_path, profile)
+    root = tmp_path / "config" / "environments"
+    path = root / f"{ENVIRONMENT}.yml"
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data.update(settings)
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    return deploy_config.load_environment(ENVIRONMENT, environments_root=root)
+
+
+def test_maintenance_schedule_is_enabled_and_the_stream_left_off_by_default(tmp_path):
+    config = _load_automation_config(tmp_path, {})
+
+    assert config.schedules.enabled_pipelines() == ("daily-maintenance",)
+    assert config.stream.start_after_deploy is False
+
+
+def test_automation_settings_load_explicit_choices(tmp_path):
+    config = _load_automation_config(
+        tmp_path,
+        {
+            "schedules": {"daily_maintenance": False, "streaming_data_load": True},
+            "stream": {"start_after_deploy": True, "rows_per_second": 20, "run_seconds": 600},
+        },
+    )
+
+    assert config.schedules.enabled_pipelines() == ("streaming-data-load",)
+    assert config.stream == deploy_config.StreamConfig(
+        start_after_deploy=True, rows_per_second=20, run_seconds=600
+    )
+
+
+@pytest.mark.parametrize(
+    "settings,match",
+    [
+        ({"schedules": {"daily_maintenance": "yes"}}, "schedules.daily_maintenance"),
+        ({"stream": {"start_after_deploy": 1}}, "stream.start_after_deploy"),
+        ({"stream": {"rows_per_second": 0}}, "stream.rows_per_second"),
+        ({"stream": {"run_seconds": -1}}, "stream.run_seconds"),
+        ({"stream": []}, "stream must be a mapping"),
+    ],
+)
+def test_automation_settings_reject_invalid_values(tmp_path, settings, match):
+    with pytest.raises(ValueError, match=match):
+        _load_automation_config(tmp_path, settings)
+
+
+def test_stream_start_requires_a_profile_that_deploys_the_stream(tmp_path):
+    with pytest.raises(ValueError, match="stream-events"):
+        _load_automation_config(tmp_path, {"stream": {"start_after_deploy": True}}, "core")
+
+
 def test_native_pack_allows_missing_connection_until_publication(tmp_path):
     config = _load_native_config(
         tmp_path, {"enabled": True, "plan_connection_id": " ", "recipient": ""}
