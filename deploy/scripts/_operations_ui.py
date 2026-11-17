@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
@@ -22,6 +24,13 @@ _GOALS = (
     "physical ops_availability_signals row per case_id, notify operators with "
     "complete evidence, and require human approval before preparing a draft."
 )
+
+
+_API_VERSION = "2025-05-01"
+# Fabric generates the playbook after the configuration is saved; it took about
+# three minutes for the retail agent.
+PLAYBOOK_TIMEOUT_SECONDS = 900
+_GENERATION_IN_PROGRESS = "BehaviorModelGenerationInProgress"
 
 
 @dataclass(frozen=True)
@@ -270,3 +279,93 @@ def ensure_operations_ui_configuration(
             "Operations Agent UI configuration readback does not match."
         )
     return actual
+
+
+def _workload_session(context: OperationsUiContext) -> requests.Session:
+    session = requests.Session()
+    session.headers["Authorization"] = "Mwc" + "Token " + context.token
+    session.headers["Accept"] = "application/json"
+    session.headers["Content-Type"] = "application/json"
+    return session
+
+
+def _rule_count(playbook: Any) -> int:
+    """Count the rules in a generated playbook (one ``<summary>`` per rule)."""
+
+    rules = playbook.get("rules") if isinstance(playbook, dict) else None
+    return rules.count("<summary>") if isinstance(rules, str) else 0
+
+
+def activate_operations_agent(
+    credential: TokenCredential,
+    *,
+    workspace_id: str,
+    agent_id: str,
+    timeout_seconds: float = PLAYBOOK_TIMEOUT_SECONDS,
+    poll_seconds: float = 15,
+    sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> dict[str, Any]:
+    """Start the agent once Fabric finishes generating its playbook.
+
+    Saving the configuration makes Fabric generate the playbook (the agent's
+    rules) from its instructions. The agent cannot run without one, so this
+    waits for a playbook with at least one rule, then sets the agent Active and
+    reads the state back.
+    """
+
+    context = get_operations_ui_context(
+        credential,
+        workspace_id=workspace_id,
+        agent_id=agent_id,
+    )
+    session = _workload_session(context)
+    version = f"api-version={_API_VERSION}"
+    deadline = clock() + timeout_seconds
+    while True:
+        response = session.get(
+            f"{context.base_url}/configuration/behaviorModel?{version}",
+            timeout=90,
+            allow_redirects=False,
+        )
+        if response.status_code == 200:
+            break
+        try:
+            code = response.json().get("code")
+        except (ValueError, AttributeError):
+            code = None
+        if code != _GENERATION_IN_PROGRESS:
+            _raise_ui_error(response, "Read the generated Operations Agent playbook")
+        if clock() >= deadline:
+            raise NativeItemError(
+                "Fabric did not finish generating the Operations Agent playbook within "
+                f"{int(timeout_seconds)} seconds; start the agent after it completes."
+            )
+        sleep(poll_seconds)
+    rule_count = _rule_count(response.json())
+    if rule_count < 1:
+        raise NativeItemError(
+            "Fabric generated an Operations Agent playbook with no rules; review the "
+            "agent instructions before starting it."
+        )
+    response = session.patch(
+        f"{context.base_url}/configuration/settings?{version}&opaPreviewGeneration=0",
+        json={"agentState": "Active"},
+        timeout=60,
+        allow_redirects=False,
+    )
+    if response.status_code != 200:
+        _raise_ui_error(response, "Start the Operations Agent")
+    response = retry_read(
+        lambda: session.get(
+            f"{context.base_url}/configuration/settings?{version}",
+            timeout=30,
+            allow_redirects=False,
+        )
+    )
+    if response.status_code != 200:
+        _raise_ui_error(response, "Read the Operations Agent state")
+    state = response.json().get("agentState")
+    if state != "Active":
+        raise NativeItemError(f"The Operations Agent reported state {state!r} after starting.")
+    return {"state": "ACTIVE", "rule_count": rule_count}

@@ -108,8 +108,13 @@ source and instructions. The public definition API rejects
 the Fabric UI to bind
 `prepare-replenishment-case` and requires exact source/action readback. It
 omits an empty `playbook` because Fabric rejects it with
-`No rule definitions available`; generate and review the playbook and Teams
-destination, then explicitly start only after review.
+`No rule definitions available`. Saving that configuration makes Fabric
+generate the playbook (the agent's rules) from its instructions, which takes a
+few minutes. By default the publisher then starts the agent: it waits for a
+playbook with at least one rule and requires an `Active` state readback. Set
+`operations_planning.activate_agent: false` to leave the agent stopped for
+review. A failed start leaves the agent stopped, records `activation_warning`
+in the report, and does not fail the deployment.
 
 The default selection deploys only the Operations Agent and leaves the existing
 model's SSO binding untouched. It is equivalent to:
@@ -118,6 +123,7 @@ model's SSO binding untouched. It is equivalent to:
 operations_planning:
   enabled: true
   include_plan: false
+  activate_agent: true
 ```
 
 Set `enabled: false` only to skip the pack in a specific environment.
@@ -127,7 +133,9 @@ fixed credentials. Readiness requires the draft notebook and reports a missing
 Operations Agent as a warning, not a failure. It does not expect a Plan.
 Operators can review the Lakehouse draft-case table and existing report
 through SSO; this is not the native Planning product.
-Operations Agent remains stopped until reviewed and explicitly activated.
+A running Operations Agent queries every five minutes (about 0.46 CU-hours per
+active hour) and sends Teams recommendations to its creator or configured
+recipient. Its notebook action still requires human approval.
 
 The publisher creates the supporting KQL tables and bound draft notebook
 before validating monitoring signals. Stale or invalid source evidence still
@@ -206,8 +214,8 @@ endpoint used by the UI. An HTTP 400
 enablement and is not retried through that incompatible contract.
 
 Disabling the pack stops its publication; it does not delete its items or stop
-an agent that an operator previously activated. Stop monitoring explicitly in
-Fabric before opting out. Readiness tolerates only the source-declared
+an agent that is already running. Stop monitoring explicitly in Fabric before
+opting out. Readiness tolerates only the source-declared
 Operations tables left behind by an unselected pack, not arbitrary extra KQL
 objects, and never treats them as evidence of a running retail stream.
 
@@ -215,9 +223,9 @@ The model publication includes additive `Next 7 Days` forecast/bound measures;
 existing full-horizon measures remain unchanged. When including the Plan, publish
 the updated Reporting model before using the targeted command against an older deployment.
 
-The pack publishes `retail-availability-operations` **stopped**, the separate
-`prepare-replenishment-case` notebook, and at most 100 current store/product
-signals. It binds the notebook as a human-approved Agent action through the
+The pack publishes `retail-availability-operations` (started by default), the
+separate `prepare-replenishment-case` notebook, and at most 20 current
+store/product signals: the riskiest observed positions. It binds the notebook as a human-approved Agent action through the
 UI-native OA workload endpoint. It publishes the native
 `retail-replenishment` Plan when requested. The
 standalone command also refreshes signals; it does not install a continuous
@@ -228,9 +236,9 @@ also uses capacity auto-resume. Plan prerequisites apply only when including
 the Plan; operations-only publication uses the configured operator login.
 
 Inspect `deploy/.generated/<env>/operations-planning-report.json` for persisted
-item identities and remaining acceptance steps. In Fabric, review/generate
-the agent playbook, configure Teams notifications, and confirm human approval
-before explicitly starting monitoring. If selected, open the Plan to confirm its shared
+item identities, the agent state, and remaining acceptance steps. In Fabric,
+review the generated playbook and Teams destination. If `activate_agent` is
+false or the start failed, start monitoring from Fabric after that review. If selected, open the Plan to confirm its shared
 model connection and application database, then configure and accept any
 approval/writeback workflow in-product. Item publication is not proof those
 interactive capabilities have been accepted.

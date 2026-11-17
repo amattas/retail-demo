@@ -10,11 +10,13 @@
   `retail-demo` as item `40d42195-9488-4ca1-8ba7-a15fc29648e6`, stopped, with
   its KQL source and instructions. Existing verified evidence includes 80
   availability signals and the separate `prepare-replenishment-case` notebook.
-- Complete the UI acceptance: generate/review the playbook, verify the KQL
-  source on the Build page, configure the Teams destination, and explicitly
-  activate only after review. The publisher omits an empty `playbook` object
-  because Fabric returned `No rule definitions available in the playbook`;
-  the UI must generate it.
+- Complete the UI acceptance: review the generated playbook, verify the KQL
+  source on the Build page, and configure the Teams destination. Playbook
+  generation and activation are now scripted: saving the workload
+  configuration generates the playbook server-side, and the publisher starts
+  the agent through `PATCH configuration/settings` (verified in
+  `retail-demo-tui` on 2026-11-17 with a temporary probe agent: two rules
+  generated in about three minutes, `Active` readback, then deleted).
 - The public definition API returns HTTP 400 `UnknownError` for
   `FabricJobAction`, including Notebook and DataPipeline probes
   (`d60c1ef9-fafc-4500-84d6-48f6d54d00d5`,
@@ -23,13 +25,9 @@
   The Fabric UI uses a separate OA workload endpoint. The publisher calls
   that endpoint, and live readback verifies one KQL source plus the
   `prepare-replenishment-case` Notebook action with `CASE_ID`.
-- Scripted playbook generation reaches the same UI endpoint but is not accepted
-  yet. `RetailOntology_AutoGen` now contains the live `StockoutRisk` entity,
-  store/product relationships, and required properties; the delegated Teams
-  recipient is also configured. The generator still returns generic
-  `BehaviorModelGenerationFailed`, including for a simple established Product
-  rule. Successful generation/review and activation therefore remain a Fabric
-  service gate rather than missing repository modeling.
+- Earlier generation attempts against the ontology source returned generic
+  `BehaviorModelGenerationFailed`. With the KQL database source and
+  physical-column instructions, generation succeeds.
 - Live prerequisites remain satisfied: non-trial F64 West US 3, user identity,
   Copilot/Azure OpenAI settings, KQL database, and `Item.ReadWrite.All`.
   Service principals and managed identities are unsupported; the tenant

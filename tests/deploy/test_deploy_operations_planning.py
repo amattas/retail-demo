@@ -22,6 +22,7 @@ def config(**changes):
                 "plan_connection_id": None,
                 "plan_billing_acknowledged": False,
                 "recipient": None,
+                "activate_agent": False,
                 **changes,
             },
         ),
@@ -337,6 +338,45 @@ def test_plan_failure_retains_real_operations_evidence_and_records_failure(
     report = json.loads(path.read_text())
     assert report["operations_agent"]["id"] == ID
     assert report["plan"]["state"] == "PUBLICATION_FAILED"
+
+
+def test_published_agent_is_started_when_configured(publication, monkeypatch, tmp_path):
+    activate = Mock(return_value={"state": "ACTIVE", "rule_count": 2})
+    monkeypatch.setattr(deploy, "activate_operations_agent", activate)
+
+    result = deploy.publish(
+        repo_root=tmp_path,
+        config=config(include_plan=False, activate_agent=True),
+        outputs={"workspace_id": ID, "lakehouse_id": ID, "kql_database_id": ID},
+    )
+
+    assert activate.call_args.kwargs == {"workspace_id": ID, "agent_id": ID}
+    assert result["operations_agent"]["state"] == "ACTIVE"
+    assert result["operations_agent"]["rule_count"] == 2
+    assert "running" in result["acceptance"]
+    assert "before activation" not in result["acceptance"]
+
+
+def test_failed_start_leaves_a_published_agent_stopped_with_a_warning(
+    publication, monkeypatch, tmp_path
+):
+    monkeypatch.setattr(
+        deploy,
+        "activate_operations_agent",
+        Mock(side_effect=deploy.NativeItemError("playbook with no rules")),
+    )
+
+    result = deploy.publish(
+        repo_root=tmp_path,
+        config=config(include_plan=False, activate_agent=True),
+        outputs={"workspace_id": ID, "lakehouse_id": ID, "kql_database_id": ID},
+    )
+
+    assert result["operations_agent"]["state"] == "STOPPED"
+    assert "no rules" in result["operations_agent"]["activation_warning"]
+    assert "before activation" in result["acceptance"]
+    path = tmp_path / "deploy" / ".generated" / "dev" / "operations-planning-report.json"
+    assert json.loads(path.read_text()) == result
 
 
 def test_agent_rejection_preserves_supporting_asset_evidence(publication, tmp_path):

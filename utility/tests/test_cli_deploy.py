@@ -457,6 +457,16 @@ def test_operations_only_plan_skips_planning_prerequisites(profile):
     assert native.required is False
     assert "continues" in native.failure_message
     assert native.description == "Publish stopped Operations Agent"
+    started = _deploy_plan(
+        "dev",
+        True,
+        profile=_profile(profile),
+        repo_root=REPO_ROOT,
+        operations_planning_enabled=True,
+        activate_operations_agent=True,
+    )
+    native = next(step for step in started if step.step_id == "deploy-operations-planning")
+    assert native.description == "Publish and start Operations Agent"
 
 
 def test_operations_only_cli_dry_run_respects_policy_without_plan_credentials(

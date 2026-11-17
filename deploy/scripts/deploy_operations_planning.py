@@ -1,4 +1,4 @@
-"""Publish a stopped Operations Agent and, when selected, a replenishment Plan."""
+"""Publish (and by default start) the Operations Agent and, when selected, a replenishment Plan."""
 
 from __future__ import annotations
 
@@ -34,7 +34,10 @@ from deploy.scripts._operations_scenario import (
     signal_ingestion_query,
     validate_signal_readback,
 )
-from deploy.scripts._operations_ui import ensure_operations_ui_configuration
+from deploy.scripts._operations_ui import (
+    activate_operations_agent,
+    ensure_operations_ui_configuration,
+)
 from deploy.scripts.apply_kql import (
     build_database_script,
     execute_database_script,
@@ -163,6 +166,41 @@ def _source_rows(
         cursor.execute(scenario_sql(plan_cohort=plan_cohort))
         columns = [column[0] for column in cursor.description]
         return [dict(zip(columns, row, strict=True)) for row in cursor.fetchall()]
+
+
+_REVIEW_BEFORE_ACTIVATION = "Generate/review the playbook and Teams destination before activation. "
+_RUNNING = (
+    "The agent is running on its generated playbook and sends recommendations to "
+    "Teams; review the playbook and destination in Fabric. "
+)
+
+
+def _activate_agent(
+    credential: Any,
+    config: DeployConfig,
+    workspace_id: str,
+    report: dict[str, Any],
+) -> None:
+    """Start the published agent when configured.
+
+    A failure leaves the agent stopped and records a warning instead of failing
+    publication: the agent and its signals are already in place, and an operator
+    can start it from Fabric.
+    """
+
+    if not config.operations_planning.activate_agent:
+        return
+    agent = report["operations_agent"]
+    try:
+        result = activate_operations_agent(
+            credential, workspace_id=workspace_id, agent_id=agent["id"]
+        )
+    except (NativeItemError, RequestException) as exc:
+        agent["activation_warning"] = _failure_message(exc)
+        console.warn(f"Operations Agent left stopped: {agent['activation_warning']}")
+        return
+    agent.update(state=result["state"], rule_count=result["rule_count"])
+    report["acceptance"] = report["acceptance"].replace(_REVIEW_BEFORE_ACTIVATION, _RUNNING)
 
 
 def _ensure_native_capacity(
@@ -343,8 +381,8 @@ def publish(
             )
         },
         "acceptance": (
-            "Generate/review the playbook and Teams destination before activation. "
-            "The prepare-replenishment-case Notebook action requires human approval. "
+            _REVIEW_BEFORE_ACTIVATION
+            + "The prepare-replenishment-case Notebook action requires human approval. "
             + (
                 "Review ops.replenishment_cases and the SSO report. No Plan. "
                 if operations_only else
@@ -419,6 +457,7 @@ def publish(
         "source_count": len(ui_configuration["dataSources"]),
         "action_count": len(ui_configuration["actions"]),
     }
+    _activate_agent(credential, config, workspace_id, report)
     write_report_atomic(report_path, report)
     if plan_definition is not None:
         try:
@@ -544,13 +583,18 @@ def publish_existing_agent(
         "action_count": len(ui_configuration["actions"]),
     }
     report["acceptance"] = (
-        "Generate/review the playbook and Teams destination before activation. "
-        "The prepare-replenishment-case Notebook action is configured but still "
+        _REVIEW_BEFORE_ACTIVATION
+        + "The prepare-replenishment-case Notebook action is configured but still "
         "requires human approval. Review ops.replenishment_cases and the SSO "
         "report. No Plan, approval routing, writeback, or ERP execution."
     )
+    _activate_agent(credential, config, workspace_id, report)
     write_report_atomic(report_path, report)
     return report
+
+
+def _agent_state(report: dict[str, Any]) -> str:
+    return "running" if report["operations_agent"]["state"] == "ACTIVE" else "stopped"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -582,7 +626,12 @@ def main(argv: list[str] | None = None) -> int:
             console.info("Operations/Planning publication is disabled for this environment.")
             return 0
         console.info(
-            "Would publish availability signals, a draft notebook, and a stopped Operations Agent."
+            "Would publish availability signals, a draft notebook, and an Operations Agent "
+            + (
+                "started after Fabric generates its playbook."
+                if config.operations_planning.activate_agent
+                else "left stopped."
+            )
         )
         if not args.operations_only and config.operations_planning.include_plan:
             console.info(
@@ -613,7 +662,8 @@ def main(argv: list[str] | None = None) -> int:
             console.error(str(exc))
             return 1
         console.info(
-            "Published the stopped Operations Agent using existing verified signals."
+            f"Published the Operations Agent ({_agent_state(report)}) using existing "
+            "verified signals."
         )
         if not organize_after_publish(args.repo_root, args.environment):
             return 1
@@ -634,7 +684,8 @@ def main(argv: list[str] | None = None) -> int:
     if not organize_after_publish(args.repo_root, args.environment):
         return 1
     console.info(
-        f"Published a stopped Operations Agent and {report['signal_count']} availability signals."
+        f"Published the Operations Agent ({_agent_state(report)}) and "
+        f"{report['signal_count']} availability signals."
     )
     console.info(
         f"Planning: {report['plan']['state']}. See operations-planning-report.json."
