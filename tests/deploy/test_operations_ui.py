@@ -128,3 +128,69 @@ def test_ui_configuration_rejects_drifted_readback(monkeypatch):
             notebook_id=ID,
             instructions="Monitor bounded availability.",
         )
+
+
+def _workload(monkeypatch, behavior_model, settings_state="Active"):
+    session = Mock()
+    session.get.side_effect = [*behavior_model, response(200, {"agentState": settings_state})]
+    session.patch.return_value = response(200, {"agentState": "Active"})
+    monkeypatch.setattr(
+        ui,
+        "get_operations_ui_context",
+        lambda *_args, **_kwargs: ui.OperationsUiContext(
+            "https://capacity.pbidedicated.windows.net/ui", "token"
+        ),
+    )
+    monkeypatch.setattr(ui, "_workload_session", lambda _context: session)
+    return session
+
+
+PLAYBOOK = {
+    "ontology": "...",
+    "rules": "<details><summary>High risk</summary></details>"
+    "<details><summary>Low inventory</summary></details>",
+}
+GENERATING = response(409, {"code": "BehaviorModelGenerationInProgress"})
+
+
+def test_agent_starts_after_fabric_finishes_generating_its_playbook(monkeypatch):
+    session = _workload(monkeypatch, [GENERATING, GENERATING, response(200, PLAYBOOK)])
+    waits = []
+
+    result = ui.activate_operations_agent(
+        Mock(), workspace_id=ID, agent_id=OTHER, sleep=waits.append, clock=lambda: 0
+    )
+
+    assert result == {"state": "ACTIVE", "rule_count": 2}
+    assert len(waits) == 2
+    assert session.patch.call_args.kwargs["json"] == {"agentState": "Active"}
+
+
+@pytest.mark.parametrize(
+    "behavior_model,match",
+    [
+        ([response(200, {"ontology": "...", "rules": ""})], "no rules"),
+        ([response(400, {"code": "InvalidConfiguration"})], "InvalidConfiguration"),
+        ([GENERATING], "did not finish"),
+    ],
+    ids=["empty-playbook", "generation-error", "timeout"],
+)
+def test_agent_is_never_started_without_a_generated_playbook(monkeypatch, behavior_model, match):
+    session = _workload(monkeypatch, behavior_model)
+    clock = iter([0, 1000])
+
+    with pytest.raises(ui.NativeItemError, match=match):
+        ui.activate_operations_agent(
+            Mock(), workspace_id=ID, agent_id=OTHER, sleep=Mock(), clock=lambda: next(clock)
+        )
+
+    session.patch.assert_not_called()
+
+
+def test_agent_start_requires_active_readback(monkeypatch):
+    _workload(monkeypatch, [response(200, PLAYBOOK)], settings_state="Inactive")
+
+    with pytest.raises(ui.NativeItemError, match="Inactive"):
+        ui.activate_operations_agent(
+            Mock(), workspace_id=ID, agent_id=OTHER, sleep=Mock(), clock=lambda: 0
+        )

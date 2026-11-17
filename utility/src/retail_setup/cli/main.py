@@ -1789,6 +1789,7 @@ def _deploy_plan(
     repo_root: Path | None = None,
     operations_planning_enabled: bool = False,
     include_native_plan: bool = False,
+    activate_operations_agent: bool = False,
     plan_connection_id: str | None = None,
     plan_billing_acknowledged: bool = False,
     twins_enabled: bool = False,
@@ -2331,9 +2332,9 @@ def _deploy_plan(
                     *([] if include_native_plan else ["--operations-only"]),
                 ],
                 description=(
-                    "Publish stopped Operations Agent and native replenishment Plan"
-                    if include_native_plan
-                    else "Publish stopped Operations Agent"
+                    ("Publish and start" if activate_operations_agent else "Publish stopped")
+                    + " Operations Agent"
+                    + (" and native replenishment Plan" if include_native_plan else "")
                 ),
                 step_id="deploy-operations-planning",
                 required=include_native_plan,
@@ -3603,6 +3604,7 @@ def deploy(
         repo_root=repo_root,
         operations_planning_enabled=native.enabled if native is not None else False,
         include_native_plan=native.include_plan if native is not None else False,
+        activate_operations_agent=native.activate_agent if native is not None else False,
         plan_connection_id=native.plan_connection_id if native is not None else None,
         plan_billing_acknowledged=(
             native.plan_billing_acknowledged if native is not None else False

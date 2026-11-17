@@ -157,6 +157,8 @@ class OperationsPlanningConfig:
     plan_connection_id: str | None = None
     plan_billing_acknowledged: bool = False
     recipient: str | None = None
+    # Start the agent once Fabric generates its playbook; off leaves it stopped.
+    activate_agent: bool = True
 
 
 @dataclass(frozen=True)
@@ -315,7 +317,7 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
         raise ValueError("twins must be a mapping")
     if not isinstance(streaming_shortcuts, dict):
         raise ValueError("streaming_shortcuts must be a mapping")
-    for flag in ("enabled", "include_plan", "plan_billing_acknowledged"):
+    for flag in ("enabled", "include_plan", "plan_billing_acknowledged", "activate_agent"):
         if flag in native and not isinstance(native[flag], bool):
             raise ValueError(f"operations_planning.{flag} must be a boolean")
     if "enabled" in twins and not isinstance(twins["enabled"], bool):
@@ -436,6 +438,7 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
                 native.get("plan_billing_acknowledged", False)
             ),
             recipient=_optional_string(recipient),
+            activate_agent=bool(native.get("activate_agent", True)),
         ),
         streaming_shortcuts=StreamingShortcutsConfig(
             enabled=streaming_shortcuts_enabled,

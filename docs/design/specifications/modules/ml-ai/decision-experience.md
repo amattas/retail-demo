@@ -79,10 +79,20 @@ publisher follows item creation with the UI-native OA workload call and binds
 `RunNotebook`. It requires exact workload-service readback of one KQL source
 and one action. The public service may normalize a KQL source ID to all zeroes
 in definition readback; the workload readback is authoritative for configured
-source/action details. Successful publication requires `shouldRun=false`.
-Teams destination setup, playbook generation/review, and deliberate activation
-remain operator steps. Deployment does not silently enable autonomous
-purchasing.
+source/action details. The public definition is published with
+`shouldRun=false`.
+
+Saving the workload configuration makes Fabric generate the playbook (the
+agent's rules) from its instructions; `GET configuration/behaviorModel` returns
+HTTP 409 `BehaviorModelGenerationInProgress` until it finishes. When
+`operations_planning.activate_agent` is true (the default), the publisher waits
+up to 15 minutes for a playbook with at least one rule, then sets
+`agentState=Active` through `PATCH configuration/settings` and requires an
+`Active` readback. It never starts an agent without generated rules. A failed
+start leaves the agent stopped and records `activation_warning` in the report
+instead of failing publication. Running the agent sends recommendations only;
+every action still requires human approval, and deployment never enables
+autonomous purchasing. Teams destination review remains an operator step.
 
 The `prepare-replenishment-case` action validates a selected case against
 live signals, freezes the inspected snapshot, and merges a DRAFT into

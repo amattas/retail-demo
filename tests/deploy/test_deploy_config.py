@@ -216,6 +216,7 @@ def test_native_pack_rejects_core_without_eventhouse_and_model(tmp_path):
         {"plan_billing_acknowledged": "true"},
         {"plan_billing_acknowledged": 1},
         {"include_plan": "false"},
+        {"activate_agent": "true"},
         {"plan_connection_id": "not-a-guid"},
         {"plan_connection_id": "00000000-0000-0000-0000-000000000000"},
         {"recipient": {"email": "operator@example.invalid"}},
@@ -224,6 +225,13 @@ def test_native_pack_rejects_core_without_eventhouse_and_model(tmp_path):
 def test_native_pack_rejects_invalid_settings(tmp_path, native):
     with pytest.raises(ValueError, match="operations_planning"):
         _load_native_config(tmp_path, native)
+
+
+def test_native_pack_starts_the_agent_unless_told_to_leave_it_stopped(tmp_path):
+    default = _load_native_config(tmp_path / "default", {"enabled": True})
+    stopped = _load_native_config(tmp_path / "stopped", {"enabled": True, "activate_agent": False})
+    assert default.operations_planning.activate_agent is True
+    assert stopped.operations_planning.activate_agent is False
 
 
 def test_native_pack_allows_missing_connection_until_publication(tmp_path):
