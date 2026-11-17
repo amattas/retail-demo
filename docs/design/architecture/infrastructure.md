@@ -83,8 +83,8 @@ allowing separate child folders. These managed exceptions are recorded in
 | --- | --- | --- |
 | `setup-pipeline` | Setup 01-10 (02-05 and 06-08 in parallel) | On demand; mandatory for Reporting profiles |
 | `historical-data-load` | Retained historical-load notebook | On demand |
-| `streaming-data-load` | Streaming Silver then Gold | Committed schedule disabled |
-| `daily-maintenance` | Delta maintenance | Daily schedule committed disabled |
+| `streaming-data-load` | Streaming Silver then Gold | Every 30 minutes when `schedules.streaming_data_load` is true (default off) |
+| `daily-maintenance` | Delta maintenance | Daily 00:00 Eastern when `schedules.daily_maintenance` is true (default on) |
 | `ml-required` | Six serialized required producers, then contract validator | On demand; terminal Reporting gate |
 | `ml-optional` | Promoted optional outputs | Full-demo post-Reporting |
 | `ml-experimental` | Experimental outputs | Full-demo post-Reporting |

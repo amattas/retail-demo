@@ -292,8 +292,12 @@ Reporting profile; native Planning stays excluded unless `include_plan` is
 set. The operations-only publication step is non-required, so a Fabric
 rejection of the agent degrades the deployment instead of failing it.
 
-No profile enables schedules or starts the live stream. The source
-daily-maintenance schedule remains present but disabled. Dashboard templates
+Committed schedules stay disabled in source. Deployment configuration
+(`schedules`) switches them on when staging pipeline definitions, and readiness
+compares live schedules with that configured state. `daily_maintenance` defaults
+on; `streaming_data_load` defaults off. `stream.start_after_deploy` (default
+off) submits one `stream-events` run after readiness and never duplicates an
+active run. Dashboard templates
 and rule definitions remain manual sources even though full-demo classifies
 them in its logical inventory.
 

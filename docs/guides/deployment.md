@@ -331,8 +331,44 @@ canonical guide for exact asset IDs, groups, pipelines, KQL scripts, staged
 counts, folders, and support status.
 
 All profiles exclude the destructive `reset` group. Pipeline selection is
-explicit; a notebook reference does not implicitly select a pipeline. No
-profile enables a schedule or starts the long-running stream.
+explicit; a notebook reference does not implicitly select a pipeline.
+Schedules and the long-running stream are controlled by configuration, not
+by the profile; see [Post-deploy automation](#post-deploy-automation).
+
+### Post-deploy automation
+
+The deployment enables the nightly Delta maintenance schedule by default and
+leaves everything that runs continuously off:
+
+```yaml
+schedules:
+  daily_maintenance: true      # daily-maintenance at 00:00 Eastern
+  streaming_data_load: false   # streaming Silver/Gold every 30 minutes
+stream:
+  start_after_deploy: false    # start stream-events after readiness
+  rows_per_second: 5
+  run_seconds: 0               # 0 = until cancelled in Fabric
+```
+
+- A schedule flag applies only when the profile deploys that pipeline
+  (`standard` and `full-demo`); `core` deploys neither. Staging writes the
+  flag into the pipeline's `.schedules` definition, and readiness expects the
+  configured state, so a schedule changed by hand in Fabric is reported as
+  drift and reset by the next deployment.
+- Scheduled runs fail while the capacity is paused. Pause after midnight
+  Eastern, or disable `daily_maintenance`.
+- `streaming_data_load` is useful only while `stream-events` produces events.
+  One Silver-then-Gold run took about 16 minutes on F64, so the committed
+  interval is 30 minutes; the pipeline runs one instance at a time.
+- `stream.start_after_deploy` runs last, after readiness, so readiness
+  evaluates the deployed baseline. It submits one `stream-events` notebook job
+  with `source_rows_per_second` and `run_seconds`. If a stream is already
+  queued or running, it reports that run instead of starting another. A
+  failure leaves the deployment `DEGRADED`, not failed, and records
+  `stream-report.json`. An unbounded stream holds a Spark session and capacity
+  until you cancel it in Fabric.
+- The Operations Agent starts by default; see
+  [Native Operations Agent and Planning](#native-operations-agent-and-planning).
 
 ### Runtime, capacity, cost, preview, and manual boundaries
 
@@ -901,8 +937,8 @@ has no automatic pipeline run.
 For `standard` and `full-demo`, the deploy command already waits for
 `setup-pipeline` and `ml-required`, publishes Reporting only after both
 succeed, and waits for selected post-Reporting ML pipelines. `--yes` does not
-skip these gates. No profile starts the long-running stream or enables an automatic schedule;
-the committed daily-maintenance schedule is disabled.
+skip these gates. Schedules and the optional stream follow
+[Post-deploy automation](#post-deploy-automation).
 
 To retry one pipeline deliberately, run:
 

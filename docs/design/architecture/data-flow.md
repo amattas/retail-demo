@@ -81,7 +81,7 @@ flowchart LR
     KQL --> Bronze --> S --> Silver --> G --> Gold
 ```
 
-This path uses `ag._watermarks`. Its committed pipeline schedule is disabled.
+This path uses `ag._watermarks`. Its schedule is enabled only by `schedules.streaming_data_load`.
 The Silver notebook defines the schema and routes for the streaming-only
 `fact_online_order_status` table. The manifest records its downstream exception,
 and Delta maintenance includes it in the table inventory.

@@ -19,6 +19,7 @@ from retail_setup.contracts import (
 )
 
 from deploy.scripts import _output as console
+from deploy.scripts.fabric_runtime import configured_schedule_document
 from deploy.scripts.workspace_folders import ITEM_FOLDERS
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -651,8 +652,13 @@ def stage_pipelines(
     selected_pipelines: tuple[str, ...] | list[str],
     deployed_notebooks: set[str],
     lakehouse_name: str = "retail_lakehouse",
+    enabled_schedules: tuple[str, ...] | list[str] = (),
 ) -> list[Path]:
     """Stage ``fabric/pipelines/*.DataPipeline`` items into the workspace output.
+
+    ``enabled_schedules`` names pipelines (without ``.DataPipeline``) whose
+    committed schedules are switched on; a name the profile does not deploy is
+    ignored.
 
     Every selected pipeline must exist and every notebook it orchestrates must
     be present in ``deployed_notebooks``. Nothing is inferred from notebook
@@ -717,6 +723,12 @@ def stage_pipelines(
             json.dumps(content, indent=2) + "\n",
             encoding="utf-8",
         )
+        schedules_path = destination / ".schedules"
+        if item_dir.stem in enabled_schedules and schedules_path.is_file():
+            document = configured_schedule_document(
+                json.loads(schedules_path.read_text(encoding="utf-8")), enabled=True
+            )
+            schedules_path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
         staged.append(destination)
     return staged
 
@@ -807,6 +819,7 @@ def build_workspace(
     ] = "all",
     report_default_date: date | None = None,
     rendered_dir: Path | None = None,
+    enabled_schedules: tuple[str, ...] = (),
 ) -> BuildResult:
     """Build a fabric-cicd workspace folder from repository source assets."""
 
@@ -921,6 +934,7 @@ def build_workspace(
                 profile.pipeline_refs,
                 _deployed_notebook_names(notebook_groups),
                 lakehouse_name=lakehouse_name,
+                enabled_schedules=enabled_schedules,
             )
         )
     # MLflow experiments bootstrap alongside their selected ML tier notebooks.
@@ -1148,6 +1162,13 @@ def main() -> int:
         type=Path,
         help="Directory containing environment-scoped rendered notebooks.",
     )
+    parser.add_argument(
+        "--enable-schedule",
+        action="append",
+        default=[],
+        metavar="PIPELINE",
+        help="Switch on a pipeline's committed schedule (repeatable).",
+    )
     args = parser.parse_args()
     if args.notebook_groups:
         parser.error(
@@ -1177,6 +1198,7 @@ def main() -> int:
         args.publication_phase,
         report_default_date,
         rendered_dir,
+        tuple(args.enable_schedule),
     )
     console.info(
         f"Staged {len(result.staged_items)}/{result.expected_item_count} items "

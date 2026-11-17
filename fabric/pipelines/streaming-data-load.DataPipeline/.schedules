@@ -9,7 +9,7 @@
         "startDateTime": "2026-01-14T16:54:00",
         "endDateTime": "2099-01-14T16:54:00",
         "localTimeZoneId": "SA Pacific Standard Time",
-        "interval": 5
+        "interval": 30
       }
     }
   ]

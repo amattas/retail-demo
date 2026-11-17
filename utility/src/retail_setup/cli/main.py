@@ -1794,6 +1794,7 @@ def _deploy_plan(
     plan_billing_acknowledged: bool = False,
     twins_enabled: bool = False,
     streaming_shortcuts_enabled: bool = False,
+    enabled_schedules: tuple[str, ...] = (),
 ) -> list[DeployStep]:
     """Build the ordered deploy command plan (data only; nothing is executed)."""
     repo_root = (repo_root or _default_repo_root()).resolve()
@@ -2072,6 +2073,7 @@ def _deploy_plan(
                 f"{rendered_dir}/{_RENDER_MANIFEST}",
                 "--rendered-dir",
                 rendered_dir,
+                *(arg for name in enabled_schedules for arg in ("--enable-schedule", name)),
             ],
             description=description,
             step_id=step_id,
@@ -3613,8 +3615,12 @@ def deploy(
         streaming_shortcuts_enabled=(
             deploy_config.streaming_shortcuts.enabled if deploy_config is not None else False
         ),
+        enabled_schedules=(
+            deploy_config.schedules.enabled_pipelines() if deploy_config is not None else ()
+        ),
     )
     total = len(plan)
+    start_stream = bool(deploy_config is not None and deploy_config.stream.start_after_deploy)
 
     _deploy_banner(env, profile, total, recreate, dry_run)
     _echo_profile_inventory(profile)
@@ -3699,6 +3705,7 @@ def deploy(
         "plan_step_ids": [
             *[step.step_id for step in plan],
             *(["verify-readiness"] if profile.post_deploy_pipeline_ref is not None else []),
+            *(["start-stream"] if start_stream else []),
         ],
         "plan_graph": [
             {
@@ -3747,6 +3754,14 @@ def deploy(
             "Verify live readiness and freshness",
             required=True,
             evidence_path=(f"deploy/.generated/{env}/readiness-report.json"),
+        )
+    if start_stream:
+        _deploy_journal.add_step(
+            run_journal,
+            "start-stream",
+            _START_STREAM_DESCRIPTION,
+            required=False,
+            evidence_path=f"deploy/.generated/{env}/stream-report.json",
         )
     if resume:
         adopted_run = None
@@ -3844,6 +3859,8 @@ def deploy(
             journal=run_journal,
             defer_post_ontology=False,
         )
+    if start_stream:
+        _start_stream_after_deploy(repo_root, env, journal=run_journal)
 
     _deploy_journal.write(repo_root, run_journal)
     typer.echo("")
@@ -4075,6 +4092,51 @@ def _verify_readiness_after_deploy(
         exit_code=result.returncode,
     )
     raise typer.Exit(code=result.returncode)
+
+
+_START_STREAM_DESCRIPTION = "Start the live stream-events notebook"
+
+
+def _start_stream_after_deploy(
+    repo_root: Path,
+    env: str,
+    *,
+    journal: _deploy_journal.DeployJournal,
+) -> None:
+    """Start the optional live stream last, so readiness sees the deployed baseline.
+
+    A failure degrades the run instead of failing it: everything else is
+    deployed, and the stream can be started from Fabric.
+    """
+
+    cmd = [
+        sys.executable,
+        "-m",
+        "deploy.scripts.start_stream",
+        "--environment",
+        env,
+        "--repo-root",
+        str(repo_root),
+    ]
+    typer.echo(f"{_START_STREAM_DESCRIPTION}...")
+    _deploy_journal.mark_running(journal, "start-stream")
+    _deploy_journal.write(repo_root, journal)
+    result = _run_step_command(cmd, cwd=repo_root, step_id="start-stream")
+    if result.returncode == 0:
+        _deploy_journal.mark_succeeded(journal, "start-stream", exit_code=0)
+    else:
+        _deploy_journal.mark_failed(
+            journal,
+            "start-stream",
+            exit_code=result.returncode,
+            error="The live stream did not start; start stream-events from Fabric.",
+        )
+        typer.echo(
+            "The live stream did not start; the rest of the deployment is ready. "
+            "See stream-report.json or start stream-events from Fabric.",
+            err=True,
+        )
+    _deploy_journal.write(repo_root, journal)
 
 
 def _run_setup_pipeline(
