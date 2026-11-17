@@ -2510,8 +2510,14 @@ def _record_capacity_sizing_after_preflight(
     repo_root: Path,
     env: str,
     journal: _deploy_journal.DeployJournal,
+    *,
+    require_match: bool = False,
 ) -> None:
-    """Validate live sizing evidence and bind it to the durable run identity."""
+    """Validate live sizing evidence and bind it to the durable run identity.
+
+    ``require_match`` rejects sizing that differs from the recorded identity,
+    for rechecks after Terraform has already applied the custom pool.
+    """
 
     if journal.targets.get("spark_pool") != "custom":
         return
@@ -2528,17 +2534,38 @@ def _record_capacity_sizing_after_preflight(
     )
     observed_identity = sizing_identity(evidence)
     expected_identity = journal.manifest.get("capacity_sizing")
-    if journal.manifest.get("capacity_sizing_match_required") is True:
+    if require_match or journal.manifest.get("capacity_sizing_match_required") is True:
         if (
             not isinstance(expected_identity, dict)
             or expected_identity.get("sha256") != observed_identity["sha256"]
         ):
             raise ValueError(
                 "Live capacity sizing changed after Terraform was already applied. "
-                "A resumed run cannot reuse the applied custom-pool plan; start a "
+                "This run cannot reuse the applied custom-pool plan; start a "
                 "new deployment so Terraform generates and applies a new plan."
             )
     journal.manifest["capacity_sizing"] = observed_identity
+
+
+# Recheck slightly before the evidence limit so the consuming step cannot age out.
+_CAPACITY_SIZING_REFRESH_MARGIN_SECONDS = 300
+
+
+def _capacity_sizing_needs_recheck(repo_root: Path, step: DeployStep) -> bool:
+    """True when ``step`` reads sizing evidence that is about to expire.
+
+    Confirmation prompts can hold a run for hours between live preflight and
+    the steps that read its evidence.
+    """
+    flag = "--capacity-sizing-evidence"
+    if flag not in step.cmd[:-1]:
+        return False
+    from deploy.scripts.capacity_sizing import EVIDENCE_MAX_AGE_SECONDS, evidence_age_seconds
+
+    age = evidence_age_seconds(repo_root / step.cmd[step.cmd.index(flag) + 1])
+    return age is not None and age > (
+        EVIDENCE_MAX_AGE_SECONDS - _CAPACITY_SIZING_REFRESH_MARGIN_SECONDS
+    )
 
 
 def _cleanup_destroy_step(env: str) -> DeployStep:
@@ -2970,6 +2997,30 @@ def _run_plan_plain(
             if terraform_data_dir and not Path(terraform_data_dir).is_absolute():
                 process_environment["TF_DATA_DIR"] = str((repo_root / terraform_data_dir).resolve())
         try:
+            live_preflight = by_id.get("live-profile-preflight")
+            if live_preflight is not None and _capacity_sizing_needs_recheck(repo_root, step):
+                typer.echo(
+                    "Capacity sizing evidence is about to expire; rechecking live "
+                    "capacity before this step."
+                )
+                recheck = _run_step_command(
+                    live_preflight.cmd,
+                    cwd=repo_root,
+                    step_id=step.step_id,
+                )
+                if recheck.returncode != 0:
+                    raise RuntimeError(f"Live capacity recheck failed (exit {recheck.returncode}).")
+                with journal_lock:
+                    applied = any(
+                        candidate.step_id == "terraform-apply" and candidate.status == "SUCCEEDED"
+                        for candidate in journal.steps
+                    )
+                    _record_capacity_sizing_after_preflight(
+                        repo_root,
+                        env,
+                        journal,
+                        require_match=applied,
+                    )
             if step.action is not None:
                 step.action(repo_root)
             elif step.output_file:

@@ -4,6 +4,7 @@ import subprocess
 import sys
 import threading
 import time
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -35,7 +36,7 @@ TENANT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 def _stub_live_capacity_sizing_record(monkeypatch):
     """Subprocess fakes do not execute preflight or create its evidence file."""
 
-    def record(_repo_root, _env, journal):
+    def record(_repo_root, _env, journal, **_kwargs):
         if journal.targets.get("spark_pool") == "custom":
             journal.manifest["capacity_sizing"] = {"sha256": "test-sizing"}
 
@@ -2725,6 +2726,75 @@ def test_retry_survives_a_sibling_finishing_before_the_failure_is_handled(monkey
 
     assert commands.count("root") == 2
     assert {step.status for step in journal.steps} == {"SUCCEEDED"}
+
+
+def _sizing_plan(monkeypatch, tmp_path, *, age_minutes, preflight_exit=0):
+    """Preflight -> apply -> regenerate, with evidence written ``age_minutes`` ago."""
+
+    observed = datetime.now(UTC) - timedelta(minutes=age_minutes)
+    (tmp_path / "sizing.json").write_text(
+        json.dumps({"observed_at": observed.isoformat()}), encoding="utf-8"
+    )
+    commands: list[str] = []
+    recorded: list[dict] = []
+
+    def fake_run(command, **_kwargs):
+        commands.append(command[0])
+        return SimpleNamespace(returncode=preflight_exit if command[0] == "preflight" else 0)
+
+    def record(_repo_root, _env, journal, **kwargs):
+        recorded.append(kwargs)
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli, "_record_capacity_sizing_after_preflight", record)
+    plan = [
+        cli.DeployStep(cmd=["preflight"], step_id="live-profile-preflight"),
+        cli.DeployStep(cmd=["apply"], step_id="terraform-apply"),
+        cli.DeployStep(
+            cmd=["regenerate", "--capacity-sizing-evidence", "sizing.json"],
+            step_id="regenerate-configs",
+            depends_on=("terraform-apply",),
+        ),
+    ]
+    journal = _deploy_journal.start_run("dev", targets={})
+    for step in plan:
+        _deploy_journal.add_step(journal, step.step_id, step.step_id, required=True)
+    _deploy_journal.mark_succeeded(journal, "live-profile-preflight", exit_code=0)
+    return plan, journal, commands, recorded
+
+
+def test_stale_capacity_sizing_is_rechecked_before_the_step_reads_it(monkeypatch, tmp_path):
+    plan, journal, commands, recorded = _sizing_plan(monkeypatch, tmp_path, age_minutes=135)
+
+    cli._run_plan_plain(tmp_path, "dev", plan, len(plan), yes=True, journal=journal)
+
+    assert commands == ["apply", "preflight", "regenerate"]
+    # Terraform already applied the pool, so the recheck must not change sizing.
+    assert recorded == [{"require_match": True}]
+    assert _deploy_journal.get_step(journal, "regenerate-configs").status == "SUCCEEDED"
+
+
+def test_fresh_capacity_sizing_is_not_rechecked(monkeypatch, tmp_path):
+    plan, journal, commands, recorded = _sizing_plan(monkeypatch, tmp_path, age_minutes=10)
+
+    cli._run_plan_plain(tmp_path, "dev", plan, len(plan), yes=True, journal=journal)
+
+    assert commands == ["apply", "regenerate"]
+    assert recorded == []
+
+
+def test_failed_capacity_recheck_fails_the_step_without_running_it(monkeypatch, tmp_path):
+    plan, journal, commands, _ = _sizing_plan(
+        monkeypatch, tmp_path, age_minutes=135, preflight_exit=3
+    )
+
+    with pytest.raises(typer.Exit):
+        cli._run_plan_plain(tmp_path, "dev", plan, len(plan), yes=True, journal=journal)
+
+    assert "regenerate" not in commands
+    step = _deploy_journal.get_step(journal, "regenerate-configs")
+    assert step.status == "FAILED"
+    assert "recheck failed" in step.error
 
 
 def test_operator_skip_blocks_all_dependents_but_not_independent_steps(monkeypatch, tmp_path):
