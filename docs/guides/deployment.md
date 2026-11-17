@@ -613,15 +613,18 @@ This yields 2 nodes per session on F64, 4 on F128, 8 on F256, and the 16-node
 cap on F512 and larger. The calculation does not use or claim burst capacity.
 Live preflight writes bounded, non-secret evidence to
 `deploy/.generated/<env>/capacity-sizing.json`; custom-pool config generation
-requires fresh evidence for the configured environment and capacity. Starter
+requires fresh evidence (under one hour old) for the configured environment and
+capacity. If a run waits at a confirmation prompt long enough for the evidence
+to near that limit, the deploy rechecks live capacity before the next step that
+reads it instead of failing. Starter
 pool profiles neither create nor consume this file. Legacy
 `--use-custom-spark-pool` and
 `spark.use_custom_pool` overrides fail clearly; select the profile instead.
 
 On resume, live sizing is observed again. Before Terraform apply, a sizing
 change forces config regeneration and a new Terraform plan. After Terraform
-apply, a sizing change fails the resumed run and requires a new deployment plan
-instead of silently reusing the applied pool.
+apply, a sizing change found on resume or by an in-run recheck fails the run and
+requires a new deployment plan instead of silently reusing the applied pool.
 
 ## Preview the plan
 

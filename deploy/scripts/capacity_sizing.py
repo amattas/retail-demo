@@ -182,6 +182,28 @@ def _integer_field(payload: dict[str, Any], name: str) -> int:
     return value
 
 
+def evidence_age_seconds(path: Path, *, now: datetime | None = None) -> float | None:
+    """Return the age of the evidence's ``observed_at``, or None if unreadable.
+
+    Callers use this to refresh evidence before it expires; full validation
+    stays in ``load_capacity_sizing_evidence``.
+    """
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        observed = datetime.fromisoformat(
+            str(payload["observed_at"]).replace("Z", "+00:00")
+        )
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    if observed.tzinfo is None:
+        return None
+    current = now or datetime.now(UTC)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=UTC)
+    return (current - observed).total_seconds()
+
+
 def load_capacity_sizing_evidence(
     path: Path,
     *,
