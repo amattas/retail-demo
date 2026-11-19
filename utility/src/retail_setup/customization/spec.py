@@ -251,9 +251,7 @@ class CustomizationSpec(_Closed):
                     name=d.name,
                     weight=weights[d.name],
                     taxability=d.taxability,
-                    categories=[
-                        CategoryDraft.model_validate(c.model_dump()) for c in d.categories
-                    ],
+                    categories=[CategoryDraft.model_validate(c.model_dump()) for c in d.categories],
                 )
                 for d in tree.departments
             ],
@@ -389,9 +387,7 @@ def draft_problems(
     for brand in draft.brands:
         text(brand.brand, "brand", 40)
         if brand.department.casefold() not in known:
-            problems.append(
-                f"brand {brand.brand!r} names unknown department {brand.department!r}"
-            )
+            problems.append(f"brand {brand.brand!r} names unknown department {brand.department!r}")
         covered.add(brand.department.casefold())
     uncovered = sorted(d for d in departments if d.casefold() not in covered)
     if uncovered:

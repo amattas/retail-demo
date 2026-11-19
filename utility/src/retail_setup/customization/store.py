@@ -62,7 +62,9 @@ def load_spec(directory: Path) -> CustomizationSpec | None:
     return CustomizationSpec.model_validate_json(path.read_text(encoding="utf-8"))
 
 
-def materialize(spec: CustomizationSpec, directory: Path, *, shared_root: Path | None = None) -> Path:
+def materialize(
+    spec: CustomizationSpec, directory: Path, *, shared_root: Path | None = None
+) -> Path:
     """Write the spec's dictionary set under ``directory/dictionaries``; return that root."""
 
     shared_root = shared_root or default_dictionary_root()

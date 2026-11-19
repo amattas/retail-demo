@@ -114,8 +114,12 @@ def _factory(chat):
 
 
 def test_generation_sends_problems_back_until_the_draft_is_valid():
-    bad = make_draft(brands=[{"brand": "Meadow Gold", "department": d} for d in
-                             ("Fresh", "Pantry", "Home Care", "Fresh")])
+    bad = make_draft(
+        brands=[
+            {"brand": "Meadow Gold", "department": d}
+            for d in ("Fresh", "Pantry", "Home Care", "Fresh")
+        ]
+    )
     chat = _FakeChat([bad, make_draft()])
 
     spec = generator.generate_spec("Northwind Market", chat_factory=_factory(chat))
@@ -225,9 +229,10 @@ def test_stale_dictionaries_are_rebuilt_when_the_spec_changes(tmp_path):
     save_spec(make_spec(summary="A grocer that also sells home care goods."), directory)
     after = custom_file_digests(active_dictionary_root(tmp_path, "dev"), "custom-northwind-market")
 
-    assert after["custom-northwind-market/profile.json"] == before[
-        "custom-northwind-market/profile.json"
-    ]
+    assert (
+        after["custom-northwind-market/profile.json"]
+        == before["custom-northwind-market/profile.json"]
+    )
     assert (root / ".spec-sha256").read_text().strip() == make_spec(
         summary="A grocer that also sells home care goods."
     ).content_hash()
@@ -254,19 +259,25 @@ def test_pale_brand_colors_are_darkened_until_readable():
 
 
 def _report(custom_theme: bool) -> dict:
-    report = {"themeCollection": {"baseTheme": {"name": "CY25SU12", "type": "SharedResources"}},
-              "resourcePackages": []}
+    report = {
+        "themeCollection": {"baseTheme": {"name": "CY25SU12", "type": "SharedResources"}},
+        "resourcePackages": [],
+    }
     documents = {
         "definition/report.json": report,
         "definition/pages/p/visuals/v/visual.json": {
-            "fill": "'#118DFF'", "good": "#3f9c45", "title": "SmartRetail Live"
+            "fill": "'#118DFF'",
+            "good": "#3f9c45",
+            "title": "SmartRetail Live",
         },
         "StaticResources/SharedResources/BaseThemes/CY25SU12.json": {"dataColors": ["#ABCDEF"]},
     }
     if custom_theme:
         report["themeCollection"]["customTheme"] = {"name": "T.json", "type": "RegisteredResources"}
         documents["StaticResources/RegisteredResources/T.json"] = {
-            "name": "old", "dataColors": ["#118DFF"], "visualStyles": {"*": {}}
+            "name": "old",
+            "dataColors": ["#118DFF"],
+            "visualStyles": {"*": {}},
         }
     return documents
 
@@ -280,8 +291,11 @@ def test_report_theme_remaps_roles_and_registers_brand_colors(custom_theme):
     themed = apply_report_theme(_report(custom_theme), theme, ROLES)
 
     visual = themed["definition/pages/p/visuals/v/visual.json"]
-    assert visual == {"fill": f"'{theme.accent}'", "good": "#3F9C45",
-                      "title": "Northwind Market Live"}
+    assert visual == {
+        "fill": f"'{theme.accent}'",
+        "good": "#3F9C45",
+        "title": "Northwind Market Live",
+    }
     assert themed["StaticResources/SharedResources/BaseThemes/CY25SU12.json"] == {
         "dataColors": ["#ABCDEF"]
     }
@@ -366,9 +380,7 @@ def test_configure_selects_the_saved_custom_layout(tmp_path):
     )
 
     assert result.exit_code == 0, result.output
-    generation = yaml.safe_load(
-        (tmp_path / "utility/config/environments/my-ws.yaml").read_text()
-    )
+    generation = yaml.safe_load((tmp_path / "utility/config/environments/my-ws.yaml").read_text())
     assert generation["store_type"] == "custom-northwind-market"
     assert "dictionary_root" not in generation
 
@@ -518,12 +530,19 @@ def test_upload_writes_and_verifies_each_custom_file(tmp_path):
 
     assert report["status"] == "SUCCEEDED"
     assert [f["path"].rsplit("/", 1)[1] for f in report["files"]] == [
-        "profile.json", "products.json", "brands.json"
+        "profile.json",
+        "products.json",
+        "brands.json",
     ]
-    assert lake.calls[:4] == [("put", "file"), ("patch", "append"), ("patch", "flush"),
-                              ("put", "file")]
-    assert all("/Files/setup/custom-dictionaries/custom-northwind-market/" in url
-               for url in lake.files)
+    assert lake.calls[:4] == [
+        ("put", "file"),
+        ("patch", "append"),
+        ("patch", "flush"),
+        ("put", "file"),
+    ]
+    assert all(
+        "/Files/setup/custom-dictionaries/custom-northwind-market/" in url for url in lake.files
+    )
 
     with pytest.raises(upload.UploadError, match="products.json"):
         upload.upload_custom_dictionaries(
@@ -540,8 +559,10 @@ def test_upload_skips_preset_store_types(tmp_path):
 
 
 def test_apostrophe_variants_of_real_names_are_caught():
-    brands = [{"brand": "Lowes Pro Tools", "department": "Fresh"},
-              *make_draft().model_dump()["brands"][1:]]
+    brands = [
+        {"brand": "Lowes Pro Tools", "department": "Fresh"},
+        *make_draft().model_dump()["brands"][1:],
+    ]
     problems = _problems(make_draft(brands=brands, inspiration_brands=["Lowe's"]))
     assert any("real name 'lowes'" in p for p in problems)
 

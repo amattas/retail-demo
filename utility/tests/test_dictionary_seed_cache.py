@@ -302,9 +302,10 @@ def test_custom_layout_files_come_from_the_verified_lakehouse_inbox(seed_helpers
         "file": "brands.json"
     }
     # The cache is reused only for the same custom digests.
-    assert _sync_custom(
-        seed_helpers, tmp_path / "cache", tmp_path / "inbox", digests, _Opener({})
-    ) == manifest
+    assert (
+        _sync_custom(seed_helpers, tmp_path / "cache", tmp_path / "inbox", digests, _Opener({}))
+        == manifest
+    )
 
 
 def test_tampered_custom_layout_is_rejected(seed_helpers, tmp_path):

@@ -51,8 +51,7 @@ def preview_lines(spec: CustomizationSpec) -> list[str]:
         f"  Report data colors: {' '.join(view.theme.data_colors)}",
         f"  Average ticket ${spec.profile.avg_ticket_target:,.2f}; "
         f"{view.product_count:,} base products; {len(view.brands)} fictional brands",
-        "  Departments: "
-        + ", ".join(f"{name} {share:.0%}" for name, share in view.departments),
+        "  Departments: " + ", ".join(f"{name} {share:.0%}" for name, share in view.departments),
         "  Brands: " + ", ".join(view.brands[:12]) + (" ..." if len(view.brands) > 12 else ""),
         "  Sample products: " + "; ".join(view.sample_products),
     ]

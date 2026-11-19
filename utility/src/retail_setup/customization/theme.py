@@ -201,8 +201,7 @@ def _color_map(colors: set[str], roles: Mapping[str, str], theme: Theme) -> dict
             f"report colors have no theme role in {ROLE_MAP_PATH.as_posix()}: {unmapped}"
         )
     return {
-        color: color if roles[color] == FIXED_ROLE else theme.role(roles[color])
-        for color in colors
+        color: color if roles[color] == FIXED_ROLE else theme.role(roles[color]) for color in colors
     }
 
 

@@ -450,9 +450,7 @@ class ConfigScreen(Screen[TargetChoice | None]):
         self._pending = spec
         self._render_custom_controls()
         if error is not None:
-            self.query_one("#layout-preview", Static).update(
-                Text(f"✗ {error}", style="#f38ba8")
-            )
+            self.query_one("#layout-preview", Static).update(Text(f"✗ {error}", style="#f38ba8"))
 
     def _accept_layout(self) -> None:
         spec, defaults = self._pending, self._defaults

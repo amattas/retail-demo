@@ -45,7 +45,11 @@ def _fingerprint_file_hashes(
     # A custom business layout changes dictionaries and every themed item. Only
     # present files are added so preset environments keep their identity.
     customization = (
-        repo_root / "utility" / "config" / "environments" / f"{env}.customization"
+        repo_root
+        / "utility"
+        / "config"
+        / "environments"
+        / f"{env}.customization"
         / "customization.json"
     )
     if customization.is_file():

@@ -397,7 +397,9 @@ def test_configuration_page_generates_and_selects_a_custom_layout(tmp_path, monk
 
     repo_root = Path(__file__).resolve().parents[2]
     monkeypatch.setattr(_tui_config, "customization_dir", lambda _root, env: tmp_path / env)
-    monkeypatch.setattr(_tui_config, "dictionary_root", lambda _root, env: tmp_path / env / "dictionaries")
+    monkeypatch.setattr(
+        _tui_config, "dictionary_root", lambda _root, env: tmp_path / env / "dictionaries"
+    )
     names: list[str] = []
 
     def fake_generate(name, progress):

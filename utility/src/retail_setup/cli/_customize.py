@@ -78,9 +78,7 @@ def ensure_customization(
     interactive = interaction.is_interactive() and not assume_yes
     while True:
         echo(f"Generating a custom layout for {business_name!r} with GitHub Copilot...")
-        spec = generate_spec(
-            business_name, model=model, chat_factory=chat_factory, progress=echo
-        )
+        spec = generate_spec(business_name, model=model, chat_factory=chat_factory, progress=echo)
         detail = "\n".join(preview_lines(spec))
         if not interactive:
             echo(detail)

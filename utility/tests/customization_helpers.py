@@ -13,12 +13,46 @@ PRESETS = ["grocery", "hardware", "luxury", "supercenter"]
 FIXTURE_GENERATOR = GeneratorInfo(sdk="github-copilot-sdk test", model=None)
 
 _DEPARTMENTS = [
-    ("Fresh", "NON_TAXABLE", True, ["Apples", "Pears", "Plums", "Kale", "Leeks", "Beets",
-                                    "Figs", "Limes", "Onions", "Yams"]),
-    ("Pantry", "NON_TAXABLE", False, ["Rice", "Oats", "Pasta", "Flour", "Lentils", "Beans",
-                                      "Barley", "Quinoa", "Couscous", "Polenta"]),
-    ("Home Care", "TAXABLE", False, ["Sponges", "Wipes", "Detergent", "Soap", "Towels",
-                                     "Brushes", "Gloves", "Bags", "Foil", "Wrap"]),
+    (
+        "Fresh",
+        "NON_TAXABLE",
+        True,
+        ["Apples", "Pears", "Plums", "Kale", "Leeks", "Beets", "Figs", "Limes", "Onions", "Yams"],
+    ),
+    (
+        "Pantry",
+        "NON_TAXABLE",
+        False,
+        [
+            "Rice",
+            "Oats",
+            "Pasta",
+            "Flour",
+            "Lentils",
+            "Beans",
+            "Barley",
+            "Quinoa",
+            "Couscous",
+            "Polenta",
+        ],
+    ),
+    (
+        "Home Care",
+        "TAXABLE",
+        False,
+        [
+            "Sponges",
+            "Wipes",
+            "Detergent",
+            "Soap",
+            "Towels",
+            "Brushes",
+            "Gloves",
+            "Bags",
+            "Foil",
+            "Wrap",
+        ],
+    ),
 ]
 _MODIFIERS = ["Organic", "Classic", "Value", "Family Size", "Premium", "Fresh", "Mini", "Bulk"]
 
