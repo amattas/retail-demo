@@ -283,7 +283,15 @@ documented in `schemas.py` and must not be silently normalized in a transform.
 
 ## Store profiles and derived defaults
 
-Supported profiles are `supercenter`, `grocery`, `hardware`, and `luxury`.
+Supported profiles are `supercenter`, `grocery`, `hardware`, and `luxury`, plus
+per-environment custom business layouts (`custom-<slug>`, see the setup CLI
+`customize` contract). Custom layouts are built deterministically from a saved
+spec by the same catalog builder as the preset trees
+(`retail_setup.dictionaries.catalog`). Their `products.json` rows add explicit
+`Taxability` and `Refrigerated` values, which take precedence over the
+department/category name rules preset catalogs rely on. Their brand
+`Category` equals a department name, and branded titles use a brand from the
+product's own department.
 Current derived defaults include:
 
 - `silver_db = ag`

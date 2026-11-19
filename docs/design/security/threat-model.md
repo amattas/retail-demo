@@ -42,6 +42,7 @@ flowchart LR
     Operator --> App[Local app]
     App --> Fabric
     App --> Browser[Operator browser and embed token]
+    Operator --> Copilot[GitHub Copilot: business name only, during customize]
     GitHub --> Pages[Public Pages site]
 ```
 
@@ -59,6 +60,7 @@ flowchart LR
 | `THREAT-008` | Public docs publish secrets, target-specific values, or temporary internal evidence. | Disclosure and stale guidance. | `SEC-003`, `SEC-010` | Review every source and built file, including files omitted from navigation. Zensical publishes non-nav files; inspect old tagged sites separately. |
 | `THREAT-009` | The optional app presents replay, local approval, or lossy telemetry as authenticated production action/audit evidence. | False operational assurance, unauthorized future actions, or lost evidence. | `SEC-003`, `SEC-008`, `SEC-012` | Proposals are local drafts and Eventhouse logging is best-effort. Per-user authorization, production adapters, durable audit, evidence validation, idempotency, and scope limits are not established by an approval button. |
 | `THREAT-010` | Notebook substitution executes configuration strings, or unverified/mismatched dictionary content is reused. | Unintended statements or irreproducible data. | `SEC-007`, `SEC-013` | Literal/JSON encoding, ref and cache checks, mutable refresh, and manifest-last publication are implemented; notebooks were rebuilt and drift checked. Explicit refs/fork overrides remain caller-selected; fresh live execution remains open. |
+| `THREAT-011` | A custom business layout carries injected instructions, unsafe text, real trademarks, or tampered dictionaries into notebooks, reports, or apps. | Script/markup injection in themed artifacts, trademark misuse in demos, or data that differs from the reviewed layout. | `SEC-007`, `SEC-014` | Copilot runs without tools or permissions and output is schema- and text-validated; colors reach artifacts only as validated hex. The fictionalization guard rejects only names the model declares or the business name itself, so the operator preview remains the final check for undeclared real brands. Copilot data handling follows the operator's GitHub Copilot terms. |
 
 ## Review triggers
 

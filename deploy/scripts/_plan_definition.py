@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 from uuid import UUID
 
+from retail_setup.customization.theme import Theme, apply_plan_theme
+
 _SOURCE = (
     Path(__file__).resolve().parents[2] / "fabric/planning/retail-replenishment.Plan"
 )
@@ -68,6 +70,7 @@ def render_plan_definition(
     semantic_model_name: str,
     connection_id: str,
     display_name: str,
+    theme: Theme | None = None,
 ) -> dict:
     """Bind explicit targets and return a Fabric multipart item definition.
 
@@ -76,6 +79,7 @@ def render_plan_definition(
     The caller must verify connection access and Direct Lake fixed credentials.
     Runtime values are assigned to parsed JSON fields, not interpolated into
     source text. Source files and their stable content identifiers stay intact.
+    ``theme`` (from a custom business layout) tints the sheet canvases.
 
     Raises:
         ValueError: An input is invalid or the source multipart graph is incomplete.
@@ -104,6 +108,8 @@ def render_plan_definition(
     documents["definition.json"]["workloadItemName"] = display_name
     documents["definition.json"]["semanticModelReference"] = reference
     documents[".platform"]["metadata"]["displayName"] = display_name
+    if theme is not None:
+        documents = apply_plan_theme(documents, theme)
     parts = [
         {
             "path": path,

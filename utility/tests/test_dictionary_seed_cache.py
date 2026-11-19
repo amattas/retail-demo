@@ -258,3 +258,66 @@ def test_interrupted_publication_has_no_success_manifest(seed_helpers, tmp_path,
         ref=SHA_B,
         store_type="grocery",
     )
+
+
+CUSTOM = "custom-northwind"
+
+
+def _custom_inbox(root: Path) -> dict[str, str]:
+    import hashlib
+
+    digests = {}
+    for name in ("profile.json", "products.json", "brands.json"):
+        data = json.dumps({"file": name}).encode()
+        path = root / CUSTOM / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        digests[f"{CUSTOM}/{name}"] = hashlib.sha256(data).hexdigest()
+    return digests
+
+
+def _sync_custom(seed_helpers, cache: Path, inbox: Path, digests: dict[str, str], opener):
+    return seed_helpers.synchronize_dictionaries(
+        destination_root=cache,
+        repository_owner="example-owner",
+        repository_name="retail-demo",
+        ref=SHA_A,
+        store_type=CUSTOM,
+        opener=opener,
+        custom_files=digests,
+        custom_root=inbox,
+    )
+
+
+def test_custom_layout_files_come_from_the_verified_lakehouse_inbox(seed_helpers, tmp_path):
+    digests = _custom_inbox(tmp_path / "inbox")
+    shared = {k: v for k, v in _payloads("shared").items() if k.startswith("_shared/")}
+    opener = _Opener(shared)
+
+    manifest = _sync_custom(seed_helpers, tmp_path / "cache", tmp_path / "inbox", digests, opener)
+
+    assert all("/_shared/" in url for url in opener.calls)
+    assert manifest["source"]["custom_files"] == digests
+    assert json.loads((tmp_path / "cache" / CUSTOM / "brands.json").read_text()) == {
+        "file": "brands.json"
+    }
+    # The cache is reused only for the same custom digests.
+    assert _sync_custom(
+        seed_helpers, tmp_path / "cache", tmp_path / "inbox", digests, _Opener({})
+    ) == manifest
+
+
+def test_tampered_custom_layout_is_rejected(seed_helpers, tmp_path):
+    digests = _custom_inbox(tmp_path / "inbox")
+    (tmp_path / "inbox" / CUSTOM / "products.json").write_text("[]", encoding="utf-8")
+    shared = {k: v for k, v in _payloads("shared").items() if k.startswith("_shared/")}
+
+    with pytest.raises(RuntimeError, match="does not match the rendered digest"):
+        _sync_custom(seed_helpers, tmp_path / "cache", tmp_path / "inbox", digests, _Opener(shared))
+    assert not (tmp_path / "cache" / seed_helpers.MANIFEST_NAME).exists()
+
+
+def test_rendered_custom_digests_are_validated(seed_helpers):
+    assert seed_helpers.parse_custom_files("{}", "grocery") == {}
+    with pytest.raises(ValueError, match="SHA-256 digests"):
+        seed_helpers.parse_custom_files(json.dumps({f"{CUSTOM}/profile.json": "x"}), CUSTOM)

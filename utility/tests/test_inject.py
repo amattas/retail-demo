@@ -22,6 +22,7 @@ VALUES = {
     "STORE_COUNT": "12",
     "SEED": "7",
     "DICTIONARY_REF": "abc123",
+    "CUSTOM_DICTIONARIES": "{}",
 }
 
 

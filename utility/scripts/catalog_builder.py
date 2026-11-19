@@ -1,87 +1,26 @@
-"""Compose store-type product catalogs from category trees. Deterministic.
+"""Compose the preset store-type product catalogs from category trees. Deterministic.
 
-Tree schema (per store type, see catalogs/*.py):
-{
-  "store_type": "grocery",
-  "brand_styles": ["Field & Vine", ...],        # brand name seeds (companies derived)
-  "departments": [
-    {"name": "Fresh", "categories": [
-        {"category": "Produce", "brand_share": 0.3,  # share of products carrying a brand prefix
-         "subcategories": [
-            {"name": "Fresh Fruit", "price_min": 0.99, "price_max": 9.99,
-             "nouns": ["Apples", "Bananas", ...],
-             "modifiers": ["Organic", "Fresh", ...]},
-        ]},
-    ]},
-  ],
-}
-
-Products are "{modifier} {noun}" (optionally "{brand} {modifier} {noun}");
-price drawn uniformly in the subcategory band, rounded to .x9.
+The tree schema and builder live in ``retail_setup.dictionaries.catalog`` so the
+same code builds preset catalogs here and custom business catalogs at runtime.
 
 Usage:
-    python scripts/catalog_builder.py            # builds all three new types
+    python scripts/catalog_builder.py            # builds all three tree-based types
 """
 
-import json
-import random
 from pathlib import Path
+
+from retail_setup.dictionaries.catalog import DEFAULT_SEED, build_catalog, write_catalog
 
 UTILITY_ROOT = Path(__file__).resolve().parents[1]
 OUT = UTILITY_ROOT / "data" / "dictionaries"
 
-# Year of initial generation; changing this value regenerates all catalogs with different RNG state.
-DEFAULT_SEED = 2026
-
-
-def _price(rng: random.Random, lo: float, hi: float) -> str:
-    # Strategy: round to nearest dollar then subtract 1 cent → .x9 price;
-    # max(lo, ...) guards against band-floor underflow when round(raw) == 0.
-    raw = rng.uniform(lo, hi)
-    return f"{max(lo, round(raw) - 0.01):.2f}"
-
-
-def build_catalog(tree: dict, seed: int) -> dict:
-    rng = random.Random(seed)
-    brands = [
-        {"Brand": b, "Company": f"{b} Co.", "Category": tree["store_type"].title()}
-        for b in tree["brand_styles"]
-    ]
-    products: list[dict] = []
-    seen: set[str] = set()
-    for dept in tree["departments"]:
-        for cat in dept["categories"]:
-            cat_name = cat["category"]
-            for sub in cat["subcategories"]:
-                for noun in sub["nouns"]:
-                    for mod in sub["modifiers"]:
-                        name = f"{mod} {noun}"
-                        if rng.random() < cat.get("brand_share", 0.3):
-                            name = f"{rng.choice(tree['brand_styles'])} {name}"
-                        if name in seen:
-                            continue
-                        seen.add(name)
-                        products.append(
-                            {
-                                "ProductName": name,
-                                "BasePrice": _price(rng, sub["price_min"], sub["price_max"]),
-                                "Department": dept["name"],
-                                "Category": cat_name,
-                                "Subcategory": sub["name"],
-                            }
-                        )
-    return {"products": products, "brands": brands}
+__all__ = ["DEFAULT_SEED", "OUT", "build_catalog", "write_store_type"]
 
 
 def write_store_type(tree: dict, seed: int) -> None:
-    out_dir = OUT / tree["store_type"]
-    out_dir.mkdir(parents=True, exist_ok=True)
-    cat = build_catalog(tree, seed)
-    for key, fname in (("products", "products.json"), ("brands", "brands.json")):
-        path = out_dir / fname
-        # indent=1 is deliberate: smaller diffs and files vs indent=2/4.
-        path.write_text(json.dumps(cat[key], indent=1, sort_keys=True) + "\n")
-        print(f"wrote {path.relative_to(UTILITY_ROOT)} ({len(cat[key])} rows)")
+    written = write_catalog(tree, seed, OUT / tree["store_type"])
+    for path in written.values():
+        print(f"wrote {path.relative_to(UTILITY_ROOT)}")
 
 
 if __name__ == "__main__":

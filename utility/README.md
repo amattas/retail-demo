@@ -18,7 +18,17 @@ retail-setup deploy --env alice
 ignored `utility\config\environments\<env>.yaml` generation configuration and
 `deploy\config\environments\<env>.yml` target configuration. A legacy
 `utility\config.yaml` is read only when the environment-specific generation
-file is absent. `render` writes twelve notebooks to `utility\out\<env>\`:
+file is absent.
+
+To build the demo around a named business instead of a preset store type, run
+`retail-setup customize --env alice --business "Kroger"` (or
+`configure --business "Kroger"`). GitHub Copilot drafts the departments,
+fictionalized brands and products, and a brand palette once; the accepted
+layout is saved under `utility\config\environments\<env>.customization\` and
+applied deterministically by render, deploy, and report/app theming. See the
+[setup CLI specification](../docs/design/specifications/modules/setup/cli.md#customize).
+
+`render` writes twelve notebooks to `utility\out\<env>\`:
 
 - `setup-01-seed-dictionaries.ipynb`
 - `setup-02-generate-dimensions.ipynb`

@@ -8,6 +8,7 @@ that differentiate store types.
 
 import re
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -80,6 +81,11 @@ class ProductEntry(BaseModel):
     Category: str = Field(..., min_length=1)
     Subcategory: str = Field(..., min_length=1)
     Tags: str | None = None
+    # Optional explicit attributes. Preset catalogs omit them and rely on the
+    # department/category name rules in generation.dims; custom catalogs set them
+    # because their department names are not known in advance.
+    Taxability: Literal["TAXABLE", "NON_TAXABLE", "REDUCED_RATE"] | None = None
+    Refrigerated: bool | None = None
 
     @field_validator("BasePrice", mode="before")
     @classmethod

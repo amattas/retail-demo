@@ -21,6 +21,9 @@ END_DATE = _param("{{END_DATE}}", "2025-03-31")
 STORE_COUNT = int(_param("{{STORE_COUNT}}", "50"))
 SEED = int(_param("{{SEED}}", "42"))
 DICTIONARY_REF = _param("{{DICTIONARY_REF}}", "main")
+# JSON {"<store_type>/<file>": sha256} for a custom business layout uploaded by
+# `retail-setup deploy`; "{}" for preset store types.
+CUSTOM_DICTIONARIES = _param("{{CUSTOM_DICTIONARIES}}", "{}")
 
 spark.conf.set("spark.sql.session.timeZone", "UTC")  # engine timestamps depend on it
 
@@ -44,11 +47,14 @@ from typing import Callable
 LOCAL_ROOT = "/lakehouse/default/Files/setup/dictionaries"
 # Same location as seen by mssparkutils (relative Files/ path).
 FS_ROOT = "Files/setup/dictionaries"
+# Custom business layouts are uploaded here (outside FS_ROOT, which publication
+# rewrites) and copied into the cache only after their digests verify.
+CUSTOM_INBOX = "/lakehouse/default/Files/setup/custom-dictionaries"
 MANIFEST_NAME = "_dictionary_manifest.json"
 MANIFEST_VERSION = 1
 
 
-def _dictionary_paths(store_type: str) -> tuple[list[str], list[str]]:
+def _dictionary_paths(store_type: str, custom: bool = False) -> tuple[list[str], list[str]]:
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,99}", store_type):
         raise ValueError("store_type must be a single safe dictionary directory name")
     required = [
@@ -60,7 +66,24 @@ def _dictionary_paths(store_type: str) -> tuple[list[str], list[str]]:
         f"{store_type}/products.json",
         f"{store_type}/brands.json",
     ]
-    return required, [f"{store_type}/tags.json"]
+    return required, [] if custom else [f"{store_type}/tags.json"]
+
+
+def parse_custom_files(value: str, store_type: str) -> dict[str, str]:
+    """Validate the rendered custom-file digests (empty for preset store types)."""
+
+    files = json.loads(value or "{}")
+    if not isinstance(files, dict):
+        raise ValueError("CUSTOM_DICTIONARIES must be a JSON object")
+    if not files:
+        return {}
+    expected = set(_dictionary_paths(store_type, custom=True)[0][4:])
+    if set(files) != expected or not all(
+        isinstance(digest, str) and re.fullmatch(r"[0-9a-f]{64}", digest)
+        for digest in files.values()
+    ):
+        raise ValueError(f"CUSTOM_DICTIONARIES must hold SHA-256 digests for {sorted(expected)}")
+    return dict(sorted(files.items()))
 
 
 def _validate_repository_component(value: str, label: str) -> str:
@@ -86,14 +109,18 @@ def _source(
     repository_name: str,
     ref: str,
     store_type: str,
-) -> dict[str, str]:
-    return {
+    custom_files: dict[str, str] | None = None,
+) -> dict[str, object]:
+    source: dict[str, object] = {
         "repository_owner": repository_owner,
         "repository_name": repository_name,
         "ref": ref,
         "store_type": store_type,
         "base_url": _base_url(repository_owner, repository_name, ref),
     }
+    if custom_files:
+        source["custom_files"] = dict(custom_files)
+    return source
 
 
 def _is_immutable_ref(ref: str) -> bool:
@@ -125,17 +152,18 @@ def cache_matches_manifest(
     repository_name: str,
     ref: str,
     store_type: str,
+    custom_files: dict[str, str] | None = None,
 ) -> bool:
     root = Path(destination_root)
     manifest = _load_manifest(root)
     if manifest is None or manifest.get("version") != MANIFEST_VERSION:
         return False
 
-    expected_source = _source(repository_owner, repository_name, ref, store_type)
+    expected_source = _source(repository_owner, repository_name, ref, store_type, custom_files)
     if manifest.get("source") != expected_source:
         return False
 
-    required, optional = _dictionary_paths(store_type)
+    required, optional = _dictionary_paths(store_type, custom=bool(custom_files))
     file_entries = manifest.get("files")
     missing_optional = manifest.get("missing_optional")
     if not isinstance(file_entries, dict) or not isinstance(missing_optional, list):
@@ -174,20 +202,38 @@ def _download_to_staging(
     required: list[str],
     optional: list[str],
     opener: Callable[[str], object],
+    custom_files: dict[str, str] | None = None,
+    custom_root: str | Path = CUSTOM_INBOX,
 ) -> tuple[dict[str, dict[str, object]], list[str]]:
     files: dict[str, dict[str, object]] = {}
     missing_optional: list[str] = []
+    custom_files = custom_files or {}
     for relative_path in required + optional:
-        url = f"{base_url}/{relative_path}"
-        try:
-            with opener(url) as response:
-                data = response.read()
-        except urllib.error.HTTPError as error:
-            if error.code == 404 and relative_path in optional:
-                missing_optional.append(relative_path)
-                print(f"optional {relative_path}: not present upstream (404)")
-                continue
-            raise
+        if relative_path in custom_files:
+            source_path = Path(custom_root) / relative_path
+            try:
+                data = source_path.read_bytes()
+            except FileNotFoundError:
+                raise RuntimeError(
+                    f"custom dictionary {relative_path} was not uploaded to {source_path}; "
+                    "re-run `retail-setup deploy`"
+                ) from None
+            if hashlib.sha256(data).hexdigest() != custom_files[relative_path]:
+                raise RuntimeError(
+                    f"custom dictionary {relative_path} does not match the rendered digest; "
+                    "re-run `retail-setup deploy` to upload the current layout"
+                )
+        else:
+            url = f"{base_url}/{relative_path}"
+            try:
+                with opener(url) as response:
+                    data = response.read()
+            except urllib.error.HTTPError as error:
+                if error.code == 404 and relative_path in optional:
+                    missing_optional.append(relative_path)
+                    print(f"optional {relative_path}: not present upstream (404)")
+                    continue
+                raise
 
         try:
             json.loads(data)
@@ -249,6 +295,8 @@ def synchronize_dictionaries(
     ref: str,
     store_type: str,
     opener: Callable[[str], object] = urllib.request.urlopen,
+    custom_files: dict[str, str] | None = None,
+    custom_root: str | Path = CUSTOM_INBOX,
 ) -> dict[str, object]:
     root = Path(destination_root)
     if _is_immutable_ref(ref) and cache_matches_manifest(
@@ -257,6 +305,7 @@ def synchronize_dictionaries(
         repository_name=repository_name,
         ref=ref,
         store_type=store_type,
+        custom_files=custom_files,
     ):
         manifest = _load_manifest(root)
         if manifest is None:
@@ -264,8 +313,8 @@ def synchronize_dictionaries(
         print(f"Verified immutable dictionary cache for {ref} under {FS_ROOT}.")
         return manifest
 
-    required, optional = _dictionary_paths(store_type)
-    source = _source(repository_owner, repository_name, ref, store_type)
+    required, optional = _dictionary_paths(store_type, custom=bool(custom_files))
+    source = _source(repository_owner, repository_name, ref, store_type, custom_files)
     root.parent.mkdir(parents=True, exist_ok=True)
     staging_root = Path(
         tempfile.mkdtemp(prefix=".dictionaries-staging-", dir=root.parent)
@@ -278,6 +327,8 @@ def synchronize_dictionaries(
             required=required,
             optional=optional,
             opener=opener,
+            custom_files=custom_files,
+            custom_root=custom_root,
         )
         manifest = {
             "version": MANIFEST_VERSION,
@@ -295,6 +346,7 @@ def synchronize_dictionaries(
         repository_name=repository_name,
         ref=ref,
         store_type=store_type,
+        custom_files=custom_files,
     ):
         raise RuntimeError("published dictionary cache failed manifest validation")
     return manifest
@@ -310,6 +362,7 @@ manifest = synchronize_dictionaries(
     repository_name=REPOSITORY_NAME,
     ref=DICTIONARY_REF,
     store_type=STORE_TYPE,
+    custom_files=parse_custom_files(CUSTOM_DICTIONARIES, STORE_TYPE),
 )
 
 # %% [markdown]

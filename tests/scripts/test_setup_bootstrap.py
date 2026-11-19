@@ -153,7 +153,7 @@ def test_install_python_dependencies_uses_reviewed_lock(monkeypatch):
 
     setup.install_python_dependencies(env, dry_run=True)
 
-    assert len(commands) == 2
+    assert len(commands) == 3
     assert "--require-hashes" in commands[0]
     assert commands[0][-2:] == [
         "-r",
@@ -161,6 +161,8 @@ def test_install_python_dependencies_uses_reviewed_lock(monkeypatch):
     ]
     assert "--no-deps" in commands[1]
     assert commands[1][-2:] == ["-e", str(setup.REPO_ROOT / "utility")]
+    # The locked Copilot SDK fetches its pinned runtime for custom layouts.
+    assert commands[2] == ["python", "-m", "copilot", "download-runtime"]
 
 
 def test_run_command_label_hides_raw_command_on_success(monkeypatch, capsys):

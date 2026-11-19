@@ -441,6 +441,12 @@ def python_install_commands(
             "Installing the retail-setup tool",
             [*pip, "--no-deps", "-e", str(REPO_ROOT / "utility")],
         ),
+        (
+            # Custom business layouts call GitHub Copilot through the SDK's
+            # pinned, checksum-verified runtime; fetch it now, not mid-configure.
+            "Downloading the GitHub Copilot runtime",
+            [str(env.python), "-m", "copilot", "download-runtime"],
+        ),
     ]
 
 

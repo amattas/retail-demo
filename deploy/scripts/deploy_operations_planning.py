@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from requests import RequestException
+from retail_setup.customization.store import active_theme
 
 from deploy.scripts import _output as console
 from deploy.scripts._auth import build_credential
@@ -335,6 +336,7 @@ def publish(
             semantic_model_name=config.powerbi.semantic_model_name,
             connection_id=connection_id,
             display_name=PLAN_NAME,
+            theme=active_theme(repo_root, config.environment),
         )
     _ensure_native_capacity(session, config, workspace_id)
     if not operations_only:

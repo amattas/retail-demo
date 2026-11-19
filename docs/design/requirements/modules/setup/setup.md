@@ -26,4 +26,15 @@ dialog box and write the complete output to a setup log. Plain output
 (`--plain` or a non-interactive terminal) and the setup log shall be linear
 and copyable, with each step and command separated.
 
+### REQ-SETUP-005 - Custom business layouts
+
+Besides the preset store profiles, configuration shall accept a business name
+and build a custom layout for it once with GitHub Copilot: a store profile,
+departments, products, and brands aligned with what the business sells, with
+brand names and product titles changed from the real ones, plus a
+brand-inspired color palette. The operator shall review the layout before it
+is used. The accepted layout shall be saved per environment, and generation,
+the Power BI and twins reports, the Fabric Apps, and planning sheets shall
+apply it deterministically without calling Copilot again.
+
 See [the CLI specification](../../../specifications/modules/setup/cli.md).

@@ -384,3 +384,74 @@ def test_prompt_modal_answers_the_runner_thread(tmp_path):
 
     asyncio.run(scenario())
     assert answers == ["no", "Skip"]
+
+
+def test_configuration_page_generates_and_selects_a_custom_layout(tmp_path, monkeypatch):
+    pytest.importorskip("textual")
+    from textual.app import App
+    from textual.widgets import Button, Input, Select
+
+    from retail_setup.cli import _tui_config
+    from retail_setup.cli._tui_config import CONFIG_CSS, ConfigScreen
+    from tests.customization_helpers import make_spec
+
+    repo_root = Path(__file__).resolve().parents[2]
+    monkeypatch.setattr(_tui_config, "customization_dir", lambda _root, env: tmp_path / env)
+    monkeypatch.setattr(_tui_config, "dictionary_root", lambda _root, env: tmp_path / env / "dictionaries")
+    names: list[str] = []
+
+    def fake_generate(name, progress):
+        names.append(name)
+        progress("needs fixing: nothing")
+        return make_spec()
+
+    monkeypatch.setattr(_tui_config, "generate_spec", fake_generate)
+    results: list[object] = []
+
+    class Harness(App[None]):
+        CSS = CONFIG_CSS
+
+        def on_mount(self) -> None:
+            screen = ConfigScreen(
+                repo_root,
+                workspace_name="retail-demo-tui-custom-test",
+                profile="core",
+                deploy=False,
+                recreate=False,
+                completed={},
+            )
+            self.push_screen(screen, results.append)
+
+    async def scenario() -> None:
+        app = Harness()
+        async with app.run_test(size=(140, 60)) as pilot:
+            await pilot.pause(0.3)
+            screen = app.screen
+            assert not screen.query_one("#row-business").display
+            screen.query_one("#store_type", Select).value = "custom"
+            await pilot.pause(0.3)
+            assert screen.query_one("#row-business").display
+            assert screen.query_one("#start", Button).disabled
+            screen.query_one("#business", Input).value = "Northwind Market"
+            screen.query_one("#generate-layout", Button).press()
+            for _ in range(100):
+                await pilot.pause(0.05)
+                if screen.query_one("#layout-actions").display:
+                    break
+            assert "Northwind Market" in str(screen.query_one("#layout-preview").render())
+            screen.query_one("#accept-layout", Button).press()
+            await pilot.pause(0.3)
+            assert screen.query_one("#store_type", Select).value == "custom-northwind-market"
+            screen.query_one("#tenant", Input).value = "00000000-0000-0000-0000-000000000000"
+            screen.query_one("#capacity", Input).value = "democapacity"
+            await pilot.pause(0.4)
+            assert not screen.query_one("#start", Button).disabled
+            await pilot.press("ctrl+s")
+            await pilot.pause(0.1)
+
+    asyncio.run(scenario())
+    assert names == ["Northwind Market"]
+    assert (tmp_path / "tui-custom-test" / "customization.json").is_file()
+    (result,) = results
+    args = dict(zip(result.configure_args[::2], result.configure_args[1::2]))
+    assert args["--store-type"] == "custom-northwind-market"

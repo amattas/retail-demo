@@ -22,6 +22,7 @@ REQUIRED_TOKENS = [
     "STORE_COUNT",
     "SEED",
     "DICTIONARY_REF",
+    "CUSTOM_DICTIONARIES",
 ]
 SETUP_NOTEBOOKS = [
     "setup-01-seed-dictionaries",

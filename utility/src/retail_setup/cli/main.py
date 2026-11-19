@@ -28,7 +28,26 @@ from pydantic import ValidationError
 
 from retail_setup import interaction
 from retail_setup.cli import _deploy_journal, _deploy_resume
-from retail_setup.config.generation import GenerationConfig, load_generation_config
+from retail_setup.cli._customize import CUSTOM_CHOICE, ensure_customization
+from retail_setup.config.generation import (
+    GenerationConfig,
+    generation_config_path,
+    load_generation_config,
+    resolve_generation_config_path,
+)
+from retail_setup.customization.generator import CustomizationError
+from retail_setup.customization.spec import CustomizationSpec
+from retail_setup.customization.store import (
+    active_dictionary_root,
+    active_spec,
+    custom_file_digests,
+    customization_dir,
+    is_custom_store_type,
+    load_spec,
+)
+from retail_setup.customization.store import (
+    dictionary_root as customization_dictionary_root,
+)
 from retail_setup.dictionaries.loader import (
     available_store_types,
     default_dictionary_root,
@@ -101,16 +120,13 @@ def _default_repo_root() -> Path:
 def _generation_config_path(repo_root: Path, env: str) -> Path:
     """Return the environment-scoped generation configuration path."""
 
-    return repo_root / "utility" / "config" / "environments" / f"{env}.yaml"
+    return generation_config_path(repo_root, env)
 
 
 def _resolve_generation_config_path(repo_root: Path, env: str) -> Path:
     """Prefer environment-scoped generation config, with a legacy fallback."""
 
-    scoped = _generation_config_path(repo_root, env)
-    if scoped.is_file():
-        return scoped
-    return repo_root / "utility" / "config.yaml"
+    return resolve_generation_config_path(repo_root, env)
 
 
 def _render_output_dir(repo_root: Path, env: str) -> Path:
@@ -265,6 +281,38 @@ def _available_store_types() -> list[str]:
         return available_store_types(default_dictionary_root())
     except RuntimeError:
         return []
+
+
+def _configure_custom_layout(
+    repo_root: Path,
+    env: str,
+    store_type: str,
+    business: str | None,
+    *,
+    regenerate: bool,
+    assume_yes: bool,
+) -> CustomizationSpec:
+    """Resolve the custom layout `configure` selected (saved, or generated now)."""
+
+    if is_custom_store_type(store_type) and business is None:
+        saved = load_spec(customization_dir(repo_root, env))
+        if saved is None or saved.store_type != store_type:
+            raise CustomizationError(
+                f"No saved layout matches {store_type!r} for environment {env!r}; "
+                "choose 'custom' and enter a business name."
+            )
+        business = saved.business_name
+    if business is None:
+        if not interaction.is_interactive():
+            raise CustomizationError("Pass --business NAME to build a custom layout.")
+        saved = load_spec(customization_dir(repo_root, env))
+        business = interaction.prompt_text(
+            "Business name for the custom layout (e.g. Kroger, Walgreens, Home Depot)",
+            default=None if saved is None else saved.business_name,
+        )
+    return ensure_customization(
+        repo_root, env, business, regenerate=regenerate, assume_yes=assume_yes
+    )
 
 
 def _record_estimate_lines(generation: GenerationConfig) -> list[str]:
@@ -725,11 +773,13 @@ def preview_generation(
     months: int,
     store_count: int,
     seed: int,
+    dictionary_root: Path | None = None,
 ) -> tuple[GenerationConfig, dict[str, int], list[Any]]:
     """Validate generation settings as `configure` does, without raising for feasibility.
 
     Returns the settings, their record estimates, and every feasibility finding
     (``retail_setup.generation.feasibility.Finding``; errors block deployment).
+    ``dictionary_root`` points custom business layouts at their dictionaries.
     Raises ValueError (pydantic ValidationError) only for invalid field values.
     """
 
@@ -738,7 +788,13 @@ def preview_generation(
 
     # The window and scale defaults are derived by GenerationConfig's validator.
     generation = GenerationConfig.model_validate(
-        {"store_type": store_type, "months": months, "store_count": store_count, "seed": seed}
+        {
+            "store_type": store_type,
+            "months": months,
+            "store_count": store_count,
+            "seed": seed,
+            **({"dictionary_root": str(dictionary_root)} if dictionary_root else {}),
+        }
     )
     findings = assess(
         generation,
@@ -778,7 +834,22 @@ def configure(
         help="Unsupported legacy override; custom pool selection belongs to full-demo.",
     ),
     store_type: Optional[str] = typer.Option(
-        None, "--store-type", help="Store type. Available values are shown interactively."
+        None,
+        "--store-type",
+        help=(
+            "Store type. Available values are shown interactively; 'custom' builds a "
+            "layout for --business with GitHub Copilot."
+        ),
+    ),
+    business: Optional[str] = typer.Option(
+        None,
+        "--business",
+        help="Business name for a custom layout (e.g. 'Kroger'); implies --store-type custom.",
+    ),
+    regenerate_layout: bool = typer.Option(
+        False,
+        "--regenerate-layout",
+        help="Ask Copilot for a new custom layout even when one is saved.",
     ),
     months: Optional[int] = typer.Option(
         None,
@@ -810,8 +881,12 @@ def configure(
 
     store_types = _available_store_types()
     store_type_prompt = (
-        f"Store type (available: {', '.join(store_types)})" if store_types else "Store type"
+        f"Store type (available: {', '.join([*store_types, CUSTOM_CHOICE])})"
+        if store_types
+        else "Store type"
     )
+    if business is not None and store_type is None:
+        store_type = CUSTOM_CHOICE
 
     _prompted_values = (
         tenant_id,
@@ -884,6 +959,27 @@ def configure(
     seed_default = defaults.seed
     while True:
         store_type = _prompt_str(store_type_prompt, store_type, default=store_type_default)
+        custom_root: Path | None = None
+        if store_type == CUSTOM_CHOICE or is_custom_store_type(store_type):
+            try:
+                spec = _configure_custom_layout(
+                    repo_root,
+                    env,
+                    store_type,
+                    business,
+                    regenerate=regenerate_layout,
+                    assume_yes=yes,
+                )
+            except (CustomizationError, ValueError, OSError) as exc:
+                typer.echo(f"Custom layout unavailable:\n{exc}", err=True)
+                if interactive:
+                    store_type = business = None
+                    continue
+                raise typer.Exit(code=1) from None
+            store_type = spec.store_type
+            custom_root = customization_dictionary_root(repo_root, env)
+            # Re-running configure reuses the accepted layout instead of regenerating.
+            regenerate_layout = False
         months = _prompt_int(
             "Months of data to generate (history ends yesterday)",
             months,
@@ -898,6 +994,7 @@ def configure(
                     "months": months,
                     "store_count": store_count,
                     "seed": seed,
+                    **({"dictionary_root": str(custom_root)} if custom_root else {}),
                 }
             )
             warnings = _validate_generation_feasibility(generation, manifest_profile)
@@ -1301,6 +1398,57 @@ def _resolve_dictionary_ref(repo_root: Path, ref: str | None) -> str:
 
 
 @app.command()
+def customize(
+    repo_root: Path = typer.Option(
+        _default_repo_root, "--repo-root", hidden=True, help="Repository root."
+    ),
+    env: str = typer.Option(..., "--env", help="Workspace-derived deployment environment name."),
+    business: Optional[str] = typer.Option(
+        None, "--business", help="Business name, e.g. 'Kroger' (default: the saved layout)."
+    ),
+    regenerate: bool = typer.Option(
+        False, "--regenerate", help="Ask Copilot for a new layout even when one is saved."
+    ),
+    from_spec: Optional[Path] = typer.Option(
+        None,
+        "--from-spec",
+        exists=True,
+        dir_okay=False,
+        help="Use an existing customization.json instead of calling Copilot.",
+    ),
+    model: Optional[str] = typer.Option(
+        None, "--model", help="Copilot model ID (default: the account's default model)."
+    ),
+    yes: bool = typer.Option(False, "--yes", help="Accept the generated layout without review."),
+) -> None:
+    """Create a custom business layout (products, brands, theme) with GitHub Copilot.
+
+    Copilot is called once; the accepted layout is saved per environment and
+    every later step (render, deploy, theming) applies it deterministically.
+    Select it with `retail-setup configure --store-type custom-<slug>`.
+    """
+    repo_root = repo_root.resolve()
+    try:
+        spec = ensure_customization(
+            repo_root,
+            env,
+            business,
+            regenerate=regenerate,
+            from_spec=from_spec,
+            model=model,
+            assume_yes=yes,
+        )
+    except (CustomizationError, ValueError, OSError) as exc:
+        typer.echo(f"Custom layout failed:\n{exc}", err=True)
+        raise typer.Exit(code=1) from None
+    typer.echo(f"Custom store type: {spec.store_type}")
+    typer.echo(
+        f"Next: retail-setup configure --store-type {spec.store_type} "
+        "(the setup TUI selects it automatically)."
+    )
+
+
+@app.command()
 def render(
     repo_root: Path = typer.Option(
         _default_repo_root, "--repo-root", hidden=True, help="Repository root."
@@ -1326,8 +1474,9 @@ def render(
         )
         raise typer.Exit(code=1)
     try:
-        generation = load_generation_config(gen_path)
-    except (ValidationError, yaml.YAMLError) as exc:
+        custom_root = active_dictionary_root(repo_root, env)
+        generation = load_generation_config(gen_path, dictionary_root=custom_root)
+    except (ValidationError, yaml.YAMLError, ValueError) as exc:
         typer.echo(f"Invalid {gen_path} (re-run `retail-setup configure`):\n{exc}")
         raise typer.Exit(code=1)
 
@@ -1361,6 +1510,12 @@ def render(
         "STORE_COUNT": str(generation.store_count),
         "SEED": str(generation.seed),
         "DICTIONARY_REF": _resolve_dictionary_ref(repo_root, ref),
+        # Custom layouts are uploaded to the Lakehouse by deploy; setup-01 verifies
+        # them against these digests before use.
+        "CUSTOM_DICTIONARIES": json.dumps(
+            custom_file_digests(custom_root, generation.store_type) if custom_root else {},
+            sort_keys=True,
+        ),
     }
 
     target_dir = output_dir if output_dir is not None else _render_output_dir(repo_root, env)
@@ -1690,6 +1845,12 @@ def _wire_deploy_plan(steps: list[DeployStep]) -> None:
         depend("apply-kql", deploy_id)
         infrastructure_tail = "apply-kql"
     depend(validate_id, infrastructure_tail)
+    upload_id = "upload-custom-dictionaries"
+    if upload_id in by_id:
+        # The Lakehouse must exist, and setup-01 must never start before the
+        # custom layout it verifies has been uploaded.
+        depend(upload_id, deploy_id)
+        depend(validate_id, upload_id)
     depend("ensure-eventhouse-shortcuts", validate_id)
 
     if "setup-pipeline-gate" in by_id:
@@ -2043,6 +2204,12 @@ def _deploy_plan(
         )
     )
     reporting_is_gated = profile.reporting_gate_pipeline_ref is not None
+    customization = active_spec(repo_root, env)
+    customization_path = (
+        customization_dir(repo_root, env) / "customization.json"
+        if customization is not None
+        else None
+    )
 
     def build_step(phase: str, step_id: str, description: str) -> DeployStep:
         rendered_dir = f"utility/out/{env}"
@@ -2074,6 +2241,11 @@ def _deploy_plan(
                 "--rendered-dir",
                 rendered_dir,
                 *(arg for name in enabled_schedules for arg in ("--enable-schedule", name)),
+                *(
+                    ("--customization", str(customization_path))
+                    if customization_path is not None
+                    else ()
+                ),
             ],
             description=description,
             step_id=step_id,
@@ -2120,6 +2292,23 @@ def _deploy_plan(
             ),
         ]
     )
+    if customization is not None:
+        steps.append(
+            DeployStep(
+                cmd=[
+                    py,
+                    "-m",
+                    "deploy.scripts.upload_custom_dictionaries",
+                    "--repo-root",
+                    str(repo_root),
+                    "--environment",
+                    env,
+                ],
+                description=f"Upload the {customization.display_name} custom dictionaries",
+                step_id="upload-custom-dictionaries",
+                evidence_path=f"deploy/.generated/{env}/custom-dictionaries-report.json",
+            )
+        )
     if profile.provisions_eventhouse:
         steps.append(
             DeployStep(
