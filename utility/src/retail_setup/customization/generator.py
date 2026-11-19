@@ -190,7 +190,9 @@ def preset_context(root: Path | None = None) -> dict[str, dict[str, object]]:
         profile.pop("store_type")
         presets[store_type] = {
             "profile": profile,
-            "sample_products": [p.ProductName for p in dicts.products[:: max(1, len(dicts.products) // 12)]][:12],
+            "sample_products": [
+                p.ProductName for p in dicts.products[:: max(1, len(dicts.products) // 12)]
+            ][:12],
         }
     return presets
 
@@ -259,9 +261,7 @@ async def _generate_draft(
                 for error in exc.errors()
             ]
         else:
-            problems = draft_problems(
-                draft, business_name=business_name, presets=preset_names
-            )
+            problems = draft_problems(draft, business_name=business_name, presets=preset_names)
             if not problems:
                 return draft
         for problem in problems[:5]:
