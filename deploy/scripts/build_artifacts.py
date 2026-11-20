@@ -17,6 +17,7 @@ from retail_setup.contracts import (
     load_repository_manifest,
     resolve_profile,
 )
+from retail_setup.customization.logo import Logo, restore_logo
 from retail_setup.customization.spec import CustomizationSpec
 from retail_setup.customization.theme import (
     Theme,
@@ -456,8 +457,12 @@ def stage_powerbi_items(
     report_default_date: date | None = None,
     theme: Theme | None = None,
     theme_roles: dict[str, str] | None = None,
+    logo: Logo | None = None,
 ) -> list[Path]:
-    """Copy Power BI items, configure staged report date defaults, and apply ``theme``."""
+    """Copy Power BI items, configure staged report date defaults, and apply ``theme``.
+
+    ``logo`` (only with ``theme``) is placed in every page header.
+    """
 
     if not source_dir.exists():
         raise FileNotFoundError(f"Power BI source directory not found: {source_dir}")
@@ -485,7 +490,7 @@ def stage_powerbi_items(
         if item_dir.suffix == ".Report" and theme is not None:
             if theme_roles is None:
                 raise ValueError("theme_roles is required to theme a report")
-            theme_report_dir(destination, theme, theme_roles)
+            theme_report_dir(destination, theme, theme_roles, logo)
         staged.append(destination)
     staged_by_name = {item.name: item for item in staged}
     for report_dir in (item for item in staged if item.suffix == ".Report"):
@@ -834,11 +839,13 @@ def build_workspace(
     rendered_dir: Path | None = None,
     enabled_schedules: tuple[str, ...] = (),
     theme: Theme | None = None,
+    logo: Logo | None = None,
 ) -> BuildResult:
     """Build a fabric-cicd workspace folder from repository source assets.
 
     ``theme`` (from a custom business layout) recolors and retitles staged
-    reports; source files are never modified.
+    reports and ``logo`` brands their page headers; source files are never
+    modified.
     """
 
     if isinstance(profile, str):
@@ -928,6 +935,7 @@ def build_workspace(
                 report_default_date=report_default_date,
                 theme=theme,
                 theme_roles=load_role_map(repo_root) if theme is not None else None,
+                logo=logo,
             )
         )
     # Curated KQL queries (fabric/querysets/*.kql) ship as a single
@@ -1213,12 +1221,15 @@ def main() -> int:
         rendered_dir = args.repo_root / rendered_dir
 
     theme = None
+    logo = None
     if args.customization is not None:
         spec_path = args.customization
         if not spec_path.is_absolute():
             spec_path = args.repo_root / spec_path
         spec = CustomizationSpec.model_validate_json(spec_path.read_text(encoding="utf-8"))
         theme = derive_theme(spec.palette, spec.display_name)
+        # logo.svg sits beside customization.json; its SHA-256 is in the spec.
+        logo = restore_logo(spec_path.parent, spec.logo)
 
     result = build_workspace(
         args.repo_root,
@@ -1233,6 +1244,7 @@ def main() -> int:
         rendered_dir,
         tuple(args.enable_schedule),
         theme,
+        logo,
     )
     console.info(
         f"Staged {len(result.staged_items)}/{result.expected_item_count} items "

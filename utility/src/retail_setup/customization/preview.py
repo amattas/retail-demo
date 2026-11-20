@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from retail_setup.customization.logo import Logo
 from retail_setup.customization.spec import CustomizationSpec
 from retail_setup.customization.theme import Theme, derive_theme
 from retail_setup.dictionaries.catalog import DEFAULT_SEED, build_catalog
@@ -38,7 +39,14 @@ def preview(spec: CustomizationSpec, *, samples: int = 8) -> Preview:
     )
 
 
-def preview_lines(spec: CustomizationSpec) -> list[str]:
+def logo_line(logo: Logo | None) -> str:
+    if logo is None:
+        return "none found (titles show the business name only; use --logo-file)"
+    info = logo.info
+    return f"{info.title} ({info.page_url or info.source})"
+
+
+def preview_lines(spec: CustomizationSpec, logo: Logo | None = None) -> list[str]:
     """Plain-text preview used by `retail-setup customize`."""
 
     view = preview(spec)
@@ -48,6 +56,7 @@ def preview_lines(spec: CustomizationSpec) -> list[str]:
         f"  {spec.summary}",
         f"  Palette: primary {palette.primary}  secondary {palette.secondary}  "
         f"accent {palette.accent}  dark {palette.dark}  light {palette.light}",
+        f"  Logo: {logo_line(logo)}",
         f"  Report data colors: {' '.join(view.theme.data_colors)}",
         f"  Average ticket ${spec.profile.avg_ticket_target:,.2f}; "
         f"{view.product_count:,} base products; {len(view.brands)} fictional brands",

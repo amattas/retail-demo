@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
+from retail_setup.customization.logo import Logo
 from retail_setup.customization.theme import Theme, apply_report_theme, load_role_map
 
 from deploy.scripts._twin_model import load_metrics
@@ -362,11 +363,14 @@ def _validate_source(documents: dict[str, Any]) -> None:
 
 
 def _part(path: str, payload: Any) -> dict[str, str]:
+    data = (
+        payload
+        if isinstance(payload, bytes)
+        else json.dumps(payload, ensure_ascii=False, allow_nan=False, sort_keys=False).encode("utf-8")
+    )
     return {
         "path": path,
-        "payload": base64.b64encode(
-            json.dumps(payload, ensure_ascii=False, allow_nan=False, sort_keys=False).encode("utf-8")
-        ).decode("ascii"),
+        "payload": base64.b64encode(data).decode("ascii"),
         "payloadType": "InlineBase64",
     }
 
@@ -377,13 +381,15 @@ def render_twins_report(
     cohort: dict[str, Any],
     display_name: str = "retail-twins",
     theme: Theme | None = None,
+    logo: Logo | None = None,
 ) -> dict[str, Any]:
     """Bind the source PBIR report to a semantic model and runtime cohort.
 
     The renderer performs no authentication, Fabric calls, credential changes, or
     publication. Runtime values are assigned to parsed JSON structures; they are
     not interpolated into source files or JSON text templates. ``theme`` (from a
-    custom business layout) recolors the report through the committed role map.
+    custom business layout) recolors the report through the committed role map and
+    ``logo`` brands its page headers.
     """
     model_id = _identifier(semantic_model_id, "semantic_model_id")
     display_name = _name(display_name, "display_name")
@@ -419,5 +425,5 @@ def render_twins_report(
         page_doc["filterConfig"] = {"filters": page_filters}
 
     if theme is not None:
-        documents = apply_report_theme(documents, theme, load_role_map(ROOT))
+        documents = apply_report_theme(documents, theme, load_role_map(ROOT), logo)
     return {"format": "PBIR", "parts": [_part(path, documents[path]) for path in sorted(documents)]}

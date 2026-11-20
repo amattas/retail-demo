@@ -21,6 +21,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from retail_setup.customization.logo import LogoInfo
 from retail_setup.dictionaries.models import StoreTypeProfile
 
 SPEC_VERSION = 1
@@ -197,6 +198,9 @@ class CustomizationSpec(_Closed):
     inspiration_brands: list[str]
     palette: Palette
     generator: GeneratorInfo
+    logo: LogoInfo | None = Field(
+        default=None, description="Provenance of the saved logo.svg beside this spec."
+    )
 
     @property
     def store_type(self) -> str:

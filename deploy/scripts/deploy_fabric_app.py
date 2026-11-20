@@ -35,7 +35,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from retail_setup.customization.store import active_theme
+from retail_setup.customization.logo import Logo
+from retail_setup.customization.store import active_logo, active_theme
 from retail_setup.customization.theme import Theme, app_css
 
 from deploy.scripts import _output as console
@@ -160,8 +161,15 @@ def stage_app(source: Path, staging: Path, app: FabricApp) -> Path:
     return staging
 
 
-def apply_brand(project: Path, theme: Theme, app: FabricApp) -> None:
-    """Brand a staged app: CSS token overrides and the HTML title (source untouched)."""
+BRAND_LOGO = Path("src") / "assets" / "brand-logo.svg"
+
+
+def apply_brand(project: Path, theme: Theme, app: FabricApp, logo: Logo | None = None) -> None:
+    """Brand a staged app: CSS tokens, HTML title, and logo (source untouched).
+
+    The app bundles ``src/assets/brand-logo.svg`` when it exists (see
+    ``brandLogoUrl`` in ``src/config/apps.ts``).
+    """
 
     stylesheet = project / "src" / "main.css"
     stylesheet.write_text(
@@ -174,6 +182,12 @@ def apply_brand(project: Path, theme: Theme, app: FabricApp) -> None:
     if branded == text and f"<title>{title}</title>" not in text:
         raise RuntimeError(f"{index} has no <title> to brand.")
     index.write_text(branded, encoding="utf-8")
+    logo_path = project / BRAND_LOGO
+    if logo is None:
+        logo_path.unlink(missing_ok=True)
+    else:
+        logo_path.parent.mkdir(parents=True, exist_ok=True)
+        logo_path.write_bytes(logo.svg)
 
 
 def registry_urls(project: Path) -> list[str]:
@@ -230,6 +244,7 @@ def deploy_app(
     environment: str = "default",
     dry_run: bool = False,
     theme: Theme | None = None,
+    logo: Logo | None = None,
     run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
     which: Callable[[str], str | None] = shutil.which,
 ) -> dict[str, Any]:
@@ -253,7 +268,7 @@ def deploy_app(
     }
     if theme is not None:
         for app in FABRIC_APPS:
-            apply_brand(projects[app.variant], theme, app)
+            apply_brand(projects[app.variant], theme, app, logo)
     up = [npx, "rayfin", "up", "--workspace-id", workspace_id, "--yes", "--json"]
     if tenant_id:
         up += ["--tenant", tenant_id]
@@ -312,6 +327,7 @@ def main(argv: list[str] | None = None) -> int:
             environment=args.environment,
             dry_run=args.dry_run,
             theme=active_theme(args.repo_root, args.environment),
+            logo=active_logo(args.repo_root, args.environment),
         )
         report["status"] = "SUCCEEDED"
     except (OSError, RuntimeError, ValueError) as exc:

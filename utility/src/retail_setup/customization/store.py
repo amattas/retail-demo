@@ -4,6 +4,7 @@ Layout (gitignored, beside the environment's generation config)::
 
     utility/config/environments/<env>.customization/
         customization.json                 # the saved CustomizationSpec
+        logo.svg                           # optional sanitized logo (SHA-256 in the spec)
         dictionaries/_shared/*.json        # copied from the packaged dictionaries
         dictionaries/custom-<slug>/{profile,products,brands}.json
 
@@ -21,6 +22,7 @@ from pathlib import Path
 import yaml
 
 from retail_setup.config.generation import resolve_generation_config_path
+from retail_setup.customization.logo import Logo, restore_logo
 from retail_setup.customization.spec import CUSTOM_PREFIX, CustomizationSpec
 from retail_setup.customization.theme import Theme, derive_theme
 from retail_setup.dictionaries.catalog import DEFAULT_SEED, catalog_json, write_catalog
@@ -149,3 +151,16 @@ def active_dictionary_root(repo_root: Path, env: str) -> Path | None:
 def active_theme(repo_root: Path, env: str) -> Theme | None:
     spec = active_spec(repo_root, env)
     return None if spec is None else derive_theme(spec.palette, spec.display_name)
+
+
+def active_logo(repo_root: Path, env: str) -> Logo | None:
+    """The env's verified logo, or None when its layout has none.
+
+    Raises LogoError when the saved logo is missing or altered and cannot be
+    re-downloaded with the recorded SHA-256.
+    """
+
+    spec = active_spec(repo_root, env)
+    if spec is None or spec.logo is None:
+        return None
+    return restore_logo(customization_dir(repo_root, env), spec.logo)

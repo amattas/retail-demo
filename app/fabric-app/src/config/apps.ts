@@ -47,3 +47,15 @@ export function appTitle(
   // Custom business layouts (retail-setup customize) brand the deployed apps.
   return brand?.trim() ? `${brand.trim()} ${title}` : title;
 }
+
+// Deployment staging adds src/assets/brand-logo.svg for custom business layouts;
+// the source tree has none, so the glob is empty and the default mark shows.
+const BRAND_LOGOS = import.meta.glob<string>('../assets/brand-logo.svg', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+});
+
+export function brandLogoUrl(logos: Record<string, string> = BRAND_LOGOS): string | undefined {
+  return Object.values(logos)[0];
+}

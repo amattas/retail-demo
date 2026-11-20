@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 
-import { appTitle, includedApps } from '@/config/apps';
+import { appTitle, brandLogoUrl, includedApps } from '@/config/apps';
 import { useAuth } from '@/hooks/AuthContext';
 import { Icon } from './Icon';
 
@@ -23,11 +23,14 @@ export function AppShell() {
   }, [theme]);
 
   const displayName = user?.name || user?.email || 'Signed-in user';
+  const logo = brandLogoUrl();
   return (
     <div className="shell">
       <aside className="sidebar">
-        <div className="brand">
-          <span className="brand-mark"><Icon name="store" /></span>
+        <div className={logo ? 'brand brand-with-logo' : 'brand'}>
+          {logo
+            ? <span className="brand-logo"><img src={logo} alt="" /></span>
+            : <span className="brand-mark"><Icon name="store" /></span>}
           <div><strong>{appTitle()}</strong><span>Fabric App · sample data</span></div>
         </div>
         <nav className="nav" aria-label="Workspaces">

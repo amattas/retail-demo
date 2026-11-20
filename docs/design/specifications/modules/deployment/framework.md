@@ -91,14 +91,30 @@ AA (accent and muted text ≥ 4.5:1, headings ≥ 7:1 on white).
 
 | Surface | Mechanism |
 | --- | --- |
-| Main Power BI report | Every hex literal is remapped through `fabric/powerbi/theme-color-roles.json`; the registered custom theme gets brand `dataColors`; the `SmartRetail` title token becomes the business name |
-| Connected twins report | Same remap, plus a registered `BrandTheme.json` custom theme |
-| Fabric Apps | `--cp-*` CSS overrides appended to the staged `main.css`, a branded `<title>`, and `VITE_BRAND_NAME` so in-app titles read "<Business> <App>" |
+| Main Power BI report | Every hex literal, including colors inside the theme's embedded SVG page wallpaper, is remapped through `fabric/powerbi/theme-color-roles.json`; the registered custom theme gets brand `dataColors`; page headers are branded (below) |
+| Connected twins report | Same remap and header branding, plus a registered `BrandTheme.json` custom theme; page backgrounds take a light brand tint |
+| Fabric Apps | `--cp-*` CSS overrides appended to the staged `main.css`, a branded `<title>`, `VITE_BRAND_NAME` so in-app titles read "<Business> <App>", and the logo as staged `src/assets/brand-logo.svg`, which the app bundles for the sidebar and sign-in page when present |
 | Plan sheets | Canvas wallpaper tinted with the brand surface color |
 
+Page headers are the `*_header` textboxes. Their title loses the trailing
+"— SmartRetail Live" or "— retail-twins" suffix. With a logo, the spec's
+`logo.svg` is registered as the `BrandLogo.svg` image resource and an image
+visual (`<header>_brand_logo`) fills the left of the header: as tall as the
+header, about 56 px of logo height, 56-180 px wide and at most a quarter of the
+header, scaled to fit. The title moves right by that width plus 16 px. Without
+a logo, the title starts with the business name in the brand accent color and a
+muted separator ("Kroger · Executive Cockpit"). Either way, a title whose
+estimated width no longer fits on one line is shrunk to fit, down to 14 pt.
+`build_artifacts --customization` reads `logo.svg` beside the spec and
+`deploy_twins`/`deploy_fabric_app` read it from the environment's customization
+folder; each verifies the recorded SHA-256 first.
+
 The role map assigns each report color a role (`accent`, `secondary`,
-`heading`, `muted`, `border`, `surface`, `data_1`-`data_8`) or `fixed`
-(canvas white, black text, and good/warning/bad status colors). A report color
+`heading`, `muted`, `border`, `surface`, `data_1`-`data_8`), a tint of a role
+(`accent~0.86` is the accent blended 86% toward white; used for wallpaper and
+page backgrounds), or `fixed`
+(canvas white, black text, good/warning/bad status colors, and the wallpaper's
+alpha mask). A report color
 without a role fails staging, and
 `tests/deploy/test_customization_theming.py` fails when a report gains an
 unmapped color. Base Microsoft themes are not modified. Real-time dashboards

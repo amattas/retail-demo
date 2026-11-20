@@ -1,5 +1,5 @@
 {
-  "description": "Theme role for every hardcoded hex color in fabric/powerbi/*.Report and fabric/twins/*.Report (base themes excluded). Custom business layouts (retail-setup customize) remap each color to its role in the derived brand theme; 'fixed' colors (canvas white, black text, good/warn/bad status) never change. A contract test fails when a report gains an unmapped color.",
+  "description": "Theme role for every hardcoded hex color in fabric/powerbi/*.Report and fabric/twins/*.Report (base themes excluded), including colors inside embedded SVG wallpapers (data:image/svg+xml). Custom business layouts (retail-setup customize) remap each color to its role in the derived brand theme; 'role~0.8' is that role tinted 80% toward white; 'fixed' colors (canvas white, black text, good/warn/bad status, the wallpaper's alpha mask) never change. A contract test fails when a report gains an unmapped color.",
   "colors": {
     "#FFFFFF": "fixed",
     "#000000": "fixed",
@@ -20,13 +20,23 @@
     "#E0E4EC": "border",
     "#E0E0E0": "border",
     "#DCE3F0": "border",
-    "#F6F8FB": "surface",
+    "#F6F8FB": "accent~0.94",
     "#12239E": "data_2",
     "#E044A7": "data_3",
     "#6B007B": "data_4",
     "#E66C37": "data_5",
     "#744EC2": "data_6",
     "#D9B300": "data_7",
-    "#D64550": "data_8"
+    "#D64550": "data_8",
+    "#D9D9D9": "fixed",
+    "#F8FAFF": "surface~0.6",
+    "#F4F9FF": "surface~0.3",
+    "#F2EEFD": "secondary~0.9",
+    "#F3D1F8": "secondary~0.72",
+    "#E1EFFD": "accent~0.9",
+    "#DEE1FD": "accent~0.86",
+    "#DEE7FD": "accent~0.86",
+    "#68C8FF": "accent~0.5",
+    "#65C7FD": "accent~0.45"
   }
 }

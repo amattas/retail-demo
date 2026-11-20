@@ -40,3 +40,6 @@ rayfin.config.json
 *.njsproj
 *.sln
 *.sw?
+
+# Business logo added only to deployment staging copies (retail-setup customize)
+src/assets/brand-logo.svg

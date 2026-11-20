@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { appTitle, appVariant, includedApps } from '@/config/apps';
+import { appTitle, appVariant, brandLogoUrl, includedApps } from '@/config/apps';
 
 describe('app variants', () => {
   it('builds one standalone app per variant and falls back to the full suite', () => {
@@ -16,5 +16,12 @@ describe('app variants', () => {
   it('prefixes titles with a custom business brand name', () => {
     expect(appTitle('approvals', 'Kroger')).toBe('Kroger Replenishment Approvals');
     expect(appTitle('suite', '  ')).toBe('Retail Operations');
+  });
+
+  it('shows a staged brand logo only when deployment added one', () => {
+    expect(brandLogoUrl()).toBeUndefined();
+    expect(brandLogoUrl({ '../assets/brand-logo.svg': '/assets/brand-logo-abc.svg' })).toBe(
+      '/assets/brand-logo-abc.svg',
+    );
   });
 });

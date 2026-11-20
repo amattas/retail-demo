@@ -393,9 +393,10 @@ def test_configuration_page_generates_and_selects_a_custom_layout(tmp_path, monk
 
     from retail_setup.cli import _tui_config
     from retail_setup.cli._tui_config import CONFIG_CSS, ConfigScreen
-    from tests.customization_helpers import make_spec
+    from tests.customization_helpers import make_logo, make_spec
 
     repo_root = Path(__file__).resolve().parents[2]
+    logo = make_logo(tmp_path)
     monkeypatch.setattr(_tui_config, "customization_dir", lambda _root, env: tmp_path / env)
     monkeypatch.setattr(
         _tui_config, "dictionary_root", lambda _root, env: tmp_path / env / "dictionaries"
@@ -408,6 +409,7 @@ def test_configuration_page_generates_and_selects_a_custom_layout(tmp_path, monk
         return make_spec()
 
     monkeypatch.setattr(_tui_config, "generate_spec", fake_generate)
+    monkeypatch.setattr(_tui_config, "choose_logo", lambda _name, progress: logo)
     results: list[object] = []
 
     class Harness(App[None]):
@@ -443,6 +445,7 @@ def test_configuration_page_generates_and_selects_a_custom_layout(tmp_path, monk
                 if screen.query_one("#layout-actions").display:
                     break
             assert "Northwind Market" in str(screen.query_one("#layout-preview").render())
+            assert "Logo: source-logo.svg" in str(screen.query_one("#layout-preview").render())
             screen.query_one("#accept-layout", Button).press()
             await pilot.pause(0.3)
             assert screen.query_one("#store_type", Select).value == "custom-northwind-market"
@@ -455,7 +458,9 @@ def test_configuration_page_generates_and_selects_a_custom_layout(tmp_path, monk
 
     asyncio.run(scenario())
     assert names == ["Northwind Market"]
-    assert (tmp_path / "tui-custom-test" / "customization.json").is_file()
+    saved = json.loads((tmp_path / "tui-custom-test" / "customization.json").read_text())
+    assert saved["logo"]["sha256"] == logo.info.sha256
+    assert (tmp_path / "tui-custom-test" / "logo.svg").read_bytes() == logo.svg
     (result,) = results
     args = dict(zip(result.configure_args[::2], result.configure_args[1::2]))
     assert args["--store-type"] == "custom-northwind-market"

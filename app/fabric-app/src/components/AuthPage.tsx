@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { appTitle } from '@/config/apps';
+import { appTitle, brandLogoUrl } from '@/config/apps';
 import { useAuth } from '@/hooks/AuthContext';
 
 const msLogo = (
@@ -52,6 +52,9 @@ export function AuthPage() {
         <div className="w-full max-w-sm">
           <div className="rounded-3xl border border-white/60 bg-white/80 p-8 shadow-xl backdrop-blur-sm">
             <div className="mb-8 text-center">
+              {brandLogoUrl() && (
+                <img src={brandLogoUrl()} alt="" className="mx-auto mb-5 h-12 max-w-[220px] object-contain" />
+              )}
               <h1 className="text-2xl font-bold text-gray-900">{appTitle()}</h1>
               <p className="mt-2 text-sm text-gray-500">
                               Merchandising, promotion planning, and replenishment approvals.

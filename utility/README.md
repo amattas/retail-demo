@@ -23,7 +23,9 @@ file is absent.
 To build the demo around a named business instead of a preset store type, run
 `retail-setup customize --env alice --business "Kroger"` (or
 `configure --business "Kroger"`). GitHub Copilot drafts the departments,
-fictionalized brands and products, and a brand palette once; the accepted
+fictionalized brands and products, and a brand palette once, and picks the
+business's current logo from Wikimedia Commons search results (`--logo-file`
+supplies your own SVG; `--no-logo` uses the name only); the accepted
 layout is saved under `utility\config\environments\<env>.customization\` and
 applied deterministically by render, deploy, and report/app theming. This
 option alone requires a GitHub account with Copilot access; the Copilot SDK is

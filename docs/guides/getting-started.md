@@ -314,14 +314,18 @@ Depot. GitHub Copilot drafts the layout **once**:
 - fictional brands and product titles, lightly varied from the real ones (for
   example `Krogan Select` or `Huskee Tools`)
 - a brand-inspired color palette
+- the business's current logo, picked from Wikimedia Commons search results
 
-You review a preview (palette, departments, brands, sample products) and accept
+You review a preview (palette, logo, departments, brands, sample products) and accept
 it or ask for another draft. The accepted layout is saved per environment, and
 every later step uses it without calling Copilot again:
 
 - setup notebooks generate data from its products, brands, and profile
 - the Power BI report, connected twins report, Fabric Apps, and planning sheets
-  use its colors, and report and app titles carry the business name
+  use its colors, including report page backgrounds
+- report page headers show the logo, or the business name in the brand color
+  when there is no logo; Fabric Apps show the logo in the sidebar and on the
+  sign-in page, and their titles carry the business name
 
 In the setup interface, choose **Custom business… (preview, needs GitHub Copilot)** under
 **Store type**, enter the name, and select **Generate**. From the CLI:
@@ -333,7 +337,9 @@ retail-setup configure --workspace-name alice --store-type custom-kroger
 
 `configure --business "Kroger"` does both steps in one command. Use
 `customize --regenerate` for a new draft, or `customize --from-spec <file>` to
-reuse a saved `customization.json` without Copilot.
+reuse a saved `customization.json` without Copilot. Use
+`customize --logo-file <file.svg>` to supply your own logo, or `--no-logo` to
+show the business name only.
 
 Requirements and limits:
 
@@ -350,7 +356,15 @@ Requirements and limits:
   draft that reuses a real brand name unchanged or breaks a data rule is sent
   back for correction, and generation fails after two repair attempts.
 - Brand colors are adjusted for readable contrast. Status colors (good, warning,
-  bad) keep their standard meaning. Logos are not added.
+  bad) keep their standard meaning.
+- Logos come only from Wikimedia Commons, as SVG files. Copilot may choose only
+  a file that its Commons search returned, and former logos are rejected. The
+  file is sanitized (scripts, external links, and active content removed) and
+  saved as `logo.svg` beside the layout, with its SHA-256 recorded in
+  `customization.json`. Some businesses have no current logo on Commons (Kroger,
+  for example, only has retired ones); their reports and apps show the name
+  instead. Logos are trademarks of their owners. They are used only to brand
+  your demo deployment and are never committed.
 - Real-time dashboards are not themed; they are not deployed by this demo.
 
 ## 5. Render the notebooks
