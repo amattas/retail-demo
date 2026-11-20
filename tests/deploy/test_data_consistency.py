@@ -1,11 +1,15 @@
 """Execute bounded reconciliation against equivalent in-memory SQL tables."""
 
+import json
+import re
 import sqlite3
 from datetime import datetime, timedelta
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
+from deploy.scripts._ontology_model import load_schemas
 from deploy.scripts.data_consistency import (
     CONSISTENCY_FIELDS,
     STREAMING_CONSISTENCY_SQL,
@@ -17,6 +21,54 @@ from deploy.scripts.verify_readiness import (
     FabricReadinessAdapter,
     ReadinessRunner,
 )
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def _watermark_columns() -> tuple[str, ...]:
+    notebook = json.loads(
+        (ROOT / "fabric" / "lakehouse" / "03-streaming-to-silver.ipynb").read_text(
+            encoding="utf-8"
+        )
+    )
+    source = "".join("".join(cell["source"]) for cell in notebook["cells"])
+    body = re.search(
+        r"CREATE TABLE IF NOT EXISTS \{WATERMARK_TABLE\} \((.*?)\)\s*USING DELTA",
+        source,
+        re.DOTALL,
+    )
+    assert body, "notebook 03 no longer defines the watermark table"
+    return tuple(line.split()[0] for line in body.group(1).split(",") if line.strip())
+
+
+def _physical_schemas() -> dict[str, dict[str, tuple[str, ...]]]:
+    """Build every table the query reads from its authoritative definition.
+
+    ``cusn`` comes from the Eventhouse DDL, ``ag``/``au`` from the Lakehouse
+    contract, and ``ag._watermarks`` from notebook 03, so a column renamed in
+    any source makes the reconciliation query fail here as it would live.
+    """
+
+    schemas = load_schemas(ROOT)
+    lakehouse = {
+        name: tuple(column for column, _ in columns)
+        for name, columns in schemas.silver.items()
+    }
+    return {
+        "ag": {**lakehouse, "_watermarks": _watermark_columns()},
+        "au": lakehouse,
+        "cusn": {
+            name: tuple(column for column, _ in columns)
+            for name, columns in schemas.bronze.items()
+        },
+    }
+
+
+def _insert(connection, table, rows):
+    for row in rows:
+        names = ", ".join(f'"{name}"' for name in row)
+        marks = ", ".join("?" for _ in row)
+        connection.execute(f"INSERT INTO {table}({names}) VALUES ({marks})", tuple(row.values()))
 
 
 def _date(value):
@@ -44,37 +96,37 @@ def database():
     connection.create_function("DATEDIFF", 3, datediff)
     for schema in ("ag", "au", "cusn"):
         connection.execute(f"ATTACH DATABASE ':memory:' AS {schema}")
-    connection.executescript("""
-        CREATE TABLE ag._watermarks(source_table TEXT, last_processed_ts TEXT);
-        INSERT INTO ag._watermarks VALUES
-            ('receipt_created', '2026-09-04 12:00:00'),
-            ('inventory_updated', '2026-09-04 12:00:00');
-        CREATE TABLE ag.fact_receipts(
-            receipt_id_ext TEXT, store_id INTEGER, customer_id INTEGER,
-            event_ts TEXT, total_cents INTEGER
-        );
-        INSERT INTO ag.fact_receipts VALUES
-            ('R1', 1, 1, '2026-09-04 08:00:00', 1234),
-            ('R2', 1, 1, '2026-09-04 10:00:00', 2000);
-        CREATE TABLE ag.fact_store_inventory_txn(trace_id TEXT, event_ts TEXT, balance INTEGER);
-        INSERT INTO ag.fact_store_inventory_txn VALUES ('I1', '2026-09-04 08:00:00', 42);
-        CREATE TABLE ag.dim_stores(ID INTEGER);
-        INSERT INTO ag.dim_stores VALUES (1);
-        CREATE TABLE ag.dim_customers(ID INTEGER);
-        INSERT INTO ag.dim_customers VALUES (1);
-        CREATE TABLE au.sales_minute_store(
-            store_id INTEGER, ts TEXT, receipts INTEGER, total_sales REAL
-        );
-        INSERT INTO au.sales_minute_store VALUES
-            (1, '2026-09-04 08:00:00', 1, 12.34),
-            (1, '2026-09-04 10:00:00', 1, 20.00);
-        CREATE TABLE cusn.receipt_created(receipt_id_ext TEXT, ingest_timestamp TEXT);
-        INSERT INTO cusn.receipt_created VALUES
-            ('R1', '2026-09-04 08:00:00'), ('R2', '2026-09-04 10:00:00'),
-            ('NOT_VISIBLE_YET', '2026-09-04 12:05:00');
-        CREATE TABLE cusn.inventory_updated(trace_id TEXT, ingest_timestamp TEXT);
-        INSERT INTO cusn.inventory_updated VALUES ('I1', '2026-09-04 08:00:00');
-    """)
+    for schema, tables in _physical_schemas().items():
+        for table, columns in tables.items():
+            column_sql = ", ".join(f'"{name}"' for name in columns)
+            connection.execute(f"CREATE TABLE {schema}.{table}({column_sql})")
+    _insert(connection, "ag._watermarks", [
+        {"source_table": "receipt_created", "last_processed_ts": "2026-09-04 12:00:00"},
+        {"source_table": "inventory_updated", "last_processed_ts": "2026-09-04 12:00:00"},
+    ])
+    _insert(connection, "ag.fact_receipts", [
+        {"receipt_id_ext": "R1", "store_id": 1, "customer_id": 1,
+         "event_ts": "2026-09-04 08:00:00", "total_cents": 1234},
+        {"receipt_id_ext": "R2", "store_id": 1, "customer_id": 1,
+         "event_ts": "2026-09-04 10:00:00", "total_cents": 2000},
+    ])
+    _insert(connection, "ag.fact_store_inventory_txn", [
+        {"trace_id": "I1", "event_ts": "2026-09-04 08:00:00", "balance": 42},
+    ])
+    _insert(connection, "ag.dim_stores", [{"ID": 1}])
+    _insert(connection, "ag.dim_customers", [{"ID": 1}])
+    _insert(connection, "au.sales_minute_store", [
+        {"store_id": 1, "ts": "2026-09-04 08:00:00", "receipts": 1, "total_sales": 12.34},
+        {"store_id": 1, "ts": "2026-09-04 10:00:00", "receipts": 1, "total_sales": 20.00},
+    ])
+    _insert(connection, "cusn.receipt_created", [
+        {"receipt_id": "R1", "ingest_timestamp": "2026-09-04 08:00:00"},
+        {"receipt_id": "R2", "ingest_timestamp": "2026-09-04 10:00:00"},
+        {"receipt_id": "NOT_VISIBLE_YET", "ingest_timestamp": "2026-09-04 12:05:00"},
+    ])
+    _insert(connection, "cusn.inventory_updated", [
+        {"trace_id": "I1", "ingest_timestamp": "2026-09-04 08:00:00"},
+    ])
     try:
         yield connection
     finally:

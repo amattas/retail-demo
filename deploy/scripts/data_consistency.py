@@ -52,7 +52,7 @@ SELECT
        AND event.ingest_timestamp < bounds.window_end
        AND NOT EXISTS (
            SELECT 1 FROM [ag].[fact_receipts] AS receipt
-           WHERE receipt.receipt_id_ext = event.receipt_id_ext
+           WHERE receipt.receipt_id_ext = event.receipt_id
        )) AS missing_receipts,
     (SELECT COUNT_BIG(*) FROM [cusn].[inventory_updated] AS event CROSS JOIN inventory_bounds
      WHERE event.ingest_timestamp >= inventory_bounds.window_start
