@@ -914,7 +914,8 @@ are in **Notebooks**, all pipelines in **Pipelines**, reports in **Reports**,
 semantic models in **Semantic Models**, and experiments in **ML Experiments**.
 Native add-ons use their own type folders, including **Fabric Apps** and
 **Ontologies**. Service-managed children stay with their parent as required
-by Fabric.
+by Fabric. Terraform ignores the Lakehouse and Eventhouse folder placement and
+the Lakehouse description, so a Terraform plan does not undo them.
 
 Normal deployment and standalone publishers preserve this layout. To
 reorganize an existing demo without rerunning data generation or publication:
