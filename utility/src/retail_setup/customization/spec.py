@@ -28,7 +28,7 @@ CUSTOM_PREFIX = "custom-"
 HEX_PATTERN = r"^#[0-9A-Fa-f]{6}$"
 # Display text reaches report JSON, CSS, HTML titles, and logs. Keep it to
 # letters, digits, spaces, and common business-name punctuation.
-_TEXT = re.compile(r"^[\w &'’.,!+\-/()]+$")
+_TEXT = re.compile(r"^[\w &'’.,!+\-/()%]+$")
 _ZONE = re.compile(r"^[a-z][a-z0-9-]{0,39}$")
 
 MIN_PRODUCTS = 200
@@ -44,7 +44,7 @@ def _text(value: str, *, field: str, max_length: int) -> str:
     if not value or len(value) > max_length or not _TEXT.fullmatch(value):
         raise ValueError(
             f"{field} must be 1-{max_length} characters of letters, digits, spaces, "
-            "or & ' . , ! + - / ( )"
+            "or & ' . , ! + - / ( ) %"
         )
     return value
 

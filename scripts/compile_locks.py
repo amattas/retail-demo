@@ -26,12 +26,25 @@ LOCKS: dict[str, list[str]] = {
     "requirements-docs.txt": ["requirements-docs.in"],
     "requirements-test.txt": ["requirements-test.in"],
     "utility/requirements-deploy.txt": ["utility/pyproject.toml", "--extra", "deploy"],
+    # A superset of the deploy lock, constrained to its exact pins, so the
+    # on-demand install adds the Copilot SDK without changing deploy packages.
+    "utility/requirements-customize.txt": [
+        "utility/pyproject.toml",
+        "--extra",
+        "deploy",
+        "--extra",
+        "customize",
+        "--constraint",
+        "utility/requirements-deploy.txt",
+    ],
     "utility/requirements-ci.txt": [
         "utility/pyproject.toml",
         "--extra",
         "dev",
         "--extra",
         "deploy",
+        "--extra",
+        "customize",
     ],
 }
 

@@ -25,7 +25,10 @@ To build the demo around a named business instead of a preset store type, run
 `configure --business "Kroger"`). GitHub Copilot drafts the departments,
 fictionalized brands and products, and a brand palette once; the accepted
 layout is saved under `utility\config\environments\<env>.customization\` and
-applied deterministically by render, deploy, and report/app theming. See the
+applied deterministically by render, deploy, and report/app theming. This
+option alone requires a GitHub account with Copilot access; the Copilot SDK is
+installed on demand from `requirements-customize.txt` the first time a layout is
+generated. See the
 [setup CLI specification](../docs/design/specifications/modules/setup/cli.md#customize).
 
 `render` writes twelve notebooks to `utility\out\<env>\`:

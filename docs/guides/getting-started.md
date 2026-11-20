@@ -322,8 +322,8 @@ every later step uses it without calling Copilot again:
 - the Power BI report, connected twins report, Fabric Apps, and planning sheets
   use its colors, and report and app titles carry the business name
 
-In the setup interface, choose **Custom business…** under **Store type**, enter
-the name, and select **Generate**. From the CLI:
+In the setup interface, choose **Custom business… (needs GitHub Copilot)** under
+**Store type**, enter the name, and select **Generate**. From the CLI:
 
 ```powershell
 retail-setup customize --env alice --business "Kroger"
@@ -336,10 +336,16 @@ reuse a saved `customization.json` without Copilot.
 
 Requirements and limits:
 
-- A GitHub account with Copilot access, signed in through `gh auth login` (or a
-  `GH_TOKEN`). The installer installs the GitHub Copilot SDK and its runtime.
+- **GitHub Copilot is required for this option only.** You need a GitHub
+  account with Copilot access, signed in through `gh auth login` (or a
+  `GH_TOKEN`). Without one, choose a preset store type; nothing else in the demo
+  uses Copilot.
+- The installer does not install the GitHub Copilot SDK. It is installed from
+  the hash-locked `utility/requirements-customize.txt` (same pins as the deploy
+  lock, plus the SDK) the first time you generate a layout, after you confirm.
+  Saved layouts and `--from-spec` never need it.
 - Only the business name and the preset layouts are sent to Copilot.
-- Generation takes about one to two minutes. Copilot output is validated; a
+- Generation takes about one to three minutes. Copilot output is validated; a
   draft that reuses a real brand name unchanged or breaks a data rule is sent
   back for correction, and generation fails after two repair attempts.
 - Brand colors are adjusted for readable contrast. Status colors (good, warning,

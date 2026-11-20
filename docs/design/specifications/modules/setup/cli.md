@@ -247,10 +247,23 @@ configuration of every shipped store type passes, and covers each check.
 ## `customize`
 
 `retail-setup customize --env <env> --business <name>` builds a custom business
-layout with the GitHub Copilot SDK (`github-copilot-sdk`, part of the `deploy`
-extra). Copilot is called only here (or from `configure --business` and the
-setup interface's **Generate** action); render, deploy, and theming read the
-saved result deterministically.
+layout with the GitHub Copilot SDK (`github-copilot-sdk`). Copilot is called
+only here (or from `configure --business` and the setup interface's
+**Generate** action); render, deploy, and theming read the saved result
+deterministically.
+
+The SDK is opt-in (`retail_setup.customization.sdk`). It is the `customize`
+extra and is absent from `requirements-deploy.txt`, so the installer and every
+preset deployment never install it. Before the first generation, the operator
+sees the requirement (a GitHub account with Copilot access, signed in through
+`gh auth login` or `GH_TOKEN`) and confirms; the TUI shows the same warning when
+**Custom business… (needs GitHub Copilot)** is selected, and **Generate** is the
+confirmation. Installation runs
+`pip install --require-hashes -r utility/requirements-customize.txt` (compiled
+with the deploy lock as a constraint, so every shared pin is identical) and
+`python -m copilot download-runtime`. Declining leaves preset store types
+available. A missing Copilot sign-in fails with `gh auth login` guidance before
+any prompt is sent. Saved layouts and `--from-spec` never need the SDK.
 
 Generation (`retail_setup.customization.generator`):
 

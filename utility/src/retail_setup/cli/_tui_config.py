@@ -28,6 +28,7 @@ from retail_setup.cli._tui_runner import PHASES, TargetChoice
 from retail_setup.contracts.models import Profile
 from retail_setup.customization.generator import CustomizationError, generate_spec
 from retail_setup.customization.preview import preview
+from retail_setup.customization.sdk import install_sdk, sdk_installed
 from retail_setup.customization.spec import CustomizationSpec, validate_business_name
 from retail_setup.customization.store import (
     customization_dir,
@@ -362,7 +363,7 @@ class ConfigScreen(Screen[TargetChoice | None]):
         options = [(name.title(), name) for name in self.store_types]
         if self._custom is not None:
             options.append((f"{self._custom.display_name} (custom)", self._custom.store_type))
-        options.append(("Custom business…", CUSTOM_CHOICE))
+        options.append(("Custom business… (needs GitHub Copilot)", CUSTOM_CHOICE))
         return options
 
     def _store_type_values(self) -> set[str]:
@@ -399,14 +400,25 @@ class ConfigScreen(Screen[TargetChoice | None]):
         if choosing and self._pending is not None:
             preview_panel.update(_layout_preview(self._pending, pending=True))
         elif choosing:
-            preview_panel.update(
-                Text(
-                    "GitHub Copilot drafts departments, fictionalized brands, products, and a "
-                    "brand color theme once; every deployment step then applies it "
-                    "deterministically. Generation takes about one to two minutes.",
-                    style="grey62",
-                )
+            intro = Text()
+            intro.append("! Requires GitHub Copilot. ", style="bold #f9e2af")
+            install = (
+                ""
+                if sdk_installed()
+                else "The GitHub Copilot SDK is installed the first time you select Generate. "
             )
+            intro.append(
+                "You need a GitHub account with Copilot access, signed in with "
+                f"`gh auth login` (or GH_TOKEN). {install}\n",
+                style="#f9e2af",
+            )
+            intro.append(
+                "GitHub Copilot drafts departments, fictionalized brands, products, and a "
+                "brand color theme once; every deployment step then applies it "
+                "deterministically. Generation takes about one to three minutes.",
+                style="grey62",
+            )
+            preview_panel.update(intro)
         elif self._custom is not None and self._value("store_type") == self._custom.store_type:
             preview_panel.update(_layout_preview(self._custom, pending=False))
         else:
@@ -436,8 +448,10 @@ class ConfigScreen(Screen[TargetChoice | None]):
             self.app.call_from_thread(self._generation_progress, message)
 
         try:
+            if not sdk_installed():
+                install_sdk(self.repo_root, progress=progress)
             spec = generate_spec(name, progress=progress)
-        except (CustomizationError, ValueError) as exc:
+        except (CustomizationError, ValueError, OSError) as exc:
             self.app.call_from_thread(self._generation_finished, None, str(exc))
         else:
             self.app.call_from_thread(self._generation_finished, spec, None)

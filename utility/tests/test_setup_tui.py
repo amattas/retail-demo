@@ -433,6 +433,7 @@ def test_configuration_page_generates_and_selects_a_custom_layout(tmp_path, monk
             screen.query_one("#store_type", Select).value = "custom"
             await pilot.pause(0.3)
             assert screen.query_one("#row-business").display
+            assert "Requires GitHub Copilot" in str(screen.query_one("#layout-preview").render())
             assert screen.query_one("#start", Button).disabled
             screen.query_one("#business", Input).value = "Northwind Market"
             screen.query_one("#generate-layout", Button).press()

@@ -19,11 +19,14 @@ deploy = [
     "azure-identity>=1.25.3,<2",
     "azure-kusto-data>=6.0.4,<7",
     "fabric-cicd==1.3.0",
-    # Custom business layouts: one structured Copilot call during `customize`.
-    "github-copilot-sdk>=1.0.31,<2",
     "mssql-python>=1.12,<2; sys_platform != 'darwin'",
     "pyodbc>=5.1,<6",
     "textual>=3.0",
+]
+# Opt-in: custom business layouts call GitHub Copilot once. Installed on demand
+# from requirements-customize.txt only when an operator chooses a custom layout.
+customize = [
+    "github-copilot-sdk>=1.0.31,<2",
 ]
 spark = [
     "numpy>=1.26",

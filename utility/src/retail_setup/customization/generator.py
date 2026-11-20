@@ -144,7 +144,8 @@ async def copilot_chat(model: str | None) -> AsyncIterator[StructuredChat]:
         from copilot import CopilotClient
     except ImportError as exc:
         raise CopilotUnavailableError(
-            f"The {SDK_PACKAGE} package is not installed; re-run the installer."
+            f"The {SDK_PACKAGE} package is not installed; generate the layout with "
+            "`retail-setup customize` or the setup interface to install it."
         ) from exc
 
     env = {key: value for key, value in os.environ.items() if key != "COPILOT_CLI_PATH"}

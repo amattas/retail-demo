@@ -36,6 +36,7 @@ from retail_setup.config.generation import (
     resolve_generation_config_path,
 )
 from retail_setup.customization.generator import CustomizationError
+from retail_setup.customization.sdk import REQUIREMENT_NOTE
 from retail_setup.customization.spec import CustomizationSpec
 from retail_setup.customization.store import (
     active_dictionary_root,
@@ -306,6 +307,7 @@ def _configure_custom_layout(
         if not interaction.is_interactive():
             raise CustomizationError("Pass --business NAME to build a custom layout.")
         saved = load_spec(customization_dir(repo_root, env))
+        typer.echo(f"Note: {REQUIREMENT_NOTE}")
         business = interaction.prompt_text(
             "Business name for the custom layout (e.g. Kroger, Walgreens, Home Depot)",
             default=None if saved is None else saved.business_name,

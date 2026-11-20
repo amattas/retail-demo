@@ -15,6 +15,7 @@ from retail_setup.customization.generator import (
     generate_spec,
 )
 from retail_setup.customization.preview import preview_lines
+from retail_setup.customization.sdk import ensure_sdk
 from retail_setup.customization.spec import (
     CustomizationSpec,
     slugify,
@@ -76,6 +77,18 @@ def ensure_customization(
         return _accept(saved, directory, echo, announce=False)
 
     interactive = interaction.is_interactive() and not assume_yes
+    if chat_factory is copilot_chat:
+
+        def confirm(note: str) -> bool:
+            if not interactive:
+                # --business/--yes is the operator's explicit opt-in.
+                echo(note)
+                return True
+            return interaction.confirm(
+                "Install the GitHub Copilot SDK now?", default=True, detail=note
+            )
+
+        ensure_sdk(repo_root, confirm=confirm, progress=echo)
     while True:
         echo(f"Generating a custom layout for {business_name!r} with GitHub Copilot...")
         spec = generate_spec(business_name, model=model, chat_factory=chat_factory, progress=echo)

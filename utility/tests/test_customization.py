@@ -603,3 +603,117 @@ def test_configure_reports_an_invalid_business_name(tmp_path):
     )
     assert result.exit_code == 1
     assert "Custom layout unavailable" in result.output
+
+
+# ----- opt-in Copilot SDK -----------------------------------------------------------
+
+
+def test_sdk_is_installed_only_after_the_operator_accepts(tmp_path, monkeypatch):
+    import subprocess
+
+    from retail_setup.customization import sdk
+
+    lock = tmp_path / sdk.CUSTOMIZE_LOCK
+    lock.parent.mkdir(parents=True)
+    lock.write_text("github-copilot-sdk==1.0.31\n", encoding="utf-8")
+    installed = {"value": False}
+    commands: list[list[str]] = []
+
+    def fake_run(command, **_kwargs):
+        commands.append(command)
+        installed["value"] = True
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(sdk, "sdk_installed", lambda: installed["value"])
+    notes: list[str] = []
+
+    with pytest.raises(generator.CustomizationError, match="preset store type"):
+        sdk.ensure_sdk(tmp_path, confirm=lambda note: notes.append(note) or False, run=fake_run)
+    assert commands == [] and "gh auth login" in notes[0]
+
+    sdk.ensure_sdk(tmp_path, confirm=lambda _note: True, run=fake_run)
+    assert commands[0][-3:] == ["--require-hashes", "-r", str(lock)]
+    assert commands[1][-2:] == ["copilot", "download-runtime"]
+
+    commands.clear()
+    sdk.ensure_sdk(tmp_path, confirm=lambda _note: pytest.fail("asked again"), run=fake_run)
+    assert commands == []
+
+
+def test_failed_sdk_install_reports_the_tool_output(tmp_path, monkeypatch):
+    import subprocess
+
+    from retail_setup.customization import sdk
+
+    lock = tmp_path / sdk.CUSTOMIZE_LOCK
+    lock.parent.mkdir(parents=True)
+    lock.write_text("", encoding="utf-8")
+    monkeypatch.setattr(sdk, "sdk_installed", lambda: False)
+
+    def failing(command, **_kwargs):
+        return subprocess.CompletedProcess(command, 1, "", "ERROR: hash mismatch")
+
+    with pytest.raises(generator.CopilotUnavailableError, match="hash mismatch"):
+        sdk.install_sdk(tmp_path, run=failing)
+
+
+def test_customize_installs_the_sdk_before_generating(tmp_path, monkeypatch):
+    from retail_setup.cli import _customize
+
+    events: list[object] = []
+    monkeypatch.setattr(
+        _customize, "ensure_sdk", lambda _root, confirm, progress: events.append(confirm("note"))
+    )
+    monkeypatch.setattr(
+        _customize, "generate_spec", lambda name, **_kwargs: events.append(name) or make_spec()
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "customize",
+            "--repo-root",
+            str(tmp_path),
+            "--env",
+            "dev",
+            "--business",
+            "Northwind Market",
+            "--yes",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert events == [True, "Northwind Market"]
+    assert "note" in result.output
+
+
+def test_missing_copilot_sign_in_fails_with_guidance(monkeypatch):
+    import sys
+    import types
+
+    stopped: list[bool] = []
+
+    class FakeClient:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def start(self):
+            pass
+
+        async def get_auth_status(self):
+            return types.SimpleNamespace(isAuthenticated=False)
+
+        async def stop(self):
+            stopped.append(True)
+
+    monkeypatch.setitem(sys.modules, "copilot", types.SimpleNamespace(CopilotClient=FakeClient))
+
+    with pytest.raises(generator.CopilotUnavailableError, match="gh auth login"):
+        generator.generate_spec("Northwind Market")
+    assert stopped == [True]
+
+
+def test_product_words_may_use_percent():
+    data = make_draft().model_dump()
+    data["departments"][0]["categories"][0]["subcategories"][0]["modifiers"][0] = "2%"
+    assert not _problems(type(make_draft()).model_validate(data))
