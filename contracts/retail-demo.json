@@ -991,7 +991,7 @@
       "reporting_gate_pipeline_ref": "ml-required.DataPipeline",
       "post_reporting_pipeline_refs": [],
       "publication": {
-        "infrastructure_item_count": 37,
+        "infrastructure_item_count": 39,
         "reporting_item_count": 2,
         "infrastructure_folders": [
           "Notebooks",
@@ -1091,7 +1091,7 @@
         "ml-experimental.DataPipeline"
       ],
       "publication": {
-        "infrastructure_item_count": 47,
+        "infrastructure_item_count": 49,
         "reporting_item_count": 2,
         "infrastructure_folders": [
           "Notebooks",
@@ -1661,7 +1661,7 @@
       "name": "Freshness Alerts",
       "owner": "owner.operations",
       "support_status": "optional",
-      "description": "Manual alert evidence is within its freshness bound.",
+      "description": "Scheduled anomaly detection has run within the streaming-data-load schedule; an empty alert table without run evidence is never healthy.",
       "sources": [
         {
           "path": "deploy/scripts/verify_readiness.py",
@@ -1674,6 +1674,28 @@
       "category": "freshness",
       "required_when_selected": false,
       "profile_refs": [
+        "profile.full-demo"
+      ]
+    },
+    {
+      "id": "freshness.operations_signals",
+      "name": "Freshness Operations Signals",
+      "owner": "owner.operations",
+      "support_status": "optional",
+      "description": "Operations Agent availability signals are inside the agent's seven-day evidence window.",
+      "sources": [
+        {
+          "path": "deploy/scripts/verify_readiness.py",
+          "selector": {
+            "kind": "text",
+            "value": "\"freshness.operations_signals\""
+          }
+        }
+      ],
+      "category": "freshness",
+      "required_when_selected": false,
+      "profile_refs": [
+        "profile.standard",
         "profile.full-demo"
       ]
     }

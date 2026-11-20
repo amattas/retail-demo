@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from retail_setup.contracts import load_repository_manifest
 
 from deploy.scripts._ontology_model import load_schemas
 from deploy.scripts.data_consistency import (
@@ -194,12 +195,23 @@ def test_watermark_readiness_requires_observed_reconciliation(database, mode):
         counts["settled_sales"] = 0
     runner = object.__new__(ReadinessRunner)
     runner.context = SimpleNamespace(
-        observed_at=datetime.fromisoformat("2026-09-04T12:00:00+00:00")
+        observed_at=datetime.fromisoformat("2026-09-04T12:00:00+00:00"),
+        manifest=load_repository_manifest(ROOT)[0],
+        repo_root=ROOT,
     )
     runner.adapter = SimpleNamespace(
         watermark_signal=lambda: {
             "source_count": 17,
             "updated_at": "2026-09-04T11:59:00+00:00",
+            "sources": {"receipt_created": "2026-09-04T11:58:00+00:00"},
+        },
+        eventhouse_signal=lambda _tables: {
+            "table_ingestion": {
+                "receipt_created": {
+                    "earliest": "2026-09-01T00:00:00+00:00",
+                    "latest": "2026-09-04T11:58:00+00:00",
+                }
+            }
         },
         data_consistency_signal=lambda: counts,
     )

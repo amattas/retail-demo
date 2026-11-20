@@ -21,8 +21,18 @@
 //   * seasonality: -1 = auto-detect seasonal patterns
 //   * trend: 'avg' = use moving average for trend line
 //
+// PERSISTENCE:
+// - fabric/lakehouse/16-persist-anomaly-alerts.ipynb runs in the
+//   streaming-data-load pipeline. It reads fn_new_anomaly_alerts() and appends
+//   the rows to anomaly_alerts, then logs the run in anomaly_detection_runs.
+// - alert_id is deterministic per metric, series and hourly bin, and
+//   fn_new_anomaly_alerts() excludes alert_ids already persisted, so reruns
+//   never duplicate an alert. Only closed hourly bins are persisted.
+// - Readiness treats anomaly_detection_runs as the detection evidence; an
+//   empty anomaly_alerts table is healthy only when recent runs exist.
+//
 // RETENTION:
-// - Anomaly alerts table: 30 days (compliance/audit)
+// - Anomaly alerts and detection runs: 30 days (compliance/audit)
 // - Allows investigation of historical anomalies
 // ============================================================================
 
@@ -48,11 +58,24 @@
     ingest_timestamp:datetime
 )
 
+// One row per detection run, including runs that find no anomaly.
+.create-merge table anomaly_detection_runs (
+    run_id:string,
+    started_at:datetime,
+    completed_at:datetime,
+    closed_bin_end:datetime,
+    lookback_hours:long,
+    persist_hours:long,
+    appended_alerts:long
+)
+
 // ============================================================================
 // RETENTION & INGESTION POLICIES
 // ============================================================================
 
 .alter-merge table anomaly_alerts policy retention softdelete = 30d
+
+.alter-merge table anomaly_detection_runs policy retention softdelete = 30d
 
 .alter table anomaly_alerts policy streamingingestion enable
 
@@ -300,6 +323,25 @@
 }
 
 // ============================================================================
+// PERSISTENCE FUNCTION
+// ============================================================================
+// New alerts for closed hourly bins in [closed_end - persist_hours, closed_end),
+// excluding alert_ids already in anomaly_alerts. The open hour is skipped
+// because its counts are still partial. Columns match anomaly_alerts in order.
+
+.create-or-alter function with (folder = "ml_anomaly_detection") fn_new_anomaly_alerts(lookback_hours:int = 168, persist_hours:int = 24, closed_end:datetime = datetime(null))
+{
+    let window_end = iif(isnull(closed_end), bin(now(), 1h), closed_end);
+    fn_detect_all_anomalies(lookback_hours)
+    | where time_window >= window_end - persist_hours * 1h and time_window < window_end
+    | join kind=leftanti (anomaly_alerts | project alert_id) on alert_id
+    | extend ingest_timestamp = now()
+    | project alert_id, detection_time, metric_type, entity_type, entity_id,
+              time_window, expected_value, actual_value, anomaly_score, severity,
+              alert_details, ingest_timestamp
+}
+
+// ============================================================================
 // USAGE EXAMPLES
 // ============================================================================
 // These queries demonstrate how to use the anomaly detection functions:
@@ -319,11 +361,8 @@
 // fn_detect_all_anomalies(168)
 // | where entity_id == "1001" or alert_details.store_id == 1001
 //
-// -- Persist anomalies to alerts table (run periodically):
-// fn_detect_all_anomalies(24)
-// | extend ingest_timestamp = now()
-// | project-away detection_time  // Will use ingest_timestamp
-// | extend detection_time = now()
+// -- Preview the alerts the scheduled persistence run would append:
+// fn_new_anomaly_alerts(168, 24)
 //
 // -- Dashboard query: Recent critical anomalies by type:
 // fn_detect_all_anomalies(24)

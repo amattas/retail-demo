@@ -84,7 +84,14 @@ def require_alertable(signals: list[dict[str, Any]]) -> int:
     return count
 
 
-def scenario_sql(*, plan_cohort: bool) -> str:
+def scenario_sql(
+    *,
+    plan_cohort: bool,
+    dialect: str = "tsql",
+    catalog: str = "",
+    silver: str = "ag",
+    gold: str = "au",
+) -> str:
     """Select a watchlist of the riskiest observed store/product positions.
 
     Every position that meets an agent alert rule ranks first, then the
@@ -96,8 +103,26 @@ def scenario_sql(*, plan_cohort: bool) -> str:
     SKU with no recent movement is not dropped as stale. With ``plan_cohort``
     the watchlist stays inside the native Plan's locked cohort so every case
     can be reviewed there.
+
+    ``dialect="tsql"`` targets the Lakehouse SQL endpoint used at deploy time;
+    ``dialect="spark"`` is the same query for the scheduled refresh notebook
+    (``fabric/lakehouse/17-refresh-availability-signals.ipynb``).
     """
 
+    if dialect == "tsql":
+        def table(schema: str, name: str) -> str:
+            return f"[{schema}].[{name}]"
+
+        horizon_end = "DATEADD(day, 7, CAST(source_as_of AS date))"
+        top, limit = f"TOP ({MAX_SIGNALS})\n       ", ""
+    elif dialect == "spark":
+        def table(schema: str, name: str) -> str:
+            return ".".join(part for part in (catalog, schema, name) if part)
+
+        horizon_end = "date_add(CAST(source_as_of AS date), 7)"
+        top, limit = "", f"\nLIMIT {MAX_SIGNALS}"
+    else:
+        raise ValueError(f"Unsupported scenario dialect: {dialect!r}")
     cohort = (
         f"AND risk.store_id BETWEEN {PLAN_STORE_IDS.start} AND {PLAN_STORE_IDS.stop - 1}\n"
         f"  AND risk.product_id BETWEEN {PLAN_PRODUCT_IDS.start} AND {PLAN_PRODUCT_IDS.stop - 1}"
@@ -109,20 +134,19 @@ WITH demand AS (
     SELECT store_id, product_id, SUM(predicted_units) AS forecast_units_7d,
            MIN(source_as_of) AS forecast_as_of, COUNT(DISTINCT forecast_date) AS forecast_days,
            COUNT(*) AS forecast_rows, COUNT(DISTINCT source_as_of) AS forecast_versions
-    FROM [au].[demand_forecast]
+    FROM {table(gold, "demand_forecast")}
     WHERE forecast_date > CAST(source_as_of AS date)
-      AND forecast_date <= DATEADD(day, 7, CAST(source_as_of AS date))
+      AND forecast_date <= {horizon_end}
     GROUP BY store_id, product_id
 )
-SELECT TOP ({MAX_SIGNALS})
-       risk.store_id, risk.product_id, product.ProductName AS product_name,
+SELECT {top}risk.store_id, risk.product_id, product.ProductName AS product_name,
        risk.current_inventory, demand.forecast_units_7d,
        risk.stockout_probability, risk.days_of_inventory,
        risk.forecast_horizon_days AS risk_horizon_days,
        risk.predicted_at AS source_as_of, demand.forecast_as_of, demand.forecast_days,
        demand.forecast_rows, demand.forecast_versions
-FROM [au].[stockout_risk] AS risk
-JOIN [ag].[dim_products] AS product ON product.ID = risk.product_id
+FROM {table(gold, "stockout_risk")} AS risk
+JOIN {table(silver, "dim_products")} AS product ON product.ID = risk.product_id
 JOIN demand ON demand.store_id = risk.store_id AND demand.product_id = risk.product_id
 WHERE demand.forecast_days = 7 AND demand.forecast_rows = 7 AND demand.forecast_versions = 1
   {cohort}
@@ -130,7 +154,7 @@ ORDER BY
     CASE WHEN risk.stockout_probability >= {HIGH_STOCKOUT_PROBABILITY}
            OR risk.days_of_inventory < {LOW_DAYS_OF_INVENTORY} THEN 0 ELSE 1 END,
     risk.stockout_probability DESC, risk.days_of_inventory ASC,
-    risk.store_id, risk.product_id
+    risk.store_id, risk.product_id{limit}
 """
 
 FIELDS = (

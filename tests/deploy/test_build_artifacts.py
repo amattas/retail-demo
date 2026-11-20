@@ -353,8 +353,9 @@ def test_build_workspace_stages_core_assets(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("profile_name", "expected_count"),
     # standard gained 07/10 and their MLflow experiments when
-    # product_recommendations and price_elasticity became required-tier.
-    [("standard", 39), ("full-demo", 49)],
+    # product_recommendations and price_elasticity became required-tier, then
+    # the anomaly-alert and availability-signal producers joined the core group.
+    [("standard", 41), ("full-demo", 51)],
 )
 def test_build_workspace_stages_exact_optional_profile_inventory(
     tmp_path: Path,

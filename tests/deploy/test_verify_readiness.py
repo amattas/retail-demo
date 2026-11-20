@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import functools
 import json
 import os
 import sys
@@ -33,6 +34,7 @@ from deploy.scripts.verify_readiness import (
     correlated_pipeline_run,
     data_agent_binding_errors,
     evaluate_freshness,
+    event_table_retention_days,
     exit_code_for_status,
     expected_live_items,
     load_readiness_context,
@@ -42,6 +44,7 @@ from deploy.scripts.verify_readiness import (
     queryset_binding_errors,
     report_binding_errors,
     semantic_model_binding_errors,
+    silver_retention_lag,
     taskflow_binding_errors,
     validate_terminal_job_evidence,
     verify_environment,
@@ -1080,9 +1083,9 @@ def test_core_profile_runs_fixed_taxonomy_and_skips_unselected_capabilities(
     adapter = _CoreAdapter(now)
     checks = ReadinessRunner(context, adapter).run()
 
-    assert len(checks) == 26
+    assert len(checks) == 27
     assert aggregate_status(checks) == "SUCCEEDED"
-    assert sum(check.status == "SKIPPED" for check in checks) == 22
+    assert sum(check.status == "SKIPPED" for check in checks) == 23
     report = build_report(
         context,
         checks,
@@ -1105,7 +1108,7 @@ def test_core_profile_runs_fixed_taxonomy_and_skips_unselected_capabilities(
         "pipeline_trigger_requested": False,
         "post_ontology_deferred": False,
     }
-    assert report["counts"]["total"] == 26
+    assert report["counts"]["total"] == 27
     assert report["freshness_lineage"][0]["check_id"] == (
         "freshness.setup_run_log"
     )
@@ -1119,7 +1122,7 @@ def test_core_profile_runs_fixed_taxonomy_and_skips_unselected_capabilities(
         adapter=adapter,
     )
     assert persisted["status"] == "SUCCEEDED"
-    assert json.loads(path.read_text(encoding="utf-8"))["counts"]["total"] == 26
+    assert json.loads(path.read_text(encoding="utf-8"))["counts"]["total"] == 27
 
     context.deploy_journal = {
         "environment": "dev",
@@ -1937,3 +1940,180 @@ def test_full_demo_initial_inventory_defers_ontology_dependent_items() -> None:
     assert "Ontology" not in initial_types
     assert "DataAgent" not in initial_types
     assert len(complete) - len(initial) == 3
+
+
+NOW = datetime(2026, 9, 7, 12, tzinfo=UTC)
+
+
+@functools.cache
+def _repository_manifest():
+    return load_repository_manifest(REPO_ROOT)[0]
+
+
+def _freshness_runner(adapter, *, schedules=(), operations_enabled=True):
+    runner = object.__new__(ReadinessRunner)
+    runner.checks = []
+    runner.context = SimpleNamespace(
+        observed_at=NOW,
+        repo_root=REPO_ROOT,
+        manifest=_repository_manifest(),
+        config=SimpleNamespace(
+            schedules=SimpleNamespace(enabled_pipelines=lambda: tuple(schedules)),
+            operations_planning=OperationsPlanningConfig(enabled=operations_enabled),
+        ),
+    )
+    runner.adapter = adapter
+    return runner
+
+
+def _status(runner, function):
+    runner._check("probe", "freshness", selected=True, required=False, function=function)
+    return runner.checks[-1]
+
+
+def test_retention_is_parsed_from_the_eventhouse_ddl():
+    retention = event_table_retention_days(REPO_ROOT)
+    assert retention["customer_entered"] == 7
+    assert retention["receipt_created"] == 30
+    assert min(retention[name] for name in retention if name != "unknown_event") == 7
+
+
+def test_silver_lag_measures_only_unprocessed_backlog_against_retention():
+    retention = {"receipt_created": 30, "customer_entered": 7}
+    ingestion = {
+        "receipt_created": {"earliest": "2026-08-01T00:00:00Z", "latest": "2026-09-07T11:50:00Z"},
+        "customer_entered": {"earliest": "2026-09-01T00:00:00Z", "latest": "2026-09-07T11:50:00Z"},
+    }
+    caught_up = {"receipt_created": "2026-09-07T11:50:00Z", "customer_entered": "2026-09-07T11:49:00Z"}
+    assert silver_retention_lag(caught_up, ingestion, retention, observed_at=NOW) is None
+    behind = {**caught_up, "customer_entered": "2026-09-03T12:00:00Z"}
+    lag = silver_retention_lag(behind, ingestion, retention, observed_at=NOW)
+    assert lag == {
+        "table": "customer_entered",
+        "lag_seconds": 4 * 86400,
+        "retention_days": 7,
+        "retention_fraction": round(4 / 7, 3),
+    }
+    # A table Silver has never processed is measured from its oldest row.
+    never = {"receipt_created": caught_up["receipt_created"]}
+    assert silver_retention_lag(never, ingestion, retention, observed_at=NOW)["lag_seconds"] == (
+        6 * 86400 + 12 * 3600
+    )
+
+
+def _watermark_adapter(watermark):
+    return SimpleNamespace(
+        watermark_signal=lambda: {
+            "source_count": 1,
+            "updated_at": (NOW - timedelta(minutes=5)).isoformat(),
+            "sources": {"customer_entered": watermark},
+        },
+        eventhouse_signal=lambda _tables: {
+            "table_ingestion": {
+                "customer_entered": {
+                    "earliest": "2026-08-25T00:00:00Z",
+                    "latest": (NOW - timedelta(minutes=1)).isoformat(),
+                }
+            }
+        },
+        data_consistency_signal=lambda: {
+            "missing_receipts": 0, "missing_inventory": 0, "null_balances": 0,
+            "orphan_receipts": 0, "gold_sales_mismatches": 0,
+            "settled_receipts": 3, "settled_inventory": 2, "settled_sales": 3,
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    ("days_behind", "status", "text"),
+    [(1, "PASS", "reconcile"), (4, "UNKNOWN", "7-day retention"), (8, "FAIL", "purged")],
+)
+def test_watermark_check_warns_before_retention_purges_unprocessed_events(
+    days_behind, status, text
+):
+    watermark = (NOW - timedelta(days=days_behind)).isoformat()
+    runner = _freshness_runner(_watermark_adapter(watermark))
+    result = _status(runner, runner._watermark_freshness)
+    assert result.status == status
+    assert text in result.summary
+
+
+def _alert_adapter(**signal):
+    return SimpleNamespace(alert_signal=lambda: signal)
+
+
+def test_empty_alert_table_without_detection_runs_is_unknown_not_pass():
+    runner = _freshness_runner(_alert_adapter(run_count=0, latest_run=None, alert_count=0))
+    result = _status(runner, runner._alert_freshness)
+    assert result.status == "UNKNOWN"
+    assert "no detection run" in result.summary
+
+
+@pytest.mark.parametrize(
+    ("age_minutes", "schedules", "status"),
+    [
+        (20, (), "PASS"),
+        (200, ("streaming-data-load",), "FAIL"),
+        (200, (), "UNKNOWN"),
+    ],
+)
+def test_alert_freshness_follows_the_detection_schedule(age_minutes, schedules, status):
+    latest = (NOW - timedelta(minutes=age_minutes)).isoformat()
+    runner = _freshness_runner(
+        _alert_adapter(run_count=4, latest_run=latest, alert_count=0, severity_count=0),
+        schedules=schedules,
+    )
+    result = _status(runner, runner._alert_freshness)
+    assert result.status == status
+    if status == "PASS":
+        assert result.evidence["run_count"] == 4
+        assert result.freshness["max_age_seconds"] == 3 * 30 * 60
+
+
+def test_alert_signal_reads_detection_run_evidence():
+    adapter = object.__new__(FabricReadinessAdapter)
+    queries = []
+    adapter._execute_kql = lambda query, **_kwargs: queries.append(query) or [
+        {"run_count": 2, "latest_run": NOW, "alert_count": 0}
+    ]
+    signal = adapter.alert_signal()
+    assert "anomaly_detection_runs" in queries[0]
+    assert signal["latest_run"] == NOW.isoformat()
+
+
+@pytest.mark.parametrize(
+    ("enabled", "signal", "status", "text"),
+    [
+        (False, None, "PASS", "not enabled"),
+        (True, {"case_count": 0}, "UNKNOWN", "no seeded case"),
+        (
+            True,
+            {
+                "case_count": 20, "alertable_count": 3,
+                "latest_source_as_of": (NOW - timedelta(days=9)).isoformat(),
+                "latest_forecast_as_of": (NOW - timedelta(days=1)).isoformat(),
+            },
+            "UNKNOWN",
+            "stale",
+        ),
+        (
+            True,
+            {
+                "case_count": 20, "alertable_count": 3,
+                "latest_source_as_of": (NOW - timedelta(days=2)).isoformat(),
+                "latest_forecast_as_of": (NOW - timedelta(days=1)).isoformat(),
+            },
+            "PASS",
+            "seven-day window",
+        ),
+    ],
+)
+def test_operations_signals_are_never_pass_when_outside_the_agent_window(
+    enabled, signal, status, text
+):
+    runner = _freshness_runner(
+        SimpleNamespace(operations_signal=lambda: signal), operations_enabled=enabled
+    )
+    result = _status(runner, runner._operations_signal_freshness)
+    assert result.status == status
+    assert text in result.summary

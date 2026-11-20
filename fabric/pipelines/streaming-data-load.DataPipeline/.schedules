@@ -6,9 +6,9 @@
       "jobType": "Execute",
       "configuration": {
         "type": "Cron",
-        "startDateTime": "2026-01-14T16:54:00",
-        "endDateTime": "2099-01-14T16:54:00",
-        "localTimeZoneId": "SA Pacific Standard Time",
+        "startDateTime": "2026-01-14T00:00:00",
+        "endDateTime": "2099-01-14T00:00:00",
+        "localTimeZoneId": "UTC",
         "interval": 30
       }
     }

@@ -1,5 +1,6 @@
 {
   "properties": {
+    "concurrency": 1,
     "activities": [
       {
         "name": "05-maintain-delta-tables",
@@ -14,6 +15,81 @@
         },
         "typeProperties": {
           "notebookId": "16aa0e09-f7c3-436b-8bb2-4250fabc65d0",
+          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+        }
+      },
+      {
+        "name": "06-ml-demand-forecast",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "05-maintain-delta-tables",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "ab4e4a25-6c9d-5c0d-bda1-793aaf424fcb",
+          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+        }
+      },
+      {
+        "name": "12-ml-stockout-prediction",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "05-maintain-delta-tables",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "f80a33a2-9699-54ef-837b-1de5c06847ab",
+          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+        }
+      },
+      {
+        "name": "17-refresh-availability-signals",
+        "type": "TridentNotebook",
+        "dependsOn": [
+          {
+            "activity": "06-ml-demand-forecast",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          },
+          {
+            "activity": "12-ml-stockout-prediction",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "2b91286a-a50e-586d-af1f-30ef3ce68235",
           "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
         }
       }
