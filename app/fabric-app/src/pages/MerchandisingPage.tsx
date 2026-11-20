@@ -1,15 +1,19 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { Icon } from '@/components/Icon';
+import { ProposalForm } from '@/components/ProposalForm';
 import { TrendChart } from '@/components/TrendChart';
 import { EmptyState, MetricCard, Notice, PageHeading, SourceNote } from '@/components/WorkspaceUI';
 import {
   CATEGORIES, DEFAULT_FILTERS, PERIODS, STORES, SUPPLIERS,
-  changeLabel, exportMerchandisingCsv, groupTrend, merchandisingView, money, number, shortDate, trendValue,
+  changeLabel, exportMerchandisingCsv, groupTrend, merchandisingView, money, number, shortDate, stockByStore, trendValue,
   type Granularity, type MerchFilters, type MerchRow, type TrendMetric,
 } from '@/data/merchandising';
+import { APPS, includesApp } from '@/config/apps';
 import { useAuth } from '@/hooks/AuthContext';
 import { useCollection } from '@/hooks/useCollection';
+import { draftProposal, submitProposal, type ProposalInput } from '@/services/approvals';
 import { deleteView, listSavedViews, saveView, type MerchandisingView } from '@/services/workspaces';
 
 type SortKey = 'name' | 'salesCents' | 'profitCents' | 'inStockRate' | 'onHand' | 'daysCover';
@@ -22,6 +26,17 @@ const GROUPINGS: { id: Granularity; label: string }[] = [
 const STATUS = {
   healthy: { label: 'Healthy', tone: 'good' }, low: { label: 'Low cover', tone: 'warning' }, out: { label: 'Out of stock', tone: 'bad' },
 } as const;
+
+/** The pre-filled proposal for ``productId`` at ``storeId`` from the period's sample evidence. */
+function proposalFor(productId: number, storeId: number, days: number): ProposalInput {
+  const stock = stockByStore(productId, days);
+  const { store, row } = stock.find((item) => item.store.id === storeId) ?? stock[0];
+  return draftProposal({
+    store_id: store.id, store_name: store.name, product_id: row.id, product_name: row.name, sku: row.sku,
+    units_sold: row.units, period_days: days, on_hand: row.onHand, days_cover: row.daysCover,
+    in_stock_rate: row.inStockRate,
+  });
+}
 
 function downloadCsv(content: string, filename: string) {
   const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
@@ -39,7 +54,14 @@ export function MerchandisingPage() {
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: 'salesCents', desc: true });
   const [attentionOnly, setAttentionOnly] = useState(false);
   const [viewName, setViewName] = useState('');
-  const [message, setMessage] = useState<{ text: string; danger?: boolean } | null>(null);
+  const [message, setMessage] = useState<{ text: string; danger?: boolean; proposed?: boolean } | null>(null);
+  const [proposing, setProposing] = useState<{ productId: number; initial: ProposalInput } | null>(null);
+  const canPropose = includesApp('approvals');
+
+  useEffect(() => {
+    // The form opens above the item table; bring it into view from a long table.
+    if (proposing) document.getElementById('propose-replenishment')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }, [proposing]);
 
   const loader = useCallback(() => listSavedViews(actor), [actor]);
   const saved = useCollection<MerchandisingView>(loader);
@@ -94,6 +116,25 @@ export function MerchandisingPage() {
     setMessage({ text: `Applied “${view.name}”.` });
   };
 
+  const startProposal = (row: MerchRow) => {
+    // A filtered store is used as-is; across all stores, start with the least cover.
+    const storeId = filters.store === 'all' ? stockByStore(row.id, filters.days)[0].store.id : Number(filters.store);
+    setMessage(null);
+    setProposing({ productId: row.id, initial: proposalFor(row.id, storeId, filters.days) });
+  };
+
+  const onPropose = async (input: ProposalInput) => {
+    try {
+      await submitProposal(input, actor);
+      setProposing(null);
+      setMessage({ text: 'Replenishment proposal submitted. Another reviewer must decide it.', proposed: true });
+      return true;
+    } catch (error) {
+      setMessage({ text: error instanceof Error ? error.message : String(error), danger: true });
+      return false;
+    }
+  };
+
   const removeView = async (id: string) => {
     try {
       await deleteView(id, actor);
@@ -114,7 +155,8 @@ export function MerchandisingPage() {
       </button>}
     />
 
-    {message && <Notice danger={message.danger}>{message.text}</Notice>}
+    {message && <Notice danger={message.danger}>{message.text}
+      {message.proposed && <> <Link to={APPS.approvals.route}>Open {APPS.approvals.label.toLowerCase()}</Link></>}</Notice>}
 
     <section className="card" aria-label="Filters">
       <div className="filter-bar">
@@ -207,6 +249,12 @@ export function MerchandisingPage() {
       </aside>
     </div>
 
+    {proposing && <div id="propose-replenishment"><ProposalForm key={`${proposing.productId}-${filters.days}`} initial={proposing.initial} lockProduct
+      title="Propose replenishment"
+      description={`Pre-filled from the last ${filters.days} days of sample evidence; change the store to redraft.`}
+      redraft={(storeId) => proposalFor(proposing.productId, storeId, filters.days)}
+      onSubmit={onPropose} onCancel={() => setProposing(null)} /></div>}
+
     <section className="card flush">
       <div className="section-title" style={{ padding: '16px 18px 0' }}>
         <div><h2>Item details</h2><p>{rows.length} of {data.rows.length} items · days of cover uses average daily sales for the period</p></div>
@@ -225,6 +273,7 @@ export function MerchandisingPage() {
           <th className="num" aria-sort={ariaSort('onHand')}><button type="button" onClick={() => sortBy('onHand')}>On hand {sortIndicator('onHand')}</button></th>
           <th className="num" aria-sort={ariaSort('daysCover')}><button type="button" onClick={() => sortBy('daysCover')}>Days cover {sortIndicator('daysCover')}</button></th>
           <th>Status</th>
+          {canPropose && <th><span className="sr-only">Actions</span></th>}
         </tr></thead>
         <tbody>{rows.map((row) => {
           const tone = row.inStockRate >= 95 ? '' : row.inStockRate >= 90 ? 'warning' : 'bad';
@@ -237,6 +286,9 @@ export function MerchandisingPage() {
             <td className="num">{number(row.onHand)}</td>
             <td className="num">{row.daysCover === null ? '—' : row.daysCover.toFixed(1)}</td>
             <td><span className={`pill ${STATUS[row.status].tone}`}>{STATUS[row.status].label}</span></td>
+            {canPropose && <td><button type="button" className={`btn btn-sm ${row.status === 'healthy' ? '' : 'btn-primary'}`}
+              aria-label={`Propose replenishment for ${row.name}`} onClick={() => startProposal(row)}>
+              <Icon name="plus" width="14" height="14" />Propose</button></td>}
           </tr>;
         })}</tbody>
         <tfoot><tr>
@@ -245,7 +297,7 @@ export function MerchandisingPage() {
           <td className="num">{money(rows.reduce((sum, row) => sum + row.profitCents, 0))}</td>
           <td className="num">{rows.length ? `${(rows.reduce((sum, row) => sum + row.inStockRate, 0) / rows.length).toFixed(1)}%` : '—'}</td>
           <td className="num">{number(rows.reduce((sum, row) => sum + row.onHand, 0))}</td>
-          <td colSpan={2} />
+          <td colSpan={canPropose ? 3 : 2} />
         </tr></tfoot>
       </table></div> : <EmptyState title="No items match" icon="search">Clear the search or change the filters.</EmptyState>}
       <div className="table-footer"><SourceNote /></div>

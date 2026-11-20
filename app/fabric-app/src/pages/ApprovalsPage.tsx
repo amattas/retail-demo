@@ -1,13 +1,14 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import { Icon } from '@/components/Icon';
+import { ProposalForm } from '@/components/ProposalForm';
 import { EmptyState, MetricCard, Notice, PageHeading } from '@/components/WorkspaceUI';
 import { PRODUCTS, STORES, number } from '@/data/merchandising';
 import { useAuth } from '@/hooks/AuthContext';
 import { useCollection } from '@/hooks/useCollection';
 import {
-  decide, listProposals, MAX_QUANTITY, submitProposal,
-  type Decision, type ProposalView,
+  decide, listProposals, submitProposal,
+  type Decision, type ProposalInput, type ProposalView,
 } from '@/services/approvals';
 
 type Tab = 'pending' | 'decided' | 'all';
@@ -25,13 +26,12 @@ function ago(date: Date): string {
   return hours < 48 ? `${hours} h ago` : date.toLocaleDateString();
 }
 
-const EMPTY = { store_id: STORES[0].id, product_id: PRODUCTS[0].id, quantity: '', rationale: '' };
+const EMPTY: ProposalInput = { store_id: STORES[0].id, product_id: PRODUCTS[0].id, quantity: 0, rationale: '' };
 
 export function ApprovalsPage() {
   const { user } = useAuth();
   const proposals = useCollection<ProposalView>(listProposals);
   const [tab, setTab] = useState<Tab>('pending');
-  const [form, setForm] = useState(EMPTY);
   const [showForm, setShowForm] = useState(false);
   const [message, setMessage] = useState<{ text: string; danger?: boolean } | null>(null);
   const reviewer = useMemo(() => ({ id: user?.id ?? '', email: user?.email }), [user?.id, user?.email]);
@@ -59,13 +59,10 @@ export function ApprovalsPage() {
     }
   }, [proposals]);
 
-  const onSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const ok = await run(() => submitProposal({
-      store_id: Number(form.store_id), product_id: Number(form.product_id),
-      quantity: Number(form.quantity), rationale: form.rationale,
-    }, reviewer), 'Proposal submitted. Another reviewer must decide it.');
-    if (ok) { setForm(EMPTY); setShowForm(false); setTab('pending'); }
+  const onSubmit = async (input: ProposalInput) => {
+    const ok = await run(() => submitProposal(input, reviewer), 'Proposal submitted. Another reviewer must decide it.');
+    if (ok) { setShowForm(false); setTab('pending'); }
+    return ok;
   };
 
   const onDecide = (id: string, decision: Decision, comment: string) =>
@@ -86,27 +83,8 @@ export function ApprovalsPage() {
       <MetricCard label="Rejected" icon="close" value={number(counts.rejected)} detail="Always with a reason" />
     </div>
 
-    {showForm && <form className="card stack" onSubmit={onSubmit} aria-label="New proposal">
-      <div className="section-title"><div><h2>New proposal</h2><p>Draft only. Up to {number(MAX_QUANTITY)} units.</p></div></div>
-      <div className="form-grid">
-        <label className="field">Store
-          <select className="select" value={form.store_id} onChange={(e) => setForm({ ...form, store_id: Number(e.target.value) })}>
-            {STORES.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select></label>
-        <label className="field">Product
-          <select className="select" value={form.product_id} onChange={(e) => setForm({ ...form, product_id: Number(e.target.value) })}>
-            {PRODUCTS.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.sku})</option>)}
-          </select></label>
-        <label className="field">Quantity
-          <input className="input" type="number" min={1} max={MAX_QUANTITY} required value={form.quantity}
-            onChange={(e) => setForm({ ...form, quantity: e.target.value })} /></label>
-        <div />
-        <label className="field span-2">Rationale
-          <textarea className="textarea" required maxLength={1000} value={form.rationale}
-            placeholder="What evidence supports this quantity?" onChange={(e) => setForm({ ...form, rationale: e.target.value })} /></label>
-      </div>
-      <div><button type="submit" className="btn btn-primary"><Icon name="arrow" width="15" height="15" />Submit for review</button></div>
-    </form>}
+    {showForm && <ProposalForm initial={EMPTY} title="New proposal"
+      description="Planners can also propose from an item in Merchandising." onSubmit={onSubmit} />}
 
     <section className="stack" aria-label="Proposals">
       <div className="section-title">

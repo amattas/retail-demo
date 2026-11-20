@@ -152,9 +152,10 @@ There are fourteen contracted ML outputs: six required, five optional, and
 three experimental. Reporting publishes only after all required outputs pass
 validation; optional and experimental pipelines run afterward in `full-demo`.
 
-The three Fabric Apps are independent items. Merchandising and promotions
-use sample data, not live Lakehouse tables; none of the apps changes prices,
-places orders, or executes transfers. Native Planning is also opt-in:
+The two Fabric Apps, Merchandising & Replenishment and Promotion Studio, are
+independent items. They use sample data, not live Lakehouse tables;
+replenishment proposals raised from an item need another reviewer's decision,
+and neither app changes prices, places orders, or executes transfers. Native Planning is also opt-in:
 creating or opening a Plan can start a non-cancellable 30-day billing session.
 
 ### Local tools and prototypes

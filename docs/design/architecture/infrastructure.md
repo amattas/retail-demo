@@ -69,7 +69,7 @@ separately with the operator identity.
 | `Eventhouses` | Eventhouses and their managed KQL databases |
 | `KQL Querysets` | Bundled KQL queryset |
 | `Ontologies` | Ontology and any service-managed children |
-| `Fabric Apps` | Approvals app and any service-managed backing items |
+| `Fabric Apps` | Merchandising & Replenishment (`retail-approvals`), Promotion Studio (`retail-promotions`), and any service-managed backing items |
 
 The [deployment folder policy](../specifications/modules/deployment/framework.md#workspace-folder-mapping)
 also covers independently movable graph models, SQL databases, Operations

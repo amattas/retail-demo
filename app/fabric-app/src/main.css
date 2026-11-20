@@ -246,6 +246,7 @@
 .empty-icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: var(--cp-surface-2); --cp-icon: var(--cp-faint); }
 .source-note { display: flex; gap: 8px; align-items: center; margin: 0; font-size: 12px; color: var(--cp-faint); --cp-icon: var(--cp-faint); }
 .muted { color: var(--cp-muted); }
+.notice a { font-weight: 600; color: var(--cp-accent); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .loading { display: grid; place-items: center; min-height: 100vh; color: var(--cp-muted); }
 
