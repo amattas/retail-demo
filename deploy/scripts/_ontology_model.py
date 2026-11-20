@@ -112,15 +112,23 @@ ENTITIES: tuple[Entity, ...] = (
     Entity("Product", "dim_products", "silver", "ID"),
     Entity("Receipt", "fact_receipts", "silver", "receipt_id_ext"),
     Entity("OnlineOrder", "fact_online_order_headers", "silver", "order_id_ext"),
-    Entity("Promotion", "fact_promotions", "silver", "receipt_id_ext"),
+    # fact_promotions has one row per (receipt_id_ext, promo_code); trace_id is
+    # that pair's unique id in history and each live event's unique id.
+    Entity("Promotion", "fact_promotions", "silver", "trace_id"),
     Entity("Payment", "fact_payments", "silver", "transaction_id"),
     Entity("CustomerSegment", "customer_segments", "gold", "customer_id"),
     Entity("ChurnPrediction", "churn_predictions", "gold", "customer_id"),
-    Entity("StockoutRisk", "stockout_risk", "gold", "ranking"),
+    # ranking is a global row number that changes every run; risk_id is the
+    # stable store:product:horizon identity of the scored position.
+    Entity("StockoutRisk", "stockout_risk", "gold", "risk_id"),
 )
 
 # Inactive flags mirror retail_model relationships.tmdl so the TOM graph has
-# no ambiguous active paths.
+# no ambiguous active paths. Both columns of every relationship must have the
+# same type (``validate_relationship_types``): Truck has no DC relationship
+# because dim_trucks.DCID is a nullable double (pool trucks have no DC) while
+# dim_distribution_centers.ID is int64, and retail_model has no such
+# relationship either.
 RELATIONSHIPS: tuple[Relationship, ...] = (
     Relationship("StoreLocatedInGeography", "Store", "Geography",
                  "dim_stores", "GeographyID", "dim_geographies", "ID"),
@@ -128,8 +136,6 @@ RELATIONSHIPS: tuple[Relationship, ...] = (
                  "dim_distribution_centers", "GeographyID", "dim_geographies", "ID"),
     Relationship("CustomerLocatedInGeography", "Customer", "Geography",
                  "dim_customers", "GeographyID", "dim_geographies", "ID", active=False),
-    Relationship("TruckAssignedToDistributionCenter", "Truck", "DistributionCenter",
-                 "dim_trucks", "DCID", "dim_distribution_centers", "ID"),
     Relationship("ReceiptPlacedByCustomer", "Receipt", "Customer",
                  "fact_receipts", "customer_id", "dim_customers", "ID"),
     Relationship("ReceiptAtStore", "Receipt", "Store",
@@ -314,6 +320,24 @@ def _require(columns: Iterable[tuple[str, str]], column: str, label: str) -> Non
         raise OntologyModelError(f"{label}: column {column!r} is not in the source schema.")
 
 
+def _require_same_type(
+    tables: Mapping[str, _Table],
+    label: str,
+    from_table: str,
+    from_column: str,
+    to_table: str,
+    to_column: str,
+) -> None:
+    """Reject a relationship whose join columns have different types."""
+    from_type = dict(tables[from_table].columns)[from_column]
+    to_type = dict(tables[to_table].columns)[to_column]
+    if from_type != to_type:
+        raise OntologyModelError(
+            f"{label}: {from_table}.{from_column} is {from_type} but "
+            f"{to_table}.{to_column} is {to_type}; relationship keys must share a type."
+        )
+
+
 def _tom_name(from_table: str, from_column: str, to_table: str) -> str:
     return f"rel_{from_table}_{snake_case(from_column)}_{to_table}"
 
@@ -431,6 +455,8 @@ def build_definition(
     for rel in RELATIONSHIPS:
         _require(tables[rel.from_table].columns, rel.from_column, rel.name)
         _require(tables[rel.to_table].columns, rel.to_column, rel.name)
+        _require_same_type(tables, rel.name, rel.from_table, rel.from_column,
+                           rel.to_table, rel.to_column)
         tom.append((
             _tom_name(rel.from_table, rel.from_column, rel.to_table),
             f"{rel.from_table}.{rel.from_column}",
@@ -447,6 +473,8 @@ def build_definition(
             (junction.target_column, junction.target),
         ):
             to_table, to_column = key_column(entity_name)
+            _require_same_type(tables, junction.name, junction.table, column,
+                               to_table, to_column)
             name = _tom_name(junction.table, column, to_table)
             tom.append((name, f"{junction.table}.{column}", f"{to_table}.{to_column}", True))
             names.append(name)
@@ -460,6 +488,8 @@ def build_definition(
         _require(table.columns, binding.key, binding.table)
         _require(table.columns, _TIMESTAMP_COLUMN, binding.table)
         to_table, to_column = key_column(binding.entity)
+        _require_same_type(tables, f"{binding.entity}<-{binding.table}", binding.table,
+                           binding.key, to_table, to_column)
         rel_name = _tom_name(binding.table, binding.key, to_table)
         active = binding.table not in active_event_tables
         active_event_tables.add(binding.table)

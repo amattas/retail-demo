@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ast
+import json
 import re
 from dataclasses import replace
 from pathlib import Path
@@ -9,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from deploy.scripts import _ontology_model as model
+from deploy.scripts import deploy_ontology
 from deploy.scripts._ontology_rules import RULES
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -88,7 +91,7 @@ def test_entities_keys_and_bindings_resolve_to_declared_columns(parts):
 
 def test_stockout_risk_is_generator_discoverable_entity(parts):
     entity = parts["entities/StockoutRisk.tmdl"]
-    assert "\tkeyProperty: ranking\n" in entity
+    assert "\tkeyProperty: risk_id\n" in entity
     for property_name in (
         "store_id",
         "product_id",
@@ -115,17 +118,107 @@ def test_time_series_properties_are_ordered_by_ingest_timestamp(parts):
 def test_relationships_reference_existing_tom_relationships(parts):
     model.validate_definition(parts)
     names = re.findall(r"^entityRelationship (\S+)$", parts["entityRelationships.tmdl"], re.M)
-    assert len(names) == len(model.RELATIONSHIPS) + len(model.JUNCTIONS) == 18
+    assert len(names) == len(model.RELATIONSHIPS) + len(model.JUNCTIONS) == 17
 
 
-def test_relationship_names_match_the_legacy_notebook():
-    notebook = (ROOT / "fabric" / "lakehouse" / "30-create-ontology.ipynb").read_text(
+def _notebook_model() -> dict:
+    notebook = json.loads(
+        (ROOT / "fabric" / "lakehouse" / "30-create-ontology.ipynb").read_text(encoding="utf-8")
+    )
+    source = next(
+        "".join(cell["source"])
+        for cell in notebook["cells"]
+        if "ENTITY_CONFIG = {" in "".join(cell["source"])
+    )
+    tree = ast.parse(source)
+    values: dict = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name):
+            try:
+                values[node.targets[0].id] = ast.literal_eval(node.value)
+            except ValueError:
+                continue
+    return values
+
+
+def _resolve(columns: list[str], candidates: list[str]) -> str:
+    lookup = {column.lower(): column for column in columns}
+    return next(lookup[c.lower()] for c in candidates if c.lower() in lookup)
+
+
+def test_notebook_30_defines_the_same_ontology_as_the_deploy_builder():
+    schemas = model.load_schemas(ROOT)
+    columns = {
+        name: [column for column, _ in fields]
+        for name, fields in {**schemas.silver, **schemas.gold}.items()
+    }
+    notebook = _notebook_model()
+    entities = {
+        cfg["entity_name"]: (table, _resolve(columns[table], cfg["key_candidates"]))
+        for table, cfg in notebook["ENTITY_CONFIG"].items()
+    }
+    assert entities == {entity.name: (entity.table, entity.key) for entity in model.ENTITIES}
+
+    keys = {entity.name: entity.key for entity in model.ENTITIES}
+    expected = {
+        rel.name: (rel.source, rel.target, rel.from_table, keys[rel.source], rel.from_column)
+        for rel in model.RELATIONSHIPS
+    } | {
+        junction.name: (
+            junction.source, junction.target, junction.table,
+            junction.source_column, junction.target_column,
+        )
+        for junction in model.JUNCTIONS
+    }
+    actual = {
+        rel["name"]: (
+            rel["source_entity"], rel["target_entity"], rel["source_table"],
+            _resolve(columns[rel["source_table"]], rel["source_column_candidates"]),
+            _resolve(columns[rel["source_table"]], rel["target_column_candidates"]),
+        )
+        for rel in notebook["RELATIONSHIPS"]
+    }
+    assert actual == expected
+    # Historical-only until the deploy builder publishes event backing tables.
+    assert notebook["ENABLE_EVENTHOUSE_BINDINGS"] is deploy_ontology._ENABLE_EVENT_BACKING_TABLES
+
+
+def test_relationship_keys_must_share_a_type():
+    broken = model.Relationship(
+        "TruckAssignedToDistributionCenter", "Truck", "DistributionCenter",
+        "dim_trucks", "DCID", "dim_distribution_centers", "ID",
+    )
+    with pytest.raises(model.OntologyModelError, match="DCID is double but .*ID is int64"):
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(model, "RELATIONSHIPS", (*model.RELATIONSHIPS, broken))
+            _build()
+
+
+def test_promotion_and_stockout_keys_identify_one_row_of_their_grain():
+    schemas = model.load_schemas(ROOT)
+    promotions = dict(schemas.silver["fact_promotions"])
+    assert promotions["trace_id"] == "string"
+    source = (ROOT / "utility" / "src" / "retail_setup" / "generation" / "promotions.py").read_text(
         encoding="utf-8"
     )
-    block = notebook[notebook.index("RELATIONSHIPS = ["):notebook.index("EVENTHOUSE_ENTITY_BINDINGS")]
-    legacy = set(re.findall(r"'name': '(\w+)'", block))
-    current = {rel.name for rel in model.RELATIONSHIPS} | {j.name for j in model.JUNCTIONS}
-    assert current == legacy
+    # trace_id is built from exactly the (receipt_id_ext, promo_code) grain.
+    assert 'lines.groupBy("receipt_id_ext", "promo_code")' in source
+    assert (
+        'F.concat(F.lit("TRC-PRM-"), F.col("receipt_id_ext"), F.lit("-"), F.col("promo_code"))'
+        in source
+    )
+    manifest = json.loads((ROOT / "contracts" / "retail-demo.json").read_text(encoding="utf-8"))
+    stockout = next(
+        contract["output"]
+        for contract in manifest["ml_contracts"]
+        if contract["output"]["table"] == "stockout_risk"
+    )
+    assert stockout["grain"] == ["store_id", "product_id", "forecast_horizon_days"]
+    notebook = (ROOT / "fabric" / "lakehouse" / "12-ml-stockout-prediction.ipynb").read_text(
+        encoding="utf-8"
+    )
+    assert 'for name in (\\"store_id\\", \\"product_id\\", \\"forecast_horizon_days\\")' in notebook
+    assert '.alias(\\"risk_id\\")' in notebook
 
 
 def test_inactive_flags_mirror_the_semantic_model():
