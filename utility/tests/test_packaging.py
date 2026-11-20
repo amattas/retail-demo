@@ -100,6 +100,7 @@ values = {
     "STORE_COUNT": "3",
     "SEED": "7",
     "DICTIONARY_REF": "deadbeef",
+    "CUSTOM_DICTIONARIES": "{}",
 }
 output = Path.cwd() / "rendered"
 written = render_notebooks(

@@ -18,6 +18,7 @@ LOCK_FILES = (
     REPO_ROOT / "requirements-test.txt",
     REPO_ROOT / "utility" / "requirements-ci.txt",
     REPO_ROOT / "utility" / "requirements-deploy.txt",
+    REPO_ROOT / "utility" / "requirements-customize.txt",
 )
 NOTEBOOK_TEMPLATES = (
     REPO_ROOT / "utility" / "notebooks" / "templates" / "driver-02-dimensions.py",
@@ -221,3 +222,18 @@ def test_miniforge_bootstraps_are_pinned_and_verified() -> None:
     assert shell.index('verify_sha256 "$installer"') < shell.index('bash "$installer"')
     assert "$MiniforgeVersion = '26.3.2-3'" in powershell
     assert "--version $MiniforgeVersion --source winget" in powershell
+
+
+def _lock_pins(path: Path) -> dict[str, str]:
+    return dict(
+        re.findall(r"^([a-z0-9_.-]+)==([^ \\;]+)", path.read_text(encoding="utf-8"), re.M)
+    )
+
+
+def test_copilot_sdk_is_opt_in_and_keeps_deploy_pins() -> None:
+    deploy = _lock_pins(REPO_ROOT / "utility" / "requirements-deploy.txt")
+    customize = _lock_pins(REPO_ROOT / "utility" / "requirements-customize.txt")
+
+    assert "github-copilot-sdk" not in deploy
+    assert "github-copilot-sdk" in customize
+    assert {name: customize.get(name) for name in deploy} == deploy

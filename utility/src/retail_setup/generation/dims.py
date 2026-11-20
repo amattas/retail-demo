@@ -314,14 +314,18 @@ def generate_dimensions(
         )
         k = min(cfg.brands_per_product, len(pool))
         brand_idx = rng.choice(len(pool), size=k, replace=False)
-        taxability = (
+        taxability = p.Taxability or (
             "NON_TAXABLE"
             if p.Department in {"Fresh", "Grocery"} and "Candy" not in p.Category
             else "REDUCED_RATE"
             if p.Department in {"Clothing", "Apparel"}
             else "TAXABLE"
         )
-        refrigerated = bool(p.Category in REFRIGERATED_CATEGORIES)
+        refrigerated = (
+            p.Refrigerated
+            if p.Refrigerated is not None
+            else bool(p.Category in REFRIGERATED_CATEGORIES)
+        )
         tags = p.Tags or tags_by_product.get(p.ProductName)
         for j in brand_idx:
             pid += 1

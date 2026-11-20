@@ -237,7 +237,7 @@ def test_configure_prompts_show_defaults_and_store_types(tmp_path):
         input="\n" * 13,
     )
     assert result.exit_code == 0, result.output
-    assert "Store type (available: grocery, hardware, luxury, supercenter)" in result.output
+    assert "Store type (available: grocery, hardware, luxury, supercenter, custom)" in result.output
     assert "[supercenter]" in result.output
     assert "Months of data to generate (history ends yesterday) [3]" in result.output
     assert "Store count [50]" in result.output

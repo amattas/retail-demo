@@ -9,7 +9,12 @@ describe('app variants', () => {
     expect(appVariant(undefined)).toBe('suite');
     expect(includedApps('merchandising').map((app) => app.id)).toEqual(['merchandising']);
     expect(includedApps('suite')).toHaveLength(3);
-    expect(appTitle('approvals')).toBe('Replenishment Approvals');
-    expect(appTitle('suite')).toBe('Retail Operations');
+    expect(appTitle('approvals', undefined)).toBe('Replenishment Approvals');
+    expect(appTitle('suite', undefined)).toBe('Retail Operations');
+  });
+
+  it('prefixes titles with a custom business brand name', () => {
+    expect(appTitle('approvals', 'Kroger')).toBe('Kroger Replenishment Approvals');
+    expect(appTitle('suite', '  ')).toBe('Retail Operations');
   });
 });

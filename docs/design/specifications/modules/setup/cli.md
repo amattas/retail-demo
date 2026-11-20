@@ -195,7 +195,9 @@ The active non-interactive inputs include:
 
 - tenant, workspace, capacity, Lakehouse, Eventhouse, and KQL database names;
 - authentication mode; the workspace name determines the environment;
-- store type: `supercenter`, `grocery`, `hardware`, or `luxury`;
+- store type: `supercenter`, `grocery`, `hardware`, `luxury`, or `custom`
+  (with `--business NAME`) for a custom business layout (see
+  [`customize`](#customize)); a saved layout is selected as `custom-<slug>`;
 - history `months`, store count, and deterministic seed.
 
 When a value is missing on an interactive terminal, `configure` prompts for it.
@@ -241,6 +243,71 @@ a live full-demo run. Some failure modes aren't checked:
 
 `utility/tests/test_feasibility.py` checks that the smallest required-ML
 configuration of every shipped store type passes, and covers each check.
+
+## `customize`
+
+Custom business layouts are a **preview** feature. The setup interface labels
+the option and its layouts as preview and shows the preview badge used for
+preview deployment profiles; CLI help and prompts say the same.
+
+`retail-setup customize --env <env> --business <name>` builds a custom business
+layout with the GitHub Copilot SDK (`github-copilot-sdk`). Copilot is called
+only here (or from `configure --business` and the setup interface's
+**Generate** action); render, deploy, and theming read the saved result
+deterministically.
+
+The SDK is opt-in (`retail_setup.customization.sdk`). It is the `customize`
+extra and is absent from `requirements-deploy.txt`, so the installer and every
+preset deployment never install it. Before the first generation, the operator
+sees the requirement (a GitHub account with Copilot access, signed in through
+`gh auth login` or `GH_TOKEN`) and confirms; the TUI shows the same warning when
+**Custom business… (preview, needs GitHub Copilot)** is selected, and **Generate** is the
+confirmation. Installation runs
+`pip install --require-hashes -r utility/requirements-customize.txt` (compiled
+with the deploy lock as a constraint, so every shared pin is identical) and
+`python -m copilot download-runtime`. Declining leaves preset store types
+available. A missing Copilot sign-in fails with `gh auth login` guidance before
+any prompt is sent. Saved layouts and `--from-spec` never need the SDK.
+
+Generation (`retail_setup.customization.generator`):
+
+1. One isolated session: SDK `empty` mode, no tools, every permission request
+   rejected, a temporary state directory, and the SDK's own pinned runtime. An
+   inherited `COPILOT_CLI_PATH` is dropped because a surrounding Copilot CLI may
+   speak a different protocol version. Authentication uses the signed-in
+   GitHub user (`gh auth login`) or `GH_TOKEN`.
+2. The prompt carries only the business name (as a JSON string) and the
+   preset profiles. The model returns structured output for
+   `CustomizationDraft`. Providers reject numeric bounds, lengths, and patterns
+   in response schemas, so the request schema omits them and the full Pydantic
+   model validates the answer afterwards.
+3. `draft_problems` checks bounds, 3-16 departments, 200-6,000 products,
+   brand-to-department coverage, profile weights, safe display text, and the
+   fictionalization guard: no brand or product word may equal, or contain as a
+   phrase, the business name or any real brand the model listed in
+   `inspiration_brands`. Problems go back to the model; after two repairs the
+   command fails.
+4. `build_spec` produces `CustomizationSpec` with store type `custom-<slug>`.
+   Department names become brand categories so generation matches brands by
+   department; each department carries an explicit `Taxability` and each
+   category a `Refrigerated` flag, emitted into `products.json`.
+
+Interactive runs show a preview (palette, departments, brands, sample
+products) and offer accept, regenerate, or cancel. `--yes` accepts the draft.
+`--regenerate` replaces a saved layout; `--from-spec <file>` uses an existing
+`customization.json` without Copilot.
+
+Storage (ignored by Git):
+
+| Path | Content |
+| --- | --- |
+| `utility/config/environments/<env>.customization/customization.json` | The accepted spec |
+| `utility/config/environments/<env>.customization/dictionaries/` | `_shared` copies and `custom-<slug>/{profile,products,brands}.json`, rebuilt from the spec when its SHA-256 (`.spec-sha256`) changes |
+
+The generation YAML stores only `store_type: custom-<slug>`. `configure`,
+`render`, and the setup interface point generation at the custom dictionary
+root. A custom store type without a matching saved spec fails closed. The spec
+is part of the deploy resume fingerprint.
 
 ## `render`
 
@@ -293,6 +360,17 @@ interrupted publication cannot leave a manifest that marks partial data as valid
 corruption, interrupted downloads, immutable hits, mutable refresh, optional
 404 behavior, and invalid JSON.
 
+Custom business layouts are never committed, so Setup 01 cannot download them.
+Render injects `CUSTOM_DICTIONARIES`, the SHA-256 of each custom file, and the
+deploy step `upload-custom-dictionaries`
+(`deploy/scripts/upload_custom_dictionaries.py`) writes those files through the
+OneLake DFS API to `Files/setup/custom-dictionaries/<store_type>/` and reads
+each one back to compare digests. Setup 01 still downloads `_shared` from
+GitHub, takes the custom files from that inbox only when their digests match,
+and records the digests in the manifest source, so a changed layout never
+reuses a stale cache. A missing or altered upload fails the notebook. Custom
+layouts have no optional `tags.json`.
+
 Fork execution must set `RETAIL_SETUP_REPOSITORY_OWNER` and
 `RETAIL_SETUP_REPOSITORY_NAME` in the notebook runtime environment. Defaults
 are `amattas` and `retail-demo`. The CLI injects the ref but does not
@@ -342,6 +420,7 @@ because both read only Silver.
 | `STORE_COUNT` | Number of stores |
 | `SEED` | Deterministic seed |
 | `DICTIONARY_REF` | Git ref used for dictionary content |
+| `CUSTOM_DICTIONARIES` | JSON map of custom layout file → SHA-256; `{}` for presets |
 
 `stream-events` is rendered with the setup notebooks but is staged separately
 and is not part of the ordered setup pipeline.

@@ -23,6 +23,11 @@ deploy = [
     "pyodbc>=5.1,<6",
     "textual>=3.0",
 ]
+# Opt-in: custom business layouts call GitHub Copilot once. Installed on demand
+# from requirements-customize.txt only when an operator chooses a custom layout.
+customize = [
+    "github-copilot-sdk>=1.0.31,<2",
+]
 spark = [
     "numpy>=1.26",
     "pyarrow>=14",

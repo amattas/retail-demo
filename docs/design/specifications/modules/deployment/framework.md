@@ -79,6 +79,31 @@ replacement of `fabric_workspace`, `fabric_lakehouse`, or `fabric_eventhouse`
 fails the normal plan guard. Intentional destructive changes require the
 explicit `--recreate` workflow, including its destroy confirmation.
 
+### Custom business layouts
+
+When the environment selects a custom store type (`custom-<slug>`), the plan
+adds `upload-custom-dictionaries` after the infrastructure publication and
+before the setup pipeline. Report-staging `build_artifacts` runs receive
+`--customization <spec>`. Theming is applied to staged copies only and never
+changes source files. `retail_setup.customization.theme.derive_theme` turns
+the saved palette into tokens, adjusting lightness until text pairs meet WCAG
+AA (accent and muted text ≥ 4.5:1, headings ≥ 7:1 on white).
+
+| Surface | Mechanism |
+| --- | --- |
+| Main Power BI report | Every hex literal is remapped through `fabric/powerbi/theme-color-roles.json`; the registered custom theme gets brand `dataColors`; the `SmartRetail` title token becomes the business name |
+| Connected twins report | Same remap, plus a registered `BrandTheme.json` custom theme |
+| Fabric Apps | `--cp-*` CSS overrides appended to the staged `main.css`, a branded `<title>`, and `VITE_BRAND_NAME` so in-app titles read "<Business> <App>" |
+| Plan sheets | Canvas wallpaper tinted with the brand surface color |
+
+The role map assigns each report color a role (`accent`, `secondary`,
+`heading`, `muted`, `border`, `surface`, `data_1`-`data_8`) or `fixed`
+(canvas white, black text, and good/warning/bad status colors). A report color
+without a role fails staging, and
+`tests/deploy/test_customization_theming.py` fails when a report gains an
+unmapped color. Base Microsoft themes are not modified. Real-time dashboards
+are design-only query catalogs and are not themed.
+
 ## Command modes
 
 | Mode | Exact behavior |

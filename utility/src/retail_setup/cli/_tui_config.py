@@ -23,8 +23,21 @@ from textual.timer import Timer
 from textual.widgets import Button, Input, Label, RadioButton, RadioSet, Select, Static
 
 from retail_setup.cli import main as cli
+from retail_setup.cli._customize import CUSTOM_CHOICE
 from retail_setup.cli._tui_runner import PHASES, TargetChoice
 from retail_setup.contracts.models import Profile
+from retail_setup.customization.generator import CustomizationError, generate_spec
+from retail_setup.customization.preview import preview
+from retail_setup.customization.sdk import install_sdk, sdk_installed
+from retail_setup.customization.spec import CustomizationSpec, validate_business_name
+from retail_setup.customization.store import (
+    customization_dir,
+    dictionary_root,
+    ensure_materialized,
+    load_spec,
+    materialize,
+    save_spec,
+)
 
 TEXT_FIELDS: tuple[tuple[str, str, str], ...] = (
     ("tenant", "Entra tenant ID", "Directory that contains the Fabric capacity"),
@@ -72,6 +85,41 @@ def _first_error(exc: Exception) -> str:
     return str(exc).splitlines()[0]
 
 
+def _preview_badge() -> Text:
+    """The same badge preview deployment profiles show."""
+
+    return Text(" preview ", style=f"bold #1e1e2e on {_STATUS_STYLE['preview']}")
+
+
+def _layout_preview(spec: CustomizationSpec, *, pending: bool) -> Text:
+    """Swatches, departments, brands, and sample products for one custom layout."""
+
+    view = preview(spec, samples=4)
+    palette = spec.palette
+    text = _preview_badge()
+    text.append(" ")
+    text.append(spec.display_name, style="bold #cdd6f4")
+    text.append(f"  {spec.store_type} · based on {spec.base_preset}\n", style="grey62")
+    for color in (palette.primary, palette.secondary, palette.accent, palette.dark, palette.light):
+        text.append("    ", style=f"on {color}")
+        text.append(f" {color}  ", style="grey62")
+    text.append("\n")
+    text.append(
+        f"{view.product_count:,} base products · {len(view.brands)} fictional brands · "
+        f"avg ticket ${spec.profile.avg_ticket_target:,.0f}\n",
+        style="#a6adc8",
+    )
+    text.append(
+        "Departments: " + ", ".join(name for name, _ in view.departments[:8]) + "\n",
+        style="#a6adc8",
+    )
+    text.append("Brands: " + ", ".join(view.brands[:8]) + "\n", style="#a6adc8")
+    text.append("e.g. " + "; ".join(view.sample_products), style="grey62")
+    if pending:
+        text.append("\nReview, then use this layout or regenerate.", style="#f9e2af")
+    return text
+
+
 class ConfigScreen(Screen[TargetChoice | None]):
     """Collect configure values; dismiss with the result, or None to quit setup."""
 
@@ -111,6 +159,10 @@ class ConfigScreen(Screen[TargetChoice | None]):
         self._env_error: str | None = None
         self._result: TargetChoice | None = None
         self._timer: Timer | None = None
+        # Accepted custom layout for the current environment, and one awaiting review.
+        self._custom: CustomizationSpec | None = None
+        self._pending: CustomizationSpec | None = None
+        self._generating = False
 
     # ----- layout -------------------------------------------------------------
     def compose(self) -> ComposeResult:
@@ -145,12 +197,26 @@ class ConfigScreen(Screen[TargetChoice | None]):
                         "store_type",
                         "Store type",
                         Select(
-                            [(name.title(), name) for name in self.store_types],
+                            self._store_type_options(),
                             id="store_type",
                             allow_blank=False,
                             compact=True,
                         ),
                     )
+                    with Horizontal(classes="cfg-row", id="row-business"):
+                        yield Label("Business name", classes="cfg-label")
+                        yield Input(
+                            id="business",
+                            placeholder="e.g. Kroger, Walgreens, Home Depot",
+                            compact=True,
+                        )
+                        yield Button("Generate ✨", id="generate-layout", compact=True)
+                    yield Static(id="layout-preview", classes="cfg-note")
+                    with Horizontal(id="layout-actions"):
+                        yield Button(
+                            "Use this layout", id="accept-layout", variant="success", compact=True
+                        )
+                        yield Button("Regenerate", id="regenerate-layout", compact=True)
                     for key, label, hint in NUMBER_FIELDS:
                         yield from self._row(
                             key,
@@ -235,6 +301,7 @@ class ConfigScreen(Screen[TargetChoice | None]):
             self._applied["profile"] = self._value("profile")
         self._applied["store_type"] = self._value("store_type")
         self._load_defaults(self.initial_workspace)
+        self._render_custom_controls()
         self._validate()
         self.query_one("#workspace", Input).focus()
 
@@ -258,7 +325,7 @@ class ConfigScreen(Screen[TargetChoice | None]):
         if isinstance(widget, Select):
             if key == "profile" and value not in self.profiles:
                 return
-            if key == "store_type" and value not in self.store_types:
+            if key == "store_type" and value not in self._store_type_values():
                 return
             widget.value = value
         else:
@@ -278,6 +345,7 @@ class ConfigScreen(Screen[TargetChoice | None]):
             return
         self._env_error = None
         self._defaults = defaults
+        self._load_custom_layout(defaults.env)
         self._set_default("tenant", defaults.tenant_id)
         self._set_default("capacity", defaults.capacity_name)
         self._set_default("lakehouse", defaults.lakehouse_name)
@@ -297,6 +365,137 @@ class ConfigScreen(Screen[TargetChoice | None]):
         required = profile.reporting_gate_pipeline_ref is not None
         self._set_default("months", str(self._defaults.months_for(required)))
 
+    # ----- custom business layouts -------------------------------------------
+    def _store_type_options(self) -> list[tuple[str, str]]:
+        options = [(name.title(), name) for name in self.store_types]
+        if self._custom is not None:
+            options.append(
+                (f"{self._custom.display_name} (custom, preview)", self._custom.store_type)
+            )
+        options.append(("Custom business… (preview, needs GitHub Copilot)", CUSTOM_CHOICE))
+        return options
+
+    def _store_type_values(self) -> set[str]:
+        return {value for _, value in self._store_type_options()}
+
+    def _load_custom_layout(self, env: str) -> None:
+        """Offer the environment's saved custom layout in the store type list."""
+
+        try:
+            custom = load_spec(customization_dir(self.repo_root, env))
+        except (OSError, ValueError):
+            custom = None
+        if custom == self._custom:
+            return
+        self._custom = custom
+        self._refresh_store_types()
+
+    def _refresh_store_types(self, selected: str | None = None) -> None:
+        select = self.query_one("#store_type", Select)
+        current = selected or self._value("store_type")
+        select.set_options(self._store_type_options())
+        select.value = current if current in self._store_type_values() else self.store_types[0]
+
+    def _render_custom_controls(self) -> None:
+        choosing = self._value("store_type") == CUSTOM_CHOICE
+        self.query_one("#row-business").display = choosing
+        reviewing = choosing and self._pending is not None and not self._generating
+        self.query_one("#layout-actions").display = reviewing
+        for button_id in ("#generate-layout", "#regenerate-layout", "#accept-layout"):
+            self.query_one(button_id, Button).disabled = self._generating
+        preview_panel = self.query_one("#layout-preview", Static)
+        if self._generating:
+            return
+        if choosing and self._pending is not None:
+            preview_panel.update(_layout_preview(self._pending, pending=True))
+        elif choosing:
+            intro = _preview_badge()
+            intro.append(" Custom business layouts are a preview feature.\n", style="#a6adc8")
+            intro.append("! Requires GitHub Copilot. ", style="bold #f9e2af")
+            install = (
+                ""
+                if sdk_installed()
+                else "The GitHub Copilot SDK is installed the first time you select Generate. "
+            )
+            intro.append(
+                "You need a GitHub account with Copilot access, signed in with "
+                f"`gh auth login` (or GH_TOKEN). {install}\n",
+                style="#f9e2af",
+            )
+            intro.append(
+                "GitHub Copilot drafts departments, fictionalized brands, products, and a "
+                "brand color theme once; every deployment step then applies it "
+                "deterministically. Generation takes about one to three minutes.",
+                style="grey62",
+            )
+            preview_panel.update(intro)
+        elif self._custom is not None and self._value("store_type") == self._custom.store_type:
+            preview_panel.update(_layout_preview(self._custom, pending=False))
+        else:
+            preview_panel.update("")
+        preview_panel.display = bool(choosing or self._value("store_type").startswith("custom-"))
+
+    def _start_generation(self) -> None:
+        if self._generating:
+            return
+        panel = self.query_one("#layout-preview", Static)
+        try:
+            name = validate_business_name(self._value("business"))
+        except ValueError as exc:
+            panel.update(Text(f"✗ {exc}", style="#f38ba8"))
+            return
+        self._generating = True
+        self._pending = None
+        self._render_custom_controls()
+        panel.display = True
+        panel.update(Text(f"Asking GitHub Copilot for a {name} layout…", style="#89dceb"))
+        self.run_worker(
+            lambda: self._generate(name), thread=True, exclusive=True, group="customize"
+        )
+
+    def _generate(self, name: str) -> None:
+        def progress(message: str) -> None:
+            self.app.call_from_thread(self._generation_progress, message)
+
+        try:
+            if not sdk_installed():
+                install_sdk(self.repo_root, progress=progress)
+            spec = generate_spec(name, progress=progress)
+        except (CustomizationError, ValueError, OSError) as exc:
+            self.app.call_from_thread(self._generation_finished, None, str(exc))
+        else:
+            self.app.call_from_thread(self._generation_finished, spec, None)
+
+    def _generation_progress(self, message: str) -> None:
+        self.query_one("#layout-preview", Static).update(Text(message, style="#89dceb"))
+
+    def _generation_finished(self, spec: CustomizationSpec | None, error: str | None) -> None:
+        self._generating = False
+        self._pending = spec
+        self._render_custom_controls()
+        if error is not None:
+            self.query_one("#layout-preview", Static).update(Text(f"✗ {error}", style="#f38ba8"))
+
+    def _accept_layout(self) -> None:
+        spec, defaults = self._pending, self._defaults
+        panel = self.query_one("#layout-preview", Static)
+        if spec is None:
+            return
+        if defaults is None:
+            panel.update(Text("✗ Enter a valid workspace name first.", style="#f38ba8"))
+            return
+        directory = customization_dir(self.repo_root, defaults.env)
+        try:
+            save_spec(spec, directory)
+            materialize(spec, directory)
+        except (OSError, ValueError) as exc:
+            panel.update(Text(f"✗ Could not save the layout: {exc}", style="#f38ba8"))
+            return
+        self._custom, self._pending = spec, None
+        self._refresh_store_types(selected=spec.store_type)
+        self._render_custom_controls()
+        self._schedule()
+
     # ----- validation ---------------------------------------------------------
     def on_input_changed(self, event: Input.Changed) -> None:
         self._schedule()
@@ -304,12 +503,17 @@ class ConfigScreen(Screen[TargetChoice | None]):
     def on_select_changed(self, event: Select.Changed) -> None:
         if event.select.id == "profile":
             self._apply_months_default()
+        if event.select.id == "store_type":
+            self._render_custom_controls()
         self._schedule()
 
     def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
         self._validate()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id == "business":
+            self._start_generation()
+            return
         self.focus_next()
 
     def _schedule(self) -> None:
@@ -355,14 +559,33 @@ class ConfigScreen(Screen[TargetChoice | None]):
                 errors.append(f"{label} must be a whole number.")
         estimate = None
         warnings: list[str] = []
-        if profile is not None and len(numbers) == len(NUMBER_FIELDS):
+        store_type = self._value("store_type")
+        custom_root = None
+        if store_type == CUSTOM_CHOICE:
+            errors.append("Generate a custom layout, then choose 'Use this layout'.")
+        elif store_type.startswith("custom-") and defaults is not None:
+            if self._custom is not None and self._custom.store_type == store_type:
+                try:
+                    custom_root = ensure_materialized(
+                        self._custom, customization_dir(self.repo_root, defaults.env)
+                    )
+                except (OSError, ValueError) as exc:
+                    errors.append(f"Custom layout dictionaries are invalid: {exc}")
+            else:
+                custom_root = dictionary_root(self.repo_root, defaults.env)
+        if (
+            profile is not None
+            and len(numbers) == len(NUMBER_FIELDS)
+            and store_type != CUSTOM_CHOICE
+        ):
             try:
                 generation, counts, findings = cli.preview_generation(
                     profile,
-                    store_type=self._value("store_type"),
+                    store_type=store_type,
                     months=numbers["months"],
                     store_count=numbers["store_count"],
                     seed=numbers["seed"],
+                    dictionary_root=custom_root,
                 )
             except ValueError as exc:
                 errors.append(_first_error(exc))
@@ -470,6 +693,10 @@ class ConfigScreen(Screen[TargetChoice | None]):
             self.action_start()
         elif event.button.id == "quit":
             self.action_quit_setup()
+        elif event.button.id in {"generate-layout", "regenerate-layout"}:
+            self._start_generation()
+        elif event.button.id == "accept-layout":
+            self._accept_layout()
 
     def action_start(self) -> None:
         if self._timer is not None:
@@ -503,6 +730,9 @@ ConfigScreen { background: #1e1e2e; color: #cdd6f4; }
 .cfg-row Input:focus { background: #45475a; }
 .cfg-note { color: #a6adc8; margin: 0 0 1 20; height: auto; }
 .cfg-warning { color: #f38ba8; margin: 0 0 1 20; height: auto; }
+#row-business Button { margin-left: 1; min-width: 14; }
+#layout-actions { height: auto; margin: 0 0 1 20; }
+#layout-actions Button { margin-right: 2; min-width: 16; }
 #cfg-next {
     height: auto; border: round #f9e2af; border-title-color: #f9e2af;
     padding: 1 2 0 2; margin-top: 1;

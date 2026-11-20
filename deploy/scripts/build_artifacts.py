@@ -17,6 +17,13 @@ from retail_setup.contracts import (
     load_repository_manifest,
     resolve_profile,
 )
+from retail_setup.customization.spec import CustomizationSpec
+from retail_setup.customization.theme import (
+    Theme,
+    derive_theme,
+    load_role_map,
+    theme_report_dir,
+)
 
 from deploy.scripts import _output as console
 from deploy.scripts.fabric_runtime import configured_schedule_document
@@ -447,8 +454,10 @@ def stage_powerbi_items(
     output_dir: Path,
     selected_items: tuple[str, ...] | list[str] | None = None,
     report_default_date: date | None = None,
+    theme: Theme | None = None,
+    theme_roles: dict[str, str] | None = None,
 ) -> list[Path]:
-    """Copy Power BI items and configure staged report date defaults."""
+    """Copy Power BI items, configure staged report date defaults, and apply ``theme``."""
 
     if not source_dir.exists():
         raise FileNotFoundError(f"Power BI source directory not found: {source_dir}")
@@ -473,6 +482,10 @@ def stage_powerbi_items(
         shutil.copytree(item_dir, destination, ignore=_ignore_powerbi_local_state)
         if item_dir.suffix == ".Report" and report_default_date is not None:
             _set_report_default_date(destination, report_default_date)
+        if item_dir.suffix == ".Report" and theme is not None:
+            if theme_roles is None:
+                raise ValueError("theme_roles is required to theme a report")
+            theme_report_dir(destination, theme, theme_roles)
         staged.append(destination)
     staged_by_name = {item.name: item for item in staged}
     for report_dir in (item for item in staged if item.suffix == ".Report"):
@@ -820,8 +833,13 @@ def build_workspace(
     report_default_date: date | None = None,
     rendered_dir: Path | None = None,
     enabled_schedules: tuple[str, ...] = (),
+    theme: Theme | None = None,
 ) -> BuildResult:
-    """Build a fabric-cicd workspace folder from repository source assets."""
+    """Build a fabric-cicd workspace folder from repository source assets.
+
+    ``theme`` (from a custom business layout) recolors and retitles staged
+    reports; source files are never modified.
+    """
 
     if isinstance(profile, str):
         manifest, validation = load_repository_manifest(repo_root)
@@ -908,6 +926,8 @@ def build_workspace(
                 output_dir,
                 powerbi_items,
                 report_default_date=report_default_date,
+                theme=theme,
+                theme_roles=load_role_map(repo_root) if theme is not None else None,
             )
         )
     # Curated KQL queries (fabric/querysets/*.kql) ship as a single
@@ -1169,6 +1189,11 @@ def main() -> int:
         metavar="PIPELINE",
         help="Switch on a pipeline's committed schedule (repeatable).",
     )
+    parser.add_argument(
+        "--customization",
+        type=Path,
+        help="customization.json of a custom business layout; themes staged reports.",
+    )
     args = parser.parse_args()
     if args.notebook_groups:
         parser.error(
@@ -1187,6 +1212,14 @@ def main() -> int:
     if rendered_dir is not None and not rendered_dir.is_absolute():
         rendered_dir = args.repo_root / rendered_dir
 
+    theme = None
+    if args.customization is not None:
+        spec_path = args.customization
+        if not spec_path.is_absolute():
+            spec_path = args.repo_root / spec_path
+        spec = CustomizationSpec.model_validate_json(spec_path.read_text(encoding="utf-8"))
+        theme = derive_theme(spec.palette, spec.display_name)
+
     result = build_workspace(
         args.repo_root,
         args.output_dir,
@@ -1199,6 +1232,7 @@ def main() -> int:
         report_default_date,
         rendered_dir,
         tuple(args.enable_schedule),
+        theme,
     )
     console.info(
         f"Staged {len(result.staged_items)}/{result.expected_item_count} items "

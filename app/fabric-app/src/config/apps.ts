@@ -39,6 +39,11 @@ export function includedApps(variant: AppVariant = appVariant()): AppInfo[] {
   return variant === 'suite' ? Object.values(APPS) : [APPS[variant]];
 }
 
-export function appTitle(variant: AppVariant = appVariant()): string {
-  return variant === 'suite' ? 'Retail Operations' : APPS[variant].title;
+export function appTitle(
+  variant: AppVariant = appVariant(),
+  brand: string | undefined = import.meta.env.VITE_BRAND_NAME,
+): string {
+  const title = variant === 'suite' ? 'Retail Operations' : APPS[variant].title;
+  // Custom business layouts (retail-setup customize) brand the deployed apps.
+  return brand?.trim() ? `${brand.trim()} ${title}` : title;
 }

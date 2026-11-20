@@ -251,7 +251,7 @@ Review these choices:
 | Lakehouse | The Lakehouse stores historical and analytical tables. Keep the default name unless you are deliberately updating every checked-in reference. |
 | Eventhouse and KQL database | Eventhouse stores optional live events, and KQL (Kusto Query Language) queries them. Use the same display name for both in this demo. |
 | Profile and Spark pool | `core` and `standard` use the starter pool. `full-demo` validates and selects the custom pool. |
-| Store type | `supercenter`, `grocery`, `hardware`, or `luxury`. |
+| Store type | `supercenter`, `grocery`, `hardware`, or `luxury`, or `custom` for a layout built for a business you name (see [Custom business layouts](#custom-business-layouts-preview)). |
 | History | `--months` defines a range ending yesterday. Reporting profiles use at least 18 months by default. |
 | Store count and seed | Control scale and deterministic reproduction. |
 
@@ -298,9 +298,60 @@ Configuration writes:
 | `deploy/config/deploy.yml` | Shared deployment defaults | Tracked |
 | `deploy/config/environments/<env>.yml` | Workspace target overlay | Ignored |
 | `utility/config/environments/<env>.yaml` | Environment-specific generation settings; legacy `utility/config.yaml` is a read fallback | Ignored |
+| `utility/config/environments/<env>.customization/` | Custom business layout (`customization.json`) and its generated dictionaries | Ignored |
 
 `configure` prints the derived environment key. Keep the local overlay out of
 source control, and never add credentials or bearer tokens to configuration.
+
+### Custom business layouts (preview)
+
+Custom business layouts are a preview feature. Instead of a preset, you can
+build the demo around a business you name, such as Kroger, Walgreens, or Home
+Depot. GitHub Copilot drafts the layout **once**:
+
+- departments, traffic and basket behavior, and price bands that match what the
+  business sells
+- fictional brands and product titles, lightly varied from the real ones (for
+  example `Krogan Select` or `Huskee Tools`)
+- a brand-inspired color palette
+
+You review a preview (palette, departments, brands, sample products) and accept
+it or ask for another draft. The accepted layout is saved per environment, and
+every later step uses it without calling Copilot again:
+
+- setup notebooks generate data from its products, brands, and profile
+- the Power BI report, connected twins report, Fabric Apps, and planning sheets
+  use its colors, and report and app titles carry the business name
+
+In the setup interface, choose **Custom business… (preview, needs GitHub Copilot)** under
+**Store type**, enter the name, and select **Generate**. From the CLI:
+
+```powershell
+retail-setup customize --env alice --business "Kroger"
+retail-setup configure --workspace-name alice --store-type custom-kroger
+```
+
+`configure --business "Kroger"` does both steps in one command. Use
+`customize --regenerate` for a new draft, or `customize --from-spec <file>` to
+reuse a saved `customization.json` without Copilot.
+
+Requirements and limits:
+
+- **GitHub Copilot is required for this option only.** You need a GitHub
+  account with Copilot access, signed in through `gh auth login` (or a
+  `GH_TOKEN`). Without one, choose a preset store type; nothing else in the demo
+  uses Copilot.
+- The installer does not install the GitHub Copilot SDK. It is installed from
+  the hash-locked `utility/requirements-customize.txt` (same pins as the deploy
+  lock, plus the SDK) the first time you generate a layout, after you confirm.
+  Saved layouts and `--from-spec` never need it.
+- Only the business name and the preset layouts are sent to Copilot.
+- Generation takes about one to three minutes. Copilot output is validated; a
+  draft that reuses a real brand name unchanged or breaks a data rule is sent
+  back for correction, and generation fails after two repair attempts.
+- Brand colors are adjusted for readable contrast. Status colors (good, warning,
+  bad) keep their standard meaning. Logos are not added.
+- Real-time dashboards are not themed; they are not deployed by this demo.
 
 ## 5. Render the notebooks
 

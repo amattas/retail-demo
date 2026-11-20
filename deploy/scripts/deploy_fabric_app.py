@@ -21,8 +21,10 @@ fields; publishable keys and tokens are never recorded.
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -33,6 +35,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from retail_setup.customization.store import active_theme
+from retail_setup.customization.theme import Theme, app_css
 
 from deploy.scripts import _output as console
 
@@ -58,6 +62,12 @@ FABRIC_APPS = (
     FabricApp("merchandising", "retail-merchandising"),
     FabricApp("promotions", "retail-promotions"),
 )
+# Mirrors APPS[...].title in app/fabric-app/src/config/apps.ts for static <title>s.
+_TITLES = {
+    "approvals": "Replenishment Approvals",
+    "merchandising": "Merchandising Portal",
+    "promotions": "Promotion Studio",
+}
 
 
 def _safe(value: Any) -> Any:
@@ -150,6 +160,22 @@ def stage_app(source: Path, staging: Path, app: FabricApp) -> Path:
     return staging
 
 
+def apply_brand(project: Path, theme: Theme, app: FabricApp) -> None:
+    """Brand a staged app: CSS token overrides and the HTML title (source untouched)."""
+
+    stylesheet = project / "src" / "main.css"
+    stylesheet.write_text(
+        stylesheet.read_text(encoding="utf-8") + app_css(theme), encoding="utf-8"
+    )
+    index = project / "index.html"
+    title = html.escape(f"{theme.display_name} {_TITLES[app.variant]}")
+    text = index.read_text(encoding="utf-8")
+    branded = re.sub(r"<title>[^<]*</title>", f"<title>{title}</title>", text, count=1)
+    if branded == text and f"<title>{title}</title>" not in text:
+        raise RuntimeError(f"{index} has no <title> to brand.")
+    index.write_text(branded, encoding="utf-8")
+
+
 def registry_urls(project: Path) -> list[str]:
     """Hosting URLs recorded in a project's Rayfin deployment registry."""
 
@@ -203,6 +229,7 @@ def deploy_app(
     tenant_id: str | None,
     environment: str = "default",
     dry_run: bool = False,
+    theme: Theme | None = None,
     run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
     which: Callable[[str], str | None] = shutil.which,
 ) -> dict[str, Any]:
@@ -224,6 +251,9 @@ def deploy_app(
     projects = {
         app.variant: stage_app(source, staging_root / app.variant, app) for app in FABRIC_APPS
     }
+    if theme is not None:
+        for app in FABRIC_APPS:
+            apply_brand(projects[app.variant], theme, app)
     up = [npx, "rayfin", "up", "--workspace-id", workspace_id, "--yes", "--json"]
     if tenant_id:
         up += ["--tenant", tenant_id]
@@ -234,6 +264,8 @@ def deploy_app(
     for app in FABRIC_APPS:
         project = projects[app.variant]
         env = {**base_env, "VITE_APP_VARIANT": app.variant}
+        if theme is not None:
+            env["VITE_BRAND_NAME"] = theme.display_name
         for attempt in range(2):
             origins = configure_identity(project, app, source_origins)
             result = _run_checked(run, up, project, env)
@@ -279,9 +311,10 @@ def main(argv: list[str] | None = None) -> int:
             tenant_id=config.tenant_id,
             environment=args.environment,
             dry_run=args.dry_run,
+            theme=active_theme(args.repo_root, args.environment),
         )
         report["status"] = "SUCCEEDED"
-    except (OSError, RuntimeError) as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         report |= {"status": "FAILED", "error": str(exc)}
         console.error(str(exc))
     (generated / "fabric-app-report.json").write_text(

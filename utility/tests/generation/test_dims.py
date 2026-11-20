@@ -112,3 +112,24 @@ def test_dim_date_is_generated_from_a_spark_range(spark):
     df = generate_dim_date(spark, date(2025, 1, 1), date(2035, 12, 31))
     plan = df._jdf.queryExecution().logical().toString()
     assert "Range" in plan
+
+
+def test_explicit_product_attributes_override_name_rules(spark, small_cfg, dicts):
+    from dataclasses import replace
+
+    # "Fresh" is NON_TAXABLE and "Produce" refrigerated by name; explicit values win.
+    product = dicts.products[0].model_copy(
+        update={
+            "Department": "Fresh",
+            "Category": "Produce",
+            "Taxability": "TAXABLE",
+            "Refrigerated": False,
+        }
+    )
+    custom = replace(dicts, products=[product, *dicts.products[1:]])
+
+    products = generate_dimensions(spark, custom, small_cfg)["dim_products"]
+    row = products.filter(products.ProductName == product.ProductName).first()
+
+    assert row is not None
+    assert (row.taxability, row.RequiresRefrigeration) == ("TAXABLE", False)

@@ -123,5 +123,25 @@ class GenerationConfig(BaseModel):
         return self
 
 
-def load_generation_config(path: Path) -> GenerationConfig:
-    return GenerationConfig.model_validate(yaml.safe_load(path.read_text()))
+def generation_config_path(repo_root: Path, env: str) -> Path:
+    """Return the environment-scoped generation configuration path."""
+
+    return repo_root / "utility" / "config" / "environments" / f"{env}.yaml"
+
+
+def resolve_generation_config_path(repo_root: Path, env: str) -> Path:
+    """Prefer environment-scoped generation config, with a legacy fallback."""
+
+    scoped = generation_config_path(repo_root, env)
+    if scoped.is_file():
+        return scoped
+    return repo_root / "utility" / "config.yaml"
+
+
+def load_generation_config(path: Path, *, dictionary_root: Path | None = None) -> GenerationConfig:
+    """Load a generation YAML, optionally pointing it at a custom dictionary root."""
+
+    data = yaml.safe_load(path.read_text())
+    if dictionary_root is not None and isinstance(data, dict):
+        data = {**data, "dictionary_root": str(dictionary_root)}
+    return GenerationConfig.model_validate(data)

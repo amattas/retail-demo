@@ -1,0 +1,32 @@
+{
+  "description": "Theme role for every hardcoded hex color in fabric/powerbi/*.Report and fabric/twins/*.Report (base themes excluded). Custom business layouts (retail-setup customize) remap each color to its role in the derived brand theme; 'fixed' colors (canvas white, black text, good/warn/bad status) never change. A contract test fails when a report gains an unmapped color.",
+  "colors": {
+    "#FFFFFF": "fixed",
+    "#000000": "fixed",
+    "#252423": "fixed",
+    "#3F9C45": "fixed",
+    "#107C10": "fixed",
+    "#D64545": "fixed",
+    "#E08E45": "fixed",
+    "#F7630C": "fixed",
+    "#118DFF": "accent",
+    "#2463A6": "accent",
+    "#0E76A8": "secondary",
+    "#0F6B78": "secondary",
+    "#5C2D91": "data_3",
+    "#1F2A44": "heading",
+    "#5A6478": "muted",
+    "#A6ADC6": "muted_light",
+    "#E0E4EC": "border",
+    "#E0E0E0": "border",
+    "#DCE3F0": "border",
+    "#F6F8FB": "surface",
+    "#12239E": "data_2",
+    "#E044A7": "data_3",
+    "#6B007B": "data_4",
+    "#E66C37": "data_5",
+    "#744EC2": "data_6",
+    "#D9B300": "data_7",
+    "#D64550": "data_8"
+  }
+}
