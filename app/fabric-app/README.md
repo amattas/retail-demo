@@ -1,24 +1,36 @@
 # Retail Operations (Fabric Apps examples)
 
-One Rayfin SDK codebase that ships as **three standalone Fabric Apps** for
-separate business functions. Each build contains one app, selected by
-`VITE_APP_VARIANT`:
+One Rayfin SDK codebase that ships as **two standalone Fabric Apps**. Each
+build contains one app, selected by `VITE_APP_VARIANT`:
 
-| Fabric App item | Variant and route | What it shows |
+| Fabric App item | Variant | Pages (routes) |
 | --- | --- | --- |
-| `retail-merchandising` | `merchandising`, `/merchandising` | Store, category, supplier, search and period filters; sales, gross profit, in-stock rate and attention KPIs; a this-period versus previous-period trend (in-stock %, sales or gross profit; daily, weekly or 4-weekly); a sortable item table with days of cover, stock status and CSV export. Filter combinations can be saved as private views. |
-| `retail-promotions` | `promotions`, `/promotions` | Choose a product, store, dates, discount and assumed unit uplift to see promoted price, revenue, gross profit, discount investment and the uplift needed to break even. Scenarios are saved privately and compared side by side. |
-| `retail-approvals` | `approvals`, `/approvals` | Submit draft replenishment proposals and approve or reject other planners' proposals, with pending/decided queues and append-only decisions. |
+| `retail-approvals` (titled **Merchandising & Replenishment**) | `merchandising` | **Merchandising** (`/merchandising`): store, category, supplier, search and period filters; sales, gross profit, in-stock rate and attention KPIs; a this-period versus previous-period trend (in-stock %, sales or gross profit; daily, weekly or 4-weekly); a sortable item table with days of cover, stock status, CSV export, and a **Propose** action per item. Filter combinations can be saved as private views. **Replenishment approvals** (`/approvals`): submit draft replenishment proposals and approve or reject other planners' proposals, with pending/decided queues and append-only decisions. |
+| `retail-promotions` | `promotions` | **Promotion studio** (`/promotions`): choose a product, store, dates, discount and assumed unit uplift to see promoted price, revenue, gross profit, discount investment and the uplift needed to break even. Scenarios are saved privately and compared side by side. |
+
+Merchandising and approvals share one item and database, so a planner can raise
+a replenishment proposal straight from an item. **Propose** pre-fills the form
+from the item's sample evidence: across all stores it starts with the store
+that has the least days of cover (a filtered store is used as-is), proposes
+enough units for 14 days of the period's average daily sales, and writes the
+on-hand units, days of cover, and in-stock rate into the rationale. Changing
+the store redrafts both; the planner can edit them before submitting. The
+proposal then waits in **Replenishment approvals** for a different reviewer.
+
+The combined app keeps the `retail-approvals` item name because that item has
+held the proposals and decisions since the first deployment; its data carries
+over. Workspaces deployed before the merge also have a `retail-merchandising`
+item; the deploy step reports it as retired and leaves it for you to delete
+(only its private saved views are lost).
 
 Without `VITE_APP_VARIANT` (local development and the design preview), one
-build contains all three apps side by side. Each deployed app stands alone,
-with its own sign-in, item, and app-managed SQL database; the apps do not link
-to or depend on each other. The deployed bundle reads
-`rayfin.config.json`, which `rayfin up` writes for each item, so the same
-source serves every app.
+build contains every page side by side. Each deployed app stands alone, with
+its own sign-in, item, and app-managed SQL database; the two apps do not link
+to or depend on each other. The deployed bundle reads `rayfin.config.json`,
+which `rayfin up` writes for each item, so the same source serves both apps.
 
-All three apps deploy the same four-entity data model for simplicity; each app
-uses only its own tables.
+Both apps deploy the same four-entity data model for simplicity; each app uses
+only its own tables.
 
 The merchandising and promotion apps use a deliberately **synthetic
 sample catalog** (`src/data/merchandising.ts`): 16 products in three stores,
@@ -83,11 +95,12 @@ npm run dev:preview # UI-only design preview: seeded sample data, no backend or 
 `retail-setup deploy` runs this deployment automatically for Reporting
 profiles, through the non-required `deploy-fabric-app` step
 (`deploy/scripts/deploy_fabric_app.py`). That step needs Node.js 20+. It stages
-each app under `deploy/.generated/<env>/fabric-apps/<variant>/` with its own
-`rayfin.yml` identity and deployment registry, builds it with its
-`VITE_APP_VARIANT`, and deploys a new app a second time in the same run once
-its own sign-in origin is known. The approvals app adopts the
-item first deployed from this folder, so its data is kept.
+each app under `deploy/.generated/<env>/fabric-apps/<folder>/` (`approvals`
+and `promotions`) with its own `rayfin.yml` identity and deployment registry,
+builds it with its `VITE_APP_VARIANT`, and deploys a new app a second time in
+the same run once its own sign-in origin is known. Merchandising &
+Replenishment adopts the `retail-approvals` item first deployed from this
+folder, so its data is kept.
 
 Prerequisites:
 - a tenant admin has enabled **Fabric Apps (preview)**;

@@ -106,10 +106,11 @@ predictive pages as supported output.
 ## 6. Close with actions and roadmap
 
 If a pricing approval or alert scenario has been validated, show it as an
-optional action. In `full-demo`, you can also open the
-`retail-approvals` Fabric App to show a different reviewer recording an
-append-only decision on a replenishment proposal; the app does not place
-orders. RTI dashboards and Activator rules are checked in as
+optional action. In `full-demo`, you can also open the Merchandising &
+Replenishment Fabric App (`retail-approvals`): filter to items needing
+attention, select **Propose** on one to draft a replenishment proposal from its
+stock evidence, then show a different reviewer recording an append-only
+decision under **Replenishment approvals**. The app does not place orders. RTI dashboards and Activator rules are checked in as
 design and reference material, not deployed items. Otherwise, describe the
 action story from the owning backlog:
 

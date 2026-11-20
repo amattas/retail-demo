@@ -11,7 +11,7 @@ from typing import Any
 
 from requests import RequestException
 from retail_setup.cli._deploy_journal import _write_atomic
-from retail_setup.customization.store import active_theme
+from retail_setup.customization.store import active_logo, active_theme
 
 from deploy.scripts import _output as console
 from deploy.scripts._auth import build_credential
@@ -132,6 +132,7 @@ def publish_twins(repo_root: Path, config: Any, outputs: dict[str, Any]) -> dict
     report_definition = render_twins_report(
         semantic_model_id=model_id, cohort=cohort, display_name=REPORT_NAME,
         theme=active_theme(repo_root, config.environment),
+        logo=active_logo(repo_root, config.environment),
     )
     current = get_definition(session, workspace_id, "SemanticModel", model_id, "TMDL")
     updated, changes = merge_twin_model(current, repo_root)

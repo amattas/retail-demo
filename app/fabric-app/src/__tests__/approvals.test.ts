@@ -8,6 +8,8 @@ vi.mock('@/services/rayfinClient', () => ({
 import {
   decide,
   decisionError,
+  draftProposal,
+  MAX_QUANTITY,
   listProposals,
   resetLocalStore,
   submitProposal,
@@ -73,5 +75,26 @@ describe('approval workflow (in-memory mode)', () => {
     expect(view!.status).toBe('APPROVED');
     expect(view!.decision?.comment).toBe('Covers weekend demand.');
     await expect(decide(created.id, 'REJECTED', 'no', reviewer)).rejects.toThrow(/already/);
+  });
+});
+
+describe('drafting from stock evidence', () => {
+  const evidence = {
+    store_id: 2, store_name: 'Riverside Market', product_id: 112, product_name: 'Free-range eggs',
+    sku: 'SKU-112', units_sold: 280, period_days: 28, on_hand: 20, days_cover: 2, in_stock_rate: 91.25,
+  };
+
+  it('proposes enough units for 14 days of average sales and records the evidence', () => {
+    const draft = draftProposal(evidence);
+    expect(draft).toMatchObject({ store_id: 2, product_id: 112, quantity: 120 });
+    expect(draft.rationale).toContain('Free-range eggs (SKU-112) at Riverside Market');
+    expect(draft.rationale).toContain('2.0 days of cover, 91.3% in stock over the last 28 days');
+    expect(validateProposal(draft)).toEqual([]);
+  });
+
+  it('keeps the quantity within the proposal bounds', () => {
+    expect(draftProposal({ ...evidence, on_hand: 5000 }).quantity).toBe(1);
+    expect(draftProposal({ ...evidence, units_sold: 10_000_000 }).quantity).toBe(MAX_QUANTITY);
+    expect(draftProposal({ ...evidence, units_sold: 0, days_cover: null }).rationale).toContain('no sales');
   });
 });

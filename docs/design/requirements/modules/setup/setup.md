@@ -32,9 +32,11 @@ Besides the preset store profiles, configuration shall accept a business name
 and build a custom layout for it once with GitHub Copilot: a store profile,
 departments, products, and brands aligned with what the business sells, with
 brand names and product titles changed from the real ones, plus a
-brand-inspired color palette. The operator shall review the layout before it
+brand-inspired color palette and, when Wikimedia Commons has one, the
+business's current logo. The operator shall review the layout before it
 is used. The accepted layout shall be saved per environment, and generation,
-the Power BI and twins reports, the Fabric Apps, and planning sheets shall
+the Power BI and twins reports (colors, page backgrounds, and logo or business
+name in page headers), the Fabric Apps, and planning sheets shall
 apply it deterministically without calling Copilot again.
 
 See [the CLI specification](../../../specifications/modules/setup/cli.md).

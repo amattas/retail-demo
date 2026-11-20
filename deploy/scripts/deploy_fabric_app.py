@@ -1,12 +1,22 @@
-"""Deploy the three Retail Operations Fabric Apps with the Rayfin CLI.
+"""Deploy the two Retail Operations Fabric Apps with the Rayfin CLI.
 
-``app/fabric-app`` is one codebase that ships as three standalone Fabric App
-items for separate business functions: ``retail-merchandising``,
-``retail-promotions``, and ``retail-approvals``. The apps do not link to or
-depend on each other. Each app is staged under ``deploy/.generated/<env>/fabric-apps/<variant>`` with its
-own ``rayfin.yml`` identity and Rayfin deployment registry, and is built with
-``VITE_APP_VARIANT`` so the bundle contains only that workspace. Staged copies
-share the source project's ``node_modules`` through a directory link.
+``app/fabric-app`` is one codebase that ships as two standalone Fabric App
+items:
+
+- ``retail-approvals``: Merchandising & Replenishment (variant
+  ``merchandising``). Item performance and replenishment proposals/approvals
+  share this item's database, so a planner can propose replenishment straight
+  from an item. It keeps the item name that first held the approvals data, so
+  existing proposals and decisions carry over.
+- ``retail-promotions``: Promotion Studio (variant ``promotions``).
+
+The apps do not link to or depend on each other. Each app is staged under
+``deploy/.generated/<env>/fabric-apps/<stage_dir>`` with its own ``rayfin.yml``
+identity and Rayfin deployment registry, and is built with ``VITE_APP_VARIANT``
+so the bundle contains only its pages. Staged copies share the source
+project's ``node_modules`` through a directory link. A workspace deployed
+before the merge keeps a ``retail-merchandising`` item; it is reported as
+retired and left for the operator to delete.
 
 A new app learns its hosting origin only after the first ``rayfin up``; it is
 then deployed once more with that origin allowed so Fabric sign-in works
@@ -35,7 +45,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from retail_setup.customization.store import active_theme
+from retail_setup.customization.logo import Logo
+from retail_setup.customization.store import active_logo, active_theme
 from retail_setup.customization.theme import Theme, app_css
 
 from deploy.scripts import _output as console
@@ -55,17 +66,20 @@ _SKIP_RAYFIN = frozenset({".temp", ".deployments.json"})
 class FabricApp:
     variant: str
     item_name: str
+    stage_dir: str
 
 
+# The source project's rayfin.yml identity; that item's data is adopted.
+SOURCE_ITEM = "retail-approvals"
 FABRIC_APPS = (
-    FabricApp("approvals", "retail-approvals"),
-    FabricApp("merchandising", "retail-merchandising"),
-    FabricApp("promotions", "retail-promotions"),
+    FabricApp("merchandising", SOURCE_ITEM, "approvals"),
+    FabricApp("promotions", "retail-promotions", "promotions"),
 )
-# Mirrors APPS[...].title in app/fabric-app/src/config/apps.ts for static <title>s.
+# Items earlier versions deployed whose function moved into another app.
+RETIRED_APPS = {"merchandising": "retail-merchandising"}
+# Mirrors VARIANTS[...].title in app/fabric-app/src/config/apps.ts for static <title>s.
 _TITLES = {
-    "approvals": "Replenishment Approvals",
-    "merchandising": "Merchandising Portal",
+    "merchandising": "Merchandising & Replenishment",
     "promotions": "Promotion Studio",
 }
 
@@ -149,7 +163,7 @@ def stage_app(source: Path, staging: Path, app: FabricApp) -> Path:
                 shutil.rmtree(entry)
             else:
                 entry.unlink()
-    if app.variant == "approvals" and not (rayfin / ".deployments.json").exists():
+    if app.item_name == SOURCE_ITEM and not (rayfin / ".deployments.json").exists():
         # Adopt the item first deployed from the source project so its data stays.
         for entry in (source / "rayfin").glob(".*"):
             if entry.is_file() and entry.name.startswith(_KEEP_RAYFIN):
@@ -160,8 +174,15 @@ def stage_app(source: Path, staging: Path, app: FabricApp) -> Path:
     return staging
 
 
-def apply_brand(project: Path, theme: Theme, app: FabricApp) -> None:
-    """Brand a staged app: CSS token overrides and the HTML title (source untouched)."""
+BRAND_LOGO = Path("src") / "assets" / "brand-logo.svg"
+
+
+def apply_brand(project: Path, theme: Theme, app: FabricApp, logo: Logo | None = None) -> None:
+    """Brand a staged app: CSS tokens, HTML title, and logo (source untouched).
+
+    The app bundles ``src/assets/brand-logo.svg`` when it exists (see
+    ``brandLogoUrl`` in ``src/config/apps.ts``).
+    """
 
     stylesheet = project / "src" / "main.css"
     stylesheet.write_text(
@@ -174,6 +195,12 @@ def apply_brand(project: Path, theme: Theme, app: FabricApp) -> None:
     if branded == text and f"<title>{title}</title>" not in text:
         raise RuntimeError(f"{index} has no <title> to brand.")
     index.write_text(branded, encoding="utf-8")
+    logo_path = project / BRAND_LOGO
+    if logo is None:
+        logo_path.unlink(missing_ok=True)
+    else:
+        logo_path.parent.mkdir(parents=True, exist_ok=True)
+        logo_path.write_bytes(logo.svg)
 
 
 def registry_urls(project: Path) -> list[str]:
@@ -198,12 +225,31 @@ def configure_identity(project: Path, app: FabricApp, source_origins: list[str])
     config["id"] = config["name"] = app.item_name
     inherited = [
         origin for origin in source_origins
-        if _is_local(origin) or app.variant == "approvals"
+        if _is_local(origin) or app.item_name == SOURCE_ITEM
     ]
     origins = list(dict.fromkeys(inherited + registry_urls(project)))
     config["services"]["auth"]["allowedRedirectUris"] = origins
     path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
     return origins
+
+
+def retired_apps(staging_root: Path) -> list[dict[str, Any]]:
+    """Retired app items this environment deployed earlier (from their old staging registry)."""
+
+    retired = []
+    for stage_dir, item_name in RETIRED_APPS.items():
+        registry = staging_root / stage_dir / "rayfin" / ".deployments.json"
+        if not registry.is_file():
+            continue
+        deployments = json.loads(registry.read_text(encoding="utf-8")).get("deployments", {})
+        for entry in deployments.values():
+            if isinstance(entry, dict) and entry.get("itemName") == item_name:
+                retired.append({
+                    "item_name": item_name,
+                    "fabric_item_id": entry.get("fabricItemId"),
+                    "workspace_id": entry.get("fabricWorkspaceId"),
+                })
+    return retired
 
 
 def _run_checked(
@@ -230,6 +276,7 @@ def deploy_app(
     environment: str = "default",
     dry_run: bool = False,
     theme: Theme | None = None,
+    logo: Logo | None = None,
     run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
     which: Callable[[str], str | None] = shutil.which,
 ) -> dict[str, Any]:
@@ -249,11 +296,11 @@ def deploy_app(
     source_origins = list(source_config["services"]["auth"].get("allowedRedirectUris") or [])
     staging_root = repo_root / "deploy" / ".generated" / environment / "fabric-apps"
     projects = {
-        app.variant: stage_app(source, staging_root / app.variant, app) for app in FABRIC_APPS
+        app.variant: stage_app(source, staging_root / app.stage_dir, app) for app in FABRIC_APPS
     }
     if theme is not None:
         for app in FABRIC_APPS:
-            apply_brand(projects[app.variant], theme, app)
+            apply_brand(projects[app.variant], theme, app, logo)
     up = [npx, "rayfin", "up", "--workspace-id", workspace_id, "--yes", "--json"]
     if tenant_id:
         up += ["--tenant", tenant_id]
@@ -275,7 +322,14 @@ def deploy_app(
             if dry_run or attempt or not hosting or hosting in origins:
                 break
         reports[app.variant] = {"item_name": app.item_name, "rayfin": _safe(payload) or {}}
-    return {"dry_run": dry_run, "apps": reports}
+    retired = [item for item in retired_apps(staging_root) if item["workspace_id"] == workspace_id]
+    for item in retired:
+        console.warn(
+            f"{item['item_name']} is retired: Merchandising now ships inside "
+            f"{SOURCE_ITEM} (Merchandising & Replenishment). Delete item "
+            f"{item['fabric_item_id']} from the workspace when it is no longer needed."
+        )
+    return {"dry_run": dry_run, "apps": reports, "retired_apps": retired}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -312,6 +366,7 @@ def main(argv: list[str] | None = None) -> int:
             environment=args.environment,
             dry_run=args.dry_run,
             theme=active_theme(args.repo_root, args.environment),
+            logo=active_logo(args.repo_root, args.environment),
         )
         report["status"] = "SUCCEEDED"
     except (OSError, RuntimeError, ValueError) as exc:

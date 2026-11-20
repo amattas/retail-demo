@@ -5,17 +5,19 @@ surfaces need, nudging lightness until text/background pairs meet WCAG AA so a
 pale or neon brand color never produces unreadable reports. Appliers rewrite
 *staged* copies only:
 
-- Power BI reports (:func:`apply_report_theme`): every hardcoded hex color is
-  remapped through the committed role map
-  ``fabric/powerbi/theme-color-roles.json`` and the custom theme's data colors
-  are replaced. Unmapped colors fail closed so new visuals cannot silently keep
-  the default palette.
+- Power BI reports (:func:`apply_report_theme`): every hardcoded hex color,
+  including colors inside embedded SVG wallpapers, is remapped through the
+  committed role map ``fabric/powerbi/theme-color-roles.json`` and the custom
+  theme's data colors are replaced. Unmapped colors fail closed so new visuals
+  cannot silently keep the default palette. Page headers gain the business
+  logo (or the business name in the brand color when there is no logo).
 - Fabric Apps (:func:`app_css`): CSS custom-property overrides.
 - Plans (:func:`apply_plan_theme`): sheet canvas wallpaper tint.
 """
 
 from __future__ import annotations
 
+import base64
 import json
 import re
 from collections.abc import Mapping
@@ -23,6 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from retail_setup.customization.logo import Logo
 from retail_setup.customization.spec import Palette
 
 HEX = re.compile(r"#[0-9A-Fa-f]{6}(?![0-9A-Fa-f])")
@@ -32,6 +35,14 @@ ROLE_MAP_PATH = Path("fabric") / "powerbi" / "theme-color-roles.json"
 # Report text placeholders that carry the demo's fictional company name.
 BRAND_TEXT_TOKENS = ("SmartRetail",)
 THEME_RESOURCE = "BrandTheme.json"
+LOGO_RESOURCE = "BrandLogo.svg"
+LOGO_VISUAL = "brand_logo"
+DATA_SVG = "data:image/svg+xml;base64,"
+# A trailing " — SmartRetail Live" or " — retail-twins" in a page title; branded
+# headers show the logo or business name first instead.
+_TITLE_BRAND_SUFFIX = re.compile(
+    r"\s*[—–-]\s*(?:" + "|".join(map(re.escape, (*BRAND_TEXT_TOKENS, "retail-twins"))) + r")\b.*$"
+)
 
 # Roles that keep their original color: white canvases, black text, and status
 # colors (good/warn/bad must stay recognizable regardless of brand).
@@ -100,6 +111,14 @@ class Theme:
     text_replacements: Mapping[str, str] = field(default_factory=dict)
 
     def role(self, name: str) -> str:
+        """Color for a role name; ``role~0.8`` is that role tinted 80% toward white."""
+
+        base, _, tint = name.partition("~")
+        if tint:
+            weight = float(tint)
+            if not 0 <= weight < 1:
+                raise ValueError(f"tint must be in [0, 1) in theme color role {name!r}")
+            return mix(self.role(base), WHITE, weight)
         if name.startswith("data_"):
             return self.data_colors[int(name.split("_", 1)[1]) - 1]
         value = getattr(self, name, None)
@@ -163,7 +182,8 @@ def report_colors(documents: Mapping[str, Any]) -> set[str]:
 
     def walk(value: Any) -> None:
         if isinstance(value, str):
-            found.update(match.upper() for match in HEX.findall(value))
+            text = _svg_text(value) if value.startswith(DATA_SVG) else value
+            found.update(match.upper() for match in HEX.findall(text))
         elif isinstance(value, Mapping):
             for item in value.values():
                 walk(item)
@@ -181,7 +201,15 @@ def _themable(path: str) -> bool:
     return "BaseThemes/" not in path and path.endswith(".json")
 
 
+def _svg_text(url: str) -> str:
+    return base64.b64decode(url[len(DATA_SVG) :]).decode("utf-8")
+
+
 def _rewrite(value: Any, colors: Mapping[str, str], texts: Mapping[str, str]) -> Any:
+    if isinstance(value, str) and value.startswith(DATA_SVG):
+        # Embedded wallpapers: recolor the SVG itself (its text is not report text).
+        svg = HEX.sub(lambda m: colors[m.group(0).upper()], _svg_text(value))
+        return DATA_SVG + base64.b64encode(svg.encode("utf-8")).decode("ascii")
     if isinstance(value, str):
         value = HEX.sub(lambda m: colors[m.group(0).upper()], value)
         for old, new in texts.items():
@@ -215,20 +243,209 @@ def _theme_document(theme: Theme) -> dict[str, Any]:
     }
 
 
+def _literal(value: str | int | float | bool) -> dict[str, Any]:
+    if isinstance(value, bool):
+        text = "true" if value else "false"
+    elif isinstance(value, str):
+        text = "'" + value.replace("'", "''") + "'"
+    else:
+        text = f"{value}D"
+    return {"expr": {"Literal": {"Value": text}}}
+
+
+def _registered_items(report: dict[str, Any]) -> list[dict[str, Any]]:
+    packages = report.setdefault("resourcePackages", [])
+    registered = next((p for p in packages if p.get("type") == "RegisteredResources"), None)
+    if registered is None:
+        registered = {"name": "RegisteredResources", "type": "RegisteredResources", "items": []}
+        packages.append(registered)
+    items: list[dict[str, Any]] = registered.setdefault("items", [])
+    return items
+
+
+def _register(report: dict[str, Any], name: str, kind: str) -> None:
+    items = _registered_items(report)
+    items[:] = [item for item in items if item.get("name") != name]
+    items.append({"name": name, "path": name, "type": kind})
+
+
+def _headers(documents: Mapping[str, Any]) -> list[str]:
+    """Paths of page-header textboxes (``*_header`` visuals)."""
+
+    return [
+        path
+        for path, document in documents.items()
+        if path.startswith("definition/pages/")
+        and path.endswith("/visual.json")
+        and isinstance(document, dict)
+        and str(document.get("name", "")).endswith("_header")
+        and document.get("visual", {}).get("visualType") == "textbox"
+    ]
+
+
+def _title_runs(header: dict[str, Any]) -> list[dict[str, Any]]:
+    general = header["visual"].get("objects", {}).get("general", [])
+    paragraphs = general[0].get("properties", {}).get("paragraphs", []) if general else []
+    runs: list[dict[str, Any]] = paragraphs[0].get("textRuns", []) if paragraphs else []
+    return runs
+
+
+def _strip_title_brand(documents: dict[str, Any]) -> dict[str, Any]:
+    """Drop " — SmartRetail Live"-style suffixes from header titles (copies only)."""
+
+    result = dict(documents)
+    for path in _headers(documents):
+        header = json.loads(json.dumps(documents[path]))
+        for run in _title_runs(header):
+            if isinstance(run.get("value"), str):
+                run["value"] = _TITLE_BRAND_SUFFIX.sub("", run["value"])
+        result[path] = header
+    return result
+
+
+# Bold Segoe UI averages under 0.54 em per character; textboxes pad ~12 px a side.
+_TITLE_EM_PER_CHAR = 0.54
+_TEXTBOX_PADDING = 24
+_MIN_TITLE_PT = 14
+
+
+def fit_title(runs: list[dict[str, Any]], box_width: float) -> None:
+    """Shrink the title runs' font so the title stays on one line in ``box_width``.
+
+    Branding adds a logo or name to every header, which can push a long title
+    onto a second line and clip the subtitle. The width estimate is conservative
+    and deterministic; titles never shrink below 14pt.
+    """
+
+    text = "".join(str(run.get("value", "")) for run in runs)
+    match = re.fullmatch(
+        r"(\d+(?:\.\d+)?)pt", str(runs[0].get("textStyle", {}).get("fontSize", ""))
+    )
+    if not text or match is None:
+        return
+    size = float(match.group(1))
+    needed = len(text) * size * 96 / 72 * _TITLE_EM_PER_CHAR
+    available = box_width - _TEXTBOX_PADDING
+    if needed <= available:
+        return
+    fitted = max(_MIN_TITLE_PT, int(size * available / needed))
+    for run in runs:
+        run.setdefault("textStyle", {})["fontSize"] = f"{fitted}pt"
+
+
+def logo_width(logo: Logo, header_width: float) -> int:
+    """Header logo tile width: about 56 px tall when it fits, 56-180 px wide.
+
+    The tile spans the header's height and the image scales to fit inside it,
+    so wide wordmarks shrink rather than crowd the title (at most a quarter of
+    the header).
+    """
+
+    limit = header_width * 0.25
+    return round(max(min(56 * logo.info.aspect, 180.0, limit), min(56.0, limit)))
+
+
+def _logo_visual(header: dict[str, Any], alt_text: str, name: str, width: float) -> dict[str, Any]:
+    position = header["position"]
+    hidden = [{"properties": {"show": _literal(False)}}]
+    return {
+        "$schema": header.get("$schema"),
+        "name": name,
+        "position": {
+            "x": position["x"],
+            "y": position["y"],
+            "z": position.get("z", 0),
+            "height": position["height"],
+            "width": width,
+        },
+        "visual": {
+            "visualType": "image",
+            "objects": {
+                "general": [
+                    {
+                        "properties": {
+                            "imageUrl": {
+                                "expr": {
+                                    "ResourcePackageItem": {
+                                        "PackageName": "RegisteredResources",
+                                        "PackageType": 1,
+                                        "ItemName": LOGO_RESOURCE,
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "imageScaling": [{"properties": {"imageScalingType": _literal("Fit")}}],
+            },
+            "visualContainerObjects": {
+                "background": hidden,
+                "border": hidden,
+                "dropShadow": hidden,
+                "title": hidden,
+                "general": [{"properties": {"altText": _literal(alt_text)}}],
+            },
+            "drillFilterOtherVisuals": True,
+        },
+    }
+
+
+def _brand_headers(documents: dict[str, Any], theme: Theme, logo: Logo | None) -> dict[str, Any]:
+    """Put the logo (or the brand-colored business name) at the start of every page header."""
+
+    result = dict(documents)
+    for path in _headers(documents):
+        header = json.loads(json.dumps(documents[path]))
+        position = header["position"]
+        runs = _title_runs(header)
+        if logo is not None:
+            width = logo_width(logo, position["width"])
+            visual_dir = path.rsplit("/", 2)[0]
+            name = f"{header['name']}_{LOGO_VISUAL}"
+            result[f"{visual_dir}/{name}/visual.json"] = _logo_visual(
+                header, f"{theme.display_name} logo", name, width
+            )
+            shift = width + 16
+            position["x"] = position["x"] + shift
+            position["width"] = position["width"] - shift
+        elif runs:
+            style = dict(runs[0].get("textStyle", {}))
+            runs[:0] = [
+                {"value": theme.display_name, "textStyle": {**style, "color": theme.accent}},
+                {
+                    "value": "  ·  ",
+                    "textStyle": {**style, "color": theme.muted_light, "fontWeight": "normal"},
+                },
+            ]
+        if runs:
+            fit_title(runs, position["width"])
+        result[path] = header
+    if logo is not None:
+        _register(result["definition/report.json"], LOGO_RESOURCE, "Image")
+        result[f"StaticResources/RegisteredResources/{LOGO_RESOURCE}"] = logo.svg
+    return result
+
+
 def apply_report_theme(
-    documents: dict[str, Any], theme: Theme, roles: Mapping[str, str]
+    documents: dict[str, Any],
+    theme: Theme,
+    roles: Mapping[str, str],
+    logo: Logo | None = None,
 ) -> dict[str, Any]:
     """Return PBIR ``documents`` (``{relative path: parsed JSON}``) themed for ``theme``.
 
     The report's registered custom theme gets the brand data colors; a report
-    without one gains a ``BrandTheme.json`` registered resource.
+    without one gains a ``BrandTheme.json`` registered resource. Page headers
+    show ``logo`` (added as the ``BrandLogo.svg`` bytes part), or the business
+    name in the brand color when there is no logo.
     """
 
     colors = _color_map(report_colors(documents), roles, theme)
     themed = {
         path: _rewrite(doc, colors, theme.text_replacements) if _themable(path) else doc
-        for path, doc in documents.items()
+        for path, doc in _strip_title_brand(documents).items()
     }
+    themed = _brand_headers(themed, theme, logo)
     report = themed["definition/report.json"]
     collection = report.setdefault("themeCollection", {})
     custom = collection.get("customTheme")
@@ -245,14 +462,7 @@ def apply_report_theme(
         **({"reportVersionAtImport": version} if version else {}),
         "type": "RegisteredResources",
     }
-    packages = report.setdefault("resourcePackages", [])
-    registered = next((p for p in packages if p.get("type") == "RegisteredResources"), None)
-    if registered is None:
-        registered = {"name": "RegisteredResources", "type": "RegisteredResources", "items": []}
-        packages.append(registered)
-    registered["items"] = [
-        item for item in registered.get("items", []) if item.get("name") != THEME_RESOURCE
-    ] + [{"name": THEME_RESOURCE, "path": THEME_RESOURCE, "type": "CustomTheme"}]
+    _register(report, THEME_RESOURCE, "CustomTheme")
     themed[f"StaticResources/RegisteredResources/{THEME_RESOURCE}"] = _theme_document(theme)
     return themed
 
@@ -266,20 +476,25 @@ def load_report_documents(report_dir: Path) -> dict[str, Any]:
     }
 
 
-def theme_report_dir(report_dir: Path, theme: Theme, roles: Mapping[str, str]) -> list[str]:
+def theme_report_dir(
+    report_dir: Path, theme: Theme, roles: Mapping[str, str], logo: Logo | None = None
+) -> list[str]:
     """Theme a staged on-disk PBIR report in place; return the rewritten paths."""
 
     documents = load_report_documents(report_dir)
-    themed = apply_report_theme(documents, theme, roles)
+    themed = apply_report_theme(documents, theme, roles, logo)
     changed = []
     for path, document in themed.items():
         if documents.get(path) == document:
             continue
         target = report_dir / path
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(
-            json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-        )
+        if isinstance(document, bytes):
+            target.write_bytes(document)
+        else:
+            target.write_text(
+                json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+            )
         changed.append(path)
     return changed
 

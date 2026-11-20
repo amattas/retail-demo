@@ -73,7 +73,7 @@ class FakeRayfin:
         ]
 
 
-def test_deploys_three_staged_apps_with_their_own_identity(tmp_path: Path):
+def test_deploys_two_staged_apps_with_their_own_identity(tmp_path: Path):
     source = _source(tmp_path)
     fake = FakeRayfin()
 
@@ -90,10 +90,9 @@ def test_deploys_three_staged_apps_with_their_own_identity(tmp_path: Path):
     up = next(command for command, _ in fake.calls if command[1] == "rayfin")
     assert up[3:] == ["--workspace-id", WS, "--yes", "--json", "--tenant", "tenant"]
     # Each app builds only its own variant and never receives another app's URL.
+    # Merchandising & Replenishment deploys to the item that holds the approvals data.
     assert [(cwd, env["VITE_APP_VARIANT"]) for cwd, env in fake.ups()] == [
-        ("approvals", "approvals"),
-        ("merchandising", "merchandising"),
-        ("merchandising", "merchandising"),
+        ("approvals", "merchandising"),
         ("promotions", "promotions"),
         ("promotions", "promotions"),
     ]
@@ -101,19 +100,24 @@ def test_deploys_three_staged_apps_with_their_own_identity(tmp_path: Path):
     # Only the new apps redeploy, once, to allow their own sign-in origin.
 
     staging = tmp_path / "deploy" / ".generated" / "dev" / "fabric-apps"
-    merch = staging / "merchandising"
-    identity = yaml.safe_load((merch / "rayfin" / "rayfin.yml").read_text(encoding="utf-8"))
-    assert identity["id"] == identity["name"] == "retail-merchandising"
+    promotions = staging / "promotions"
+    identity = yaml.safe_load((promotions / "rayfin" / "rayfin.yml").read_text(encoding="utf-8"))
+    assert identity["id"] == identity["name"] == "retail-promotions"
     assert identity["services"]["auth"]["allowedRedirectUris"] == [
-        "http://localhost:5173", "https://merchandising.example",
+        "http://localhost:5173", "https://promotions.example",
     ]
-    assert (merch / "src" / "main.tsx").exists()
-    assert (merch / "node_modules").exists()
-    assert not (merch / ".env.local").exists()
-    assert not (merch / "rayfin" / ".env").exists()
-    # Approvals adopts the existing item's registry so its data is kept.
-    assert (staging / "approvals" / "rayfin" / ".env").exists()
-    assert set(report["apps"]) == {"approvals", "merchandising", "promotions"}
+    assert (promotions / "src" / "main.tsx").exists()
+    assert (promotions / "node_modules").exists()
+    assert not (promotions / ".env.local").exists()
+    assert not (promotions / "rayfin" / ".env").exists()
+    # The combined app adopts the existing approvals item's registry so its data is kept.
+    combined = staging / "approvals"
+    assert (combined / "rayfin" / ".env").exists()
+    identity = yaml.safe_load((combined / "rayfin" / "rayfin.yml").read_text(encoding="utf-8"))
+    assert identity["id"] == "retail-approvals"
+    assert set(report["apps"]) == {"merchandising", "promotions"}
+    assert report["apps"]["merchandising"]["item_name"] == "retail-approvals"
+    assert report["retired_apps"] == []
     assert report["apps"]["promotions"]["item_name"] == "retail-promotions"
     assert report["apps"]["promotions"]["rayfin"]["deployment"]["hostingUrl"] == (
         "https://promotions.example"
@@ -125,7 +129,26 @@ def test_deploys_three_staged_apps_with_their_own_identity(tmp_path: Path):
         tmp_path, workspace_id=WS, tenant_id=None, environment="dev",
         run=rerun, which=_which,
     )
-    assert [cwd for cwd, _ in rerun.ups()] == ["approvals", "merchandising", "promotions"]
+    assert [cwd for cwd, _ in rerun.ups()] == ["approvals", "promotions"]
+
+
+def test_reports_the_retired_merchandising_item(tmp_path: Path):
+    _source(tmp_path)
+    old = tmp_path / "deploy" / ".generated" / "dev" / "fabric-apps" / "merchandising" / "rayfin"
+    old.mkdir(parents=True)
+    (old / ".deployments.json").write_text(json.dumps({"deployments": {"dev": {
+        "itemName": "retail-merchandising", "fabricItemId": "item-1", "fabricWorkspaceId": WS,
+    }}}), encoding="utf-8")
+
+    report = wrapper.deploy_app(
+        tmp_path, workspace_id=WS, tenant_id=None, environment="dev",
+        run=FakeRayfin(), which=_which,
+    )
+
+    assert report["retired_apps"] == [
+        {"item_name": "retail-merchandising", "fabric_item_id": "item-1", "workspace_id": WS}
+    ]
+    assert set(report["apps"]) == {"merchandising", "promotions"}
 
 
 def test_dry_run_flag_and_missing_node(tmp_path: Path):
@@ -135,7 +158,7 @@ def test_dry_run_flag_and_missing_node(tmp_path: Path):
     wrapper.deploy_app(tmp_path, workspace_id=WS, tenant_id=None, dry_run=True,
                        run=fake, which=_which)
     ups = [command for command, _ in fake.calls if command[1] == "rayfin"]
-    assert len(ups) == 3
+    assert len(ups) == 2
     assert all(command[-1] == "--dry-run" and "--tenant" not in command for command in ups)
     with pytest.raises(RuntimeError, match="Node.js"):
         wrapper.deploy_app(tmp_path, workspace_id=WS, tenant_id=None, which=lambda _: None)

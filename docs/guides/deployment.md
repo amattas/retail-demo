@@ -261,12 +261,15 @@ without stopping deployment.
   Agents are published. Fabric retires the old format on Jan 31, 2027. An
   old-format item is replaced only after a staged copy passes readback.
   Evidence: `deploy/.generated/<env>/ontology-report.json`.
-- **`deploy-fabric-app`** (standard and full-demo) deploys three Fabric Apps
-  from `app/fabric-app` with the Rayfin CLI: `retail-merchandising`,
-  `retail-promotions`, and `retail-approvals`. Each is staged under
-  `deploy/.generated/<env>/fabric-apps/<app>/` with its own Rayfin identity,
-  and a new app is deployed a second time in the same run once its sign-in
-  origin is known. The apps stand alone and do not link to each other. It needs
+- **`deploy-fabric-app`** (standard and full-demo) deploys two Fabric Apps
+  from `app/fabric-app` with the Rayfin CLI: `retail-approvals`, titled
+  **Merchandising & Replenishment** (item performance plus replenishment
+  proposals and approvals in one database), and `retail-promotions`. Each is
+  staged under `deploy/.generated/<env>/fabric-apps/<folder>/` with its own
+  Rayfin identity, and a new app is deployed a second time in the same run once
+  its sign-in origin is known. The apps stand alone and do not link to each
+  other. A `retail-merchandising` item from an earlier deployment is reported
+  as retired in the evidence (`retired_apps`); delete it when convenient. It needs
   Node.js 20+, the **Fabric Apps (preview)** tenant setting, and a capacity
   region that supports Fabric Apps. The first run can open a browser for the
   Rayfin sign-in. To deploy only the apps, run

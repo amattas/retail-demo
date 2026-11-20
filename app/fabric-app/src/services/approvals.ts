@@ -40,7 +40,40 @@ export interface ProposalView extends Proposal {
 }
 
 export const MAX_QUANTITY = 10000;
+export const TARGET_COVER_DAYS = 14;
 const EVIDENCE_MODE = 'synthetic-draft';
+
+/** What the merchandising view shows for one product at one store. */
+export interface StockEvidence {
+  store_id: number;
+  store_name: string;
+  product_id: number;
+  product_name: string;
+  sku: string;
+  units_sold: number;
+  period_days: number;
+  on_hand: number;
+  days_cover: number | null;
+  in_stock_rate: number;
+}
+
+/**
+ * A pre-filled proposal for one product at one store: enough units to cover
+ * TARGET_COVER_DAYS of the period's average daily sales, and a rationale that
+ * records the evidence the planner saw. The planner can edit both.
+ */
+export function draftProposal(evidence: StockEvidence): ProposalInput {
+  const daily = evidence.period_days > 0 ? evidence.units_sold / evidence.period_days : 0;
+  const shortfall = Math.ceil(daily * TARGET_COVER_DAYS - evidence.on_hand);
+  const quantity = Math.min(MAX_QUANTITY, Math.max(1, shortfall));
+  const cover = evidence.days_cover === null ? 'no sales to measure cover' : `${evidence.days_cover.toFixed(1)} days of cover`;
+  const rationale = `${evidence.product_name} (${evidence.sku}) at ${evidence.store_name}: `
+    + `${evidence.on_hand.toLocaleString('en-US')} units on hand, ${cover}, `
+    + `${evidence.in_stock_rate.toFixed(1)}% in stock over the last ${evidence.period_days} days `
+    + `(synthetic sample). ${quantity.toLocaleString('en-US')} units cover about ${TARGET_COVER_DAYS} days `
+    + `of average sales (${daily.toFixed(1)} a day).`;
+  return { store_id: evidence.store_id, product_id: evidence.product_id, quantity, rationale };
+}
 
 export function validateProposal(input: ProposalInput): string[] {
   const errors: string[] = [];

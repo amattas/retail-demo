@@ -43,6 +43,34 @@ describe('standalone pages', () => {
     expect(within(body).queryByText('Healthy')).toBeNull();
   });
 
+  it('proposes replenishment for an item straight from merchandising', async () => {
+    const user = userEvent.setup();
+    renderPage(<MerchandisingPage />);
+
+    await user.click(await screen.findByRole('button', { name: /Needs attention/ }));
+    const body = screen.getAllByRole('rowgroup')[1];
+    const [first] = within(body).getAllByRole('row');
+    const product = first.querySelector('.product-cell strong')!.textContent!;
+    await user.click(within(first).getByRole('button', { name: /^Propose replenishment for/ }));
+    const form = screen.getByRole('form', { name: 'Propose replenishment' });
+    const quantity = within(form).getByRole('spinbutton', { name: 'Quantity' }) as HTMLInputElement;
+    const rationale = within(form).getByRole('textbox', { name: 'Rationale' }) as HTMLTextAreaElement;
+    expect(Number(quantity.value)).toBeGreaterThan(0);
+    expect(rationale.value).toContain(product);
+
+    await user.selectOptions(within(form).getByRole('combobox', { name: 'Store' }), 'Northside Market');
+    expect(rationale.value).toContain('at Northside Market');
+    const proposed = Number(quantity.value);
+    await user.click(within(form).getByRole('button', { name: 'Submit for review' }));
+
+    expect(await screen.findByRole('link', { name: 'Open replenishment approvals' })).toBeInTheDocument();
+    const [proposal] = await listProposals();
+    expect(proposal).toMatchObject({
+      created_by: planner.id, store_id: 3, quantity: proposed, status: 'PENDING',
+    });
+    expect(proposal.rationale).toContain(product);
+  });
+
   it('submits a proposal that only another reviewer can decide', async () => {
     const user = userEvent.setup();
     renderPage(<ApprovalsPage />);

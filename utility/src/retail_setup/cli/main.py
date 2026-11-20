@@ -1425,11 +1425,21 @@ def customize(
         None, "--model", help="Copilot model ID (default: the account's default model)."
     ),
     yes: bool = typer.Option(False, "--yes", help="Accept the generated layout without review."),
+    logo_file: Optional[Path] = typer.Option(
+        None,
+        "--logo-file",
+        exists=True,
+        dir_okay=False,
+        help="Use this SVG as the business logo instead of Copilot's Wikimedia pick.",
+    ),
+    no_logo: bool = typer.Option(False, "--no-logo", help="Show the business name without a logo."),
 ) -> None:
     """Preview: create a custom business layout (products, brands, theme) with GitHub Copilot.
 
     Copilot is called once; the accepted layout is saved per environment and
     every later step (render, deploy, theming) applies it deterministically.
+    Copilot also picks the business's current logo from Wikimedia Commons search
+    results; the SVG is sanitized and saved with the layout.
     Select it with `retail-setup configure --store-type custom-<slug>`.
     """
     repo_root = repo_root.resolve()
@@ -1442,6 +1452,8 @@ def customize(
             from_spec=from_spec,
             model=model,
             assume_yes=yes,
+            logo_file=logo_file,
+            no_logo=no_logo,
         )
     except (CustomizationError, ValueError, OSError) as exc:
         typer.echo(f"Custom layout failed:\n{exc}", err=True)

@@ -8,11 +8,11 @@ from pathlib import Path
 
 import pytest
 import yaml
-from tests.customization_helpers import make_draft, make_spec
+from tests.customization_helpers import LOGO_SVG, make_draft, make_logo, make_spec
 from typer.testing import CliRunner
 
 from retail_setup.cli.main import app
-from retail_setup.customization import generator
+from retail_setup.customization import generator, logo
 from retail_setup.customization.spec import draft_problems, slugify
 from retail_setup.customization.store import (
     active_dictionary_root,
@@ -33,6 +33,13 @@ from retail_setup.dictionaries.loader import load_dictionaries
 
 PRESETS = ["grocery", "hardware", "luxury", "supercenter"]
 UTILITY = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(autouse=True)
+def _offline_logo(monkeypatch):
+    """CLI flows pick no logo unless a test opts in (no Wikimedia calls)."""
+
+    monkeypatch.setattr("retail_setup.cli._customize.choose_logo", lambda *_a, **_k: None)
 
 
 def _problems(draft, business: str = "Northwind Market") -> list[str]:
@@ -717,3 +724,186 @@ def test_product_words_may_use_percent():
     data = make_draft().model_dump()
     data["departments"][0]["categories"][0]["subcategories"][0]["modifiers"][0] = "2%"
     assert not _problems(type(make_draft()).model_validate(data))
+
+
+# ----- logos ------------------------------------------------------------------------
+
+
+def _claim(name, rank="normal", start=None, ended=False):
+    qualifiers = {}
+    if start:
+        qualifiers["P580"] = [{"datavalue": {"value": {"time": f"+{start}-01-01T00:00:00Z"}}}]
+    if ended:
+        qualifiers["P582"] = [{}]
+    return {"mainsnak": {"datavalue": {"value": name}}, "rank": rank, "qualifiers": qualifiers}
+
+
+def test_logo_selection_skips_former_logos():
+    claims = [
+        _claim("Northwind logo (1961-2019).svg", rank="preferred"),
+        _claim("Northwind 2001.svg", start=2001, ended=True),
+        _claim("Northwind old.svg", rank="deprecated"),
+        _claim("Northwind.png", start=2023),
+        _claim("Northwind 2015.svg", start=2015),
+        _claim("Northwind 2020.svg", start=2020),
+    ]
+    assert logo.select_logo_file(claims) == "Northwind 2020.svg"
+    assert logo.select_logo_file(claims[:4]) is None
+
+
+def test_logo_svg_is_sanitized():
+    raw = (
+        b'<?xml version="1.0"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "x.dtd">'
+        b'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '
+        b'viewBox="0 0 40 10" onload="alert(1)"><script>alert(2)</script>'
+        b"<foreignObject><p>x</p></foreignObject>"
+        b'<image xlink:href="https://evil.example/x.png"/><use xlink:href="#a"/>'
+        b'<rect id="a" width="40" height="10" style="fill:url(https://evil.example/f)"/></svg>'
+    )
+    clean, width, height = logo.sanitize_svg(raw)
+    text = clean.decode()
+    assert (width, height) == (40, 10)
+    for banned in ("script", "onload", "foreignObject", "evil.example", "DOCTYPE"):
+        assert banned not in text
+    assert 'href="#a"' in text
+    with pytest.raises(logo.LogoError, match="entities"):
+        logo.sanitize_svg(
+            b'<!DOCTYPE svg [<!ENTITY x "y">]><svg xmlns="http://www.w3.org/2000/svg"/>'
+        )
+
+
+def _commons_page(title, index):
+    return {
+        "title": f"File:{title}",
+        "index": index,
+        "imageinfo": [
+            {
+                "mime": "image/svg+xml",
+                "width": 200,
+                "height": 50,
+                "timestamp": "2024-01-01T00:00:00Z",
+                "extmetadata": {},
+            }
+        ],
+    }
+
+
+def _wikimedia(files: dict[str, str]):
+    """Fake Wikimedia: no Wikidata match; Commons search returns ``files``."""
+
+    fetched: list[str] = []
+
+    def fetch(url: str) -> bytes:
+        fetched.append(url)
+        if "wbsearchentities" in url:
+            return b'{"search": []}'
+        if "generator=search" in url:
+            pages = {str(i): _commons_page(title, i) for i, title in enumerate(files)}
+            return json.dumps({"query": {"pages": pages}}).encode()
+        for title, svg in files.items():
+            if url.endswith(title.replace(" ", "_")):
+                return svg.encode()
+        raise AssertionError(f"unexpected fetch {url}")
+
+    return fetch, fetched
+
+
+class _LogoChat:
+    """Searches once with the session's tool, then gives the scripted answers."""
+
+    def __init__(self, tools, answers):
+        self.tools, self.answers, self.prompts = tools, list(answers), []
+
+    async def ask(self, prompt, response_type):
+        if not self.prompts:
+            await self.tools[0].handler(self.tools[0].params(query="Northwind logo"))
+        self.prompts.append(prompt)
+        return response_type(**self.answers.pop(0))
+
+
+def test_copilot_must_pick_a_current_logo_from_search_results():
+    fetch, fetched = _wikimedia(
+        {"Northwind logo (1990-2010).svg": LOGO_SVG, "Northwind logo.svg": LOGO_SVG}
+    )
+    chats = []
+
+    @asynccontextmanager
+    async def factory(_model, *, tools=()):
+        chats.append(
+            _LogoChat(
+                tools,
+                [
+                    {"file": "Northwind Market 2024.svg", "reason": "remembered"},
+                    {"file": "Northwind logo (1990-2010).svg", "reason": "classic"},
+                    {"file": "File:Northwind logo.svg", "reason": "current wordmark"},
+                ],
+            )
+        )
+        yield chats[0]
+
+    picked = generator.choose_logo("Northwind Market", chat_factory=factory, fetch=fetch)
+
+    assert picked is not None and picked.info.title == "Northwind logo.svg"
+    assert picked.info.page_url.endswith("File:Northwind_logo.svg")
+    prompts = chats[0].prompts
+    assert "not returned by search_wikimedia_logos" in prompts[1]
+    assert "former logo" in prompts[2]
+    assert sum("Special:FilePath" in url for url in fetched) == 1
+
+
+def test_logo_falls_back_to_none_when_copilot_and_wikidata_have_nothing():
+    fetch, _ = _wikimedia({})
+
+    @asynccontextmanager
+    async def broken(_model, *, tools=()):
+        raise generator.CustomizationError("provider unavailable")
+        yield
+
+    messages: list[str] = []
+    assert (
+        generator.choose_logo(
+            "Northwind Market", chat_factory=broken, fetch=fetch, progress=messages.append
+        )
+        is None
+    )
+    assert any("provider unavailable" in m for m in messages)
+
+
+def test_saved_wikimedia_logo_is_restored_by_name_and_hash(tmp_path):
+    fetch, _ = _wikimedia({"Northwind logo.svg": LOGO_SVG})
+    original = logo.download_logo("Northwind logo.svg", fetch)
+
+    restored = logo.restore_logo(tmp_path, original.info, fetch)
+
+    assert restored is not None and restored.svg == original.svg
+    assert (tmp_path / logo.LOGO_FILE).read_bytes() == original.svg
+    (tmp_path / logo.LOGO_FILE).unlink()
+    changed, _ = _wikimedia({"Northwind logo.svg": LOGO_SVG.replace('width="200"', 'width="300"')})
+    with pytest.raises(logo.LogoError, match="changed since the layout was saved"):
+        logo.restore_logo(tmp_path, original.info, changed)
+
+
+def test_customize_logo_file_and_no_logo_options(tmp_path):
+    save_spec(make_spec(), customization_dir(tmp_path, "dev"))
+    source = make_logo(tmp_path)
+    base = ["customize", "--repo-root", str(tmp_path), "--env", "dev"]
+
+    result = runner.invoke(app, [*base, "--logo-file", str(tmp_path / "source-logo.svg")])
+
+    assert result.exit_code == 0, result.output
+    directory = customization_dir(tmp_path, "dev")
+    spec = active_spec_from(directory)
+    assert spec.logo == source.info and spec.logo.source == "file"
+    assert (directory / logo.LOGO_FILE).read_bytes() == source.svg
+
+    result = runner.invoke(app, [*base, "--no-logo"])
+
+    assert result.exit_code == 0, result.output
+    assert active_spec_from(directory).logo is None
+    assert not (directory / logo.LOGO_FILE).exists()
+
+
+def active_spec_from(directory: Path):
+    from retail_setup.customization.store import load_spec
+
+    return load_spec(directory)

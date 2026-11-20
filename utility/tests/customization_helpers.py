@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+from retail_setup.customization.logo import Logo, logo_from_file
 from retail_setup.customization.spec import (
     CustomizationDraft,
     CustomizationSpec,
@@ -124,3 +127,17 @@ def make_spec(**overrides: object) -> CustomizationSpec:
         presets=PRESETS,
         generator=FIXTURE_GENERATOR,
     )
+
+
+LOGO_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 50">'
+    '<rect width="200" height="50" fill="#1A5D3A"/></svg>'
+)
+
+
+def make_logo(directory: Path) -> Logo:
+    """A sanitized 4:1 wordmark logo read from ``directory/source-logo.svg``."""
+
+    path = directory / "source-logo.svg"
+    path.write_text(LOGO_SVG, encoding="utf-8")
+    return logo_from_file(path)

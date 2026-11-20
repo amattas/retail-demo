@@ -189,6 +189,20 @@ export function merchandisingView(filters: MerchFilters, asOf = SAMPLE_AS_OF) {
   };
 }
 
+/**
+ * One product's row at each store for the period, the store with the least
+ * cover first (no sales to measure cover sorts last).
+ */
+export function stockByStore(
+  productId: number, days: number, asOf = SAMPLE_AS_OF
+): { store: (typeof STORES)[number]; row: MerchRow }[] {
+  return STORES.flatMap((store) => {
+    const view = merchandisingView({ ...DEFAULT_FILTERS, store: String(store.id), days }, asOf);
+    const row = view.rows.find((item) => item.id === productId);
+    return row ? [{ store, row }] : [];
+  }).sort((a, b) => (a.row.daysCover ?? Infinity) - (b.row.daysCover ?? Infinity));
+}
+
 export function groupTrend(points: TrendPoint[], granularity: Granularity): TrendPoint[] {
   const size = granularity === 'day' ? 1 : granularity === 'week' ? 7 : 28;
   const result: TrendPoint[] = [];

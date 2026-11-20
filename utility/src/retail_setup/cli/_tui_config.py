@@ -26,7 +26,12 @@ from retail_setup.cli import main as cli
 from retail_setup.cli._customize import CUSTOM_CHOICE
 from retail_setup.cli._tui_runner import PHASES, TargetChoice
 from retail_setup.contracts.models import Profile
-from retail_setup.customization.generator import CustomizationError, generate_spec
+from retail_setup.customization.generator import (
+    CustomizationError,
+    choose_logo,
+    generate_spec,
+)
+from retail_setup.customization.logo import Logo, save_logo
 from retail_setup.customization.preview import preview
 from retail_setup.customization.sdk import install_sdk, sdk_installed
 from retail_setup.customization.spec import CustomizationSpec, validate_business_name
@@ -114,7 +119,16 @@ def _layout_preview(spec: CustomizationSpec, *, pending: bool) -> Text:
         style="#a6adc8",
     )
     text.append("Brands: " + ", ".join(view.brands[:8]) + "\n", style="#a6adc8")
-    text.append("e.g. " + "; ".join(view.sample_products), style="grey62")
+    text.append("e.g. " + "; ".join(view.sample_products) + "\n", style="grey62")
+    if spec.logo is not None:
+        origin = "Wikimedia Commons" if spec.logo.source == "wikimedia" else "your file"
+        text.append(f"Logo: {spec.logo.title} ({origin})", style="#a6adc8")
+    else:
+        text.append(
+            "Logo: none found; reports show the name only "
+            "(supply one with `retail-setup customize --logo-file`)",
+            style="grey62",
+        )
     if pending:
         text.append("\nReview, then use this layout or regenerate.", style="#f9e2af")
     return text
@@ -162,6 +176,7 @@ class ConfigScreen(Screen[TargetChoice | None]):
         # Accepted custom layout for the current environment, and one awaiting review.
         self._custom: CustomizationSpec | None = None
         self._pending: CustomizationSpec | None = None
+        self._pending_logo: Logo | None = None
         self._generating = False
 
     # ----- layout -------------------------------------------------------------
@@ -424,7 +439,8 @@ class ConfigScreen(Screen[TargetChoice | None]):
             )
             intro.append(
                 "GitHub Copilot drafts departments, fictionalized brands, products, and a "
-                "brand color theme once; every deployment step then applies it "
+                "brand color theme once, and picks the business logo from Wikimedia "
+                "Commons; every deployment step then applies them "
                 "deterministically. Generation takes about one to three minutes.",
                 style="grey62",
             )
@@ -461,17 +477,21 @@ class ConfigScreen(Screen[TargetChoice | None]):
             if not sdk_installed():
                 install_sdk(self.repo_root, progress=progress)
             spec = generate_spec(name, progress=progress)
+            logo = choose_logo(name, progress=progress)
         except (CustomizationError, ValueError, OSError) as exc:
-            self.app.call_from_thread(self._generation_finished, None, str(exc))
+            self.app.call_from_thread(self._generation_finished, None, None, str(exc))
         else:
-            self.app.call_from_thread(self._generation_finished, spec, None)
+            spec = spec.model_copy(update={"logo": None if logo is None else logo.info})
+            self.app.call_from_thread(self._generation_finished, spec, logo, None)
 
     def _generation_progress(self, message: str) -> None:
         self.query_one("#layout-preview", Static).update(Text(message, style="#89dceb"))
 
-    def _generation_finished(self, spec: CustomizationSpec | None, error: str | None) -> None:
+    def _generation_finished(
+        self, spec: CustomizationSpec | None, logo: Logo | None, error: str | None
+    ) -> None:
         self._generating = False
-        self._pending = spec
+        self._pending, self._pending_logo = spec, logo
         self._render_custom_controls()
         if error is not None:
             self.query_one("#layout-preview", Static).update(Text(f"✗ {error}", style="#f38ba8"))
@@ -487,11 +507,12 @@ class ConfigScreen(Screen[TargetChoice | None]):
         directory = customization_dir(self.repo_root, defaults.env)
         try:
             save_spec(spec, directory)
+            save_logo(directory, self._pending_logo)
             materialize(spec, directory)
         except (OSError, ValueError) as exc:
             panel.update(Text(f"✗ Could not save the layout: {exc}", style="#f38ba8"))
             return
-        self._custom, self._pending = spec, None
+        self._custom, self._pending, self._pending_logo = spec, None, None
         self._refresh_store_types(selected=spec.store_type)
         self._render_custom_controls()
         self._schedule()

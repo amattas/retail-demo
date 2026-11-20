@@ -271,7 +271,7 @@ any prompt is sent. Saved layouts and `--from-spec` never need the SDK.
 
 Generation (`retail_setup.customization.generator`):
 
-1. One isolated session: SDK `empty` mode, no tools, every permission request
+1. One isolated session: SDK `empty` mode, no built-in tools, every permission request
    rejected, a temporary state directory, and the SDK's own pinned runtime. An
    inherited `COPILOT_CLI_PATH` is dropped because a surrounding Copilot CLI may
    speak a different protocol version. Authentication uses the signed-in
@@ -291,17 +291,36 @@ Generation (`retail_setup.customization.generator`):
    Department names become brand categories so generation matches brands by
    department; each department carries an explicit `Taxability` and each
    category a `Refrigerated` flag, emitted into `products.json`.
+5. Logo (`choose_logo`, `retail_setup.customization.logo`): a second isolated
+   session with one read-only custom tool, `search_wikimedia_logos`, which
+   searches Wikimedia Commons for SVG files (at most six searches). The prompt
+   also lists the logos Wikidata records for the business (`P154`), with former
+   logos flagged. Copilot answers with one file name or none. The pick must be
+   a file a search returned or Wikidata listed in that session and must not be
+   a former logo (Wikidata end date, deprecated rank, or a `(1961-2019)`-style
+   name); otherwise the problem goes back to Copilot, up to two repairs. The
+   code, never the model, downloads the file from Wikimedia hosts only (HTTPS,
+   1 MB cap) and sanitizes it: entity and internal DTD declarations are
+   rejected; scripts, `foreignObject`, animation, event attributes, external
+   `href`s, and unsafe CSS are removed. If the session fails, the deterministic
+   fallback is Wikidata's current `P154` SVG. No logo is not an error: headers
+   then show the business name.
 
-Interactive runs show a preview (palette, departments, brands, sample
-products) and offer accept, regenerate, or cancel. `--yes` accepts the draft.
-`--regenerate` replaces a saved layout; `--from-spec <file>` uses an existing
-`customization.json` without Copilot.
+Interactive runs show a preview (palette, logo, departments, brands, sample
+products) and offer accept, regenerate, or cancel. Regenerating keeps the chosen
+logo. `--yes` accepts the draft. `--regenerate` replaces a saved layout;
+`--from-spec <file>` uses an existing `customization.json` without Copilot and
+re-downloads a missing Wikimedia logo by its recorded name, failing unless it
+matches the recorded SHA-256. `--logo-file <file.svg>` uses an operator SVG
+(sanitized the same way) and `--no-logo` removes the logo; both apply to new
+and saved layouts.
 
 Storage (ignored by Git):
 
 | Path | Content |
 | --- | --- |
-| `utility/config/environments/<env>.customization/customization.json` | The accepted spec |
+| `utility/config/environments/<env>.customization/customization.json` | The accepted spec, including the logo's provenance (`source`, Commons `title` and page, Wikidata ID, SHA-256, size) |
+| `utility/config/environments/<env>.customization/logo.svg` | The sanitized logo; deployment verifies it against the spec's SHA-256 |
 | `utility/config/environments/<env>.customization/dictionaries/` | `_shared` copies and `custom-<slug>/{profile,products,brands}.json`, rebuilt from the spec when its SHA-256 (`.spec-sha256`) changes |
 
 The generation YAML stores only `store_type: custom-<slug>`. `configure`,
