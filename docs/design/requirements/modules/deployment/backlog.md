@@ -69,5 +69,6 @@
   and the default-workspace sentinel resolved natively by `fabric-cicd`, not
   generated per-notebook parameter rules.
 - `fabric-cicd` bulk publish stays opt-in while its upstream API is
-  experimental and post-ontology Data Agent publication needs dynamic
-  target-item resolution.
+  experimental. Dynamic target-item resolution in bulk mode, which the
+  post-ontology Data Agent phase needs, is available since `fabric-cicd` 1.4.0
+  but has no live proof yet.
