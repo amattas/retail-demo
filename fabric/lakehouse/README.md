@@ -25,8 +25,10 @@ Lakehouse Silver (`ag`) and Gold (`au`).
 These two notebooks remain for older or specialized flows. They are not the
 current historical bootstrap:
 
-- `01-create-bronze-shortcuts.ipynb` creates Lakehouse shortcuts to Eventhouse
-  tables for the optional live projection path.
+- `01-create-bronze-shortcuts.ipynb` guides manual creation of the Lakehouse
+  shortcuts to the 18 Eventhouse event tables for the optional live projection
+  path, and fails when any of them is missing or unreadable. Its ADLS parquet
+  shortcuts are optional and only feed the retained 02 loader.
 - `02-historical-data-load.ipynb` is the retained legacy historical loader.
   The supported path now uses setup notebooks 01 through 04 rendered from
   `utility/`. If the retained loader is used, it requires each parquet input to
@@ -42,11 +44,18 @@ Notable groups in this directory:
 
 - `03-streaming-to-silver` and `04-streaming-to-gold`: optional Eventhouse to
   Lakehouse projection
-- `05-maintain-delta-tables`: maintenance, including the owned streaming-only
-  `fact_online_order_status` and `ag._watermarks` processing/reconciliation
-  state
-- `06` through `14`: ML and advanced analytics
-- `30-create-ontology`: ontology creation and Eventhouse TimeSeries bindings
+- `05-maintain-delta-tables`: maintenance of every Silver, Gold and ML table
+  in the contracts, including the owned streaming-only
+  `fact_online_order_status`, `ag._watermarks` and `setup_run_log`
+- `06` through `14`: ML and advanced analytics. `14` also appends `PENDING`
+  pricing recommendations to the Eventhouse approval workflow.
+- `16-persist-anomaly-alerts`: runs in `streaming-data-load` and appends new
+  Eventhouse anomaly alerts plus a detection-run record
+- `17-refresh-availability-signals`: runs in `daily-maintenance` after `06`
+  and `12` and reseeds the Operations Agent's `ops_availability_signals`
+- `30-create-ontology`: legacy-format ontology creation. It mirrors the
+  canonical deploy builder (`deploy/scripts/_ontology_model.py`) and is
+  historical-only; its Eventhouse TimeSeries bindings stay disabled
 - `90` and `99`: manual augmentation/reset utilities
 
 See the [historical data contract](../../docs/design/specifications/modules/generation/data-contract.md),

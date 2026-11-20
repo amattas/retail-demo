@@ -95,7 +95,7 @@ flowchart LR
     Gold[(Gold)] --> Model --> Report[Power BI report]
     Silver --> Ontology[Ontology]
     Gold --> Ontology
-    Event[(Eventhouse)] -->|TimeSeries context| Ontology
+    Event[(Eventhouse)] -.->|TimeSeries context, disabled| Ontology
     Model --> SMAgent[Semantic-model agent]
     Ontology --> OntAgent[Ontology agent]
 ```

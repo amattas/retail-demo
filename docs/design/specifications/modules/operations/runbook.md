@@ -27,10 +27,10 @@ retail-setup verify --env <env>
 ```
 
 It is read-only by default and writes the redacted, atomic
-`deploy/.generated/<env>/readiness-report.json`. The 26-row taxonomy covers
+`deploy/.generated/<env>/readiness-report.json`. The 27-row taxonomy covers
 target identity (1), item inventory (2), live definitions and bindings (6),
 task flow (1), KQL objects (4), schedules (1), pipeline results (3), and
-freshness (8). Only unselected capabilities may be `SKIPPED`.
+freshness (9). Only unselected capabilities may be `SKIPPED`.
 
 Required `FAIL` or `UNKNOWN` produces `FAILED` and exit `1`. Optional `FAIL` or
 `UNKNOWN` produces `DEGRADED` and exit `3`; full success exits `0`, and command
@@ -66,8 +66,8 @@ still fails the deployment when a required table is not queryable.
 | --- | --- | --- |
 | `setup-pipeline` | Setup 01-10 (02-05 and 06-08 in parallel) | On demand; mandatory for Reporting profiles |
 | `historical-data-load` | Retained historical-load notebook | On demand |
-| `streaming-data-load` | Streaming Silver then Gold | Committed disabled, every 30 minutes; `schedules.streaming_data_load` enables it |
-| `daily-maintenance` | Delta maintenance | Committed disabled, daily 00:00 Eastern; enabled by `schedules.daily_maintenance` (default) |
+| `streaming-data-load` | Streaming Silver then Gold, with `16-persist-anomaly-alerts` in parallel | Committed disabled, every 30 minutes (UTC); `schedules.streaming_data_load` enables it |
+| `daily-maintenance` | Delta maintenance, then `06-ml-demand-forecast` and `12-ml-stockout-prediction`, then `17-refresh-availability-signals` | Committed disabled, daily 00:00 Eastern; enabled by `schedules.daily_maintenance` (default) |
 | `ml-required` | Demand, segmentation, churn, stockout, market-basket, and promotion/elasticity producers, then runtime contract validation | Terminal Reporting gate |
 | `ml-optional` | Promoted optional outputs | Full-demo post-Reporting |
 | `ml-experimental` | Experimental outputs (consumes `price_elasticity` from `ml-required`) | Full-demo post-Reporting |
@@ -100,7 +100,8 @@ The verifier evaluates these signals together:
 | Required model outputs | Yes | The six Reporting models were published by the required pipeline. |
 | Optional model outputs | No | Full-demo optional outputs are recent or have a valid empty snapshot. |
 | Experimental model outputs | No | Full-demo experimental outputs are recent or have a valid empty snapshot. |
-| Alerts | No | Optional alert queries are available and recent when rows exist. |
+| Alerts | No | Scheduled anomaly detection has run recently. No `anomaly_detection_runs` row is `UNKNOWN`; a last run older than three streaming intervals is `FAIL` when the streaming schedule is enabled and `UNKNOWN` when it is not. An empty `anomaly_alerts` table passes only with recent run evidence. |
+| Operations signals | No | The Operations Agent's newest `source_as_of`/`forecast_as_of` is inside its seven-day window. Older or missing signals are `UNKNOWN`, because the agent's query then returns no case; a disabled agent passes with `enabled=false`. |
 
 ### Console severity versus report status
 
@@ -153,7 +154,11 @@ taxonomy row or make streaming a required deployment capability.
 - Receipt and inventory shortcut-to-Silver key anti-joins sample ingestion
   timestamps from each source checkpoint minus 24 hours up to checkpoint
   minus three hours. The newest overlap is excluded for OneLake visibility.
-- Receipt identity uses `receipt_id_ext`; inventory identity uses `trace_id`.
+- Receipt identity joins Silver `receipt_id_ext` to the Eventhouse
+  `receipt_created.receipt_id` column; inventory identity uses `trace_id`.
+  The test fixture builds `cusn` tables from `01-create-tables.kql`, `ag`/`au`
+  tables from `schemas.TABLES`, and `ag._watermarks` from notebook 03, so a
+  renamed column fails the test.
 - Recent Silver inventory rows are checked for null balances, and receipts
   for missing store or non-null customer dimension keys. These integrity
   scans start at the respective window's lower bound; unlike the ingestion
@@ -163,6 +168,15 @@ taxonomy row or make streaming a required deployment capability.
   capped by both the settled receipt cutoff and Gold's latest timestamp;
   receipt counts must match and a cents difference greater than one is a
   mismatch.
+
+The same check compares each Eventhouse event table's newest
+`ingest_timestamp` with its Silver watermark. When Silver is behind, the
+backlog age is measured from the watermark (or from the oldest row of a table
+Silver never processed) against that table's soft-delete retention in
+`01-create-tables.kql` (7 days for customer and BLE tables). A backlog older
+than three days is `UNKNOWN` with a warning to run `streaming-data-load`; a
+backlog at or beyond the table's retention is `FAIL`, because unprocessed
+events may already be purged.
 
 Missing/invalid evidence or an empty receipt, inventory, or sales sample is
 `UNKNOWN`, not a zero-defect success. An observed positive mismatch is `FAIL`.

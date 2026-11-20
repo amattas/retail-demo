@@ -345,8 +345,8 @@ leaves everything that runs continuously off:
 
 ```yaml
 schedules:
-  daily_maintenance: true      # daily-maintenance at 00:00 Eastern
-  streaming_data_load: false   # streaming Silver/Gold every 30 minutes
+  daily_maintenance: true      # maintenance, 06/12 ML and agent signal refresh at 00:00 Eastern
+  streaming_data_load: false   # streaming Silver/Gold and anomaly alerts every 30 minutes
 stream:
   start_after_deploy: false    # start stream-events after readiness
   rows_per_second: 5

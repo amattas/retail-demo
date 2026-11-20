@@ -15,7 +15,13 @@ verification evidence.
 
 The ontology shall represent business entities and relationships. Eventhouse
 tables shall bind as time-series context on those entities rather than become
-duplicate event entities.
+duplicate event entities. Each entity key shall identify one row of its
+backing table's grain, and relationship key columns shall share a type.
+
+Current state: the deployed ontology is historical-only. Event backing tables
+are disabled in the TMDL publisher (`_ENABLE_EVENT_BACKING_TABLES = False`)
+because the service rejects them, and `30-create-ontology.ipynb` keeps its
+Eventhouse bindings off to match.
 
 ### REQ-MLAI-004 - Governed agents (retired)
 

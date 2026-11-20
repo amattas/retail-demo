@@ -313,13 +313,18 @@ Run the following in your Fabric KQL Eventhouse:
    targeting the KQL Eventhouse tables created in Step 1
 3. Use `tableCreateOptions=FailIfNotExist` and `mode("Append")`
 
-### Step 4: Extend Pricing Notebook
-Modify `fabric/lakehouse/14-ml-dynamic-pricing.ipynb` to:
-1. Generate `recommendation_id` (use UUID)
-2. Calculate `expected_revenue_impact` (demand forecast * price change)
-3. Preserve nullable `ml_confidence`; do not invent a numeric score when the
-   experimental model has no calibrated confidence evidence
-4. Write `pricing_recommendation_created` events to the Eventhouse (Spark Kusto connector)
+### Step 4: Pricing notebook publication (implemented)
+`fabric/lakehouse/14-ml-dynamic-pricing.ipynb` now:
+1. Derives a deterministic `recommendation_id` from product, recommendation
+   date and recommended price, so reruns do not create a second pending row
+2. Maps `projected_revenue_impact_30d` to `expected_revenue_impact` (null for
+   rule-only rows)
+3. Preserves nullable `ml_confidence`; it does not invent a numeric score
+4. Appends one `PENDING` `pricing_recommendation_created` event per price
+   change not blocked by the weekly max-change rule, with `constraint_status`
+   `HAS_WARNINGS` when a margin or MSRP bound clamped the price and `ALL_PASS`
+   otherwise. Ids already in the Eventhouse are skipped.
+   Set `PUBLISH_APPROVAL_EVENTS=false` to skip publication.
 
 **Sample PySpark code:**
 ```python

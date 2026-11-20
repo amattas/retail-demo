@@ -41,7 +41,7 @@ flowchart LR
     Event --> Pipes --> Lake
     Lake --> Model --> Report
     Lake --> Ontology
-    Event -->|TimeSeries bindings| Ontology
+    Event -.->|TimeSeries bindings, disabled| Ontology
     Model --> Agents
     Ontology --> Agents
 ```
