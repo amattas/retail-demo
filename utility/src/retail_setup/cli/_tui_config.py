@@ -85,12 +85,19 @@ def _first_error(exc: Exception) -> str:
     return str(exc).splitlines()[0]
 
 
+def _preview_badge() -> Text:
+    """The same badge preview deployment profiles show."""
+
+    return Text(" preview ", style=f"bold #1e1e2e on {_STATUS_STYLE['preview']}")
+
+
 def _layout_preview(spec: CustomizationSpec, *, pending: bool) -> Text:
     """Swatches, departments, brands, and sample products for one custom layout."""
 
     view = preview(spec, samples=4)
     palette = spec.palette
-    text = Text()
+    text = _preview_badge()
+    text.append(" ")
     text.append(spec.display_name, style="bold #cdd6f4")
     text.append(f"  {spec.store_type} · based on {spec.base_preset}\n", style="grey62")
     for color in (palette.primary, palette.secondary, palette.accent, palette.dark, palette.light):
@@ -362,8 +369,10 @@ class ConfigScreen(Screen[TargetChoice | None]):
     def _store_type_options(self) -> list[tuple[str, str]]:
         options = [(name.title(), name) for name in self.store_types]
         if self._custom is not None:
-            options.append((f"{self._custom.display_name} (custom)", self._custom.store_type))
-        options.append(("Custom business… (needs GitHub Copilot)", CUSTOM_CHOICE))
+            options.append(
+                (f"{self._custom.display_name} (custom, preview)", self._custom.store_type)
+            )
+        options.append(("Custom business… (preview, needs GitHub Copilot)", CUSTOM_CHOICE))
         return options
 
     def _store_type_values(self) -> set[str]:
@@ -400,7 +409,8 @@ class ConfigScreen(Screen[TargetChoice | None]):
         if choosing and self._pending is not None:
             preview_panel.update(_layout_preview(self._pending, pending=True))
         elif choosing:
-            intro = Text()
+            intro = _preview_badge()
+            intro.append(" Custom business layouts are a preview feature.\n", style="#a6adc8")
             intro.append("! Requires GitHub Copilot. ", style="bold #f9e2af")
             install = (
                 ""

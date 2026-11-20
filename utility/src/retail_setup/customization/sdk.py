@@ -22,9 +22,9 @@ from retail_setup.customization.generator import (
 
 CUSTOMIZE_LOCK = Path("utility") / "requirements-customize.txt"
 REQUIREMENT_NOTE = (
-    "Custom layouts need a GitHub account with GitHub Copilot access, signed in with "
-    "`gh auth login` (or GH_TOKEN). The GitHub Copilot SDK is installed the first "
-    "time you generate a layout."
+    "Custom business layouts are a preview feature. They need a GitHub account with "
+    "GitHub Copilot access, signed in with `gh auth login` (or GH_TOKEN). The GitHub "
+    "Copilot SDK is installed the first time you generate a layout."
 )
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]

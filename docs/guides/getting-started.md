@@ -251,7 +251,7 @@ Review these choices:
 | Lakehouse | The Lakehouse stores historical and analytical tables. Keep the default name unless you are deliberately updating every checked-in reference. |
 | Eventhouse and KQL database | Eventhouse stores optional live events, and KQL (Kusto Query Language) queries them. Use the same display name for both in this demo. |
 | Profile and Spark pool | `core` and `standard` use the starter pool. `full-demo` validates and selects the custom pool. |
-| Store type | `supercenter`, `grocery`, `hardware`, or `luxury`, or `custom` for a layout built for a business you name (see [Custom business layouts](#custom-business-layouts)). |
+| Store type | `supercenter`, `grocery`, `hardware`, or `luxury`, or `custom` for a layout built for a business you name (see [Custom business layouts](#custom-business-layouts-preview)). |
 | History | `--months` defines a range ending yesterday. Reporting profiles use at least 18 months by default. |
 | Store count and seed | Control scale and deterministic reproduction. |
 
@@ -303,10 +303,11 @@ Configuration writes:
 `configure` prints the derived environment key. Keep the local overlay out of
 source control, and never add credentials or bearer tokens to configuration.
 
-### Custom business layouts
+### Custom business layouts (preview)
 
-Instead of a preset, you can build the demo around a business you name, such as
-Kroger, Walgreens, or Home Depot. GitHub Copilot drafts the layout **once**:
+Custom business layouts are a preview feature. Instead of a preset, you can
+build the demo around a business you name, such as Kroger, Walgreens, or Home
+Depot. GitHub Copilot drafts the layout **once**:
 
 - departments, traffic and basket behavior, and price bands that match what the
   business sells
@@ -322,7 +323,7 @@ every later step uses it without calling Copilot again:
 - the Power BI report, connected twins report, Fabric Apps, and planning sheets
   use its colors, and report and app titles carry the business name
 
-In the setup interface, choose **Custom business… (needs GitHub Copilot)** under
+In the setup interface, choose **Custom business… (preview, needs GitHub Copilot)** under
 **Store type**, enter the name, and select **Generate**. From the CLI:
 
 ```powershell

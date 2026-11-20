@@ -839,14 +839,17 @@ def configure(
         None,
         "--store-type",
         help=(
-            "Store type. Available values are shown interactively; 'custom' builds a "
-            "layout for --business with GitHub Copilot."
+            "Store type. Available values are shown interactively; 'custom' (preview) "
+            "builds a layout for --business with GitHub Copilot."
         ),
     ),
     business: Optional[str] = typer.Option(
         None,
         "--business",
-        help="Business name for a custom layout (e.g. 'Kroger'); implies --store-type custom.",
+        help=(
+            "Business name for a custom layout (preview; needs GitHub Copilot), e.g. "
+            "'Kroger'; implies --store-type custom."
+        ),
     ),
     regenerate_layout: bool = typer.Option(
         False,
@@ -1423,7 +1426,7 @@ def customize(
     ),
     yes: bool = typer.Option(False, "--yes", help="Accept the generated layout without review."),
 ) -> None:
-    """Create a custom business layout (products, brands, theme) with GitHub Copilot.
+    """Preview: create a custom business layout (products, brands, theme) with GitHub Copilot.
 
     Copilot is called once; the accepted layout is saved per environment and
     every later step (render, deploy, theming) applies it deterministically.

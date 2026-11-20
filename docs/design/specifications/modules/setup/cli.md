@@ -246,6 +246,10 @@ configuration of every shipped store type passes, and covers each check.
 
 ## `customize`
 
+Custom business layouts are a **preview** feature. The setup interface labels
+the option and its layouts as preview and shows the preview badge used for
+preview deployment profiles; CLI help and prompts say the same.
+
 `retail-setup customize --env <env> --business <name>` builds a custom business
 layout with the GitHub Copilot SDK (`github-copilot-sdk`). Copilot is called
 only here (or from `configure --business` and the setup interface's
@@ -257,7 +261,7 @@ extra and is absent from `requirements-deploy.txt`, so the installer and every
 preset deployment never install it. Before the first generation, the operator
 sees the requirement (a GitHub account with Copilot access, signed in through
 `gh auth login` or `GH_TOKEN`) and confirms; the TUI shows the same warning when
-**Custom business… (needs GitHub Copilot)** is selected, and **Generate** is the
+**Custom business… (preview, needs GitHub Copilot)** is selected, and **Generate** is the
 confirmation. Installation runs
 `pip install --require-hashes -r utility/requirements-customize.txt` (compiled
 with the deploy lock as a constraint, so every shared pin is identical) and
