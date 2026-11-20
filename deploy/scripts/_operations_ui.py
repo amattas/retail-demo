@@ -21,8 +21,9 @@ if TYPE_CHECKING:
 _ACTION_ID = str(uuid5(NAMESPACE_URL, "retail-demo:operations:prepare-case"))
 _GOALS = (
     "Detect current high stockout risk or low inventory cases from the latest "
-    "physical ops_availability_signals row per case_id, notify operators with "
-    "complete evidence, and require human approval before preparing a draft."
+    "physical ops_availability_signals row per store and product, skip cases "
+    "that already have a DRAFT, APPROVED or RESOLVED action, notify operators "
+    "with complete evidence, and require human approval before preparing a draft."
 )
 
 

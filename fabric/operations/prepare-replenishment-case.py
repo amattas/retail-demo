@@ -31,7 +31,9 @@ rows = source.collect()
 if len(rows) != 1:
     raise RuntimeError("The selected case has no unique signal; refresh the scenario first.")
 row = rows[0]
-if not 1 <= row.store_id <= 5 or not 1 <= row.product_id <= 20:
+# PLAN_COHORT is True only when the native Plan is published; its locked
+# cohort is stores 1-5 and products 1-20. Operations-only cases can be any position.
+if PLAN_COHORT and (not 1 <= row.store_id <= 5 or not 1 <= row.product_id <= 20):
     raise RuntimeError("The selected case is outside the fixed Plan cohort.")
 if (
     row.source_as_of is None or row.shortage_units is None or row.shortage_units < 0

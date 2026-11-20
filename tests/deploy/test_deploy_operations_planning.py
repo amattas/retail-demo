@@ -10,6 +10,9 @@ from deploy.scripts import deploy_operations_planning as deploy
 ID = "11111111-1111-4111-8111-111111111111"
 
 
+ALERTABLE = {"stockout_probability": 0.8, "days_of_inventory": 5.0}
+
+
 def config(**changes):
     return SimpleNamespace(
         environment="dev",
@@ -138,7 +141,9 @@ def publication(monkeypatch):
     )
     monkeypatch.setattr(deploy, "_source_rows", lambda *a, **k: [])
     monkeypatch.setattr(deploy, "_ensure_native_capacity", Mock())
-    monkeypatch.setattr(deploy, "scenario_signals", lambda *a, **k: [{"case_id": ID}])
+    monkeypatch.setattr(
+        deploy, "scenario_signals", lambda *a, **k: [{"case_id": ID, **ALERTABLE}]
+    )
     monkeypatch.setattr(
         deploy, "resolve_kql_database", lambda *a: ("https://kusto.test", "retail")
     )
@@ -377,6 +382,29 @@ def test_failed_start_leaves_a_published_agent_stopped_with_a_warning(
     assert "before activation" in result["acceptance"]
     path = tmp_path / "deploy" / ".generated" / "dev" / "operations-planning-report.json"
     assert json.loads(path.read_text()) == result
+
+
+def test_watchlist_with_no_alertable_case_refuses_activation_and_fails_the_step(
+    publication, monkeypatch, tmp_path
+):
+    quiet = {"case_id": ID, "stockout_probability": 0.3, "days_of_inventory": 9.0}
+    monkeypatch.setattr(deploy, "scenario_signals", lambda *a, **k: [quiet])
+    activate = Mock()
+    monkeypatch.setattr(deploy, "activate_operations_agent", activate)
+
+    with pytest.raises(deploy.NativeItemError, match="never alert"):
+        deploy.publish(
+            repo_root=tmp_path,
+            config=config(include_plan=False, activate_agent=True),
+            outputs={"workspace_id": ID, "lakehouse_id": ID, "kql_database_id": ID},
+        )
+
+    activate.assert_not_called()
+    path = tmp_path / "deploy" / ".generated" / "dev" / "operations-planning-report.json"
+    report = json.loads(path.read_text())
+    assert report["alertable_signal_count"] == 0
+    assert report["operations_agent"]["state"] == "STOPPED"
+    assert "never alert" in report["operations_agent"]["activation_refused"]
 
 
 def test_agent_rejection_preserves_supporting_asset_evidence(publication, tmp_path):

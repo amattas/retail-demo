@@ -89,6 +89,8 @@ def render_case_notebook(
         "LAKEHOUSE_NAME": lakehouse_name,
         "KUSTO_URI": kusto_uri,
         "KQL_DATABASE": database_name,
+        # Only a published Plan locks the cohort; operations-only cases can be any position.
+        "PLAN_COHORT": include_plan,
         "PLANNING_REVIEW_TARGET": (
             "the retail-replenishment Plan" if include_plan
             else "the Lakehouse ops.replenishment_cases table and existing retail report through SSO"

@@ -12,6 +12,9 @@ from deploy.scripts._operations_scenario import (
     LOW_DAYS_OF_INVENTORY,
     MAX_SIGNALS,
     PLAN_PRODUCT_IDS,
+    current_alert_cases,
+    meets_alert_rule,
+    require_alertable,
     scenario_signals,
     scenario_sql,
     signal_ingestion_query,
@@ -51,7 +54,7 @@ def test_real_evidence_has_deterministic_case_and_shortage():
     assert "unverified" in first["provenance"]
 
 
-def test_last_inventory_movement_can_precede_forecast_anchor_without_relabeling():
+def test_inventory_snapshot_can_precede_forecast_anchor_without_relabeling():
     source = source_row(source_as_of=NOW - timedelta(days=3))
     signal = scenario_signals([source], NOW)[0]
     assert signal["source_as_of"] == source["source_as_of"].isoformat()
@@ -82,14 +85,18 @@ def test_invalid_or_stale_data_is_not_silently_seeded(changes):
         scenario_signals([source_row(**changes)], NOW)
 
 
-def test_slow_moving_sku_keeps_its_last_movement_when_the_snapshot_is_current():
-    # A slow mover's last ledger change can be older than a week while the
-    # snapshot (its newest source time) is current; only that is judged.
+def test_every_case_carries_the_snapshot_as_of_not_its_last_ledger_change():
+    # A stocked-out SKU can be unchanged for over a week while the snapshot is
+    # current. It must not be stamped with its last movement, or the agent
+    # query and the case notebook would drop exactly that SKU as stale.
     slow = source_row(product_id=17, source_as_of=NOW - timedelta(days=11))
     signals = scenario_signals([source_row(), slow], NOW)
-    assert signals[1]["source_as_of"] == slow["source_as_of"].isoformat()
+    snapshot = source_row()["source_as_of"].isoformat()
+    assert [signal["source_as_of"] for signal in signals] == [snapshot, snapshot]
+    assert current_alert_cases(signals, [], NOW) == signals
     with pytest.raises(ValueError, match="snapshot is stale"):
         scenario_signals([slow], NOW)
+    assert "risk.predicted_at AS source_as_of" in scenario_sql(plan_cohort=False)
 
 
 def test_duplicate_source_and_out_of_scope_batches_are_rejected():
@@ -202,4 +209,67 @@ def test_operations_only_handoff_never_requires_native_planning():
         kusto_uri="https://example.kusto.fabric.microsoft.com", database_name="retail",
         include_plan=False,
     )
-    assert "retail-replenishment" not in decode_definition_parts(notebook)["notebook-content.ipynb"].decode()
+    content = decode_definition_parts(notebook)["notebook-content.ipynb"].decode()
+    assert "retail-replenishment" not in content
+    # Without a Plan the case notebook must not enforce the Plan's locked cohort.
+    assert "PLAN_COHORT = False" in content
+
+
+def test_watchlist_without_an_alertable_case_is_refused():
+    quiet = source_row(stockout_probability=0.2, days_of_inventory=9.0)
+    signals = scenario_signals([quiet], NOW)
+    assert not meets_alert_rule(signals[0])
+    with pytest.raises(ValueError, match="never alert"):
+        require_alertable(signals)
+    assert require_alertable(scenario_signals([quiet, source_row(product_id=3)], NOW)) == 1
+
+
+def test_signals_record_the_cohort_mode_for_the_scheduled_refresh():
+    assert scenario_signals([source_row()], NOW)[0]["plan_cohort"] is False
+    assert scenario_signals([source_row()], NOW, plan_cohort=True)[0]["plan_cohort"] is True
+    query = signal_ingestion_query(scenario_signals([source_row()], NOW))
+    assert "plan_cohort:bool" in query
+
+
+def test_agent_query_suppresses_acted_and_superseded_cases():
+    first = scenario_signals([source_row(), source_row(product_id=3)], NOW)
+    refreshed = scenario_signals(
+        [source_row(forecast_as_of=NOW - timedelta(hours=2))], NOW + timedelta(hours=1)
+    )
+    signals = first + refreshed
+    later = NOW + timedelta(hours=2)
+    cases = current_alert_cases(signals, [], later)
+    # The refreshed case supersedes the first case for store 1 product 2.
+    assert {case["case_id"] for case in cases} == {
+        refreshed[0]["case_id"], first[1]["case_id"]
+    }
+    actions = [
+        {"case_id": refreshed[0]["case_id"], "status": "DRAFT"},
+        {"case_id": first[1]["case_id"], "status": "REJECTED"},
+    ]
+    assert [case["case_id"] for case in current_alert_cases(signals, actions, later)] == [
+        first[1]["case_id"]
+    ]
+    stale = NOW + timedelta(days=8)
+    assert current_alert_cases(signals, [], stale) == []
+
+
+def test_canonical_agent_query_expresses_the_reference_semantics():
+    instructions = (
+        Path(__file__).resolve().parents[2]
+        / "fabric"
+        / "operations"
+        / "availability.instructions.md"
+    ).read_text(encoding="utf-8")
+    query = instructions.split("```kusto", 1)[1].split("```", 1)[0]
+    steps = [line.strip() for line in query.strip().splitlines()]
+    assert steps[0].startswith("let acted_cases = ops_case_actions")
+    assert '| where status in ("DRAFT", "APPROVED", "RESOLVED")' in steps
+    assert "| summarize arg_max(event_ts, *) by store_id, product_id" in steps
+    assert "| join kind=leftanti acted_cases on case_id" in steps
+    # Superseded cases are collapsed before the action filter, so acting on the
+    # newest case for a position silences that position.
+    assert steps.index("| summarize arg_max(event_ts, *) by store_id, product_id") < steps.index(
+        "| join kind=leftanti acted_cases on case_id"
+    )
+    assert "by case_id" not in query

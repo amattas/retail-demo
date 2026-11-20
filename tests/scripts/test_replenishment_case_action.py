@@ -17,7 +17,7 @@ SOURCE = (
 CASE_ID = "11111111-1111-4111-8111-111111111111"
 
 
-def runtime(monkeypatch, *, status="DRAFT", source_time=None):
+def runtime(monkeypatch, *, status="DRAFT", source_time=None, plan_cohort=True):
     sql_module = ModuleType("pyspark.sql")
     sql_module.functions = SimpleNamespace(
         **{name: MagicMock() for name in ("col", "lit", "current_timestamp")},
@@ -46,6 +46,7 @@ def runtime(monkeypatch, *, status="DRAFT", source_time=None):
         "LAKEHOUSE_NAME": "retail_lakehouse",
         "KUSTO_URI": "https://example.kusto.fabric.microsoft.com",
         "KQL_DATABASE": "retail",
+        "PLAN_COHORT": plan_cohort,
         "PLANNING_REVIEW_TARGET": "the existing report through SSO",
     }
     return namespace, spark, source, row
@@ -79,6 +80,13 @@ def test_out_of_cohort_cases_fail_before_writes(monkeypatch, store_id, product_i
     with pytest.raises(RuntimeError, match="cohort"):
         exec(compile(SOURCE.read_text(), str(SOURCE), "exec"), namespace)
     spark.sql.assert_not_called()
+
+
+def test_operations_only_mode_accepts_cases_outside_the_plan_cohort(monkeypatch):
+    namespace, spark, _source, row = runtime(monkeypatch, plan_cohort=False)
+    row.store_id, row.product_id = 37, 1828
+    exec(compile(SOURCE.read_text(), str(SOURCE), "exec"), namespace)
+    assert spark.sql.call_count >= 2
 
 
 @pytest.mark.parametrize("offset", [-8, 1])
