@@ -25,6 +25,7 @@ VALUES = {
     "ONLINE_ORDERS_PER_DAY": "96",
     "ANNUAL_CHURN_RATE": "0.2",
     "ANONYMOUS_SHARE": "0.45",
+    "ANNUAL_VOLUME_GROWTH": "0.03",
     "SEED": "7",
     "DICTIONARY_REF": "abc123",
     "CUSTOM_DICTIONARIES": "{}",

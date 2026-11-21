@@ -21,8 +21,10 @@
 #   path through the store type's zones (entrance → departments → checkout →
 #   exit) with realistic dwell times, and their BLE IDs resolve to
 #   `dim_customers.BLEId`.
-# - **Purchases and marketing.** Baskets, per-line promotions, the tender mix,
-#   declines and campaigns use the historical catalogs. Marketing journey
+# - **Purchases and marketing.** Baskets (with complementary products and
+#   repeated SKUs merged), shelf prices of the catalog date, one basket-level
+#   promotion, the tender mix, declines and campaigns use the historical
+#   catalogs; volume follows history's year-over-year trend. Marketing journey
 #   touches carry their touch time in `impression_time` and arrive with the
 #   purchase, so notebook 03 never skips them.
 # - **Store inventory.** Each store keeps a running balance per product,
@@ -109,6 +111,10 @@ TRANSACTIONS_PER_STORE_DAY = int(_param("{{TRANSACTIONS_PER_STORE_DAY}}", "0"))
 ONLINE_ORDERS_PER_DAY = int(_param("{{ONLINE_ORDERS_PER_DAY}}", "0"))
 HISTORY_START = _param("{{START_DATE}}", "")
 HISTORY_END = _param("{{END_DATE}}", "")
+# Prices and the volume trend are anchored on the configuration's anchor date.
+ANCHOR_DATE = _param("{{ANCHOR_DATE}}", "")
+ANNUAL_VOLUME_GROWTH = float(_param(
+    "{{ANNUAL_VOLUME_GROWTH}}", str(GenerationConfig.model_fields["annual_volume_growth"].default)))
 # Customer lifecycle of the history (who is signed up, churned or anonymous).
 ANNUAL_CHURN_RATE = float(_param(
     "{{ANNUAL_CHURN_RATE}}", str(GenerationConfig.model_fields["annual_churn_rate"].default)))
@@ -236,10 +242,7 @@ from datetime import date as _date
 STREAM_PROFILE = StoreTypeProfile.model_validate(json.loads(
     mssparkutils.fs.head(f"Files/setup/dictionaries/{STORE_TYPE}/profile.json", 65536)
 ))
-STREAM_PRODUCTS = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_products").select(
-    _F.col("ID").alias("product_id"), "SalePrice", "taxability",
-    _F.col("Department").alias("department"), _F.to_date("LaunchDate").alias("launch_date"),
-)
+STREAM_PRODUCTS = basket_products(spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_products"), SEED)
 DIM_STORES = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_stores")
 DIM_CUSTOMERS = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_customers")
 
@@ -265,6 +268,7 @@ if not HISTORY_START:
 HISTORY_START_DATE = _date.fromisoformat(HISTORY_START)
 if not HISTORY_END:
     HISTORY_END = (_history["last"] or CATALOG_DATE).isoformat()
+ANCHOR = _date.fromisoformat(ANCHOR_DATE) if ANCHOR_DATE else HISTORY_START_DATE
 STREAM_LIFECYCLE = CustomerLifecycle(
     seed=SEED,
     history_start=HISTORY_START_DATE,
@@ -294,6 +298,7 @@ LANE_PLAN = plan_lanes(
     marketing_impressions_per_day=sum(entry[2] for entry in CAMPAIGN_ARCHETYPES),
     volume_scale=float(volume_scale),
     rows_per_second=max(1, round(_requested_rate)) if _requested_rate > 0 else None,
+    growth=volume_growth(ANNUAL_VOLUME_GROWTH, ANCHOR, CATALOG_DATE),
 )
 RATE_ROWS_PER_SECOND = int(LANE_PLAN.rows_per_second)
 if LANE_PLAN.clipped:
@@ -361,11 +366,15 @@ STREAM_CONTEXT = build_stream_context(
         "dcs": (DC_IDS, DC_COUNT),
         "trucks": (TRUCK_IDS, TRUCK_COUNT),
     },
-    baskets=prepare_basket_catalog(spark, STREAM_PRODUCTS, STREAM_PROFILE, SEED, CATALOG_DATE),
+    baskets=prepare_basket_catalog(
+        spark, STREAM_PRODUCTS, STREAM_PROFILE, SEED, CATALOG_DATE, ANCHOR
+    ),
     lanes=LANE_PLAN,
     supply=STREAM_SUPPLY,
     lifecycle=STREAM_LIFECYCLE,
     inventory_seed=INVENTORY_SEED,
+    anchor_date=ANCHOR,
+    annual_volume_growth=ANNUAL_VOLUME_GROWTH,
 )
 print(f"live volume: {RATE_ROWS_PER_SECOND} source rows/s; lane shares "
       + ", ".join(f"{lane}={share:.3f}" for lane, share in LANE_PLAN.shares.items()))

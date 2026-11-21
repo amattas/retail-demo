@@ -292,20 +292,27 @@ def lifecycle_struct(lc: CustomerLifecycle, customer_id: Column) -> Column:
 
 def activity_column(lc: CustomerLifecycle, customer_id: Column, day: Column) -> Column:
     """Column form of :func:`activity` for a customer and a date column (0 when NULL)."""
-    life = lifecycle_struct(lc, customer_id)
     offset = F.datediff(day, F.lit(lc.history_start))
-    taper_start = life["churn_day"] - TAPER_DAYS
-    tapered = F.lit(1.0) - F.lit(1.0 - TAPER_FLOOR) * (offset - taper_start) / F.lit(
-        float(TAPER_DAYS)
-    )
-    return (
-        F.when(
-            customer_id.isNull() | (offset < life["signup_day"]) | (offset >= life["churn_day"]),
-            F.lit(0.0),
+
+    def from_life(life: Column) -> Column:
+        taper_start = life["churn_day"] - TAPER_DAYS
+        tapered = F.lit(1.0) - F.lit(1.0 - TAPER_FLOOR) * (offset - taper_start) / F.lit(
+            float(TAPER_DAYS)
         )
-        .when(life["tapered"] & (offset >= taper_start), tapered)
-        .otherwise(F.lit(1.0))
-    )
+        return (
+            F.when(
+                customer_id.isNull()
+                | (offset < life["signup_day"])
+                | (offset >= life["churn_day"]),
+                F.lit(0.0),
+            )
+            .when(life["tapered"] & (offset >= taper_start), tapered)
+            .otherwise(F.lit(1.0))
+        )
+
+    # The lifecycle is evaluated once and bound to a lambda variable, which
+    # keeps the expression (and query planning) small.
+    return F.element_at(F.transform(F.array(lifecycle_struct(lc, customer_id)), from_life), 1)
 
 
 # ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
+from retail_setup.generation.pricing import PriceSchedule, demand_response, shelf_price_struct
 from retail_setup.generation.runtime import seeded_draws
 
 
@@ -49,10 +50,16 @@ def retail_basket_size(
     return (1 + draws.negative_binomial(purchase_keys, "retail-basket", extra, 3)).cast("int")
 
 
-def retail_catalog(products: DataFrame, dates: DataFrame, draws: seeded_draws) -> DataFrame:
+def retail_catalog(
+    products: DataFrame, dates: DataFrame, draws: seeded_draws, schedule: PriceSchedule
+) -> DataFrame:
     """One launch-eligible weighted product CDF per day and department.
 
-    Popularity is persistent per SKU, with price sensitivity and a long tail.
+    Popularity is persistent per SKU, with cross-sectional price sensitivity,
+    a long tail, and a demand response to the SKU's shelf price that day
+    (markdowns and price reviews, ``pricing.demand_response``). Each entry
+    carries the day's shelf price (``unit_cents``) and the SKU's complementary
+    partner priced the same day (``baskets.basket_products``).
     Arrays keep selection a bounded lookup rather than a receipt x catalog join.
     """
     eligible = (
@@ -60,11 +67,26 @@ def retail_catalog(products: DataFrame, dates: DataFrame, draws: seeded_draws) -
         .distinct()
         .join(F.broadcast(products), F.col("launch_date") <= F.col("event_date"))
     )
+    day = F.col("event_date")
+    eligible = eligible.withColumn(
+        "_price",
+        shelf_price_struct(
+            schedule, F.col("product_id"), F.col("SalePrice"), F.col("department"), day
+        ),
+    ).withColumn(
+        "_partner_price",
+        shelf_price_struct(
+            schedule, F.col("partner_id"), F.col("partner_price"), F.col("department"), day
+        ),
+    )
     eligible = eligible.withColumn(
         "_popularity",
         F.exp(0.8 * draws.gauss(["product_id"], "retail-popularity") - 0.32)
-        / F.pow(F.col("SalePrice"), 1.15),
-    )
+        / F.pow(F.col("SalePrice"), 1.15)
+        * demand_response(
+            F.col("_price.price_cents"), F.col("_price.trend_cents"), F.col("department")
+        ),
+    ).withColumn("unit_cents", F.col("_price.price_cents"))
     # Floating-point sums run in product_id order over the whole department, so
     # they are bit-identical whatever order the shuffle delivers rows in.
     by_product = Window.partitionBy("event_date", "department").orderBy("product_id")
@@ -81,7 +103,7 @@ def retail_catalog(products: DataFrame, dates: DataFrame, draws: seeded_draws) -
         .withColumn("_cdf", F.sum("_probability").over(ordered))
         .withColumn(
             "_unit_value",
-            F.col("SalePrice") / (1.0 - repeat_purchase_probability(F.col("department"))),
+            F.col("unit_cents") / 100.0 / (1.0 - repeat_purchase_probability(F.col("department"))),
         )
         .withColumn(
             "_expected_line_value",
@@ -91,10 +113,27 @@ def retail_catalog(products: DataFrame, dates: DataFrame, draws: seeded_draws) -
             "_expected_taxable_value",
             F.sum(F.col("_probability") * F.col("_unit_value") * taxable_share).over(whole),
         )
+        .withColumn(
+            "partner_ok",
+            F.col("partner_id").isNotNull() & (F.col("partner_launch") <= F.col("event_date")),
+        )
+        .withColumn("partner_cents", F.col("_partner_price.price_cents"))
     )
     return eligible.groupBy("event_date", "department").agg(
         F.sort_array(
-            F.collect_list(F.struct("_cdf", "product_id", "SalePrice", "taxability"))
+            F.collect_list(
+                F.struct(
+                    "_cdf",
+                    "product_id",
+                    "SalePrice",
+                    "taxability",
+                    "unit_cents",
+                    "partner_id",
+                    "partner_cents",
+                    "partner_taxability",
+                    "partner_ok",
+                )
+            )
         ).alias("_catalog"),
         F.first("_expected_line_value").alias("_expected_line_value"),
         F.first("_expected_taxable_value").alias("_expected_taxable_value"),
@@ -129,9 +168,18 @@ def calibrated_basket_mean(
     target: float,
     promo_rate: float,
     nominal_lines: float,
+    complement_rate: float = 0.0,
 ) -> Column:
+    """Drawn basket lines so the average ticket meets ``target``.
+
+    ``complement_rate`` is the share of drawn lines that bring a complementary
+    product along (``baskets.with_complements``); those extra lines count
+    towards the ticket too.
+    """
     affordable_lines = F.lit(target) / (
-        (expected_line + expected_taxable * tax_rate) * (1.0 - promo_rate * 0.20)
+        (expected_line + expected_taxable * tax_rate)
+        * (1.0 - promo_rate * 0.20)
+        * (1.0 + complement_rate)
     )
     return F.when(
         (expected_line > 0)

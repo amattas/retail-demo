@@ -14,7 +14,9 @@ from retail_setup.generation.behavior import (
     retail_catalog,
     retail_quantity,
 )
+from retail_setup.generation.baskets import receipt_offer
 from retail_setup.generation.customers import shopper_key
+from retail_setup.generation.pricing import PriceSchedule
 from retail_setup.generation.receipts import _seasonal_factor
 from retail_setup.generation.runtime import seeded_draws
 
@@ -34,17 +36,23 @@ def prepare_basket_catalog(
     profile: StoreTypeProfile,
     seed: int,
     catalog_date: date,
+    anchor_date: date,
 ) -> BasketCatalog:
     """Build the live catalog as of ``catalog_date`` once per stream run.
 
-    Launch eligibility and the seasonal department weights both come from
-    ``catalog_date``, not the clock, so a replayed micro-batch rebuilds the same
-    baskets. The stream keeps the date in its checkpoint incarnation record and
-    moves it forward on a restart that has no batch to replay.
+    ``products`` is ``baskets.basket_products`` of ``dim_products``. Launch
+    eligibility, shelf prices (``pricing``, anchored on ``anchor_date`` as in
+    history) and the seasonal department weights all come from
+    ``catalog_date``, not the clock, so a replayed micro-batch rebuilds the
+    same baskets. The stream keeps the date in its checkpoint incarnation
+    record and moves it forward on a restart that has no batch to replay.
     """
     draws = seeded_draws(seed)
     catalog = retail_catalog(
-        products, spark.range(1).select(F.lit(catalog_date).alias("event_date")), draws
+        products,
+        spark.range(1).select(F.lit(catalog_date).alias("event_date")),
+        draws,
+        PriceSchedule(seed, anchor_date),
     )
     weight = sum(
         (
@@ -73,7 +81,8 @@ def prepare_basket_catalog(
         metadata.append((row["department"], cumulative, row["_catalog"]))
     schema = (
         "department string, _cdf double, _catalog array<struct<_cdf:double,"
-        "product_id:bigint,SalePrice:double,taxability:string>>"
+        "product_id:bigint,SalePrice:double,taxability:string,unit_cents:bigint,"
+        "partner_id:bigint,partner_cents:bigint,partner_taxability:string,partner_ok:boolean>>"
     )
     lookup = spark.createDataFrame(metadata, schema).agg(
         F.sort_array(F.collect_list(F.struct("_cdf", "department", "_catalog"))).alias(
@@ -86,9 +95,17 @@ def prepare_basket_catalog(
 
 
 def attach_baskets(
-    purchases: DataFrame, catalog: BasketCatalog, profile: StoreTypeProfile, seed: int
+    purchases: DataFrame,
+    catalog: BasketCatalog,
+    profile: StoreTypeProfile,
+    seed: int,
+    complement_rate: float = 0.0,
 ) -> DataFrame:
     """Attach ``_offer``, ``basket_n`` and ``basket_lines`` to purchase rows.
+
+    Lines carry the catalog date's shelf price and the SKU's complementary
+    partner; ``complement_rate`` sizes baskets that will bring complements
+    along (``baskets.with_complements``, store purchases).
 
     Rows need ``receipt_id``, ``customer_id`` (NULL for anonymous shoppers)
     and ``store_bps``. Budgets and favorite departments are the customer's,
@@ -98,7 +115,7 @@ def attach_baskets(
     purchases = (
         purchases.join(F.broadcast(catalog.lookup))
         .withColumn("_shopper", shopper_key(F.col("customer_id"), F.col("receipt_id")))
-        .withColumn("_offer", draws.u(["receipt_id"], "offer") < profile.promo_rate)
+        .withColumn("_offer", receipt_offer(draws, F.col("receipt_id"), profile.promo_rate))
         .withColumn(
             "basket_n",
             retail_basket_size(
@@ -112,6 +129,7 @@ def attach_baskets(
                     profile.avg_ticket_target,
                     profile.promo_rate,
                     profile.basket_lambda,
+                    complement_rate,
                 ),
                 F.col("_offer"),
                 profile.promo_rate,
@@ -131,7 +149,7 @@ def attach_baskets(
         department = pick_retail_product(F.col("_departments"), department_draw)
         product = pick_retail_product(department["_catalog"], draws.u(keys, "prod"))
         quantity = retail_quantity(draws, keys, department["department"])
-        unit = F.round(product["SalePrice"] * 100).cast("long")
+        unit = product["unit_cents"]
         return F.struct(
             index.alias("line_num"),
             product["product_id"].alias("product_id"),
@@ -139,6 +157,11 @@ def attach_baskets(
             unit.alias("unit_cents"),
             (unit * quantity).alias("gross_cents"),
             product["taxability"].alias("taxability"),
+            department["department"].alias("department"),
+            product["partner_id"].alias("partner_id"),
+            product["partner_cents"].alias("partner_cents"),
+            product["partner_taxability"].alias("partner_taxability"),
+            product["partner_ok"].alias("partner_ok"),
         )
 
     return purchases.withColumn(
@@ -153,7 +176,8 @@ def attach_stream_baskets(
     profile: StoreTypeProfile,
     seed: int,
     catalog_date: date,
+    anchor_date: date,
 ) -> DataFrame:
     """Attach baskets drawn from the catalog as of ``catalog_date`` (one-off form)."""
-    catalog = prepare_basket_catalog(spark, products, profile, seed, catalog_date)
+    catalog = prepare_basket_catalog(spark, products, profile, seed, catalog_date, anchor_date)
     return attach_baskets(purchases, catalog, profile, seed)

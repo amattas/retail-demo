@@ -10,6 +10,8 @@ from pyspark.sql import DataFrame, Row, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
+from retail_setup.generation.vocabulary import PROMO_CATALOG
+
 # Each check is one small Spark job; at demo scale their fixed per-job overhead
 # dominates. The publish notebook evaluates checks concurrently over Delta
 # reads; the default stays sequential because concurrent checks over lineage
@@ -209,6 +211,42 @@ def run_invariants(
                 | (F.col("promo_discount") != F.col("line_discount"))
             )
             .count()
+        ),
+    )
+
+    # Basket-level promotions: one code per SALE receipt, whose minimum the
+    # receipt's gross subtotal meets, and no SKU on two lines of a receipt.
+    minimums = F.create_map(
+        *[item for code, *_, minimum, _ in PROMO_CATALOG for item in (F.lit(code), F.lit(minimum))]
+    )
+    sale_receipts = t["fact_receipts"].filter(F.col("receipt_type") == "SALE")
+    sale_lines = lines.join(sale_receipts.select("receipt_id_ext"), "receipt_id_ext", "left_semi")
+    receipt_codes = (
+        sale_lines.filter(F.col("promo_code").isNotNull())
+        .groupBy("receipt_id_ext")
+        .agg(F.countDistinct("promo_code").alias("codes"), F.first("promo_code").alias("code"))
+    )
+    _check(
+        r,
+        "one promotion code per receipt",
+        lambda: receipt_codes.filter(F.col("codes") > 1).count(),
+    )
+    _check(
+        r,
+        "promotion minimums met by the basket",
+        lambda: (
+            receipt_codes.join(
+                sale_receipts.select("receipt_id_ext", "gross_subtotal_cents"), "receipt_id_ext"
+            )
+            .filter(F.coalesce(minimums[F.col("code")], F.lit(0)) > F.col("gross_subtotal_cents"))
+            .count()
+        ),
+    )
+    _check(
+        r,
+        "no SKU repeated within a receipt",
+        lambda: (
+            sale_lines.groupBy("receipt_id_ext", "product_id").count().filter("count > 1").count()
         ),
     )
 

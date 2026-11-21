@@ -11,7 +11,7 @@ One micro-batch of ``rate`` rows becomes the events of that minute:
   events are emitted as their time passes, so a visit that spans micro-batches
   lives in the visit state.
   About 22% of visits buy, as in history.
-- **Purchases.** Baskets, per-line promotions, tender mix, declines and
+- **Purchases.** Baskets, the basket-level promotion, tender mix, declines and
   marketing journeys reuse the batch helpers. Journey touches carry their
   touch time in ``impression_time`` and arrive with the purchase.
 - **Store operations.** Opened/closed events at each store's local operating
@@ -41,6 +41,12 @@ from pyspark.sql import functions as F
 
 from retail_setup.dictionaries.models import StoreTypeProfile
 from retail_setup.generation.attribution import SELECTION_RATE, with_journey_plan
+from retail_setup.generation.baskets import (
+    COMPLEMENT_RATE,
+    merge_lines,
+    price_basket,
+    with_complements,
+)
 from retail_setup.generation.behavior import pick_retail_product
 from retail_setup.generation.customers import (
     HOME_STORE_SHARE,
@@ -54,6 +60,7 @@ from retail_setup.generation.marketing import (
     campaign_window_start,
     impression_device_cost,
 )
+from retail_setup.generation.pricing import volume_growth_column
 from retail_setup.generation.runtime import case_when, seeded_draws
 from retail_setup.generation.store_activity import FORMAT_ZONE_SHARES
 from retail_setup.generation.stream_baskets import BasketCatalog, attach_baskets
@@ -119,7 +126,6 @@ from retail_setup.generation.vocabulary import (
     ble_layout,
     campaign_id_column,
     decline_reason_column,
-    line_promotion,
     payment_status_column,
     processing_ms_column,
     sensor_id_column,
@@ -171,6 +177,14 @@ class StreamContext:
     supply: SupplyNetwork
     customer_tax: DataFrame
     inventory_seed: DataFrame | None = None
+    # Year-over-year volume trend, as history (pricing.volume_growth).
+    anchor_date: date | None = None
+    annual_volume_growth: float = 0.0
+
+    def growth(self, day: Column) -> Column:
+        """Volume trend multiplier on a date column (1 at the anchor date)."""
+        anchor = self.anchor_date or self.history_start
+        return volume_growth_column(self.annual_volume_growth, anchor, day)
 
     @property
     def draws(self) -> seeded_draws:
@@ -216,6 +230,8 @@ def build_stream_context(
     supply: SupplyNetwork,
     lifecycle: CustomerLifecycle,
     inventory_seed: DataFrame | None = None,
+    anchor_date: date | None = None,
+    annual_volume_growth: float = 0.0,
 ) -> StreamContext:
     """Collect the bounded store metadata and build the customer pools.
 
@@ -337,6 +353,8 @@ def build_stream_context(
         supply=supply,
         customer_tax=customer_tax,
         inventory_seed=inventory_seed,
+        anchor_date=anchor_date,
+        annual_volume_growth=annual_volume_growth,
     )
 
 
@@ -474,7 +492,8 @@ def new_visits(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
     )
     local_day = F.to_date(_local(F.col("ts")))
     time_factor = F.when(closed_date_column(local_day), F.lit(0.0)).otherwise(
-        daily_factor_column(ctx.profile, local_day)
+        ctx.growth(local_day)
+        * daily_factor_column(ctx.profile, local_day)
         * monthly_factor_column(ctx.profile, local_day)
         * F.element_at(F.col("_hour_share"), F.hour(_local(F.col("ts"))) + 1)
     )
@@ -490,10 +509,14 @@ def new_visits(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
         .drop("_stores")
         .join(F.broadcast(ctx.customer_pools), "pool_store", "left")
     )
-    picked = F.when(
-        F.col("_pool").isNotNull(),
-        pick_retail_product(F.col("_pool"), d.u([v], "customer"))["customer_id"].cast("long"),
+    visits = visits.withColumn(
+        "_picked",
+        F.when(
+            F.col("_pool").isNotNull(),
+            pick_retail_product(F.col("_pool"), d.u([v], "customer"))["customer_id"].cast("long"),
+        ),
     )
+    picked = F.col("_picked")
     kept = (d.u([v], "customer-identified") < F.lit(ctx.lifecycle.identify_probability)) & (
         d.u([v], "customer-active") < activity_column(ctx.lifecycle, picked, local_day)
     )
@@ -787,32 +810,6 @@ def visit_events(
 # ---------------------------------------------------------------------------
 
 
-def _tax_share(taxability: Column) -> Column:
-    return (
-        F.when(taxability == "TAXABLE", F.lit(1.0))
-        .when(taxability == "REDUCED_RATE", F.lit(0.5))
-        .otherwise(F.lit(0.0))
-    )
-
-
-def price_line(
-    draws: seeded_draws, line: Column, receipt_id: Column, month: Column, offer: Column, bps: Column
-) -> Column:
-    """Per-line promotion (shared with history), then tax on the net amount."""
-    promo = line_promotion(
-        draws, [receipt_id, line["line_num"]], month, line["unit_cents"], line["quantity"], offer
-    )
-    discount = promo["discount_cents"]
-    net = F.greatest(F.lit(0).cast("long"), line["gross_cents"] - discount)
-    tax = F.floor(net * _tax_share(line["taxability"]) * bps / 10000.0 + 0.5).cast("long")
-    return (
-        line.withField("promo_code", promo["promo_code"])
-        .withField("discount_cents", discount)
-        .withField("net_cents", net)
-        .withField("tax_cents", tax)
-    )
-
-
 def _sum_lines(lines: str | Column, field_name: str) -> Column:
     return F.aggregate(lines, F.lit(0).cast("long"), lambda acc, line: acc + line[field_name])
 
@@ -913,15 +910,22 @@ def purchase_baskets(
         F.date_format(local_purchase, "yyyy-MM-dd").alias("_local_day"),
         "tz",
     )
-    buyers = attach_baskets(buyers, ctx.baskets, ctx.profile, ctx.seed)
-    return buyers.withColumn(
-        "priced_lines",
-        F.transform(
-            "basket_lines",
-            lambda line: price_line(
-                d, line, F.col("receipt_id"), F.col("_month"), F.col("_offer"), F.col("store_bps")
+    buyers = attach_baskets(buyers, ctx.baskets, ctx.profile, ctx.seed, COMPLEMENT_RATE)
+    # As in history: complementary products join the basket and repeated SKUs
+    # merge into one line. Prices and the promotion are set when the purchase
+    # is emitted, over the lines the store could fill (purchase_events).
+    return (
+        buyers.withColumn(
+            "priced_lines", with_complements(d, F.col("receipt_id"), F.col("basket_lines"))
+        )
+        .withColumn("priced_lines", merge_lines(F.col("priced_lines")))
+        .withColumn(
+            "priced_lines",
+            F.transform(
+                "priced_lines",
+                lambda line: line.withField("gross_cents", line["unit_cents"] * line["quantity"]),
             ),
-        ),
+        )
     )
 
 
@@ -987,6 +991,20 @@ def purchase_events(ctx: StreamContext, buyers: DataFrame) -> DataFrame:
     payment_due = F.col("_payment_due")
     buyers = buyers.withColumn("priced_lines", _kept_lines("priced_lines")).where(
         F.size("priced_lines") > 0
+    )
+    # One basket-level promotion over the filled lines, then integer tax, as
+    # history prices its fulfilled baskets.
+    buyers = buyers.withColumn(
+        "priced_lines",
+        price_basket(
+            d,
+            F.col("receipt_id"),
+            F.col("priced_lines"),
+            F.col("_month"),
+            F.col("_offer"),
+            F.col("store_bps"),
+            ctx.profile,
+        ),
     )
     gross = _sum_lines("priced_lines", "gross_cents")
     discount = _sum_lines("priced_lines", "discount_cents")
@@ -1075,7 +1093,7 @@ def purchase_events(ctx: StreamContext, buyers: DataFrame) -> DataFrame:
                 line["product_id"].alias("product_id"),
                 line["quantity"].cast("long").alias("quantity"),
                 (line["unit_cents"] / 100.0).alias("unit_price"),
-                (line["net_cents"] / 100.0).alias("extended_price"),
+                (line["ext_cents"] / 100.0).alias("extended_price"),
                 F.when(line["discount_cents"] > 0, line["promo_code"]).alias("promo_code"),
             ),
             purchase_ts,
@@ -1140,8 +1158,11 @@ def new_orders(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
     (UTC); ``rejected`` starts empty.
     """
     rows = lanes.where(F.col("lane") == "online")
-    factor = monthly_factor_column(ctx.profile, F.to_date(F.col("ts"))) * (
-        online_hour_factor_column(F.col("ts"))
+    day = F.to_date(F.col("ts"))
+    factor = (
+        ctx.growth(day)
+        * monthly_factor_column(ctx.profile, day)
+        * (online_hour_factor_column(F.col("ts")))
     )
     return rows.where(_keep(ctx, "online", factor)).select(
         F.col("v"),

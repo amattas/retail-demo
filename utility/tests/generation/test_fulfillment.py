@@ -11,6 +11,7 @@ from pyspark.sql.types import ArrayType
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.generation import engine
 from retail_setup.generation.fulfillment import resolve_fulfillment
+from retail_setup.generation.vocabulary import PROMO_CATALOG
 from retail_setup.generation.inventory import generate_inventory_chain
 from retail_setup.generation.inventory_policy import opening_stock
 from retail_setup.generation.returns import generate_returns
@@ -188,7 +189,13 @@ def test_spark_fulfillment_finances_returns_and_all_ledgers(spark, candidate_cas
     assert {row.product_id for row in retained} == {1, 3, 5}
     assert partial.gross_subtotal_cents == sum(row.quantity * row.unit_cents for row in retained)
     assert partial.subtotal_cents == sum(row.ext_cents for row in retained)
-    assert partial.discount_cents == 3
+    # The fulfilled basket is priced again: at most one promotion code, whose
+    # minimum the retained lines meet.
+    assert partial.discount_cents == partial.gross_subtotal_cents - partial.subtotal_cents
+    codes = {row.promo_code for row in retained if row.promo_code is not None}
+    assert len(codes) <= 1 and "TEST" not in codes
+    minimums = {code: minimum for code, _, _, minimum, _ in PROMO_CATALOG}
+    assert all(partial.gross_subtotal_cents >= minimums[code] for code in codes)
     assert partial.tax_cents == sum(
         (row.ext_cents * 825 * {1: 100, 3: 0, 5: 50}[row.product_id] + 500_000) // 1_000_000
         for row in retained

@@ -102,11 +102,16 @@ history:
   emitted halfway through checkout and the payment after the tender's
   processing time. A visit that would run past closing time is compressed to
   end before it.
-- **Purchases.** Baskets, per-line promotions (`PROMO_CATALOG` with the
-  evergreen fallback), the 40/30/20/10 tender mix and the 2.5% base decline
+- **Purchases.** Baskets (complementary products and merged repeated SKUs,
+  `generation/baskets.py`), shelf prices of the incarnation's catalog date
+  (`generation/pricing.py`, the same price schedule as history), one
+  basket-level promotion priced over the lines the store could fill, the
+  40/30/20/10 tender mix and the 2.5% base decline
   model are the batch helpers. A declined payment keeps its `SALE` receipt,
   as in history, and is never attributed. One `promotion_applied` is emitted per
-  receipt and promo code.
+  receipt and promo code, so at most one per receipt. Visit and online volume
+  follow history's year-over-year trend (`annual_volume_growth` from the
+  anchor date).
 - **Store operations.** `store_opened` and `store_closed` (lower-case
   `opened`/`closed`, like history) are emitted exactly at each store's local
   opening and closing time, one pair per open day. A 24-hour store closes at

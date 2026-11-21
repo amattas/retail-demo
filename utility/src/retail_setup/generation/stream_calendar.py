@@ -263,6 +263,7 @@ def plan_lanes(
     marketing_impressions_per_day: float,
     volume_scale: float = 1.0,
     rows_per_second: float | None = None,
+    growth: float = 1.0,
 ) -> LanePlan:
     """Size the rate source and the lanes from the historical configuration.
 
@@ -271,7 +272,9 @@ def plan_lanes(
     campaign archetype. The default rate is the smallest whole number of rows
     per second that covers the peak of every lane; an explicit
     ``rows_per_second`` only changes the resolution, not the volume, unless it
-    is below the peak (``clipped``).
+    is below the peak (``clipped``). ``growth`` is the volume trend multiplier
+    (``pricing.volume_growth``) of the stream's dates; the lanes apply it per
+    row, so it only sizes the peaks.
     """
     if volume_scale <= 0:
         raise ValueError("volume_scale must be positive")
@@ -285,8 +288,11 @@ def plan_lanes(
     )
     # Mean events per second of each lane at time factor 1, and its peak factor.
     base = {
-        "visits": (visits_per_second, visit_peak_factor),
-        "online": (online_per_second, max(monthly_factors(profile)) * max(online_hour_factors())),
+        "visits": (visits_per_second, visit_peak_factor * growth),
+        "online": (
+            online_per_second,
+            max(monthly_factors(profile)) * max(online_hour_factors()) * growth,
+        ),
         "marketing": (marketing_per_second, 1.0),
     }
     peaks = {lane: rate * peak * volume_scale for lane, (rate, peak) in base.items()}

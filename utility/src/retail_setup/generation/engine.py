@@ -106,7 +106,7 @@ def _build_candidates(ctx: GenerationContext) -> StageOutputs:
 
 def _build_plan(ctx: GenerationContext, candidates: StageOutputs) -> StageOutputs:
     # Inventory-constrained fulfillment precedes every receipt consumer.
-    plan = resolve_fulfillment(candidates, ctx.dims, ctx.cfg)
+    plan = resolve_fulfillment(candidates, ctx.dims, ctx.cfg, profile=ctx.dicts.profile)
     return {"return_headers": plan.return_headers, "events": plan.events, **plan.sales}
 
 

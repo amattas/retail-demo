@@ -1534,6 +1534,7 @@ def render(
         "ONLINE_ORDERS_PER_DAY": str(generation.online_orders_per_day),
         "ANNUAL_CHURN_RATE": str(generation.annual_churn_rate),
         "ANONYMOUS_SHARE": str(generation.anonymous_share),
+        "ANNUAL_VOLUME_GROWTH": str(generation.annual_volume_growth),
         "SEED": str(generation.seed),
         "DICTIONARY_REF": _resolve_dictionary_ref(repo_root, ref),
         # Custom layouts are uploaded to the Lakehouse by deploy; setup-01 verifies

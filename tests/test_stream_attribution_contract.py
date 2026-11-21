@@ -148,15 +148,14 @@ def test_receipt_and_order_payloads_carry_the_imp007_fields() -> None:
     assert '.withColumn("gross_cents", (subtotal + discount).cast("long"))' in online
 
 
-def test_discount_is_applied_per_line_before_tax() -> None:
-    pricing = _function_source("price_line")
-    assert "line_promotion(" in pricing
-    assert 'net = F.greatest(F.lit(0).cast("long"), line["gross_cents"] - discount)' in pricing
-    assert 'net * _tax_share(line["taxability"])' in pricing
+def test_discount_is_applied_per_basket_before_tax() -> None:
     purchases = _function_source("purchase_events")
+    # One basket-level promotion over the filled lines, then tax on the net.
+    assert "price_basket(" in purchases
+    assert purchases.index("_kept_lines(") < purchases.index("price_basket(")
     assert '.withColumn("subtotal_cents", gross - discount)' in purchases
     assert '.withColumn("total_cents", gross - discount + tax)' in purchases
-    assert '(line["net_cents"] / 100.0).alias("extended_price")' in purchases
+    assert '(line["ext_cents"] / 100.0).alias("extended_price")' in purchases
     assert 'F.when(line["discount_cents"] > 0, line["promo_code"]).alias("promo_code")' in purchases
     # one promotion_applied per (receipt, promo code), like fact_promotions
     assert 'F.transform(codes, promotion_event)' in purchases

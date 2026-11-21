@@ -387,6 +387,7 @@ Current derived defaults include:
   2.5): about 14,000 customers per supercenter
 - `anonymous_share = 0.45`
 - `annual_churn_rate = 0.20`
+- `annual_volume_growth = 0.03`
 - `transactions_per_store_day` = the store type's profile value (see below)
 - `online_orders_per_day = store_count * transactions_per_store_day * 1.0525 *
   s / (1 - s)`, where `s` is the profile's `online_order_share` and 1.0525 is
@@ -450,6 +451,51 @@ pool, and keeps that customer with their activity on the receipt's local date
 (1 while active, tapering before churn, 0 before signup or after churn);
 otherwise it is anonymous. Churn dates are not published: models learn them
 from purchase behavior.
+
+## Prices, baskets and promotions
+
+`generation/pricing.py` sets every SKU's shelf price per week, as a pure
+function of the seed, the SKU and the date, shared by receipts, online orders
+and the live stream:
+
+- `dim_products.SalePrice` is the list price at `anchor_date`. Regular prices
+  follow a per-department inflation trend from there (for example grocery 3%,
+  electronics -3% a year).
+- Every 13 weeks (each SKU on its own phase) a price review resets the regular
+  price within 6% of trend; 30% of review periods carry a one-to-three week
+  markdown of 10-35%.
+- `fact_receipt_lines.unit_cents` and `fact_online_order_lines.unit_cents` are
+  the shelf price on the sale's local date. No separate price-history table is
+  published: reports read sale prices from the lines and catalog prices from
+  `dim_products`.
+- Product choice responds to price: within a department, a SKU's choice weight
+  scales with `(price / trend price) ** elasticity`, with department
+  elasticities from about -0.8 (groceries, jewelry) to -2.5 (electronics), so
+  markdowns sell more units.
+- Store traffic and online orders grow `annual_volume_growth` (3%) a year from
+  the anchor date.
+
+Store baskets (`generation/baskets.py`, shared with the stream) are built per
+receipt:
+
+1. Lines are drawn by department missions as before; 15% of lines bring along
+   their complementary product, a fixed partner in the same department, so
+   market-basket analysis finds real pairs.
+2. A SKU drawn twice becomes one line with the summed quantity.
+3. A receipt with an offer (the profile's `promo_rate`) gets one promotion code
+   for the whole basket, drawn among the `PROMO_CATALOG` codes in season whose
+   minimum (for example `SAVE20` at $50, `BFRIDAY40` at $100) the basket gross
+   subtotal meets. Seasonal codes are three times as likely while in season.
+   Each code discounts only the lines in its department scope (for example
+   `BACKTOSCHOOL20` on clothing, office and electronics); `BOGO50` discounts
+   every second unit of eligible lines with two or more units. A line carries
+   at most one code, and `fact_promotions` has at most one row per receipt.
+4. Tax is integer basis-point math on each line's net amount.
+
+Fulfillment prices the basket again over the lines the store could fill, so a
+promotion whose minimum the filled basket no longer meets is replaced or
+dropped. The invariants check one code per receipt, met minimums, and no
+repeated SKU within a receipt.
 
 ## Removed active-path behavior
 

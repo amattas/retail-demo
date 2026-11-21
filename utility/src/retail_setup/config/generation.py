@@ -136,6 +136,9 @@ class GenerationConfig(BaseModel):
     # share of the customers active at a time who churn within a year; churn is
     # driven by segment, trip frequency and spend, with a tapering lead-in
     annual_churn_rate: float = Field(default=0.20, gt=0.0, lt=1.0)
+    # year-over-year growth of store traffic and online orders, compounding from
+    # anchor_date (1.0 there); prices carry their own inflation (pricing.py)
+    annual_volume_growth: float = Field(default=0.03, ge=-0.5, le=1.0)
 
     @model_validator(mode="before")
     @classmethod

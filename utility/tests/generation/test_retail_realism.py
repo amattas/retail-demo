@@ -5,6 +5,7 @@ from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.loader import load_dictionaries
+from retail_setup.generation.baskets import basket_products
 from retail_setup.generation.dims import generate_dimensions
 from retail_setup.generation.receipts import generate_receipts_group
 from retail_setup.generation.stream_baskets import attach_stream_baskets
@@ -25,20 +26,14 @@ def test_supercenter_ticket_calibration_and_live_basket_continuity(spark):
     headers = generate_receipts_group(spark, dims, dictionaries.profile, cfg)["fact_receipts"]
     average = headers.agg(F.avg("total_cents")).first()[0] / 100
     assert 55 < average < 115, average
-    products = dims["dim_products"].select(
-        F.col("ID").alias("product_id"),
-        "SalePrice",
-        "taxability",
-        F.col("Department").alias("department"),
-        F.to_date("LaunchDate").alias("launch_date"),
-    )
+    products = basket_products(dims["dim_products"], cfg.seed)
     purchases = spark.range(3000).select(
         F.concat(F.lit("LIVE-"), "id").alias("receipt_id"),
         (F.col("id") % 1000 + 1).alias("customer_id"),
         F.lit(800).alias("store_bps"),
     )
     live = attach_stream_baskets(
-        spark, purchases, products, dictionaries.profile, cfg.seed, cfg.end_date
+        spark, purchases, products, dictionaries.profile, cfg.seed, cfg.end_date, cfg.anchor_date
     ).cache()
     try:
         row = live.agg(F.min("basket_n"), F.max("basket_n"), F.countDistinct("basket_n")).first()
@@ -63,12 +58,8 @@ def test_live_baskets_replay_from_the_recorded_catalog_date(spark):
         seed=42,
     )
     dictionaries = load_dictionaries(cfg.resolved_dictionary_root, cfg.store_type)
-    products = generate_dimensions(spark, dictionaries, cfg)["dim_products"].select(
-        F.col("ID").alias("product_id"),
-        "SalePrice",
-        "taxability",
-        F.col("Department").alias("department"),
-        F.to_date("LaunchDate").alias("launch_date"),
+    products = basket_products(
+        generate_dimensions(spark, dictionaries, cfg)["dim_products"], cfg.seed
     )
     purchases = spark.range(500).select(
         F.concat(F.lit("RCP-stream-a-0a1b2c3d-"), "id").alias("receipt_id"),
@@ -78,7 +69,13 @@ def test_live_baskets_replay_from_the_recorded_catalog_date(spark):
 
     def lines(catalog_date):
         live = attach_stream_baskets(
-            spark, purchases, products, dictionaries.profile, cfg.seed, catalog_date
+            spark,
+            purchases,
+            products,
+            dictionaries.profile,
+            cfg.seed,
+            catalog_date,
+            cfg.anchor_date,
         )
         return sorted(
             (row.receipt_id, row.line.line_num, row.line.product_id, row.line.quantity)
@@ -115,45 +112,3 @@ def test_conversion_is_visit_first_not_four_fixed_bands(spark, seed):
     ).first()
     assert row.oversold == 0
     assert row.rates > 15
-
-
-def test_variable_live_lines_reconcile_discount_and_tax(spark):
-    from retail_setup.generation.runtime import seeded_draws
-    from retail_setup.generation.stream_events import price_line
-
-    frame = spark.sql("""
-        SELECT true AS _offer, 'RCP-x-1' AS receipt_id, 6 AS month, 800 AS store_bps,
-               array(named_struct('line_num', 1, 'quantity', 3, 'unit_cents', 199L,
-                                  'gross_cents', 597L, 'taxability', 'TAXABLE'),
-                     named_struct('line_num', 2, 'quantity', 1, 'unit_cents', 299L,
-                                  'gross_cents', 299L, 'taxability', 'NON_TAXABLE'),
-                     named_struct('line_num', 3, 'quantity', 2, 'unit_cents', 500L,
-                                  'gross_cents', 1000L, 'taxability', 'REDUCED_RATE')) AS lines
-    """)
-    priced = (
-        frame.select(
-            F.transform(
-                "lines",
-                lambda line: price_line(
-                    seeded_draws(7),
-                    line,
-                    F.col("receipt_id"),
-                    F.col("month"),
-                    F.col("_offer"),
-                    F.col("store_bps"),
-                ),
-            ).alias("lines")
-        )
-        .first()
-        .lines
-    )
-    # Every line of an offered receipt gets its own code; the discount comes off
-    # before tax (taxable 100%, non-taxable 0%, reduced rate 50%).
-    assert all(line.promo_code for line in priced)
-    assert all(line.discount_cents > 0 for line in priced)
-    for line in priced:
-        assert line.net_cents == line.gross_cents - line.discount_cents
-    share = {"TAXABLE": 1.0, "NON_TAXABLE": 0.0, "REDUCED_RATE": 0.5}
-    assert [line.tax_cents for line in priced] == [
-        int(line.net_cents * share[line.taxability] * 800 / 10000 + 0.5) for line in priced
-    ]

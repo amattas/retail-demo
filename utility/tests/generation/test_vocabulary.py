@@ -151,7 +151,7 @@ def test_stream_uses_the_shared_definitions() -> None:
     for usage in (
         'tender_column(d, [F.col("receipt_id")])',
         'payment_status_column(d, [F.col("receipt_id")], F.col("tender"))',
-        "line_promotion(",
+        "price_basket(",
         'ble_id_column(F.col("customer_id"))',
         "anonymous_ble_id_column(",
         "beacon_id_column(",

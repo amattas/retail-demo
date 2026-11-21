@@ -89,6 +89,7 @@ def world(spark):
 def _simulate(spark):
     from pyspark.sql import functions as F
 
+    from retail_setup.generation.baskets import basket_products
     from retail_setup.generation.customers import lifecycle_for
     from retail_setup.generation.dims import generate_dimensions
     from retail_setup.generation.network import dc_fleets, store_dc_map
@@ -132,13 +133,7 @@ def _simulate(spark):
         "dcs": dense_id_lookup(dims["dim_distribution_centers"]),
         "trucks": dense_id_lookup(dims["dim_trucks"]),
     }
-    products = dims["dim_products"].select(
-        F.col("ID").alias("product_id"),
-        "SalePrice",
-        "taxability",
-        F.col("Department").alias("department"),
-        F.to_date("LaunchDate").alias("launch_date"),
-    )
+    products = basket_products(dims["dim_products"], cfg.seed)
     store_rows = dims["dim_stores"].collect()
     plan = plan_lanes(
         profile,
@@ -195,11 +190,13 @@ def _simulate(spark):
         dim_stores=dims["dim_stores"],
         dim_customers=dims["dim_customers"],
         ids=ids,
-        baskets=prepare_basket_catalog(spark, products, profile, cfg.seed, START),
+        baskets=prepare_basket_catalog(spark, products, profile, cfg.seed, START, cfg.anchor_date),
         lanes=lanes,
         supply=network,
         lifecycle=lifecycle_for(cfg, profile.resolved_customer_visits_per_year()),
         inventory_seed=stock,
+        anchor_date=cfg.anchor_date,
+        annual_volume_growth=cfg.annual_volume_growth,
     )
 
     state = MemoryStateStore(NAMESPACE)
@@ -358,7 +355,7 @@ def test_live_vocabularies_equal_history(world) -> None:
         lo, hi = vocab.CHANNEL_COSTS[payload["channel"]]
         assert lo * 0.8 - 0.01 <= payload["cost"] <= hi * 1.2 + 0.01, payload
     codes = {e["payload"]["promo_code"] for e in _of(world, "promotion_applied")}
-    assert codes <= {c for c, *_ in vocab.PROMO_CATALOG} | {c for c, _ in vocab.EVERGREEN_PROMOS}
+    assert codes <= {c for c, *_ in vocab.PROMO_CATALOG}
 
 
 def test_store_payments_decline_at_the_historical_rate(world) -> None:

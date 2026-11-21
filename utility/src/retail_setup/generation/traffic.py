@@ -6,6 +6,7 @@ from pyspark.sql.window import Window
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.models import StoreTypeProfile
+from retail_setup.generation.pricing import volume_growth_column
 from retail_setup.generation.runtime import date_grid, seeded_draws
 from retail_setup.generation.stream_calendar import (
     VISIT_CONVERSION_CALIBRATION,
@@ -61,6 +62,7 @@ def generate_hourly_visits(
         * daily
         * monthly
         * weather
+        * volume_growth_column(cfg.annual_volume_growth, cfg.anchor_date, F.col("day"))
         * F.col("daily_traffic_multiplier")
         * F.col("_hour_share"),
     ).withColumn("_conversion", conversion)
