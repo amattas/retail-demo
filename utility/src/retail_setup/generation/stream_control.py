@@ -14,6 +14,19 @@ from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Protocol
 
+# Event types declared end to end (KQL, mappings, EVENT_PAYLOADS, Silver) for
+# the incident and online-order lifecycle models, which the live stream does
+# not emit yet. Readiness doesn't expect fresh rows for them. Shrink this set
+# as the models land; tests/test_notebook_build.py checks it against the slots.
+PENDING_EVENT_TYPES = frozenset(
+    {
+        "logistics_incident_started",
+        "logistics_incident_resolved",
+        "online_order_line_added",
+        "online_order_delivered",
+    }
+)
+
 # Live runs trigger a micro-batch every minute. Each batch makes one Kusto
 # transaction per event table, so a longer trigger means fewer, larger extents.
 DEFAULT_TRIGGER_SECONDS = 60

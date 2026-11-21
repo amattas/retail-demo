@@ -23,7 +23,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
-from retail_setup.generation.stream_control import INGEST_TAG_PREFIX, parse_ingest_tag
+from retail_setup.generation.stream_control import (
+    INGEST_TAG_PREFIX,
+    PENDING_EVENT_TYPES,
+    parse_ingest_tag,
+)
 
 from deploy.scripts import _output as console
 from deploy.scripts._auth import build_credential
@@ -79,6 +83,8 @@ _STREAM_MAX_AGE = timedelta(minutes=30)
 _SILVER_LAG_WARNING = timedelta(days=3)
 # Missed streaming-data-load intervals tolerated before anomaly detection is stale.
 _ANOMALY_MISSED_INTERVALS = 3
+# Silver watermarks may be this many streaming-data-load intervals old.
+_SILVER_FRESHNESS_INTERVALS = 2
 # The Operations Agent query and case notebook reject evidence older than this.
 _OPERATIONS_SIGNAL_MAX_AGE = timedelta(days=7)
 _RETENTION_RE = re.compile(
@@ -2104,12 +2110,26 @@ class ReadinessRunner:
                 "unprocessed events may already be purged.",
                 evidence=lag,
             )
+        # Freshness follows the event time Silver has processed (last_processed_ts)
+        # for the stalest live table, not updated_at, which the daily deep
+        # reconciliation refreshes even when no new rows arrive.
+        live_tables = _live_stream_tables(self.context.manifest)
+        processed = {
+            table: timestamp
+            for table, timestamp in (signal.get("sources") or {}).items()
+            if table in live_tables and timestamp
+        }
+        if not processed:
+            raise EvidenceNotObserved(_UNOBSERVED_STREAM_MESSAGES["freshness.watermarks"])
+        stalest_table, stalest = min(
+            processed.items(), key=lambda item: _parse_time(item[1])
+        )
         try:
             freshness = evaluate_freshness(
-                signal.get("updated_at"),
+                stalest,
                 observed_at=self.context.observed_at,
-                max_age=_STREAM_MAX_AGE,
-                lineage="ag._watermarks maximum updated_at",
+                max_age=self._silver_max_age(),
+                lineage=f"ag._watermarks last_processed_ts (stalest: {stalest_table})",
             )
         except CheckFailed as exc:
             if lag is not None and lag["lag_seconds"] > _SILVER_LAG_WARNING.total_seconds():
@@ -2171,23 +2191,58 @@ class ReadinessRunner:
             observed_at=self.context.observed_at,
         )
 
+    def _silver_max_age(self) -> timedelta:
+        """Silver advances once per streaming-data-load run, so allow two intervals.
+
+        One interval would flap: a watermark is up to a full interval old just
+        before the next run, plus the run's own duration.
+        """
+
+        interval = committed_schedule_interval(self.context.repo_root, "streaming-data-load")
+        return (interval or _STREAM_MAX_AGE) * _SILVER_FRESHNESS_INTERVALS
+
     def _eventhouse_freshness(self) -> Observation:
         tables = _stream_event_tables(self.context.manifest)
+        live_tables = _live_stream_tables(self.context.manifest)
         signal = self.adapter.eventhouse_signal(tables)
         if not signal:
             raise EvidenceNotObserved(_UNOBSERVED_STREAM_MESSAGES["freshness.eventhouse_ingestion"])
         observed_tables = frozenset(str(name) for name in signal.get("tables", []))
-        comparison = compare_sets(tables, observed_tables)
+        comparison = compare_sets(live_tables, observed_tables)
         if comparison["missing"]:
-            raise CheckFailed("Eventhouse ingestion is missing selected event tables.")
+            raise CheckFailed(
+                "Eventhouse ingestion is missing selected event tables.", evidence=comparison
+            )
+        # Each live table must be fresh on its own; one busy table must not make
+        # the whole Eventhouse look fresh.
+        per_table = signal.get("table_ingestion") or {}
+        ingested = {table: (per_table.get(table) or {}).get("ingested") for table in live_tables}
+        stale: list[str] = []
+        for table in sorted(live_tables):
+            try:
+                evaluate_freshness(
+                    ingested[table],
+                    observed_at=self.context.observed_at,
+                    max_age=_STREAM_MAX_AGE,
+                    lineage=table,
+                )
+            except (CheckFailed, EvidenceUnknown):
+                stale.append(table)
+        if stale:
+            raise CheckFailed(
+                f"Eventhouse ingestion is stale or invalid for {len(stale)} of "
+                f"{len(live_tables)} live event tables: {', '.join(stale)}.",
+                evidence={**comparison, "stale": stale},
+            )
+        stalest_table = min(live_tables, key=lambda table: _parse_time(ingested[table]))
         freshness = evaluate_freshness(
-            signal.get("latest_ingestion"),
+            ingested[stalest_table],
             observed_at=self.context.observed_at,
             max_age=_STREAM_MAX_AGE,
-            lineage="Eventhouse selected event tables max ingest_timestamp",
+            lineage=f"Eventhouse per-table max ingestion_time() (stalest: {stalest_table})",
         )
         return Observation(
-            "Eventhouse ingestion covers every selected event table and is recent.",
+            "Ingestion into every live Eventhouse event table is recent.",
             comparison,
             freshness,
         )
@@ -2606,6 +2661,12 @@ def _stream_event_tables(manifest: SolutionManifest) -> frozenset[str]:
     return frozenset()
 
 
+def _live_stream_tables(manifest: SolutionManifest) -> frozenset[str]:
+    """Event tables the stream emits today (declared types minus pending ones)."""
+
+    return _stream_event_tables(manifest) - PENDING_EVENT_TYPES
+
+
 def _row_ingest_tags(row: dict[str, Any]) -> list[dict[str, Any]]:
     """Parse every stream ingest tag on an extent row (``tag`` or raw ``Tags``)."""
 
@@ -2912,11 +2973,13 @@ class FabricReadinessAdapter:
         return {
             "tables": [str(row.get("table_name", "")) for row in rows],
             "latest_ingestion": _iso_value(latest),
-            # Compared with ag._watermarks, which advance on ingest_timestamp.
+            # earliest/latest are ingest_timestamp (event time), compared with
+            # ag._watermarks; ingested is the table's own max ingestion_time().
             "table_ingestion": {
                 str(row.get("table_name", "")): {
                     "earliest": _iso_value(row.get("earliest_event")),
                     "latest": _iso_value(row.get("latest_event")),
+                    "ingested": _iso_value(row.get("latest_ingestion")),
                 }
                 for row in rows
             },

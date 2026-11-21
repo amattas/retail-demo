@@ -13,6 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 from retail_setup.contracts import load_repository_manifest, resolve_profile
+from retail_setup.generation.stream_control import PENDING_EVENT_TYPES
 
 from deploy.scripts.build_artifacts import SETUP_NOTEBOOKS
 from deploy.scripts.deploy_config import OperationsPlanningConfig, TwinsConfig
@@ -2067,17 +2068,69 @@ def _watermark_adapter(watermark):
 
 
 @pytest.mark.parametrize(
-    ("days_behind", "status", "text"),
-    [(1, "PASS", "reconcile"), (4, "UNKNOWN", "7-day retention"), (8, "FAIL", "purged")],
+    ("behind", "status", "text"),
+    [
+        (timedelta(minutes=20), "PASS", "reconcile"),
+        # Two 30-minute schedule intervals: a run that is due soon is not stale.
+        (timedelta(minutes=50), "PASS", "reconcile"),
+        # updated_at is five minutes old, but Silver has processed nothing for a
+        # day: freshness follows last_processed_ts, so this is not a pass.
+        (timedelta(days=1), "FAIL", "stale"),
+        (timedelta(days=4), "FAIL", "7-day retention"),
+        (timedelta(days=8), "FAIL", "purged"),
+    ],
 )
 def test_watermark_check_warns_before_retention_purges_unprocessed_events(
-    days_behind, status, text
+    behind, status, text
 ):
-    watermark = (NOW - timedelta(days=days_behind)).isoformat()
+    watermark = (NOW - behind).isoformat()
     runner = _freshness_runner(_watermark_adapter(watermark))
     result = _status(runner, runner._watermark_freshness)
     assert result.status == status
     assert text in result.summary
+    if status == "PASS":
+        assert result.freshness["max_age_seconds"] == 2 * 30 * 60
+        assert "last_processed_ts" in result.freshness["lineage"]
+
+
+def _live_tables() -> frozenset[str]:
+    return frozenset(
+        event.event_type
+        for contract in _repository_manifest().data_contracts
+        if contract.kind == "event"
+        for event in contract.events
+    ) - PENDING_EVENT_TYPES
+
+
+@pytest.mark.parametrize("stale_table", [None, "store_closed"])
+def test_eventhouse_freshness_is_checked_per_live_table(stale_table):
+    ingestion = {
+        table: {
+            "ingested": (
+                NOW - (timedelta(hours=2) if table == stale_table else timedelta(minutes=2))
+            ).isoformat()
+        }
+        for table in _live_tables()
+    }
+    adapter = SimpleNamespace(
+        eventhouse_signal=lambda _tables: {
+            "tables": sorted(ingestion),
+            # One busy table used to make the whole Eventhouse look fresh.
+            "latest_ingestion": NOW.isoformat(),
+            "table_ingestion": ingestion,
+        }
+    )
+    runner = _freshness_runner(adapter)
+
+    result = _status(runner, runner._eventhouse_freshness)
+
+    assert PENDING_EVENT_TYPES.isdisjoint(ingestion)
+    if stale_table is None:
+        assert result.status == "PASS"
+        assert result.freshness["age_seconds"] == 120
+    else:
+        assert result.status == "FAIL"
+        assert stale_table in result.summary
 
 
 def _alert_adapter(**signal):
