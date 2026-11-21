@@ -18,10 +18,11 @@
     let touches =
         ad_impression
         | where isnotempty(correlation_id)
+        // Touches arrive with their purchase; impression_time is when they were shown.
+        | extend touch_ts = coalesce(impression_time, ingest_timestamp)
         | extend attribution_journey_id = correlation_id,
-                 touch_ts = ingest_timestamp,
                  touch_rank = strcat(
-                     format_datetime(ingest_timestamp, "yyyy-MM-dd HH:mm:ss.fffffff"),
+                     format_datetime(touch_ts, "yyyy-MM-dd HH:mm:ss.fffffff"),
                      "|",
                      impression_id
                  )
@@ -147,7 +148,8 @@
         | summarize arg_max(ingest_timestamp, *) by impression_id
         | summarize impressions = dcount(impression_id),
                     spend_cents = sum(tolong(round(cost * 100.0)))
-            by campaign_id, channel, day = startofday(ingest_timestamp);
+            by campaign_id, channel,
+               day = startofday(coalesce(impression_time, ingest_timestamp));
     let conversions =
         attributed
         | summarize conversions = dcount(attribution_id),

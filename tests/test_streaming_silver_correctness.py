@@ -1228,7 +1228,7 @@ def test_event_time_rules_are_explicit_and_payload_first() -> None:
         "truck_departed": ("departure_time", "ingest_timestamp"),
         "store_opened": ("operation_time", "ingest_timestamp"),
         "store_closed": ("operation_time", "ingest_timestamp"),
-        "ad_impression": ("ingest_timestamp",),
+        "ad_impression": ("impression_time", "ingest_timestamp"),
         "promotion_applied": ("ingest_timestamp",),
         "customer_zone_changed": ("timestamp", "ingest_timestamp"),
         "ble_ping_detected": ("ingest_timestamp",),

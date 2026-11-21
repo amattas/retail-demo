@@ -323,6 +323,7 @@
   {"column":"cost","path":"$.payload.cost","datatype":"real"},
   {"column":"device_type","path":"$.payload.device_type","datatype":"string"},
   {"column":"customer_id","path":"$.payload.customer_id","datatype":"long"},
+  {"column":"impression_time","path":"$.payload.impression_time","datatype":"datetime"},
   {"column":"event_type","path":"$.event_type","datatype":"string"},
   {"column":"trace_id","path":"$.trace_id","datatype":"string"},
   {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
