@@ -128,8 +128,18 @@ consistent with the reported totals.
 Required ML evidence selects the latest `generated_at` and a nonblank
 `model_run_id` from the same Gold row. Source/business dates remain separate
 lineage and cannot make an old model generation appear fresh. Setup and model
-evidence use a seven-day maximum age. Streaming watermark,
-Eventhouse ingestion, and checkpoint evidence use a 30-minute maximum age.
+evidence use a seven-day maximum age. Eventhouse ingestion and checkpoint
+evidence use a 30-minute maximum age, checked per live event table: each
+table's own `max(ingestion_time())` must be recent, so one busy table cannot
+make the rest look fresh. Event types declared but not yet emitted
+(`stream_control.PENDING_EVENT_TYPES`) are not expected. Silver watermark
+evidence uses the stalest live table's `last_processed_ts` (the event time
+Silver has processed), not `updated_at`, which the daily deep reconciliation
+refreshes without new rows. Its maximum age is two `streaming-data-load`
+intervals (60 minutes for the committed 30-minute schedule), so a run that
+is merely due does not flap the check. Checkpoint evidence reads
+`.show tables (...) extents where tags contains 'ingest-by:retail-demo:'`
+for the last day, one row per table.
 Pipeline and data evidence must match the exact triggered run or the retained
 successful deployment-journal step. Historical full-demo execution is baseline
 evidence only; current repairs require new live verification.
@@ -294,8 +304,22 @@ stream only when the live-event story is required.
 
 Check notebook errors, KQL permissions, resolved Query URI, ingestion failures,
 checkpoint path, persisted stream ID, Eventhouse shortcuts, and Silver
-watermarks. Restart with the same checkpoint root so the failed micro-batch
-retains its event identities and ingestion tags.
+watermarks. The notebook already retries transient Kusto errors and restarts
+a failed live query up to `max_restarts` times; a notebook that ended has a
+permanent error or exhausted that budget.
+
+Restart with the same checkpoint root so the failed micro-batch replays with
+its event identities, catalog date, and ingestion tags. A restart after a long
+stop does not replay the downtime: only the last `max_lag_seconds` (10 minutes)
+of source rows are kept, so expect a gap for the stop.
+
+Do not delete only `eventhouse-live/`. The notebook then refuses to start,
+because the checkpoint's incarnation record says batches were already
+ingested. To start a new incarnation (new tags and IDs, same stream ID),
+delete `eventhouse-live/` and `_metadata/eventhouse-live.json` together. To
+start a new stream ID, delete the whole checkpoint root. A new incarnation
+also re-runs the history handoff check; set `allow_history_gap = True` if
+history ends more than a day before the restart.
 
 ### Ontology/task-flow binding missing
 

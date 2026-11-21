@@ -42,9 +42,16 @@ The live stream declares twenty-two typed business event tables and emits
 eighteen of them today. `logistics_incident_started`,
 `logistics_incident_resolved`, `online_order_line_added`, and
 `online_order_delivered` are declared for the incident and online-order
-lifecycle models; they follow the same retention, streaming-ingestion, and
-batching policies as their operational and omnichannel peers. `unknown_event`
+lifecycle models; they follow the same retention and extent-tag retention
+policies as their operational and omnichannel peers. `unknown_event`
 is a catch-all KQL table, not a generated business event.
+
+Every stream event table drops `ingest-by:` extent tags after seven days
+(`extent_tags_retention`), so the per-batch idempotency tags don't accumulate
+for the full table retention. The event tables set no streaming-ingestion or
+ingestion-batching policy: the stream's Spark connector writes are
+transactional queued ingestion with `flushImmediately`, so those policies were
+never used. Only `unknown_event` keeps them, for queued ingestion.
 
 The Spark Kusto writes are positional, so a new column in an existing event
 table must keep the payload-then-envelope order. `01-create-tables.kql`

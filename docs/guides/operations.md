@@ -131,8 +131,11 @@ For required machine learning, it checks the publication time and the
 identifier of the run that produced the same row. Business "as of" fields
 describe the source period; they do not prove when the model output was
 published.
-Setup and model evidence may be at most seven days old. Streaming watermarks,
-Eventhouse ingestion, and checkpoint evidence may be at most 30 minutes old.
+Setup and model evidence may be at most seven days old. Eventhouse ingestion
+and checkpoint evidence may be at most 30 minutes old, for every live event
+table separately. Silver watermarks may be two `streaming-data-load` intervals
+old (60 minutes on the committed schedule), measured from the event time Silver
+last processed.
 Pipeline and data timestamps must correlate with the retained deployment or
 explicitly triggered run.
 
@@ -197,6 +200,8 @@ rather than ingestion time.
 | `freshness.setup_run_log` reports `ProgrammingError` after deployment | Update the local verifier to query setup data and staging catalog metadata separately, then rerun read-only readiness. Fabric error 15816 rejects a mixed catalog/data query; do not regenerate setup data for this checker error. |
 | Ontology, Data Agent, or task-flow links missing | Run `retail-setup post-ontology --env <env>` to recreate any missing ontology, republish agents, and verify the exact persisted graph. |
 | Live rows absent | Verify notebook parameters, resolved Query URI, KQL permissions, connector errors, and ingestion timestamps. |
+| `stream-events` refuses to start with a checkpoint error | Its Spark checkpoint and incarnation record disagree. Follow the file names in the error; see [Restart or reset the live stream](#restart-or-reset-the-live-stream). |
+| `stream-events` refuses to start with a history handoff error | History ends more than a day before now, or overlaps it. Rerender and rerun setup, or set `allow_history_gap = True` to accept the gap. |
 | Silver data stale | Inspect Eventhouse shortcuts, transform run history, source timestamps, and `ag._watermarks`. |
 | Gold data stale | Confirm the Silver run completed, then run the Gold transform. |
 | Power BI cannot see newly created tables | Run `python -m deploy.scripts.refresh_sql_endpoint --environment <env>`, then reload the report and rerun readiness. |
@@ -218,6 +223,36 @@ Historical setup tables do not need regeneration for this derived-output
 repair. Reporting publication still requires a successful exact
 `ml-required` pipeline run; standalone notebook results do not replace that
 pipeline evidence. Do not weaken the gate or mark its failed run successful.
+
+## Restart or reset the live stream
+
+`stream-events` keeps its state under `Files/setup/stream/checkpoint` in the
+Lakehouse. Live runs (`run_seconds = 0`) use `eventhouse-live/`; bounded runs
+use `eventhouse-smoke/`, so a smoke test never interferes with the live
+stream. Each folder has an incarnation record in `_metadata/` whose nonce is
+part of every generated ID and Kusto ingest tag.
+
+- **Restart after a stop or failure.** Run the notebook again with the same
+  checkpoint. A batch that failed part-way replays with the same rows, IDs,
+  and tags, so the tables that already succeeded are skipped. Only the last
+  10 minutes (`max_lag_seconds`) of the downtime are generated; the rest of
+  the stop is a gap in the live data.
+- **Transient errors.** Kusto throttling, 5xx responses, timeouts, and expired
+  tokens are retried within the batch. A live query that still fails is
+  restarted up to five times (`max_restarts`) with backoff. The notebook ends
+  only on a permanent error or once that budget is spent.
+- **Start a new incarnation** (new IDs and tags, same stream ID): stop the
+  notebook, then delete both `eventhouse-live/` and
+  `_metadata/eventhouse-live.json`. Deleting only the folder is refused,
+  because reusing batch numbers would make Eventhouse silently skip the
+  writes.
+- **Start a new stream ID:** stop the notebook and delete the whole
+  `Files/setup/stream/checkpoint` folder.
+- **Upgrade from an earlier version:** the old `eventhouse/` folder is no
+  longer read and can be deleted.
+
+A new incarnation checks the history handoff again. If history ends more than
+a day before the start, rerun setup or set `allow_history_gap = True`.
 
 ## Rerun safely
 
