@@ -435,9 +435,21 @@ layouts derive them:
 
 A store's format is drawn from those its volume class suits among the store
 type's formats. Every store follows its store type's `operating_hours`
-patterns ("24h" or "open-close"). BLE pings and zone changes use the store
-type's `zones` (upper-cased), in history and in the live stream; a live visit
-walks entrance, one to three department zones, checkout (buyers) and exit.
+patterns ("24h" or "open-close"). Foot traffic, BLE pings and zone changes
+use the store type's `zones` (upper-cased), in history and in the live stream,
+and the same visit path (`vocabulary.visit_zone_path`): entrance, one to three
+department zones in random order, checkout (buyers) and exit.
+
+`fact_foot_traffic` counts zone passages per store-hour, not shares of the
+visitors: the entrance and exit count every visitor of the hour, checkout
+counts the hour's buyers (so it is never below the receipts), and each
+department zone the visitors who browse it (on average two zones a visitor).
+Visitor totals and conversion use the entrance count; the semantic model's
+`Foot Traffic Count` does so unless a zone is filtered. Beacons detect a quarter
+of visits (`BLE_DETECTED_SHARE`), buyers and non-buyers alike. A detected
+buyer's pings run entrance, departments, checkout and exit, with the purchase
+in the middle of its checkout dwell; a non-buyer starts inside the hour and
+never passes checkout. Pings and zone changes stay inside store hours.
 
 ## Customers and churn
 

@@ -299,10 +299,13 @@ def test_foot_traffic_converts_like_history(world) -> None:
     history = sum(int(r["n_receipts"]) for r in world["visits"]) / sum(
         int(r["visitors"]) for r in world["visits"]
     )
+    # Sensors count zone passages; every visitor passes the entrance once.
+    entrance = vocab.ble_layout(world["profile"]).entry
     entered = sum(
         e["payload"]["customer_count"]
         for e in _of(world, "customer_entered")
-        if _in_history(world, e["payload"]["store_id"], e["ingest_timestamp"])
+        if e["payload"]["zone"] == entrance
+        and _in_history(world, e["payload"]["store_id"], e["ingest_timestamp"])
     )
     receipts = sum(
         1
@@ -337,7 +340,7 @@ def test_live_vocabularies_equal_history(world) -> None:
     profile_zones = set(vocab.ble_zones_for_profile(world["profile"]))
     assert ble_zones == {row["zone"] for row in world["pings"]} == profile_zones
     sensor_zones = {e["payload"]["zone"] for e in _of(world, "customer_entered")}
-    assert sensor_zones <= set(vocab.FOOT_TRAFFIC_ZONES)
+    assert sensor_zones == profile_zones
     for event in _of(world, "ble_ping_detected"):
         payload = event["payload"]
         assert payload["beacon_id"] == vocab.beacon_id(payload["store_id"], payload["zone"])

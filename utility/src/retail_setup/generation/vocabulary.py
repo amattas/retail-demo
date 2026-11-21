@@ -10,7 +10,7 @@ The module holds:
 - payment tenders, their mix, and the decline model
 - the named promotion catalog
 - identifier formats: BLE IDs, ad IDs, beacon and sensor IDs, campaign IDs
-- zone vocabularies (BLE zones and foot-traffic zones)
+- zone vocabularies and the visit path through a store type's zones
 - marketing channels, their cost-per-impression bands, and device types
 - online fulfillment modes
 
@@ -288,7 +288,7 @@ def campaign_id_column(campaign_start: Column, archetype_index: Column) -> Colum
 # BLE beacon zones a shopper's phone is seen in.
 BLE_ZONES = ["ENTRANCE", "ELECTRONICS", "GROCERY", "CLOTHING", "CHECKOUT"]
 
-# Foot-traffic sensor zones -> (dwell_lo_seconds, dwell_hi_seconds).
+# Generic zone dwell ranges (seconds), which the store types' zones borrow.
 FOOT_TRAFFIC_ZONE_DWELL: dict[str, tuple[int, int]] = {
     "ENTRANCE_MAIN": (45, 90),
     "ENTRANCE_SIDE": (30, 75),
@@ -296,11 +296,11 @@ FOOT_TRAFFIC_ZONE_DWELL: dict[str, tuple[int, int]] = {
     "AISLES_B": (120, 300),
     "CHECKOUT": (90, 240),
 }
-FOOT_TRAFFIC_ZONES = list(FOOT_TRAFFIC_ZONE_DWELL)
 
-# A shopper's BLE path starts at the entrance, visits some department zones in
-# a random order, and ends at checkout when the visit buys. Each BLE zone
-# borrows the dwell range of the foot-traffic zone it overlaps.
+
+# A shopper's path starts at the entrance, visits some department zones in a
+# random order, and passes checkout when the visit buys (visit_zone_path). Each
+# zone borrows the dwell range of the generic zone it overlaps.
 BLE_ENTRY_ZONE = "ENTRANCE"
 BLE_CHECKOUT_ZONE = "CHECKOUT"
 BLE_ZONE_DWELL: dict[str, tuple[int, int]] = {
@@ -368,6 +368,108 @@ def ble_layout(profile: StoreTypeProfile | None) -> BleLayout:
         for zone in zones
     }
     return BleLayout(entry, middle, checkout, exit_zone, dwell)
+
+
+# A shopper's visit (history and the live stream): the entrance, 1-3 of the
+# store type's department zones in a random order, checkout when the visit
+# buys, and the exit. Foot-traffic sensors count every zone a visitor passes;
+# beacons detect the phones of BLE_DETECTED_SHARE of visits, 2-5 pings a zone.
+BLE_MAX_MIDDLE_ZONES = 3
+BLE_PINGS_PER_ZONE = (2, 5)
+BLE_DETECTED_SHARE = 0.25
+# Pings carry an RSSI uniform in [-80, -29] dBm.
+RSSI_FLOOR = -80
+RSSI_SPAN = 52
+
+
+def zone_bound(zone: Column, dwell: dict[str, tuple[int, int]], index: int) -> Column:
+    """Lower (``index`` 0) or upper (1) dwell seconds of ``zone``."""
+    return case_when((zone == name, F.lit(bounds[index])) for name, bounds in dwell.items())
+
+
+def visit_zone_path(draws: seeded_draws, key: list, converts: Column, layout: BleLayout) -> Column:
+    """Ordered zones of a visit: entrance, browsed departments, checkout (buyers), exit.
+
+    ``key`` holds the visit's key columns; every draw is keyed on it, so history
+    and the stream lay out a visit the same way.
+    """
+    shuffled = F.array_sort(
+        F.array(
+            *[
+                F.struct(
+                    draws.u([*key, F.lit(zone)], "zone-order").alias("draw"),
+                    F.lit(zone).alias("zone"),
+                )
+                for zone in layout.middle
+            ]
+        )
+    )
+    browse = min(BLE_MAX_MIDDLE_ZONES, len(layout.middle))
+    middle_count = (F.floor(draws.u(key, "zone-count") * browse) + 1).cast("int")
+    middle = F.transform(F.slice(shuffled, 1, middle_count), lambda entry: entry["zone"])
+    no_zone = F.array().cast("array<string>")
+    checkout = (
+        F.when(converts, F.array(F.lit(layout.checkout))).otherwise(no_zone)
+        if layout.checkout is not None
+        else no_zone
+    )
+    exit_zone = F.array(F.lit(layout.exit)) if layout.exit is not None else no_zone
+    return F.concat(F.array(F.lit(layout.entry)), middle, checkout, exit_zone)
+
+
+def visit_zone_dwell(draws: seeded_draws, key: list, zones: Column, layout: BleLayout) -> Column:
+    """Dwell seconds in each zone of a visit's path, uniform in the zone's range."""
+    return F.transform(
+        zones,
+        lambda zone, i: (
+            zone_bound(zone, layout.dwell, 0)
+            + F.floor(
+                draws.u([*key, i], "zone-dwell")
+                * (zone_bound(zone, layout.dwell, 1) - zone_bound(zone, layout.dwell, 0) + 1)
+            )
+        ).cast("long"),
+    )
+
+
+def visit_zone_starts(dwell: Column) -> Column:
+    """Seconds from the visit start at which each zone of the path is entered."""
+    return F.transform(
+        dwell,
+        lambda _dwell, i: F.aggregate(
+            F.slice(dwell, 1, i), F.lit(0).cast("long"), lambda acc, x: acc + x
+        ),
+    )
+
+
+def visit_ping_counts(draws: seeded_draws, key: list, zones: Column) -> Column:
+    """Beacon pings in each zone of a detected visit (2-5)."""
+    low, high = BLE_PINGS_PER_ZONE
+    return F.transform(
+        zones,
+        lambda _zone, i: (F.floor(draws.u([*key, i], "pings") * (high - low + 1)) + low).cast(
+            "int"
+        ),
+    )
+
+
+def checkout_index(zones: Column, layout: BleLayout) -> Column:
+    """1-based position of the zone a buyer pays in: the last before any exit."""
+    return F.size(zones) - (1 if layout.exit is not None else 0)
+
+
+def zone_passage_shares(layout: BleLayout) -> dict[str, float]:
+    """Share of visitors that pass each non-checkout zone of the layout.
+
+    Every visitor passes the entrance and the exit; a department zone is one
+    of 1-``BLE_MAX_MIDDLE_ZONES`` browsed zones. Checkout is passed by buyers.
+    """
+    browse = min(BLE_MAX_MIDDLE_ZONES, len(layout.middle))
+    department = (browse + 1) / 2 / len(layout.middle)
+    shares = {zone: department for zone in layout.middle}
+    shares[layout.entry] = 1.0
+    if layout.exit is not None:
+        shares[layout.exit] = 1.0
+    return shares
 
 
 # ---------------------------------------------------------------------------

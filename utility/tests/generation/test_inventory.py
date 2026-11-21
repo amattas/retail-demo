@@ -197,12 +197,13 @@ def test_truck_lifecycle(seeded_logistics):
         assert r.n == 6
     done = moves.filter("status = 'COMPLETED'")
     assert done.filter(F.col("actual_unload_duration") < 30).count() == 0
-    # load/unload pairs exist per shipment product
+    # every unload pairs with a load (a load on the last day may still be on the road)
     loads = truck_inventory.filter("action = 'LOAD'").groupBy("shipment_id", "product_id").count()
     unloads = (
         truck_inventory.filter("action = 'UNLOAD'").groupBy("shipment_id", "product_id").count()
     )
-    assert loads.join(unloads, ["shipment_id", "product_id"], "left_anti").count() == 0
+    assert unloads.count() > 0
+    assert unloads.join(loads, ["shipment_id", "product_id"], "left_anti").count() == 0
 
 
 def test_reorders_consolidate_into_capacity_bounded_shipments_on_free_trucks(seeded_logistics):

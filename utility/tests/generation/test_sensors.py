@@ -9,7 +9,7 @@ from retail_setup.generation.dims import generate_dimensions
 from retail_setup.generation.receipts import generate_receipts_group
 from retail_setup.generation.sensors import generate_ble
 from retail_setup.generation.schemas import column_names
-from retail_setup.generation.vocabulary import ble_zones_for_profile
+from retail_setup.generation.vocabulary import ble_layout, ble_zones_for_profile
 
 
 @pytest.fixture(scope="module")
@@ -37,26 +37,80 @@ def test_contract_columns(setup):
     assert zc.columns == column_names("fact_customer_zone_changes")
 
 
+def _visits(pings):
+    """Each visit's pings in time order: (key, buyer, zones in order, customer IDs)."""
+    rows = pings.select("trace_id", "event_ts", "zone", "customer_id").collect()
+    visits = {}
+    for row in rows:
+        key, seq = row.trace_id.removeprefix("TRC-BLE-").rsplit("-", 1)
+        visits.setdefault(key, []).append((int(seq), row.event_ts, row.zone, row.customer_id))
+    return {key: sorted(entries) for key, entries in visits.items()}
+
+
 def test_ping_properties(setup):
     sales, pings, _, profile = setup
-    n_receipts = sales["fact_receipts"].count()
-    # 2-5 zones x 2-5 pings per visit => 4-25 pings per receipt
-    assert 4 * n_receipts <= pings.count() <= 25 * n_receipts
     assert pings.filter((F.col("rssi") < -80) | (F.col("rssi") > -29)).count() == 0
     # The store type's own zones (grocery: produce, bakery, deli, ...).
     zones = {r.zone for r in pings.select("zone").distinct().collect()}
     assert zones <= set(ble_zones_for_profile(profile))
     assert {"PRODUCE", "BAKERY", "DELI"} & zones
-    known = pings.filter(F.col("customer_id").isNotNull()).count() / pings.count()
-    assert 0.15 < known < 0.45  # 30% of visits nominal
     anon = pings.filter(F.col("customer_ble_id").startswith("ANON-"))
     assert anon.filter(F.col("customer_id").isNotNull()).count() == 0
+    visits = _visits(pings)
+    buyers = {key for key in visits if key.startswith("RCP")}
+    browsers = set(visits) - buyers
+    n_receipts = sales["fact_receipts"].count()
+    # A quarter of visits are detected, buyers and non-buyers alike.
+    assert 0.15 * n_receipts <= len(buyers) <= 0.35 * n_receipts
+    assert len(browsers) > len(buyers)
+    known = sum(1 for key in buyers if visits[key][0][3] is not None) / len(buyers)
+    assert 0.15 < known < 0.45  # 30% of buying visits nominal
 
 
-def test_zone_changes_derive_from_pings(setup):
-    _, pings, zc, _ = setup
+def test_ble_paths_run_entrance_departments_checkout_exit(setup):
+    _, pings, _, profile = setup
+    layout = ble_layout(profile)
+    for key, entries in _visits(pings).items():
+        times = [ts for _, ts, _, _ in entries]
+        assert times == sorted(times), key
+        path = [
+            zone for i, (_, _, zone, _) in enumerate(entries) if i == 0 or zone != entries[i - 1][2]
+        ]
+        assert len(path) == len(set(path)), (key, path)
+        assert path[0] == layout.entry and path[-1] == layout.exit, (key, path)
+        middle = path[1:-1]
+        if key.startswith("RCP"):
+            # Buyers pay at checkout, the last zone before the exit.
+            assert middle[-1] == layout.checkout, (key, path)
+            middle = middle[:-1]
+        else:
+            assert layout.checkout not in path, (key, path)
+        assert 1 <= len(middle) <= 3 and set(middle) <= set(layout.middle), (key, path)
+
+
+def test_buyers_pay_at_checkout_between_browsing_and_the_exit(setup):
+    sales, pings, _, profile = setup
+    layout = ble_layout(profile)
+    purchased = {r.receipt_id_ext: r.event_ts for r in sales["fact_receipts"].collect()}
+    for key, entries in _visits(pings).items():
+        if not key.startswith("RCP"):
+            continue
+        paid = purchased[key]
+        at_checkout = [ts for _, ts, zone, _ in entries if zone == layout.checkout]
+        assert min(at_checkout) <= paid <= max(at_checkout), key
+        assert all(
+            ts <= paid for _, ts, zone, _ in entries if zone not in (layout.checkout, layout.exit)
+        )
+        assert all(ts >= paid for _, ts, zone, _ in entries if zone == layout.exit)
+
+
+def test_zone_changes_follow_the_path(setup):
+    _, pings, zc, profile = setup
+    layout = ble_layout(profile)
     assert zc.count() > 0
     assert zc.filter(F.col("from_zone") == F.col("to_zone")).count() == 0
+    assert zc.filter(F.col("to_zone") == layout.entry).count() == 0
+    assert zc.filter(F.col("from_zone") == layout.exit).count() == 0
     # every (store, ble) in zone-changes exists in pings
     zk = zc.select("store_id", "customer_ble_id").distinct()
     pk = pings.select("store_id", "customer_ble_id").distinct()
@@ -104,8 +158,8 @@ def test_ble_visits_stay_within_store_hours_and_history(spark):
             "ID long, BLEId string",
         ),
         "dim_stores": spark.createDataFrame(
-            [(1, "7-22")],
-            "ID long, operating_hours string",
+            [(1, 1, 1.0, "7-22")],
+            "ID long, GeographyID long, daily_traffic_multiplier double, operating_hours string",
         ),
     }
 

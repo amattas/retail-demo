@@ -62,7 +62,6 @@ from retail_setup.generation.marketing import (
 )
 from retail_setup.generation.pricing import volume_growth_column
 from retail_setup.generation.runtime import case_when, seeded_draws
-from retail_setup.generation.store_activity import FORMAT_ZONE_SHARES
 from retail_setup.generation.stream_baskets import BasketCatalog, attach_baskets
 from retail_setup.generation.stream_calendar import (
     LanePlan,
@@ -105,10 +104,9 @@ from retail_setup.generation.stream_supply import (
     run_supply_batch,
 )
 from retail_setup.generation.vocabulary import (
+    BLE_DETECTED_SHARE,
     BLE_KNOWN_SHARE,
     CAMPAIGN_ARCHETYPES,
-    FOOT_TRAFFIC_ZONE_DWELL,
-    FOOT_TRAFFIC_ZONES,
     ONLINE_BACKORDER_RATE,
     ONLINE_CANCEL_RATE,
     ONLINE_DELIVER_SECONDS,
@@ -123,13 +121,20 @@ from retail_setup.generation.vocabulary import (
     anonymous_ble_id_column,
     beacon_id_column,
     ble_id_column,
+    RSSI_FLOOR,
+    RSSI_SPAN,
     ble_layout,
     campaign_id_column,
+    checkout_index,
     decline_reason_column,
     payment_status_column,
     processing_ms_column,
     sensor_id_column,
     tender_column,
+    visit_ping_counts,
+    visit_zone_dwell,
+    visit_zone_path,
+    visit_zone_starts,
 )
 
 ISO_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
@@ -138,13 +143,6 @@ VISIT_SCHEMA = "v long, start_ms long, store_id long, customer_id long, rejected
 ORDER_SCHEMA = "v long, start_ms long, rejected array<int>"
 STORE_OP_SCHEMA = "store_id long, event_ms long, operation_type string"
 LOST_SCHEMA = "_owner string, _lost array<int>"
-# A shopper browses 1-3 of the store type's department zones between the
-# entrance and checkout.
-BLE_MAX_MIDDLE_ZONES = 3
-BLE_PINGS_PER_ZONE = (2, 5)
-# Pings carry an RSSI uniform in [-80, -29] dBm, as in history.
-RSSI_FLOOR = -80
-RSSI_SPAN = 52
 # Days of Silver ledger demand that seed a store-product's smoothed daily rate.
 INVENTORY_SEED_LOOKBACK_DAYS = 7
 # One row per supply record: inventory moves, stockouts, reorders and trucks.
@@ -528,29 +526,12 @@ def new_visits(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
     )
 
 
-def _zone_bound(zone: Column, dwell: dict[str, tuple[int, int]], index: int) -> Column:
-    return case_when((zone == name, F.lit(bounds[index])) for name, bounds in dwell.items())
-
-
-def _format_zone(draw: Column) -> Column:
-    """Foot-traffic sensor zone picked by the store format's zone shares."""
-    branches = []
-    for store_format, shares in FORMAT_ZONE_SHARES.items():
-        bound, pick = 0.0, []
-        for zone, share in zip(FOOT_TRAFFIC_ZONES, shares):
-            bound += share
-            pick.append((draw < F.lit(bound), F.lit(zone)))
-        branches.append(
-            (F.col("store_format") == store_format, case_when(pick).otherwise(F.lit(zone)))
-        )
-    return case_when(branches).otherwise(F.lit(FOOT_TRAFFIC_ZONES[0]))
-
-
 def plan_visits(ctx: StreamContext, visits: DataFrame) -> DataFrame:
     """Lay out each visit's events in time.
 
-    Adds the visit's IDs, conversion, BLE identity, sensor zone, the ordered
-    zone path with dwell times, ping and zone-change offsets, purchase and
+    Adds the visit's IDs, conversion, BLE identity and detection, the ordered
+    zone path with dwell times (``vocabulary.visit_zone_path``, as history),
+    zone entry, ping and zone-change offsets, purchase and
     payment offsets (buyers), and ``end_ms``. All draws are keyed on the
     visit's rate row, so the plan is identical in every batch that sees it.
     Visits that would run past closing time are compressed to end before it.
@@ -577,63 +558,17 @@ def plan_visits(ctx: StreamContext, visits: DataFrame) -> DataFrame:
                 ble_id_column(F.col("customer_id")),
             ).otherwise(anonymous_ble_id_column(F.col("store_id"), d.h64([v], "anon_id"))),
         )
-        .withColumn("sensor_zone", _format_zone(d.u([v], "sensor-zone")))
-    )
-    sensor_lo = _zone_bound(F.col("sensor_zone"), FOOT_TRAFFIC_ZONE_DWELL, 0)
-    sensor_hi = _zone_bound(F.col("sensor_zone"), FOOT_TRAFFIC_ZONE_DWELL, 1)
-    frame = frame.withColumn(
-        "sensor_dwell",
-        (sensor_lo + F.floor(d.u([v], "sensor-dwell") * (sensor_hi - sensor_lo + 1))).cast("long"),
+        .withColumn("ble_detected", d.u([v], "ble-detected") < F.lit(BLE_DETECTED_SHARE))
     )
 
-    # Ordered path: entrance, 1-3 department zones in random order, checkout (buyers).
+    # Ordered path shared with history: entrance, 1-3 department zones in
+    # random order, checkout (buyers), exit.
     layout = ble_layout(ctx.profile)
-    shuffled = F.array_sort(
-        F.array(
-            *[
-                F.struct(
-                    d.u([v, F.lit(zone)], "zone-order").alias("draw"), F.lit(zone).alias("zone")
-                )
-                for zone in layout.middle
-            ]
-        )
+    frame = frame.withColumn("zones", visit_zone_path(d, [v], F.col("converts"), layout))
+    frame = frame.withColumn("dwell", visit_zone_dwell(d, [v], F.col("zones"), layout))
+    frame = frame.withColumn("starts", visit_zone_starts(F.col("dwell"))).withColumn(
+        "_duration_s", F.aggregate("dwell", F.lit(0).cast("long"), lambda acc, x: acc + x)
     )
-    browse = min(BLE_MAX_MIDDLE_ZONES, len(layout.middle))
-    middle_count = (F.floor(d.u([v], "zone-count") * browse) + 1).cast("int")
-    middle = F.transform(F.slice(shuffled, 1, middle_count), lambda entry: entry["zone"])
-    no_zone = F.array().cast("array<string>")
-    checkout = (
-        F.when(F.col("converts"), F.array(F.lit(layout.checkout))).otherwise(no_zone)
-        if layout.checkout is not None
-        else no_zone
-    )
-    exit_zone = F.array(F.lit(layout.exit)) if layout.exit is not None else no_zone
-    frame = frame.withColumn(
-        "zones",
-        F.concat(F.array(F.lit(layout.entry)), middle, checkout, exit_zone),
-    )
-    frame = frame.withColumn(
-        "dwell",
-        F.transform(
-            "zones",
-            lambda zone, i: (
-                _zone_bound(zone, layout.dwell, 0)
-                + F.floor(
-                    d.u([v, i], "zone-dwell")
-                    * (_zone_bound(zone, layout.dwell, 1) - _zone_bound(zone, layout.dwell, 0) + 1)
-                )
-            ).cast("long"),
-        ),
-    )
-    frame = frame.withColumn(
-        "starts",
-        F.transform(
-            "zones",
-            lambda _zone, i: F.aggregate(
-                F.slice(F.col("dwell"), 1, i), F.lit(0).cast("long"), lambda acc, x: acc + x
-            ),
-        ),
-    ).withColumn("_duration_s", F.aggregate("dwell", F.lit(0).cast("long"), lambda acc, x: acc + x))
     # Compress a visit that would run past a closing store's closing time.
     close_local = F.make_timestamp(
         F.year("_local_day"),
@@ -658,19 +593,14 @@ def plan_visits(ctx: StreamContext, visits: DataFrame) -> DataFrame:
     def offset(seconds: Column) -> Column:
         return F.floor(seconds * 1000 * F.col("_scale")).cast("long")
 
-    pings_low, pings_high = BLE_PINGS_PER_ZONE
+    frame = frame.withColumn("_ping_counts", visit_ping_counts(d, [v], F.col("zones")))
     frame = frame.withColumn(
         "pings",
         F.flatten(
             F.transform(
                 "zones",
                 lambda zone, i: F.transform(
-                    F.sequence(
-                        F.lit(1),
-                        (
-                            F.floor(d.u([v, i], "pings") * (pings_high - pings_low + 1)) + pings_low
-                        ).cast("int"),
-                    ),
+                    F.sequence(F.lit(1), F.element_at("_ping_counts", i + 1)),
                     lambda k: F.struct(
                         (i + 1).alias("zone_index"),
                         k.alias("seq"),
@@ -679,15 +609,22 @@ def plan_visits(ctx: StreamContext, visits: DataFrame) -> DataFrame:
                             F.element_at("starts", i + 1)
                             + F.element_at("dwell", i + 1)
                             * k
-                            / (
-                                F.floor(d.u([v, i], "pings") * (pings_high - pings_low + 1))
-                                + pings_low
-                                + 1
-                            )
+                            / (F.element_at("_ping_counts", i + 1) + 1)
                         ).alias("offset_ms"),
                     ),
                 ),
             )
+        ),
+    ).withColumn(
+        "entries",
+        F.transform(
+            "zones",
+            lambda zone, i: F.struct(
+                (i + 1).alias("zone_index"),
+                zone.alias("zone"),
+                offset(F.element_at("starts", i + 1)).alias("offset_ms"),
+                F.element_at("dwell", i + 1).alias("dwell"),
+            ),
         ),
     ).withColumn(
         "changes",
@@ -702,7 +639,7 @@ def plan_visits(ctx: StreamContext, visits: DataFrame) -> DataFrame:
         ),
     )
     # Buyers pay in the checkout zone, the last zone before any exit.
-    last = F.size("zones") - (1 if layout.exit is not None else 0)
+    last = checkout_index(F.col("zones"), layout)
     frame = (
         frame.withColumn("tender", tender_column(d, [F.col("receipt_id")]))
         .withColumn(
@@ -743,22 +680,26 @@ def visit_events(
     v = F.col("v")
     store = _store_key(F.col("store_id"))
     session = F.col("session_id")
-    entered = slot(
-        ctx,
-        _due(F.col("start_ms"), previous_ms, clock_ms),
-        "customer_entered",
-        F.struct(
-            F.col("store_id"),
-            sensor_id_column(F.col("store_id"), F.col("sensor_zone")).alias("sensor_id"),
-            F.col("sensor_zone").alias("zone"),
-            F.lit(1).cast("long").alias("customer_count"),
-            F.col("sensor_dwell").alias("dwell_time"),
-        ),
-        _ms_ts(F.col("start_ms")),
-        store,
-        v,
-        session=session,
-    )
+    # Foot-traffic sensors count every zone the visitor passes, as it enters it.
+    def entered(entry: Column) -> Column:
+        ms = F.col("start_ms") + entry["offset_ms"]
+        zone = entry["zone"]
+        return slot(
+            ctx,
+            _due(ms, previous_ms, clock_ms),
+            "customer_entered",
+            F.struct(
+                F.col("store_id"),
+                sensor_id_column(F.col("store_id"), zone).alias("sensor_id"),
+                zone.alias("zone"),
+                F.lit(1).cast("long").alias("customer_count"),
+                entry["dwell"].alias("dwell_time"),
+            ),
+            _ms_ts(ms),
+            store,
+            F.concat(v, F.lit("-e"), entry["zone_index"]),
+            session=session,
+        )
 
     def ping(entry: Column) -> Column:
         ms = F.col("start_ms") + entry["offset_ms"]
@@ -801,7 +742,11 @@ def visit_events(
             session=session,
         )
 
-    events = F.concat(F.array(entered), F.transform("pings", ping), F.transform("changes", change))
+    events = F.concat(
+        F.transform("entries", entered),
+        F.transform(F.filter("pings", lambda _entry: F.col("ble_detected")), ping),
+        F.transform(F.filter("changes", lambda _entry: F.col("ble_detected")), change),
+    )
     return collect_events(plan, events)
 
 

@@ -91,14 +91,18 @@ history:
   churn continues from the history's lifecycle (rendered start, end, churn
   rate and anonymous share). Online orders take the first of four tries that
   is active that day.
-- **Visit path.** A visit enters (`customer_entered`, sensor zone by store
-  format), walks from the store type's entrance zone through one to three of its
-  department zones (`profile.zones`, upper-cased) in random order, passes
-  `CHECKOUT` when it buys and leaves through `EXIT` when the store type has
-  one. Each zone has a dwell time
-  in its foot-traffic range, two to five BLE pings, and a zone change on
-  arrival. 30% of visits carry the customer's `dim_customers.BLEId`; the rest
-  are `ANON-<store>-<n>`, as in history. The receipt, lines and promotions are
+- **Visit path.** A visit walks from the store type's entrance zone through
+  one to three of its department zones (`profile.zones`, upper-cased) in
+  random order, passes `CHECKOUT` when it buys and leaves through `EXIT` when
+  the store type has one (`vocabulary.visit_zone_path`, the path history
+  uses). Each zone has a dwell time in its range and a `customer_entered`
+  event as the visitor enters it: foot-traffic sensors count zone passages, so
+  the entrance zone counts visitors and checkout counts buyers
+  (`customer_count` is 1, `dwell_time` the zone's dwell). Beacons detect the
+  phone of a quarter of visits (`BLE_DETECTED_SHARE`, buyers and non-buyers):
+  those emit two to five BLE pings per zone and a zone change on arrival. 30%
+  of detected visits carry the customer's `dim_customers.BLEId`; the rest are
+  `ANON-<store>-<n>`, as in history. The receipt, lines and promotions are
   emitted halfway through checkout and the payment after the tender's
   processing time. A visit that would run past closing time is compressed to
   end before it.
