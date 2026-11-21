@@ -11,6 +11,9 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
+from retail_setup.dictionaries.loader import load_dictionaries
+from retail_setup.dictionaries.models import StoreTypeProfile
+from retail_setup.generation.baskets import price_basket, receipt_offer, sum_lines
 from retail_setup.generation.inventory_policy import Demand, InventoryEvent, simulate_sku
 from retail_setup.generation.receipts import _fmt
 from retail_setup.generation.returns import build_return_headers
@@ -150,55 +153,92 @@ def _fulfilled_finances(
     sales: dict[str, DataFrame],
     events: DataFrame,
     dims: dict[str, DataFrame],
+    profile: StoreTypeProfile,
+    seed: int,
 ) -> dict[str, DataFrame]:
+    """Receipts, lines and payments of the lines the policy could fill.
+
+    The basket is priced again over its accepted lines (``baskets.price_basket``,
+    as for candidates and the live stream), so a promotion whose minimum the
+    fulfilled basket no longer meets is replaced or dropped.
+    """
+    draws = seeded_draws(seed)
     accepted = events.filter(F.col("kind") == "SALE").select(
         F.col("receipt_id").alias("receipt_id_ext"),
         "line_num",
     )
-    lines = sales["fact_receipt_lines"].join(
-        accepted,
-        ["receipt_id_ext", "line_num"],
-        "left_semi",
-    )
-    finance_lines = (
-        lines.join(
-            sales["fact_receipts"].select("receipt_id_ext", "store_id"),
-            "receipt_id_ext",
-        )
-        .join(dims["dim_stores"].select(F.col("ID").alias("store_id"), "tax_rate"), "store_id")
+    lines = (
+        sales["fact_receipt_lines"]
+        .join(accepted, ["receipt_id_ext", "line_num"], "left_semi")
         .join(
-            dims["dim_products"].select(F.col("ID").alias("product_id"), "taxability"),
+            dims["dim_products"].select(
+                F.col("ID").alias("product_id"),
+                "taxability",
+                F.col("Department").alias("department"),
+            ),
             "product_id",
         )
-        .withColumn("_gross", F.col("unit_cents") * F.col("quantity"))
-        .withColumn("_bps", F.round(F.col("tax_rate") * 10000).cast("long"))
-        .withColumn(
-            "_tax_mult",
-            F.when(F.col("taxability") == "TAXABLE", 100)
-            .when(F.col("taxability") == "REDUCED_RATE", 50)
-            .otherwise(0),
-        )
-        .withColumn(
-            "_tax",
-            F.floor(
-                (
-                    F.col("ext_cents").cast("decimal(24,0)") * F.col("_bps") * F.col("_tax_mult")
-                    + F.lit(500_000)
+        .groupBy("receipt_id_ext")
+        .agg(
+            F.array_sort(
+                F.collect_list(
+                    F.struct(
+                        "line_num",
+                        "product_id",
+                        "quantity",
+                        "unit_cents",
+                        "taxability",
+                        "department",
+                    )
                 )
-                / F.lit(1_000_000),
-            ).cast("long"),
+            ).alias("_lines")
         )
     )
-    totals = finance_lines.groupBy("receipt_id_ext").agg(
-        F.sum("ext_cents").alias("subtotal_cents"),
-        F.sum("_gross").alias("gross_subtotal_cents"),
-        F.sum("_tax").alias("tax_cents"),
+    key = F.col("receipt_id_ext")
+    priced = (
+        sales["fact_receipts"]
+        .select("receipt_id_ext", "store_id", "event_ts", "event_date")
+        .join(lines, "receipt_id_ext")
+        .join(dims["dim_stores"].select(F.col("ID").alias("store_id"), "tax_rate"), "store_id")
+        .withColumn(
+            "_lines",
+            price_basket(
+                draws,
+                key,
+                F.col("_lines"),
+                F.month("event_date"),
+                receipt_offer(draws, key, profile.promo_rate),
+                F.round(F.col("tax_rate") * 10000).cast("long"),
+                profile,
+            ),
+        )
+    )
+    fulfilled_lines = priced.select(
+        "receipt_id_ext", "event_ts", "event_date", F.explode("_lines").alias("_l")
+    ).select(
+        "receipt_id_ext",
+        "event_ts",
+        "event_date",
+        F.col("_l.line_num").alias("line_num"),
+        F.col("_l.product_id").alias("product_id"),
+        F.col("_l.quantity").alias("quantity"),
+        _fmt(F.col("_l.unit_cents")).alias("unit_price"),
+        F.col("_l.unit_cents").alias("unit_cents"),
+        _fmt(F.col("_l.ext_cents")).alias("ext_price"),
+        F.col("_l.ext_cents").alias("ext_cents"),
+        F.col("_l.promo_code").alias("promo_code"),
+    )
+    totals = priced.select(
+        "receipt_id_ext",
+        sum_lines(F.col("_lines"), "ext_cents").alias("subtotal_cents"),
+        sum_lines(F.col("_lines"), "discount_cents").alias("discount_cents"),
+        sum_lines(F.col("_lines"), "tax_cents").alias("tax_cents"),
     )
     header = (
         sales["fact_receipts"]
         .drop(*_FINANCE_COLUMNS)
         .join(totals, "receipt_id_ext")
-        .withColumn("discount_cents", F.col("gross_subtotal_cents") - F.col("subtotal_cents"))
+        .withColumn("gross_subtotal_cents", F.col("subtotal_cents") + F.col("discount_cents"))
         .withColumn("total_cents", F.col("subtotal_cents") + F.col("tax_cents"))
     )
     for name in ("subtotal", "discount", "tax", "total"):
@@ -218,7 +258,7 @@ def _fulfilled_finances(
     )
     return {
         "fact_receipts": header,
-        "fact_receipt_lines": lines.select(*column_names("fact_receipt_lines")),
+        "fact_receipt_lines": fulfilled_lines.select(*column_names("fact_receipt_lines")),
         "fact_payments": payments,
     }
 
@@ -229,6 +269,7 @@ def resolve_fulfillment(
     cfg: GenerationConfig,
     *,
     return_headers: DataFrame | None = None,
+    profile: StoreTypeProfile | None = None,
 ) -> FulfillmentResult:
     """Resolve candidate demand before any receipt-dependent fact generation.
 
@@ -321,4 +362,8 @@ def resolve_fulfillment(
         )
         .cache()
     )
-    return FulfillmentResult(_fulfilled_finances(sales_group, events, dims), headers, events)
+    if profile is None:
+        profile = load_dictionaries(cfg.resolved_dictionary_root, cfg.store_type).profile
+    return FulfillmentResult(
+        _fulfilled_finances(sales_group, events, dims, profile, cfg.seed), headers, events
+    )

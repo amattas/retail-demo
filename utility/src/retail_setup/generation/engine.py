@@ -106,7 +106,7 @@ def _build_candidates(ctx: GenerationContext) -> StageOutputs:
 
 def _build_plan(ctx: GenerationContext, candidates: StageOutputs) -> StageOutputs:
     # Inventory-constrained fulfillment precedes every receipt consumer.
-    plan = resolve_fulfillment(candidates, ctx.dims, ctx.cfg)
+    plan = resolve_fulfillment(candidates, ctx.dims, ctx.cfg, profile=ctx.dicts.profile)
     return {"return_headers": plan.return_headers, "events": plan.events, **plan.sales}
 
 
@@ -115,7 +115,11 @@ def _build_online(ctx: GenerationContext) -> StageOutputs:
 
 
 def _build_ads(ctx: GenerationContext) -> StageOutputs:
-    return {"fact_marketing": marketing.generate_marketing(ctx.spark, ctx.dims, ctx.cfg)}
+    return {
+        "fact_marketing": marketing.generate_marketing(
+            ctx.spark, ctx.dims, ctx.cfg, ctx.dicts.profile
+        )
+    }
 
 
 def _build_refunds(ctx: GenerationContext, plan: StageOutputs) -> StageOutputs:
@@ -152,7 +156,9 @@ def _build_foot_traffic(ctx: GenerationContext, plan: StageOutputs) -> StageOutp
 
 
 def _build_ble(ctx: GenerationContext, plan: StageOutputs) -> StageOutputs:
-    pings, zone_changes = sensors.generate_ble(ctx.spark, plan["fact_receipts"], ctx.dims, ctx.cfg)
+    pings, zone_changes = sensors.generate_ble(
+        ctx.spark, plan["fact_receipts"], ctx.dims, ctx.cfg, ctx.dicts.profile
+    )
     return {
         "fact_ble_pings": localize_by_store(pings, ctx.dims, ["event_ts"]),
         "fact_customer_zone_changes": localize_by_store(zone_changes, ctx.dims, ["event_ts"]),

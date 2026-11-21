@@ -251,11 +251,25 @@ Review these choices:
 | Lakehouse | The Lakehouse stores historical and analytical tables. Keep the default name unless you are deliberately updating every checked-in reference. |
 | Eventhouse and KQL database | Eventhouse stores optional live events, and KQL (Kusto Query Language) queries them. Use the same display name for both in this demo. |
 | Profile and Spark pool | `core` and `standard` use the starter pool. `full-demo` validates and selects the custom pool. |
-| Store type | `supercenter`, `grocery`, `hardware`, or `luxury`, or `custom` for a layout built for a business you name (see [Custom business layouts](#custom-business-layouts-preview)). |
+| Store type | `supercenter`, `grocery`, `hardware`, or `luxury`, or `custom` for a layout built for a business you name (see [Custom business layouts](#custom-business-layouts-preview)). The store type sets store traffic, hours, formats and online volume (see below). |
 | History | `--months` defines a range ending yesterday. Reporting profiles use at least 18 months by default. |
 | Store count and seed | Control scale and deterministic reproduction. |
 
 The CLI shows an estimated record count before writing configuration.
+
+Store types differ in how busy and how long their stores are open. Volumes are
+per store at an average traffic multiplier; the generator varies each store
+around them:
+
+| Store type | Receipts per store-day | Average ticket | Opening hours | Store formats | Online orders |
+| --- | --- | --- | --- | --- | --- |
+| `supercenter` | 400 | $85 | 6-22, 7-23, or 24h | hypermarket, superstore, standard | 12% of orders |
+| `grocery` | 280 | $55 | 6-22, 7-22, or 7-23 | superstore, standard, neighborhood, express | 15% |
+| `hardware` | 180 | $95 | 6-21, 7-21, or 7-22 | superstore, standard, neighborhood | 20% |
+| `luxury` | 40 | $3,000 | 10-19, 10-20, or 11-19 | boutique | 25% |
+
+A custom layout takes its traffic from its average ticket, its hours from its
+hourly traffic curve, and its online share and zones from its profile.
 
 Non-interactive example:
 

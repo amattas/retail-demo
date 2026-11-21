@@ -84,24 +84,34 @@ history:
   live receipt is outside opening hours. Visits are drawn at
   `transactions_per_store_day / 0.225` per store-day and convert with the same
   store/day/hour conversion as history (about 22%).
-- **Customers.** 70% of shoppers come from the store's own geography and the
-  rest from the whole network, both weighted by the historical visit tickets
-  (`behavior.customer_visit_tickets`). The churned history cohort
-  (`customer_id % 10 == 0`) no longer shops.
+- **Customers.** As in history (`generation/customers.py`), about 45% of
+  visits are anonymous. The rest pick a customer from the store's home-customer
+  pool (85%) or another store's, weighted by visit tickets, and keep them only
+  while they are signed up and not churned on the visit's local day; live
+  churn continues from the history's lifecycle (rendered start, end, churn
+  rate and anonymous share). Online orders take the first of four tries that
+  is active that day.
 - **Visit path.** A visit enters (`customer_entered`, sensor zone by store
-  format), walks from `ENTRANCE` through one to three department zones in
-  random order, and ends at `CHECKOUT` when it buys. Each zone has a dwell time
+  format), walks from the store type's entrance zone through one to three of its
+  department zones (`profile.zones`, upper-cased) in random order, passes
+  `CHECKOUT` when it buys and leaves through `EXIT` when the store type has
+  one. Each zone has a dwell time
   in its foot-traffic range, two to five BLE pings, and a zone change on
   arrival. 30% of visits carry the customer's `dim_customers.BLEId`; the rest
   are `ANON-<store>-<n>`, as in history. The receipt, lines and promotions are
   emitted halfway through checkout and the payment after the tender's
   processing time. A visit that would run past closing time is compressed to
   end before it.
-- **Purchases.** Baskets, per-line promotions (`PROMO_CATALOG` with the
-  evergreen fallback), the 40/30/20/10 tender mix and the 2.5% base decline
+- **Purchases.** Baskets (complementary products and merged repeated SKUs,
+  `generation/baskets.py`), shelf prices of the incarnation's catalog date
+  (`generation/pricing.py`, the same price schedule as history), one
+  basket-level promotion priced over the lines the store could fill, the
+  40/30/20/10 tender mix and the 2.5% base decline
   model are the batch helpers. A declined payment keeps its `SALE` receipt,
   as in history, and is never attributed. One `promotion_applied` is emitted per
-  receipt and promo code.
+  receipt and promo code, so at most one per receipt. Visit and online volume
+  follow history's year-over-year trend (`annual_volume_growth` from the
+  anchor date).
 - **Store operations.** `store_opened` and `store_closed` (lower-case
   `opened`/`closed`, like history) are emitted exactly at each store's local
   opening and closing time, one pair per open day. A 24-hour store closes at
@@ -173,7 +183,8 @@ has passed.
 
 ## Online orders
 
-Online orders arrive at `online_orders_per_day`, shaped by the profile's
+Online orders arrive at `online_orders_per_day` (by default derived so online
+orders are the profile's `online_order_share` of all orders), shaped by the profile's
 monthly weights and the online hourly curve (`vocabulary.ONLINE_HOURLY_WEIGHTS`,
 UTC, peaking in the US evening; history uses the same curve). Each order has
 one fulfillment mode and node, drawn by the historical mix (60% ship from a DC,

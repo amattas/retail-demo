@@ -6,11 +6,12 @@ One micro-batch of ``rate`` rows becomes the events of that minute:
   multiplier and is kept with the store's local hour/day/month weight (no
   visits while closed). The shopper comes from the store's own customer pool
   (or, as in history, a network-wide pick), weighted by visit tickets. Each
-  visit follows an ordered path (entrance, department zones, checkout for
-  buyers) with per-zone dwell times; its events are emitted as their time
-  passes, so a visit that spans micro-batches lives in the visit state.
+  visit follows an ordered path through the store type's zones (entrance,
+  department zones, checkout for buyers, exit) with per-zone dwell times; its
+  events are emitted as their time passes, so a visit that spans micro-batches
+  lives in the visit state.
   About 22% of visits buy, as in history.
-- **Purchases.** Baskets, per-line promotions, tender mix, declines and
+- **Purchases.** Baskets, the basket-level promotion, tender mix, declines and
   marketing journeys reuse the batch helpers. Journey touches carry their
   touch time in ``impression_time`` and arrive with the purchase.
 - **Store operations.** Opened/closed events at each store's local operating
@@ -40,13 +41,26 @@ from pyspark.sql import functions as F
 
 from retail_setup.dictionaries.models import StoreTypeProfile
 from retail_setup.generation.attribution import SELECTION_RATE, with_journey_plan
-from retail_setup.generation.behavior import customer_visit_tickets, pick_retail_product
+from retail_setup.generation.baskets import (
+    COMPLEMENT_RATE,
+    merge_lines,
+    price_basket,
+    with_complements,
+)
+from retail_setup.generation.behavior import pick_retail_product
+from retail_setup.generation.customers import (
+    HOME_STORE_SHARE,
+    ONLINE_CUSTOMER_ATTEMPTS,
+    CustomerLifecycle,
+    activity_column,
+    visit_tickets,
+)
 from retail_setup.generation.marketing import (
     CRM_MATCH_RATE,
     campaign_window_start,
     impression_device_cost,
 )
-from retail_setup.generation.receipts import CHURN_COHORT_MODULUS, GEO_AFFINITY
+from retail_setup.generation.pricing import volume_growth_column
 from retail_setup.generation.runtime import case_when, seeded_draws
 from retail_setup.generation.store_activity import FORMAT_ZONE_SHARES
 from retail_setup.generation.stream_baskets import BasketCatalog, attach_baskets
@@ -91,11 +105,7 @@ from retail_setup.generation.stream_supply import (
     run_supply_batch,
 )
 from retail_setup.generation.vocabulary import (
-    BLE_CHECKOUT_ZONE,
-    BLE_ENTRY_ZONE,
     BLE_KNOWN_SHARE,
-    BLE_ZONE_DWELL,
-    BLE_ZONES,
     CAMPAIGN_ARCHETYPES,
     FOOT_TRAFFIC_ZONE_DWELL,
     FOOT_TRAFFIC_ZONES,
@@ -113,9 +123,9 @@ from retail_setup.generation.vocabulary import (
     anonymous_ble_id_column,
     beacon_id_column,
     ble_id_column,
+    ble_layout,
     campaign_id_column,
     decline_reason_column,
-    line_promotion,
     payment_status_column,
     processing_ms_column,
     sensor_id_column,
@@ -128,8 +138,9 @@ VISIT_SCHEMA = "v long, start_ms long, store_id long, customer_id long, rejected
 ORDER_SCHEMA = "v long, start_ms long, rejected array<int>"
 STORE_OP_SCHEMA = "store_id long, event_ms long, operation_type string"
 LOST_SCHEMA = "_owner string, _lost array<int>"
-# BLE department zones a shopper may visit between the entrance and checkout.
-BLE_MIDDLE_ZONES = [zone for zone in BLE_ZONES if zone not in (BLE_ENTRY_ZONE, BLE_CHECKOUT_ZONE)]
+# A shopper browses 1-3 of the store type's department zones between the
+# entrance and checkout.
+BLE_MAX_MIDDLE_ZONES = 3
 BLE_PINGS_PER_ZONE = (2, 5)
 # Pings carry an RSSI uniform in [-80, -29] dBm, as in history.
 RSSI_FLOOR = -80
@@ -159,13 +170,21 @@ class StreamContext:
     stores: DataFrame
     store_picker: DataFrame
     customer_pools: DataFrame
-    geo_picker: DataFrame
+    lifecycle: CustomerLifecycle
     ids: dict[str, tuple[DataFrame, int]]
     baskets: BasketCatalog
     store_hours: tuple[StoreHours, ...]
     supply: SupplyNetwork
     customer_tax: DataFrame
     inventory_seed: DataFrame | None = None
+    # Year-over-year volume trend, as history (pricing.volume_growth).
+    anchor_date: date | None = None
+    annual_volume_growth: float = 0.0
+
+    def growth(self, day: Column) -> Column:
+        """Volume trend multiplier on a date column (1 at the anchor date)."""
+        anchor = self.anchor_date or self.history_start
+        return volume_growth_column(self.annual_volume_growth, anchor, day)
 
     @property
     def draws(self) -> seeded_draws:
@@ -209,15 +228,20 @@ def build_stream_context(
     baskets: BasketCatalog,
     lanes: LanePlan,
     supply: SupplyNetwork,
+    lifecycle: CustomerLifecycle,
     inventory_seed: DataFrame | None = None,
+    anchor_date: date | None = None,
+    annual_volume_growth: float = 0.0,
 ) -> StreamContext:
     """Collect the bounded store metadata and build the customer pools.
 
+    Each store's pool holds its home customers (``dim_customers.HomeStoreID``)
+    weighted by their visit tickets; ``lifecycle`` (the history's
+    :class:`CustomerLifecycle`) decides who is active on a live day.
     ``inventory_seed`` (``store_id, product_id, on_hand, rate``, see
     :func:`inventory_seed_frame`) seeds store stock the stream has not
     touched yet; without it, stock starts from history's opening stock.
     """
-    draws = seeded_draws(seed)
     stores = dim_stores.select(
         F.col("ID").cast("long").alias("store_id"),
         F.col("GeographyID").cast("long").alias("store_geo_id"),
@@ -255,39 +279,28 @@ def build_stream_context(
     customers = (
         dim_customers.select(
             F.col("ID").cast("long").alias("customer_id"),
-            F.col("GeographyID").cast("long").alias("geo_id"),
+            F.col("HomeStoreID").cast("long").alias("pool_store"),
         )
-        .where(F.col("customer_id").isNotNull() & F.col("geo_id").isNotNull())
-        # The historical churn cohort has stopped buying by the end of history.
-        .where(F.pmod(F.col("customer_id"), F.lit(CHURN_COHORT_MODULUS)) != 0)
-        .withColumn("_tickets", customer_visit_tickets(draws, F.col("customer_id")).cast("double"))
+        .where(F.col("customer_id").isNotNull() & F.col("pool_store").isNotNull())
+        .withColumn("_tickets", visit_tickets(lifecycle, F.col("customer_id")).cast("double"))
     )
     ordered = (
-        Window.partitionBy("geo_id")
+        Window.partitionBy("pool_store")
         .orderBy("customer_id")
         .rowsBetween(Window.unboundedPreceding, Window.currentRow)
     )
     pools = (
         customers.withColumn(
             "_cdf",
-            F.sum("_tickets").over(ordered) / F.sum("_tickets").over(Window.partitionBy("geo_id")),
+            F.sum("_tickets").over(ordered)
+            / F.sum("_tickets").over(Window.partitionBy("pool_store")),
         )
-        .groupBy("geo_id")
-        .agg(
-            F.sort_array(F.collect_list(F.struct("_cdf", "customer_id"))).alias("_pool"),
-            F.sum("_tickets").alias("_tickets"),
-        )
+        .groupBy("pool_store")
+        .agg(F.sort_array(F.collect_list(F.struct("_cdf", "customer_id"))).alias("_pool"))
         .persist()
     )
-    geos = pools.select("geo_id", "_tickets").orderBy("geo_id").collect()
-    if not geos:
-        raise ValueError("dim_customers has no active customers for live visits")
-    total_tickets = sum(row["_tickets"] for row in geos)
-    cumulative, geo_entries = 0.0, []
-    for row in geos:
-        cumulative += row["_tickets"] / total_tickets
-        geo_entries.append((cumulative, row["geo_id"]))
-    with_pool = {row["geo_id"] for row in geos}
+    if pools.limit(1).count() == 0:
+        raise ValueError("dim_customers has no customers with a home store; re-run setup")
 
     total_multiplier = sum(row["multiplier"] for row in rows)
     cumulative, store_entries = 0.0, []
@@ -295,11 +308,7 @@ def build_stream_context(
         cumulative += row["multiplier"] / total_multiplier
         store_entries.append((cumulative, row["store_id"]))
 
-    stores = (
-        stores.join(F.broadcast(hours), "operating_hours")
-        .withColumn("_has_pool", F.col("store_geo_id").isin(*sorted(with_pool)))
-        .persist()
-    )
+    stores = stores.join(F.broadcast(hours), "operating_hours").persist()
     # Destination tax for DC-shipped online orders, as in history: the mean
     # store rate of the customer's geography, else the network mean.
     mean_bps = int(round(sum(row["_tax_rate"] for row in rows) / len(rows) * 10000))
@@ -334,7 +343,7 @@ def build_stream_context(
             spark, "_stores", store_entries, "_cdf:double,store_id:bigint"
         ),
         customer_pools=pools,
-        geo_picker=_single_row_array(spark, "_geos", geo_entries, "_cdf:double,geo_id:bigint"),
+        lifecycle=lifecycle,
         ids=ids,
         baskets=baskets,
         store_hours=tuple(
@@ -344,6 +353,8 @@ def build_stream_context(
         supply=supply,
         customer_tax=customer_tax,
         inventory_seed=inventory_seed,
+        anchor_date=anchor_date,
+        annual_volume_growth=annual_volume_growth,
     )
 
 
@@ -481,26 +492,39 @@ def new_visits(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
     )
     local_day = F.to_date(_local(F.col("ts")))
     time_factor = F.when(closed_date_column(local_day), F.lit(0.0)).otherwise(
-        daily_factor_column(ctx.profile, local_day)
+        ctx.growth(local_day)
+        * daily_factor_column(ctx.profile, local_day)
         * monthly_factor_column(ctx.profile, local_day)
         * F.element_at(F.col("_hour_share"), F.hour(_local(F.col("ts"))) + 1)
     )
     visits = visits.where(_keep(ctx, "visits", time_factor))
-    local = (d.u([v], "affinity") < F.lit(GEO_AFFINITY)) & F.col("_has_pool")
-    network_geo = pick_retail_product(F.col("_geos"), d.u([v], "customer-geo"))["geo_id"]
-    pools = ctx.customer_pools.select("geo_id", "_pool")
+    # As in history: most identified shoppers are the store's home customers,
+    # the rest another store's; a shopper is kept with their lifecycle
+    # activity that local day, else the visit is anonymous.
+    home = d.u([v], "customer-home-visit") < F.lit(HOME_STORE_SHARE)
+    away = pick_retail_product(F.col("_stores"), d.u([v], "customer-away-store"))["store_id"]
     visits = (
-        visits.crossJoin(F.broadcast(ctx.geo_picker))
-        .withColumn("geo_id", F.when(local, F.col("store_geo_id")).otherwise(network_geo))
-        .join(F.broadcast(pools), "geo_id")
+        visits.crossJoin(F.broadcast(ctx.store_picker))
+        .withColumn("pool_store", F.when(home, F.col("store_id")).otherwise(away).cast("long"))
+        .drop("_stores")
+        .join(F.broadcast(ctx.customer_pools), "pool_store", "left")
+    )
+    visits = visits.withColumn(
+        "_picked",
+        F.when(
+            F.col("_pool").isNotNull(),
+            pick_retail_product(F.col("_pool"), d.u([v], "customer"))["customer_id"].cast("long"),
+        ),
+    )
+    picked = F.col("_picked")
+    kept = (d.u([v], "customer-identified") < F.lit(ctx.lifecycle.identify_probability)) & (
+        d.u([v], "customer-active") < activity_column(ctx.lifecycle, picked, local_day)
     )
     return visits.select(
         v,
         F.unix_millis(F.col("ts")).alias("start_ms"),
         "store_id",
-        pick_retail_product(F.col("_pool"), d.u([v], "customer"))["customer_id"]
-        .cast("long")
-        .alias("customer_id"),
+        F.when(kept, picked).cast("long").alias("customer_id"),
     )
 
 
@@ -563,41 +587,40 @@ def plan_visits(ctx: StreamContext, visits: DataFrame) -> DataFrame:
     )
 
     # Ordered path: entrance, 1-3 department zones in random order, checkout (buyers).
+    layout = ble_layout(ctx.profile)
     shuffled = F.array_sort(
         F.array(
             *[
                 F.struct(
                     d.u([v, F.lit(zone)], "zone-order").alias("draw"), F.lit(zone).alias("zone")
                 )
-                for zone in BLE_MIDDLE_ZONES
+                for zone in layout.middle
             ]
         )
     )
-    middle_count = (F.floor(d.u([v], "zone-count") * len(BLE_MIDDLE_ZONES)) + 1).cast("int")
+    browse = min(BLE_MAX_MIDDLE_ZONES, len(layout.middle))
+    middle_count = (F.floor(d.u([v], "zone-count") * browse) + 1).cast("int")
     middle = F.transform(F.slice(shuffled, 1, middle_count), lambda entry: entry["zone"])
+    no_zone = F.array().cast("array<string>")
+    checkout = (
+        F.when(F.col("converts"), F.array(F.lit(layout.checkout))).otherwise(no_zone)
+        if layout.checkout is not None
+        else no_zone
+    )
+    exit_zone = F.array(F.lit(layout.exit)) if layout.exit is not None else no_zone
     frame = frame.withColumn(
         "zones",
-        F.concat(
-            F.array(F.lit(BLE_ENTRY_ZONE)),
-            middle,
-            F.when(F.col("converts"), F.array(F.lit(BLE_CHECKOUT_ZONE))).otherwise(
-                F.array().cast("array<string>")
-            ),
-        ),
+        F.concat(F.array(F.lit(layout.entry)), middle, checkout, exit_zone),
     )
     frame = frame.withColumn(
         "dwell",
         F.transform(
             "zones",
             lambda zone, i: (
-                _zone_bound(zone, BLE_ZONE_DWELL, 0)
+                _zone_bound(zone, layout.dwell, 0)
                 + F.floor(
                     d.u([v, i], "zone-dwell")
-                    * (
-                        _zone_bound(zone, BLE_ZONE_DWELL, 1)
-                        - _zone_bound(zone, BLE_ZONE_DWELL, 0)
-                        + 1
-                    )
+                    * (_zone_bound(zone, layout.dwell, 1) - _zone_bound(zone, layout.dwell, 0) + 1)
                 )
             ).cast("long"),
         ),
@@ -678,7 +701,8 @@ def plan_visits(ctx: StreamContext, visits: DataFrame) -> DataFrame:
             ),
         ),
     )
-    last = F.size("zones")
+    # Buyers pay in the checkout zone, the last zone before any exit.
+    last = F.size("zones") - (1 if layout.exit is not None else 0)
     frame = (
         frame.withColumn("tender", tender_column(d, [F.col("receipt_id")]))
         .withColumn(
@@ -786,32 +810,6 @@ def visit_events(
 # ---------------------------------------------------------------------------
 
 
-def _tax_share(taxability: Column) -> Column:
-    return (
-        F.when(taxability == "TAXABLE", F.lit(1.0))
-        .when(taxability == "REDUCED_RATE", F.lit(0.5))
-        .otherwise(F.lit(0.0))
-    )
-
-
-def price_line(
-    draws: seeded_draws, line: Column, receipt_id: Column, month: Column, offer: Column, bps: Column
-) -> Column:
-    """Per-line promotion (shared with history), then tax on the net amount."""
-    promo = line_promotion(
-        draws, [receipt_id, line["line_num"]], month, line["unit_cents"], line["quantity"], offer
-    )
-    discount = promo["discount_cents"]
-    net = F.greatest(F.lit(0).cast("long"), line["gross_cents"] - discount)
-    tax = F.floor(net * _tax_share(line["taxability"]) * bps / 10000.0 + 0.5).cast("long")
-    return (
-        line.withField("promo_code", promo["promo_code"])
-        .withField("discount_cents", discount)
-        .withField("net_cents", net)
-        .withField("tax_cents", tax)
-    )
-
-
 def _sum_lines(lines: str | Column, field_name: str) -> Column:
     return F.aggregate(lines, F.lit(0).cast("long"), lambda acc, line: acc + line[field_name])
 
@@ -912,15 +910,22 @@ def purchase_baskets(
         F.date_format(local_purchase, "yyyy-MM-dd").alias("_local_day"),
         "tz",
     )
-    buyers = attach_baskets(buyers, ctx.baskets, ctx.profile, ctx.seed)
-    return buyers.withColumn(
-        "priced_lines",
-        F.transform(
-            "basket_lines",
-            lambda line: price_line(
-                d, line, F.col("receipt_id"), F.col("_month"), F.col("_offer"), F.col("store_bps")
+    buyers = attach_baskets(buyers, ctx.baskets, ctx.profile, ctx.seed, COMPLEMENT_RATE)
+    # As in history: complementary products join the basket and repeated SKUs
+    # merge into one line. Prices and the promotion are set when the purchase
+    # is emitted, over the lines the store could fill (purchase_events).
+    return (
+        buyers.withColumn(
+            "priced_lines", with_complements(d, F.col("receipt_id"), F.col("basket_lines"))
+        )
+        .withColumn("priced_lines", merge_lines(F.col("priced_lines")))
+        .withColumn(
+            "priced_lines",
+            F.transform(
+                "priced_lines",
+                lambda line: line.withField("gross_cents", line["unit_cents"] * line["quantity"]),
             ),
-        ),
+        )
     )
 
 
@@ -986,6 +991,20 @@ def purchase_events(ctx: StreamContext, buyers: DataFrame) -> DataFrame:
     payment_due = F.col("_payment_due")
     buyers = buyers.withColumn("priced_lines", _kept_lines("priced_lines")).where(
         F.size("priced_lines") > 0
+    )
+    # One basket-level promotion over the filled lines, then integer tax, as
+    # history prices its fulfilled baskets.
+    buyers = buyers.withColumn(
+        "priced_lines",
+        price_basket(
+            d,
+            F.col("receipt_id"),
+            F.col("priced_lines"),
+            F.col("_month"),
+            F.col("_offer"),
+            F.col("store_bps"),
+            ctx.profile,
+        ),
     )
     gross = _sum_lines("priced_lines", "gross_cents")
     discount = _sum_lines("priced_lines", "discount_cents")
@@ -1074,7 +1093,7 @@ def purchase_events(ctx: StreamContext, buyers: DataFrame) -> DataFrame:
                 line["product_id"].alias("product_id"),
                 line["quantity"].cast("long").alias("quantity"),
                 (line["unit_cents"] / 100.0).alias("unit_price"),
-                (line["net_cents"] / 100.0).alias("extended_price"),
+                (line["ext_cents"] / 100.0).alias("extended_price"),
                 F.when(line["discount_cents"] > 0, line["promo_code"]).alias("promo_code"),
             ),
             purchase_ts,
@@ -1139,8 +1158,11 @@ def new_orders(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
     (UTC); ``rejected`` starts empty.
     """
     rows = lanes.where(F.col("lane") == "online")
-    factor = monthly_factor_column(ctx.profile, F.to_date(F.col("ts"))) * (
-        online_hour_factor_column(F.col("ts"))
+    day = F.to_date(F.col("ts"))
+    factor = (
+        ctx.growth(day)
+        * monthly_factor_column(ctx.profile, day)
+        * (online_hour_factor_column(F.col("ts")))
     )
     return rows.where(_keep(ctx, "online", factor)).select(
         F.col("v"),
@@ -1183,6 +1205,43 @@ def _online_line(ctx: StreamContext, line: Column) -> Column:
     )
 
 
+def _online_customers(ctx: StreamContext, orders: DataFrame) -> DataFrame:
+    """Add each order's customer: the first of a few tries active that (UTC) day.
+
+    As in history, a try picks a store by traffic and a ticket in its pool;
+    an order whose tries all find inactive customers is never placed.
+    """
+    d = ctx.draws
+    tries = orders.select(
+        "v",
+        F.to_date(_ms_ts(F.col("start_ms"))).alias("_day"),
+        F.explode(F.sequence(F.lit(1), F.lit(ONLINE_CUSTOMER_ATTEMPTS))).alias("_try"),
+    )
+    k = [F.col("v"), F.col("_try")]
+    store = pick_retail_product(F.col("_stores"), d.u(k, "online-customer-store"))["store_id"]
+    tries = (
+        tries.crossJoin(F.broadcast(ctx.store_picker))
+        .withColumn("pool_store", store.cast("long"))
+        .drop("_stores")
+        .join(F.broadcast(ctx.customer_pools), "pool_store")
+        .withColumn(
+            "_picked",
+            pick_retail_product(F.col("_pool"), d.u(k, "online-customer"))["customer_id"].cast(
+                "long"
+            ),
+        )
+    )
+    active = d.u(k, "online-customer-active") < activity_column(
+        ctx.lifecycle, F.col("_picked"), F.col("_day")
+    )
+    chosen = (
+        tries.where(active)
+        .groupBy("v")
+        .agg(F.min_by("_picked", "_try").cast("long").alias("customer_id"))
+    )
+    return orders.join(chosen, "v")
+
+
 def plan_orders(ctx: StreamContext, orders: DataFrame) -> DataFrame:
     """Lay out each order's lifecycle (``v, start_ms, rejected, _is_new`` rows).
 
@@ -1197,10 +1256,10 @@ def plan_orders(ctx: StreamContext, orders: DataFrame) -> DataFrame:
     v = F.col("v")
     for salt, name, output in (
         ("store", "stores", "store_id"),
-        ("cust", "customers", "customer_id"),
         ("dc", "dcs", "dc_id"),
     ):
         orders = _sample(ctx, orders, salt, name, output)
+    orders = _online_customers(ctx, orders)
     key = [F.col("order_id")]
     mode = F.col("fulfillment_mode")
     bopis = mode == "BOPIS"
@@ -1536,7 +1595,12 @@ def marketing_events(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
         F.col("impression_id"),
         F.round(cost, 2).alias("cost"),
         device.alias("device_type"),
-        F.when(d.u(key, "mk_crm") < F.lit(CRM_MATCH_RATE), F.col("customer_pick"))
+        # A CRM match needs a customer who is signed up and not churned, as in history.
+        F.when(
+            (d.u(key, "mk_crm") < F.lit(CRM_MATCH_RATE))
+            & (activity_column(ctx.lifecycle, F.col("customer_pick"), F.col("day")) > 0),
+            F.col("customer_pick"),
+        )
         .cast("long")
         .alias("customer_id"),
         iso(F.col("ts")).alias("impression_time"),

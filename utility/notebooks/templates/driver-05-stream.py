@@ -15,12 +15,16 @@
 #   profile's hourly, daily and monthly weights in the store's **local** time,
 #   its traffic multiplier and its operating hours (no sales while closed).
 #   Stores open and close at their local operating-hour boundaries.
-# - **Customers.** Shoppers come from each store's local pool, weighted by visit
-#   frequency like history; about 22% of visits buy. Visits follow an ordered
-#   path (entrance → zones → checkout) with realistic dwell times, and their
-#   BLE IDs resolve to `dim_customers.BLEId`.
-# - **Purchases and marketing.** Baskets, per-line promotions, the tender mix,
-#   declines and campaigns use the historical catalogs. Marketing journey
+# - **Customers.** As in history, about 45% of shoppers are anonymous; the rest
+#   are mostly the store's own home customers, weighted by visit frequency and
+#   kept only while signed up and not churned; about 22% of visits buy. Visits follow an ordered
+#   path through the store type's zones (entrance → departments → checkout →
+#   exit) with realistic dwell times, and their BLE IDs resolve to
+#   `dim_customers.BLEId`.
+# - **Purchases and marketing.** Baskets (with complementary products and
+#   repeated SKUs merged), shelf prices of the catalog date, one basket-level
+#   promotion, the tender mix, declines and campaigns use the historical
+#   catalogs; volume follows history's year-over-year trend. Marketing journey
 #   touches carry their touch time in `impression_time` and arrive with the
 #   purchase, so notebook 03 never skips them.
 # - **Store inventory.** Each store keeps a running balance per product,
@@ -103,9 +107,19 @@ STORE_TYPE = _param("{{STORE_TYPE}}", "supercenter")
 SEED = int(_param("{{SEED}}", "42"))
 # The historical volume the live stream continues, and the first history day
 # (campaign windows are anchored on it).
-TRANSACTIONS_PER_STORE_DAY = int(_param("{{TRANSACTIONS_PER_STORE_DAY}}", "400"))
+TRANSACTIONS_PER_STORE_DAY = int(_param("{{TRANSACTIONS_PER_STORE_DAY}}", "0"))
 ONLINE_ORDERS_PER_DAY = int(_param("{{ONLINE_ORDERS_PER_DAY}}", "0"))
 HISTORY_START = _param("{{START_DATE}}", "")
+HISTORY_END = _param("{{END_DATE}}", "")
+# Prices and the volume trend are anchored on the configuration's anchor date.
+ANCHOR_DATE = _param("{{ANCHOR_DATE}}", "")
+ANNUAL_VOLUME_GROWTH = float(_param(
+    "{{ANNUAL_VOLUME_GROWTH}}", str(GenerationConfig.model_fields["annual_volume_growth"].default)))
+# Customer lifecycle of the history (who is signed up, churned or anonymous).
+ANNUAL_CHURN_RATE = float(_param(
+    "{{ANNUAL_CHURN_RATE}}", str(GenerationConfig.model_fields["annual_churn_rate"].default)))
+ANONYMOUS_SHARE = float(_param(
+    "{{ANONYMOUS_SHARE}}", str(GenerationConfig.model_fields["anonymous_share"].default)))
 
 spark.conf.set("spark.sql.session.timeZone", "UTC")  # ingest_timestamp depends on it
 
@@ -228,10 +242,7 @@ from datetime import date as _date
 STREAM_PROFILE = StoreTypeProfile.model_validate(json.loads(
     mssparkutils.fs.head(f"Files/setup/dictionaries/{STORE_TYPE}/profile.json", 65536)
 ))
-STREAM_PRODUCTS = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_products").select(
-    _F.col("ID").alias("product_id"), "SalePrice", "taxability",
-    _F.col("Department").alias("department"), _F.to_date("LaunchDate").alias("launch_date"),
-)
+STREAM_PRODUCTS = basket_products(spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_products"), SEED)
 DIM_STORES = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_stores")
 DIM_CUSTOMERS = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_customers")
 
@@ -240,7 +251,8 @@ DIM_CUSTOMERS = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_customers")
 # checkpoint only warns (its own downtime is an expected gap).
 _history = (spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.fact_receipts")
             .agg(_F.max("event_ts").cast("long").alias("end"),
-                 _F.min("event_date").alias("start")).first())
+                 _F.min("event_date").alias("start"),
+                 _F.max("event_date").alias("last")).first())
 _history_end = _history["end"]
 enforce_history_handoff(
     check_history_handoff(
@@ -254,8 +266,24 @@ enforce_history_handoff(
 if not HISTORY_START:
     HISTORY_START = (_history["start"] or CATALOG_DATE).isoformat()
 HISTORY_START_DATE = _date.fromisoformat(HISTORY_START)
+if not HISTORY_END:
+    HISTORY_END = (_history["last"] or CATALOG_DATE).isoformat()
+ANCHOR = _date.fromisoformat(ANCHOR_DATE) if ANCHOR_DATE else HISTORY_START_DATE
+STREAM_LIFECYCLE = CustomerLifecycle(
+    seed=SEED,
+    history_start=HISTORY_START_DATE,
+    history_end=_date.fromisoformat(HISTORY_END),
+    annual_churn_rate=ANNUAL_CHURN_RATE,
+    anonymous_share=ANONYMOUS_SHARE,
+    visits_per_year=STREAM_PROFILE.resolved_customer_visits_per_year(),
+)
+# Unrendered runs take the store type's volumes, as configuration derives them.
+if TRANSACTIONS_PER_STORE_DAY <= 0:
+    TRANSACTIONS_PER_STORE_DAY = STREAM_PROFILE.resolved_transactions_per_store_day()
 if ONLINE_ORDERS_PER_DAY <= 0:
-    ONLINE_ORDERS_PER_DAY = STORE_COUNT * 8
+    ONLINE_ORDERS_PER_DAY = default_online_orders_per_day(
+        STREAM_PROFILE.online_order_share, STORE_COUNT, TRANSACTIONS_PER_STORE_DAY
+    )
 
 _store_rows = DIM_STORES.select("daily_traffic_multiplier", "operating_hours").collect()
 # The rate source takes whole rows per second; 0 derives the rate from history.
@@ -270,6 +298,7 @@ LANE_PLAN = plan_lanes(
     marketing_impressions_per_day=sum(entry[2] for entry in CAMPAIGN_ARCHETYPES),
     volume_scale=float(volume_scale),
     rows_per_second=max(1, round(_requested_rate)) if _requested_rate > 0 else None,
+    growth=volume_growth(ANNUAL_VOLUME_GROWTH, ANCHOR, CATALOG_DATE),
 )
 RATE_ROWS_PER_SECOND = int(LANE_PLAN.rows_per_second)
 if LANE_PLAN.clipped:
@@ -337,10 +366,15 @@ STREAM_CONTEXT = build_stream_context(
         "dcs": (DC_IDS, DC_COUNT),
         "trucks": (TRUCK_IDS, TRUCK_COUNT),
     },
-    baskets=prepare_basket_catalog(spark, STREAM_PRODUCTS, STREAM_PROFILE, SEED, CATALOG_DATE),
+    baskets=prepare_basket_catalog(
+        spark, STREAM_PRODUCTS, STREAM_PROFILE, SEED, CATALOG_DATE, ANCHOR
+    ),
     lanes=LANE_PLAN,
     supply=STREAM_SUPPLY,
+    lifecycle=STREAM_LIFECYCLE,
     inventory_seed=INVENTORY_SEED,
+    anchor_date=ANCHOR,
+    annual_volume_growth=ANNUAL_VOLUME_GROWTH,
 )
 print(f"live volume: {RATE_ROWS_PER_SECOND} source rows/s; lane shares "
       + ", ".join(f"{lane}={share:.3f}" for lane, share in LANE_PLAN.shares.items()))

@@ -2,7 +2,7 @@
 
 import hashlib
 import math
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import date
 
 from pyspark.sql import Column, DataFrame, SparkSession
@@ -113,6 +113,16 @@ def legacy_index(*key_cols):
     from pyspark.sql import functions as F
 
     return F.pmod(F.xxhash64(*key_cols, F.lit("__legacy_index__")), F.lit(2**62))
+
+
+def bind(value: Column, body: Callable[[Column], Column]) -> Column:
+    """``body(value)`` with ``value`` evaluated once.
+
+    Binds ``value`` to a lambda variable (a one-element ``transform``), so a
+    sub-expression used several times in ``body`` is not copied into the
+    plan; large copied expressions make query planning slow.
+    """
+    return F.element_at(F.transform(F.array(value), body), 1)
 
 
 def case_when(branches: Iterable[tuple[Column, object]]) -> Column:

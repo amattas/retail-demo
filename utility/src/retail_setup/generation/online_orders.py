@@ -11,8 +11,11 @@ Documented decisions (per plan 2b, Task 5):
 - Backorders: a small fraction of non-BOPIS lines ship but are not yet
   delivered (fulfillment_status SHIPPED, delivered_ts NULL), mirroring
   datagen's ``"DELIVERED" if not is_backordered else "SHIPPED"``.
-- Product picks use the shared launch-eligible popularity model and seasonal
-  department weights.
+- Product picks use the shared launch-eligible, price-elastic popularity model
+  at the day's shelf price and seasonal department weights; daily volume
+  follows the year-over-year trend (pricing.py).
+- Each order's customer is active (signed up, not churned) on the order day
+  (customers.py).
 - CANCELLED orders get NO payment row (no pay-then-refund), which preserves
   the `payment.amount == header.total` invariant.
 """
@@ -21,16 +24,20 @@ from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
+from retail_setup.generation.baskets import basket_products
 from retail_setup.generation.behavior import (
     pick_retail_product,
     retail_catalog,
     retail_quantity,
 )
 from retail_setup.dictionaries.models import StoreTypeProfile
+from retail_setup.generation.customers import assign_online_customers, lifecycle_for
 from retail_setup.generation.receipts import (
     _fmt,
     _with_seasonal_department,
+    customer_pools,
 )
+from retail_setup.generation.pricing import PriceSchedule, volume_growth_column
 from retail_setup.generation.runtime import (
     date_grid,
     fixed_width_decimal,
@@ -107,7 +114,11 @@ def generate_online_orders(
     m_mean = sum(mw) / 12.0
     days = date_grid(spark, cfg.start_date, cfg.end_date)
     monthly_w = F.element_at(F.array(*[F.lit(w / m_mean) for w in mw]), F.month("day"))
-    lam = F.lit(float(cfg.online_orders_per_day)) * monthly_w
+    lam = (
+        F.lit(float(cfg.online_orders_per_day))
+        * monthly_w
+        * volume_growth_column(cfg.annual_volume_growth, cfg.anchor_date, F.col("day"))
+    )
     n_orders = d.negative_binomial(["day"], "onl_n", lam, 24).cast("int")
 
     # --- orders: ids, timestamps, customer, tender, cancellation, basket size
@@ -163,10 +174,6 @@ def generate_online_orders(
             ),
         )
         .withColumn(
-            "customer_id",
-            (d.h64(["order_id_ext"], "onl_cust") % F.lit(cfg.customer_count) + 1).cast("long"),
-        )
-        .withColumn(
             "tender_type",
             d.pick_by_weights(
                 ["order_id_ext"], "onl_tender", [(n, w) for n, w, _, _, _ in ONLINE_TENDERS]
@@ -181,21 +188,25 @@ def generate_online_orders(
             + F.lit(ONLINE_PROMO_LINE_SHARE[0]),
         )
         .withColumn("basket_n", basket_n)
+    )
+    # Each order's customer is active that day (signed up, not churned); the
+    # rare order whose tries all find inactive customers is not placed.
+    lifecycle = lifecycle_for(cfg, profile.resolved_customer_visits_per_year())
+    pool, sizes, picker = customer_pools(lifecycle, dims)
+    orders = (
+        assign_online_customers(
+            lifecycle, orders, pool, sizes, picker, "order_id_ext", "event_date"
+        )
         # destination-based tax rate for this order's customer
         .join(cust_rate, "customer_id", "left")
         .withColumn("rate_bps", F.coalesce(F.col("rate_bps"), F.lit(mean_bps)))
     )
 
-    # --- lines: shared popularity over products launched by the order date
-    products = dims["dim_products"].select(
-        F.col("ID").alias("product_id"),
-        F.col("SalePrice"),
-        F.col("taxability"),
-        F.col("Department").alias("department"),
-        F.to_date("LaunchDate").alias("launch_date"),
-    )
-    order_dates = orders.select("event_date").distinct()
-    catalog = retail_catalog(products, order_dates, d)
+    # --- lines: shared popularity and shelf prices over products launched by
+    # the order date
+    products = basket_products(dims["dim_products"], cfg.seed)
+    order_dates = date_grid(spark, cfg.start_date, cfg.end_date, "event_date")
+    catalog = retail_catalog(products, order_dates, d, PriceSchedule(cfg.seed, cfg.anchor_date))
 
     qty = retail_quantity(d, ["order_id_ext", "line_num"], F.col("department"))
 
@@ -236,10 +247,9 @@ def generate_online_orders(
             "_product",
             pick_retail_product(F.col("_catalog"), d.u(["order_id_ext", "line_num"], "onl_prod")),
         )
-        .select("*", "_product.product_id", "_product.SalePrice", "_product.taxability")
+        .select("*", "_product.product_id", "_product.unit_cents", "_product.taxability")
         .drop("_product", "_catalog")
         .withColumn("quantity", qty.cast("long"))
-        .withColumn("unit_cents", F.round(F.col("SalePrice") * 100).cast("long"))
         .withColumn("ext_before", F.col("unit_cents") * F.col("quantity"))
         .withColumn(
             "has_promo", d.u(["order_id_ext", "line_num"], "onl_promo") < F.col("promo_rate")

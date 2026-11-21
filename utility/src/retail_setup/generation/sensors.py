@@ -6,7 +6,8 @@ Derives from SALE receipts (one BLE visit per receipt):
 - 70% anonymous: customer_ble_id = 'ANON-<store_id>-<h64 % 900000 + 100000>';
   customer_id NULL.
 
-Per visit, 2-5 zones are selected without replacement by sorting the five zones
+Per visit, 2-5 of the store type's zones (``profile.zones``) are selected
+without replacement by sorting the zones
 on a per-(receipt, zone) draw in place. Each zone gets 2-5 pings. Ping event_ts
 is based on the receipt timestamp plus a deterministic visit offset, then
 bounded to that store-day's open interval and the requested history. All
@@ -30,17 +31,19 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
+from retail_setup.dictionaries.loader import load_dictionaries
+from retail_setup.dictionaries.models import StoreTypeProfile
 from retail_setup.generation.runtime import legacy_index, seeded_draws
 from retail_setup.generation.schemas import column_names
 from retail_setup.generation.vocabulary import (
     BLE_KNOWN_SHARE,
-    BLE_ZONES,
     anonymous_ble_id_column,
     beacon_id_column,
+    ble_zones_for_profile,
 )
 
-# zone selection is without replacement
-_N_ZONES = len(BLE_ZONES)  # 5
+# Zones a visit is seen in, at most (fewer when the store type has fewer zones).
+MAX_VISIT_ZONES = 5
 
 
 def generate_ble(
@@ -48,13 +51,21 @@ def generate_ble(
     receipts: DataFrame,
     dims: dict[str, DataFrame],
     cfg: GenerationConfig,
+    profile: StoreTypeProfile | None = None,
 ) -> tuple[DataFrame, DataFrame]:
     """Generate BLE ping and zone-change facts from SALE receipts.
+
+    Zones are the store type's (``profile.zones``, upper-cased).
 
     Returns:
         (pings_df, zone_changes_df)
     """
     d = seeded_draws(cfg.seed)
+    if profile is None:
+        profile = load_dictionaries(cfg.resolved_dictionary_root, cfg.store_type).profile
+    zones = ble_zones_for_profile(profile)
+    max_zones = min(MAX_VISIT_ZONES, len(zones))
+    min_zones = min(2, max_zones)
 
     # --- filter to SALE receipts (defensively; receipts may already be SALE-only)
     visits = receipts.filter(
@@ -114,14 +125,16 @@ def generate_ble(
         ).cast("double"),
     )
 
-    # --- draw n_zones per visit (2-5 inclusive)
-    # u_zones in [0,1) → floor(u * 4) + 2 = 2..5
+    # --- draw n_zones per visit (2-5 inclusive, capped by the zone count)
     visits = visits.withColumn(
         "n_zones",
-        (F.floor(d.u(["receipt_id_ext"], "nz") * F.lit(4)) + F.lit(2)).cast("int"),
+        (
+            F.floor(d.u(["receipt_id_ext"], "nz") * F.lit(max_zones - min_zones + 1))
+            + F.lit(min_zones)
+        ).cast("int"),
     )
 
-    # --- zone selection without replacement: rank the visit's five zones by a
+    # --- zone selection without replacement: rank the visit's zones by a
     # per-(receipt, zone) draw. Sorting the small zone array in place (draw, then
     # zone position as the tie-break) replaces a per-receipt window shuffle.
     zone_entries = F.array(
@@ -131,7 +144,7 @@ def generate_ble(
                 F.lit(pos).alias("zone_pos"),
                 F.lit(zone).alias("zone"),
             )
-            for pos, zone in enumerate(BLE_ZONES)
+            for pos, zone in enumerate(zones)
         ]
     )
     selected = F.slice(F.array_sort(zone_entries), 1, F.col("n_zones"))

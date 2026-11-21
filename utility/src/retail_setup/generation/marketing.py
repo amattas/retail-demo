@@ -10,7 +10,9 @@ Per impression: channel uniform over the archetype's channels; device
 MOBILE/DESKTOP/TABLET at 60/30/10 with cost multipliers 1.2/0.8/0.9; cost a
 uniform draw within the channel's dollar band times the device multiplier;
 a uniformly-assigned customer supplies `customer_ad_id` (dim_customers.AdId),
-with `customer_id` populated for ~5% of impressions (CRM match) else NULL.
+with `customer_id` populated for ~5% of impressions (CRM match) else NULL. A
+CRM match needs the customer to be signed up and not yet churned that day
+(generation.customers), so lapsed customers stop showing up as matched.
 All draws via `runtime.seeded_draws`, so output is deterministic for a
 (config, seed) pair regardless of cluster shape.
 
@@ -26,6 +28,9 @@ from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
+from retail_setup.dictionaries.loader import load_dictionaries
+from retail_setup.dictionaries.models import StoreTypeProfile
+from retail_setup.generation.customers import activity_column, lifecycle_for
 from retail_setup.generation.runtime import (
     case_when,
     date_grid,
@@ -80,10 +85,14 @@ def generate_marketing(
     spark: SparkSession,
     dims: dict[str, DataFrame],
     cfg: GenerationConfig,
+    profile: StoreTypeProfile | None = None,
 ) -> DataFrame:
     """Ad-impression facts: day x archetype grid exploded to impressions."""
 
     d = seeded_draws(cfg.seed)
+    if profile is None:
+        profile = load_dictionaries(cfg.resolved_dictionary_root, cfg.store_type).profile
+    lifecycle = lifecycle_for(cfg, profile.resolved_customer_visits_per_year())
     scale = cfg.store_count / LEGACY_FLEET_SIZE
 
     # --- Spark-native day x archetype grid
@@ -165,7 +174,8 @@ def generate_marketing(
         "cost", F.format_string("%.2f", cost_dollars)
     )
 
-    # --- uniform customer per impression; ~5% CRM-matched (customer_id set)
+    # --- uniform customer per impression; ~5% CRM-matched (customer_id set).
+    # A CRM match needs a customer who is signed up and not churned that day.
     imps = imps.withColumn(
         "customer_pick",
         (d.h64(key, "mk_customer") % F.lit(cfg.customer_count) + 1).cast("long"),
@@ -177,7 +187,8 @@ def generate_marketing(
     imps = imps.withColumn(
         "customer_id",
         F.when(
-            d.u(key, "mk_crm") < F.lit(CRM_MATCH_RATE),
+            (d.u(key, "mk_crm") < F.lit(CRM_MATCH_RATE))
+            & (activity_column(lifecycle, F.col("customer_pick"), F.col("day")) > 0),
             F.col("customer_pick").cast("double"),
         ),
     )

@@ -132,6 +132,8 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("Phone", "string"),
         ("BLEId", "string"),
         ("AdId", "string"),
+        # The store where the customer makes most visits (generation.customers).
+        ("HomeStoreID", "long"),
     ],
     "dim_products": [
         ("ID", "long"),

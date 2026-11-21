@@ -8,7 +8,7 @@ definition.
 The module holds:
 
 - payment tenders, their mix, and the decline model
-- the named promotion catalog and the evergreen fallback codes
+- the named promotion catalog
 - identifier formats: BLE IDs, ad IDs, beacon and sensor IDs, campaign IDs
 - zone vocabularies (BLE zones and foot-traffic zones)
 - marketing channels, their cost-per-impression bands, and device types
@@ -18,10 +18,11 @@ The live stream does not use every definition yet. The remaining differences
 are listed, with their review IDs, in the known-gap allowlist of
 ``tests/generation/test_vocabulary.py``.
 
-Column helpers here (tender, decline, promotion and BLE draws) are the single
+Column helpers here (tender, decline and BLE draws) are the single
 implementation both producers call, keyed on each producer's own IDs.
 """
 
+from dataclasses import dataclass
 from datetime import date
 
 from pyspark.sql import Column
@@ -147,9 +148,11 @@ def processing_ms_column(
 # Promotions
 # ---------------------------------------------------------------------------
 
-# Named promo catalog. Seasonal codes apply only in their eligible months.
-# Some codes carry a minimum line value; BOGO discounts every second unit and
-# needs a quantity of at least two.
+# Named promo catalog. A purchase with an offer gets at most one code for the
+# whole basket (``baskets.basket_promotion``): seasonal codes apply only in
+# their eligible months, minimums apply to the basket gross subtotal, and each
+# code discounts only the lines in its department scope (``baskets.PROMO_SCOPES``).
+# BOGO discounts every second unit and needs a line with at least two units.
 # (code, discount_pct, eligible_months | None, min_cents, kind)
 PROMO_CATALOG: list[tuple[str, int, list[int] | None, int, str]] = [
     ("SAVE10", 10, None, 0, "PCT"),
@@ -166,86 +169,21 @@ PROMO_CATALOG: list[tuple[str, int, list[int] | None, int, str]] = [
     ("BFRIDAY40", 40, [11], 10000, "PCT"),  # min $100
     ("HOLIDAY20", 20, [12], 0, "PCT"),
 ]
-# Evergreen fallback when the drawn catalog code is not eligible: always
-# eligible, no minimum, percentage only.
-EVERGREEN_PROMOS: list[tuple[str, int]] = [
-    ("SAVE10", 10),
-    ("CLEARANCE30", 30),
-    ("DEAL15", 15),
-]
 
 
-def promo_eligible(index: int, month: int, line_cents: int, quantity: int) -> bool:
-    """Per-line eligibility of ``PROMO_CATALOG[index]``.
+def promo_eligible(index: int, month: int, basket_cents: int, max_quantity: int) -> bool:
+    """Whether ``PROMO_CATALOG[index]`` may apply to a basket.
 
-    The code must be in season, the line value before discount must meet any
-    minimum, and BOGO needs at least two units.
+    The code must be in season, the basket gross subtotal must meet any
+    minimum, and BOGO needs a line with at least two units. Department scope
+    is checked per line by ``baskets.basket_promotion``.
     """
     _, _, months, min_cents, kind = PROMO_CATALOG[index]
     if months is not None and month not in months:
         return False
-    if line_cents < min_cents:
+    if basket_cents < min_cents:
         return False
-    return kind != "BOGO" or quantity >= 2
-
-
-def promo_eligible_column(
-    index: Column, month: Column, line_cents: Column, quantity: Column
-) -> Column:
-    """Column form of :func:`promo_eligible`."""
-    expr: Column | None = None
-    for i, (_, _, months, min_cents, kind) in enumerate(PROMO_CATALOG):
-        eligible = F.lit(True) if months is None else month.isin(*months)
-        if min_cents:
-            eligible = eligible & (line_cents >= F.lit(min_cents))
-        if kind == "BOGO":
-            eligible = eligible & (quantity >= F.lit(2))
-        condition = index == F.lit(i)
-        expr = F.when(condition, eligible) if expr is None else expr.when(condition, eligible)
-    assert expr is not None
-    return expr.otherwise(F.lit(False))
-
-
-def line_promotion(
-    draws: seeded_draws,
-    keys: list,
-    month: Column,
-    unit_cents: Column,
-    quantity: Column,
-    offer: Column,
-) -> Column:
-    """Per-line promotion: ``struct<promo_code string, discount_cents long>``.
-
-    Lines of an offered receipt each draw a catalog code; when it is not
-    eligible for the line, an evergreen code applies. Lines of other receipts
-    get no code and no discount.
-    """
-    line_cents = unit_cents * quantity
-    index = (draws.h64(keys, "pcode") % F.lit(len(PROMO_CATALOG))).cast("int")
-    position = index + 1
-    code = F.element_at(F.array(*[F.lit(entry[0]) for entry in PROMO_CATALOG]), position)
-    pct = F.element_at(F.array(*[F.lit(entry[1]) for entry in PROMO_CATALOG]), position)
-    kind = F.element_at(F.array(*[F.lit(entry[4]) for entry in PROMO_CATALOG]), position)
-    eligible = promo_eligible_column(index, month, line_cents, quantity)
-    fallback = (draws.h64(keys, "pcodeev") % F.lit(len(EVERGREEN_PROMOS))).cast("int") + 1
-    fallback_code = F.element_at(F.array(*[F.lit(c) for c, _ in EVERGREEN_PROMOS]), fallback)
-    fallback_pct = F.element_at(F.array(*[F.lit(p) for _, p in EVERGREEN_PROMOS]), fallback)
-    discount_pct = F.when(eligible, pct).otherwise(fallback_pct)
-    discount_kind = F.when(eligible, kind).otherwise(F.lit("PCT"))
-    discount = F.when(
-        offer,
-        F.when(
-            discount_kind == "BOGO",
-            # Buy one, get one: every second unit is discounted.
-            F.floor(
-                F.floor(quantity / F.lit(2)) * unit_cents * discount_pct / F.lit(100.0) + F.lit(0.5)
-            ).cast("long"),
-        ).otherwise(F.floor(line_cents * discount_pct / F.lit(100.0) + F.lit(0.5)).cast("long")),
-    ).otherwise(F.lit(0).cast("long"))
-    return F.struct(
-        F.when(offer, F.when(eligible, code).otherwise(fallback_code)).alias("promo_code"),
-        discount.alias("discount_cents"),
-    )
+    return kind != "BOGO" or max_quantity >= 2
 
 
 # ---------------------------------------------------------------------------
@@ -379,12 +317,57 @@ def ble_zones_for_profile(profile: StoreTypeProfile | None) -> list[str]:
 
     Profile zone names are normalized to upper case so they match the rest of
     the zone vocabulary. Without a profile the default ``BLE_ZONES`` apply.
-    Generators switch to this helper when profile-driven zones land (B-7,
-    B-18); until then they use ``BLE_ZONES`` directly.
+    History (``sensors.py``) and the live stream both use these zones.
     """
     if profile is None or not profile.zones:
         return list(BLE_ZONES)
     return list(dict.fromkeys(zone.strip().upper() for zone in profile.zones if zone.strip()))
+
+
+BLE_EXIT_ZONE = "EXIT"
+# Dwell of zones outside BLE_ZONE_DWELL: exits pass like entrances, every other
+# store-type zone (produce, tools, jewelry, ...) dwells like a secondary aisle.
+BLE_EXIT_DWELL = FOOT_TRAFFIC_ZONE_DWELL["ENTRANCE_MAIN"]
+BLE_DEPARTMENT_DWELL = FOOT_TRAFFIC_ZONE_DWELL["AISLES_B"]
+
+
+@dataclass(frozen=True)
+class BleLayout:
+    """A store type's BLE zones by their role in a shopper's path."""
+
+    entry: str
+    middle: list[str]
+    checkout: str | None
+    exit: str | None
+    dwell: dict[str, tuple[int, int]]
+
+    @property
+    def zones(self) -> list[str]:
+        ordered = [self.entry, *self.middle, self.checkout, self.exit]
+        return list(dict.fromkeys(zone for zone in ordered if zone is not None))
+
+
+def ble_layout(profile: StoreTypeProfile | None) -> BleLayout:
+    """Entry, department, checkout and exit zones with their dwell ranges.
+
+    The entry is ``ENTRANCE`` (else the first zone), checkout and exit are the
+    ``CHECKOUT`` and ``EXIT`` zones when the store type has them, and every
+    other zone is a department zone a shopper may browse.
+    """
+    zones = ble_zones_for_profile(profile)
+    entry = BLE_ENTRY_ZONE if BLE_ENTRY_ZONE in zones else zones[0]
+    checkout = BLE_CHECKOUT_ZONE if BLE_CHECKOUT_ZONE in zones else None
+    exit_zone = BLE_EXIT_ZONE if BLE_EXIT_ZONE in zones and BLE_EXIT_ZONE != entry else None
+    middle = [zone for zone in zones if zone not in (entry, checkout, exit_zone)]
+    if not middle:
+        middle = [zone for zone in zones if zone != entry] or [entry]
+    dwell = {
+        zone: BLE_ZONE_DWELL.get(
+            zone, BLE_EXIT_DWELL if zone == BLE_EXIT_ZONE else BLE_DEPARTMENT_DWELL
+        )
+        for zone in zones
+    }
+    return BleLayout(entry, middle, checkout, exit_zone, dwell)
 
 
 # ---------------------------------------------------------------------------

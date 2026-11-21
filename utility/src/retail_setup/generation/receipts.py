@@ -8,6 +8,11 @@ regardless of cluster shape. The seed is folded into the salt delimiter inside
 
 Visits precede purchase decisions. Negative-binomial baskets combine shopping
 missions and persistent budgets, calibrated against the eligible catalog.
+Products are chosen by price-elastic popularity at the day's shelf price
+(pricing.py); each basket then gains complementary products, merges repeated
+SKUs and takes at most one promotion code (baskets.py, shared with the live
+stream). Customers follow their lifecycle (customers.py); about 45% of
+receipts are anonymous.
 
 Money is integer cents end-to-end; tax replicates datagen's basis-point
 integer formula exactly:
@@ -22,16 +27,35 @@ from pyspark.sql.window import Window
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.models import StoreTypeProfile
+from retail_setup.generation.baskets import (
+    COMPLEMENT_RATE,
+    basket_products,
+    merge_lines,
+    price_basket,
+    receipt_offer,
+    sum_lines,
+    with_complements,
+)
 from retail_setup.generation.behavior import (
     calibrated_basket_mean,
-    customer_visit_tickets,
     pick_retail_product,
     retail_basket_size,
     retail_catalog,
     retail_quantity,
 )
+from retail_setup.generation.customers import (
+    CustomerLifecycle,
+    assign_customers,
+    lifecycle_for,
+    pool_sizes,
+    shopper_key,
+    store_picker,
+    ticket_pool,
+)
+from retail_setup.generation.pricing import PriceSchedule
 from retail_setup.generation.runtime import (
     case_when,
+    date_grid,
     fixed_width_decimal,
     seeded_draws,
 )
@@ -39,21 +63,10 @@ from retail_setup.generation.schemas import column_names
 from retail_setup.generation.traffic import generate_hourly_visits
 from retail_setup.generation.vocabulary import (
     decline_reason_column,
-    line_promotion,
     payment_status_column,
     processing_ms_column,
-    promo_eligible_column,
     tender_column,
 )
-
-# Share of in-store receipts whose customer lives in the store's geography
-# (datagen home-store locality). The rest draw a network-wide customer.
-GEO_AFFINITY = 0.70
-# A deterministic cohort stops receiving purchases at staggered dates. This
-# creates realistic forward churn labels throughout long histories while
-# preserving active customers and pre-churn behavior.
-CHURN_COHORT_MODULUS = 10
-CHURN_CUTOFF_MAX_MARGIN_DAYS = 60
 
 # Per-department seasonal demand multipliers by month (Jan..Dec), keyed by a
 # lowercase token matched as a substring of the department name so the one
@@ -75,28 +88,6 @@ SEASONAL_LIFT: dict[str, list[float]] = {
     "beauty": [1.2, 1.05, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.05, 1.2, 1.5],
     "automotive": [1.0, 1.0, 1.05, 1.1, 1.2, 1.2, 1.2, 1.1, 1.0, 1.0, 1.0, 1.0],
 }
-
-# Per-customer shopping segments (datagen CustomerJourney segment distribution).
-SEGMENT_WEIGHTS: list[tuple[str, float]] = [
-    ("BUDGET", 0.35),
-    ("CONVENIENCE", 0.25),
-    ("QUALITY", 0.20),
-    ("BRAND_LOYAL", 0.20),
-]
-
-
-def _segment_price_skew(u: Column, seg: Column) -> Column:
-    """Skew a uniform draw toward cheaper/pricier products by customer segment.
-
-    BUDGET biases to the low (cheap) end of a department's price-ranked
-    catalog, QUALITY/BRAND_LOYAL to the high end, CONVENIENCE is neutral.
-    """
-    return (
-        F.when(seg == "BUDGET", u * u)
-        .when(seg == "QUALITY", F.lit(1.0) - (F.lit(1.0) - u) * (F.lit(1.0) - u))
-        .when(seg == "BRAND_LOYAL", F.pow(u, F.lit(0.85)))
-        .otherwise(u)
-    )
 
 
 # Weather simulation (datagen EventPatterns): a per-store-day weather state
@@ -192,138 +183,35 @@ def _with_seasonal_department(
     return out.drop(*drop_cols)
 
 
-def _promo_eligible_expr(
-    idx_col: Column, month_col: Column, ext_before: Column, qty: Column
-) -> Column:
-    """True when the catalog entry at idx_col is eligible: in-month, line value
-    meets any minimum, and BOGO needs qty >= 2."""
-    return promo_eligible_column(idx_col, month_col, ext_before, qty)
+def customer_pools(
+    lifecycle: CustomerLifecycle, dims: dict[str, DataFrame]
+) -> tuple[DataFrame, DataFrame, Column]:
+    """(ticket pool, pool sizes, store picker) of the customer dimension.
 
-
-def _apply_churn_lifecycle(
-    receipts: DataFrame,
-    d: seeded_draws,
-    cfg: GenerationConfig,
-) -> DataFrame:
-    """Stop assigning purchases to a seeded customer cohort after its cutoff."""
-
-    customer_count = int(cfg.customer_count)
-    history_days = (cfg.end_date - cfg.start_date).days + 1
-    cutoff_margin = min(
-        CHURN_CUTOFF_MAX_MARGIN_DAYS,
-        max(1, history_days // 4),
+    Replicated selection tickets give persistent, long-tailed visit frequency;
+    the dimension-sized expansion avoids receipt x customer inequality joins.
+    """
+    pool = ticket_pool(lifecycle, dims["dim_customers"])
+    stores = dims["dim_stores"].select("ID", "daily_traffic_multiplier").collect()
+    picker = store_picker(
+        [(int(row["ID"]), float(row["daily_traffic_multiplier"])) for row in stores]
     )
-    cutoff_span = max(1, history_days - (2 * cutoff_margin))
-    cutoff_offset = (
-        F.lit(cutoff_margin)
-        + F.pmod(
-            d.h64(["customer_id"], "churn_cutoff"),
-            F.lit(cutoff_span),
-        )
-    ).cast("int")
-    cutoff_date = F.date_add(F.lit(cfg.start_date), cutoff_offset)
-
-    replacement_base = (
-        F.pmod(
-            d.h64(["receipt_id_ext"], "active_customer"),
-            F.lit(customer_count),
-        )
-        + F.lit(1)
-    ).cast("long")
-    replacement_customer = F.when(
-        F.pmod(replacement_base, F.lit(CHURN_COHORT_MODULUS)) == 0,
-        F.pmod(replacement_base, F.lit(customer_count)) + F.lit(1),
-    ).otherwise(replacement_base)
-    is_post_churn = (F.pmod(F.col("customer_id"), F.lit(CHURN_COHORT_MODULUS)) == 0) & (
-        F.col("event_date") >= cutoff_date
-    )
-    return receipts.withColumn(
-        "customer_id",
-        F.when(is_post_churn, replacement_customer).otherwise(F.col("customer_id")),
-    )
+    return pool, pool_sizes(pool), picker
 
 
 def _assign_customers(
-    receipts: DataFrame, dims: dict[str, DataFrame], d: seeded_draws, cfg: GenerationConfig
+    receipts: DataFrame, dims: dict[str, DataFrame], lifecycle: CustomerLifecycle
 ) -> DataFrame:
-    """Resolve each receipt's customer_id with store-geography affinity.
+    """Resolve each receipt's customer_id (NULL for anonymous shoppers).
 
-    With probability ``GEO_AFFINITY`` the customer is drawn from those living
-    in the store's geography (resolved by a deterministic within-geography
-    rank), otherwise a network-wide customer is used. Falls back to the
-    network-wide pick when the store's geography has no customers.
+    Most identified visits come from the store's own home customers, the
+    rest from another store's; each customer is kept with their lifecycle
+    activity on the receipt's local date (generation.customers).
     """
-    customers = dims["dim_customers"].select(
-        F.col("ID").alias("customer_id"), F.col("GeographyID").alias("cust_geo_id")
+    pool, sizes, picker = customer_pools(lifecycle, dims)
+    return assign_customers(
+        lifecycle, receipts, pool, sizes, picker, "receipt_id_ext", "store_id", "event_date"
     )
-    # Replicated selection tickets give persistent, long-tailed visit propensity.
-    # This dimension-sized expansion avoids receipt x customer inequality joins.
-    customers = customers.withColumn(
-        "_ticket",
-        F.explode(F.sequence(F.lit(1), customer_visit_tickets(d, F.col("customer_id")))),
-    )
-    geo_sizes = customers.groupBy("cust_geo_id").agg(F.count("*").alias("geo_cust_count"))
-    rank_w = Window.partitionBy("cust_geo_id").orderBy("customer_id", "_ticket")
-    cust_ranked = customers.withColumn("local_rank", F.row_number().over(rank_w))
-    global_customers = customers.withColumn(
-        "_global_rank", F.row_number().over(Window.orderBy("customer_id", "_ticket"))
-    ).select("_global_rank", F.col("customer_id").alias("global_customer"))
-    global_size = customers.agg(F.count("*").alias("_global_size"))
-
-    r = (
-        receipts.join(geo_sizes, receipts["store_geo_id"] == geo_sizes["cust_geo_id"], "left")
-        .drop("cust_geo_id")
-        .withColumn("geo_cust_count", F.coalesce(F.col("geo_cust_count"), F.lit(0)))
-        .crossJoin(global_size)
-        .withColumn(
-            "_global_rank",
-            (d.h64(["receipt_id_ext"], "cust") % F.col("_global_size") + 1).cast("int"),
-        )
-        .join(global_customers, "_global_rank")
-        .withColumn(
-            "want_local",
-            (d.u(["receipt_id_ext"], "affinity") < F.lit(GEO_AFFINITY))
-            & (F.col("geo_cust_count") > 0),
-        )
-        .withColumn(
-            "local_rank_target",
-            F.when(
-                F.col("geo_cust_count") > 0,
-                (d.h64(["receipt_id_ext"], "localcust") % F.col("geo_cust_count") + 1),
-            ).cast("long"),
-        )
-    )
-    local = cust_ranked.select(
-        F.col("cust_geo_id").alias("_lgeo"),
-        F.col("local_rank").alias("_lrank"),
-        F.col("customer_id").alias("local_customer"),
-    )
-    assigned = (
-        r.join(
-            local,
-            (F.col("store_geo_id") == F.col("_lgeo"))
-            & (F.col("local_rank_target") == F.col("_lrank")),
-            "left",
-        )
-        .withColumn(
-            "customer_id",
-            F.when(
-                F.col("want_local") & F.col("local_customer").isNotNull(), F.col("local_customer")
-            ).otherwise(F.col("global_customer")),
-        )
-        .drop(
-            "_lgeo",
-            "_lrank",
-            "local_customer",
-            "global_customer",
-            "want_local",
-            "local_rank_target",
-            "geo_cust_count",
-            "_global_rank",
-            "_global_size",
-        )
-    )
-    return _apply_churn_lifecycle(assigned, d, cfg)
 
 
 def _fmt(cents_col: Column) -> Column:
@@ -450,26 +338,23 @@ def generate_receipts_group(
         .withColumn("trace_id", F.concat(F.lit("TRC"), F.col("receipt_id_ext")))
     )
 
-    # geography affinity: resolve each receipt's customer (local vs network-wide)
-    receipts = _assign_customers(receipts, dims, d, cfg)
+    # home-store customers by lifecycle activity, or anonymous shoppers
+    lifecycle = lifecycle_for(cfg, profile.resolved_customer_visits_per_year())
+    receipts = _assign_customers(receipts, dims, lifecycle).withColumn(
+        "_shopper", shopper_key(F.col("customer_id"), F.col("receipt_id_ext"))
+    )
 
     receipts = receipts.withColumn(
-        "_offer", d.u(["receipt_id_ext"], "offer") < F.lit(profile.promo_rate)
+        "_offer", receipt_offer(d, F.col("receipt_id_ext"), profile.promo_rate)
     ).withColumn(
         "tender_type",
         tender_column(d, ["receipt_id_ext"]),
     )
 
-    # --- lines: explode baskets, weighted department -> price-tiered product
-    # within department, restricted to products already launched on the sale day
-    # (IMP-010 no-pre-launch-sales invariant).
-    products = dims["dim_products"].select(
-        F.col("ID").alias("product_id"),
-        F.col("SalePrice"),
-        F.col("taxability"),
-        F.col("Department").alias("department"),
-        F.to_date("LaunchDate").alias("launch_date"),
-    )
+    # --- lines: explode baskets, weighted department -> price- and
+    # promo-elastic product within department, restricted to products already
+    # launched on the sale day (IMP-010 no-pre-launch-sales invariant).
+    products = basket_products(dims["dim_products"], cfg.seed)
 
     product_departments = {r.department for r in products.select("department").distinct().collect()}
     unknown = set(profile.department_weights) - product_departments
@@ -478,8 +363,11 @@ def generate_receipts_group(
             f"profile department_weights reference departments missing from the catalog: {sorted(unknown)}"
         )
 
-    sale_dates = receipts.select("event_date").distinct()
-    catalog = retail_catalog(products, sale_dates, d)
+    # Catalog days come from the history window, not from the receipts: deriving
+    # them from receipts lets the optimizer push the visit filter into the
+    # traffic grid and copy its large expressions into the plan.
+    sale_dates = date_grid(spark, cfg.start_date, cfg.end_date, "event_date")
+    catalog = retail_catalog(products, sale_dates, d, PriceSchedule(cfg.seed, cfg.anchor_date))
     department_weight = sum(
         (
             F.when(
@@ -513,6 +401,7 @@ def generate_receipts_group(
                 profile.avg_ticket_target,
                 profile.promo_rate,
                 profile.basket_lambda,
+                COMPLEMENT_RATE,
             ),
         )
         .withColumn(
@@ -520,7 +409,7 @@ def generate_receipts_group(
             retail_basket_size(
                 d,
                 ["receipt_id_ext"],
-                F.col("customer_id"),
+                F.col("_shopper"),
                 F.col("_basket_mean"),
                 F.col("_offer"),
                 profile.promo_rate,
@@ -536,7 +425,7 @@ def generate_receipts_group(
         "tax_rate",
         "basket_n",
         "_offer",
-        "customer_id",
+        "_shopper",
     ).withColumn("line_num", F.explode(F.sequence(F.lit(1), F.col("basket_n"))))
     exploded = _with_seasonal_department(
         exploded,
@@ -544,85 +433,84 @@ def generate_receipts_group(
             d.u(["receipt_id_ext", "line_num"], "mission-coherence") < 0.60,
             F.when(
                 d.u(["receipt_id_ext"], "favorite-mission") < 0.50,
-                d.u(["customer_id"], "favorite-department"),
+                d.u(["_shopper"], "favorite-department"),
             ).otherwise(d.u(["receipt_id_ext"], "mission-department")),
         ).otherwise(d.u(["receipt_id_ext", "line_num"], "dept")),
         profile.department_weights,
     )
 
-    lines = (
+    key = ["receipt_id_ext", "line_num"]
+    drawn = (
         exploded.join(catalog, ["event_date", "department"])
-        .withColumn(
-            "_product",
-            pick_retail_product(F.col("_catalog"), d.u(["receipt_id_ext", "line_num"], "prod")),
+        .withColumn("_product", pick_retail_product(F.col("_catalog"), d.u(key, "prod")))
+        .select(
+            "receipt_id_ext",
+            F.struct(
+                F.col("line_num").cast("int").alias("line_num"),
+                F.col("_product.product_id").alias("product_id"),
+                retail_quantity(d, key, F.col("department")).alias("quantity"),
+                F.col("_product.unit_cents").alias("unit_cents"),
+                F.col("_product.taxability").alias("taxability"),
+                F.col("department"),
+                F.col("_product.partner_id").alias("partner_id"),
+                F.col("_product.partner_cents").alias("partner_cents"),
+                F.col("_product.partner_taxability").alias("partner_taxability"),
+                F.col("_product.partner_ok").alias("partner_ok"),
+            ).alias("_line"),
         )
-        .select("*", "_product.product_id", "_product.SalePrice", "_product.taxability")
-        .drop("_product", "_catalog", "_expected_line_value", "_expected_taxable_value")
+        .groupBy("receipt_id_ext")
+        .agg(F.array_sort(F.collect_list("_line")).alias("_lines"))
+    )
+    # Basket-level steps shared with the live stream: complementary products,
+    # repeated SKUs merged into one line, and at most one promotion code whose
+    # threshold the basket meets; tax is integer basis-point math on the net.
+    # Each step is its own projection so the optimizer keeps the array
+    # expressions small instead of inlining one into the next.
+    receipt_key = F.col("receipt_id_ext")
+    receipts = (
+        receipts.join(drawn, "receipt_id_ext")
+        .withColumn("_lines", with_complements(d, receipt_key, F.col("_lines")))
+        .withColumn("_lines", merge_lines(F.col("_lines")))
         .withColumn(
-            "quantity", retail_quantity(d, ["receipt_id_ext", "line_num"], F.col("department"))
-        )
-        .withColumn("unit_cents", F.round(F.col("SalePrice") * 100).cast("long"))
-        .withColumn("ext_before", F.col("unit_cents") * F.col("quantity"))
-        # named promo code + matching discount (datagen promotion_utils parity):
-        # a seasonal/min-purchase/BOGO code if eligible, else an evergreen code.
-        .withColumn(
-            "_promo",
-            line_promotion(
+            "_lines",
+            price_basket(
                 d,
-                ["receipt_id_ext", "line_num"],
+                receipt_key,
+                F.col("_lines"),
                 F.month(F.col("event_date")),
-                F.col("unit_cents"),
-                F.col("quantity"),
                 F.col("_offer"),
+                F.round(F.col("tax_rate") * 10000).cast("long"),
+                profile,
             ),
         )
-        .withColumn("promo_code", F.col("_promo.promo_code"))
-        .withColumn("discount_cents", F.col("_promo.discount_cents"))
-        .withColumn(
-            "ext_cents",
-            F.greatest(F.lit(0).cast("long"), F.col("ext_before") - F.col("discount_cents")),
-        )
-        # tax: integer basis-point math, replicating datagen _tax_cents exactly
-        .withColumn("rate_bps", F.round(F.col("tax_rate") * 10000).cast("long"))
-        .withColumn(
-            "tax_mult",
-            F.when(F.col("taxability") == "TAXABLE", 100)
-            .when(F.col("taxability") == "REDUCED_RATE", 50)
-            .otherwise(0)
-            .cast("long"),
-        )
-        .withColumn(
-            "line_tax_cents",
-            F.floor(
-                (F.col("ext_cents") * F.col("rate_bps") * F.col("tax_mult") + F.lit(500_000))
-                / F.lit(1_000_000)
-            ).cast("long"),
-        )
     )
 
-    fact_receipt_lines = lines.select(
-        "receipt_id_ext",
-        "event_ts",
-        "event_date",
-        "line_num",
-        "product_id",
-        "quantity",
-        _fmt(F.col("unit_cents")).alias("unit_price"),
-        "unit_cents",
-        _fmt(F.col("ext_cents")).alias("ext_price"),
-        "ext_cents",
-        "promo_code",
-    ).select(*column_names("fact_receipt_lines"))
+    fact_receipt_lines = (
+        receipts.select("receipt_id_ext", "event_ts", "event_date", F.explode("_lines").alias("_l"))
+        .select(
+            "receipt_id_ext",
+            "event_ts",
+            "event_date",
+            F.col("_l.line_num").alias("line_num"),
+            F.col("_l.product_id").alias("product_id"),
+            F.col("_l.quantity").alias("quantity"),
+            _fmt(F.col("_l.unit_cents")).alias("unit_price"),
+            F.col("_l.unit_cents").alias("unit_cents"),
+            _fmt(F.col("_l.ext_cents")).alias("ext_price"),
+            F.col("_l.ext_cents").alias("ext_cents"),
+            F.col("_l.promo_code").alias("promo_code"),
+        )
+        .select(*column_names("fact_receipt_lines"))
+    )
 
-    # --- header rollup
-    hdr = lines.groupBy("receipt_id_ext").agg(
-        F.sum("ext_cents").alias("subtotal_cents"),
-        F.sum("discount_cents").alias("discount_cents"),
-        F.sum("line_tax_cents").alias("tax_cents"),
+    # --- header rollup from the priced basket
+    receipts = (
+        receipts.withColumn("subtotal_cents", sum_lines(F.col("_lines"), "ext_cents"))
+        .withColumn("discount_cents", sum_lines(F.col("_lines"), "discount_cents"))
+        .withColumn("tax_cents", sum_lines(F.col("_lines"), "tax_cents"))
     )
     fact_receipts = (
-        receipts.join(hdr, "receipt_id_ext")
-        .withColumn("total_cents", F.col("subtotal_cents") + F.col("tax_cents"))
+        receipts.withColumn("total_cents", F.col("subtotal_cents") + F.col("tax_cents"))
         .withColumn("receipt_type", F.lit("SALE"))
         .withColumn("payment_method", F.col("tender_type"))
         # IMP-007: discount is applied before tax, so subtotal_cents (kept as

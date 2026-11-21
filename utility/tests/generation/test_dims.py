@@ -62,11 +62,30 @@ def test_fk_integrity(dims):
         assert refs <= geo_ids, t
 
 
-def test_store_fields(dims):
+def test_store_fields(dims, dicts):
     rows = dims["dim_stores"].collect()
     assert all(r.StoreNumber == f"S{r.ID:06d}" for r in rows)
     assert all(0 < r.tax_rate < 0.20 for r in rows)
     assert all(r.daily_traffic_multiplier > 0 for r in rows)
+    # Formats and hours come from the store type (grocery never runs hypermarkets).
+    assert {r.store_format for r in rows} <= set(dicts.profile.resolved_store_formats())
+    assert {r.operating_hours for r in rows} <= set(dicts.profile.resolved_operating_hours())
+
+
+def test_luxury_stores_are_boutiques_with_daytime_hours(spark):
+    cfg = GenerationConfig(
+        store_type="luxury",
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 1, 7),
+        store_count=30,
+        dc_count=2,
+        seed=42,
+    )
+    luxury = load_dictionaries(default_dictionary_root(), "luxury")
+    rows = generate_dimensions(spark, luxury, cfg)["dim_stores"].collect()
+    assert {r.store_format for r in rows} == {"boutique"}
+    assert {r.operating_hours for r in rows} <= {"10-19", "10-20", "11-19"}
+    assert "24h" not in {r.operating_hours for r in rows}
 
 
 def test_product_pricing_invariants(dims):

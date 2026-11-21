@@ -180,6 +180,8 @@ def test_sales_per_customer_counts_filtered_purchasers() -> None:
     )
     assert "[Purchasing Customers]" in sales_per_customer
     assert "[# of Customers]" not in sales_per_customer
+    # Anonymous receipts (no customer) stay out of the numerator too.
+    assert "KEEPFILTERS('fact_receipts'[Customer ID] <> BLANK())" in sales_per_customer
 
 
 def test_product_cost_measures_use_grouped_relationship_aggregation() -> None:

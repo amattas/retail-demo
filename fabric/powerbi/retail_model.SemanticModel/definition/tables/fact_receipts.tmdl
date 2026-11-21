@@ -101,8 +101,8 @@ table fact_receipts
 		displayFolder: Core Metrics\Productivity
 		lineageTag: a34939d7-9fcf-4a82-92ed-3a4c8a82ffae
 
-	/// Store sales normalized by customers who purchased in the current filter context.
-	measure 'Sales per Customer' = DIVIDE([Net Sales], [Purchasing Customers], 0)
+	/// Store sales to identified customers per purchasing customer. Anonymous receipts carry no customer, so their sales are left out of both sides.
+	measure 'Sales per Customer' = DIVIDE(CALCULATE([Net Sales], KEEPFILTERS('fact_receipts'[Customer ID] <> BLANK())), [Purchasing Customers], 0)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Core Metrics\Productivity
 		lineageTag: c1010001-0000-0000-0000-000000000008

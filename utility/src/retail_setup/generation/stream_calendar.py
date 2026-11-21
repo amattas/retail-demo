@@ -26,7 +26,7 @@ from zoneinfo import ZoneInfo
 from pyspark.sql import Column
 from pyspark.sql import functions as F
 
-from retail_setup.dictionaries.models import StoreTypeProfile
+from retail_setup.dictionaries.models import StoreTypeProfile, parse_operating_hours
 from retail_setup.generation.runtime import seeded_draws
 from retail_setup.generation.vocabulary import ONLINE_HOURLY_WEIGHTS
 
@@ -34,7 +34,9 @@ from retail_setup.generation.vocabulary import ONLINE_HOURLY_WEIGHTS
 # Operating hours
 # ---------------------------------------------------------------------------
 
-# operating_hours literal -> [open_hour, close_hour); "24h" maps to 0/24.
+# operating_hours literal -> [open_hour, close_hour); "24h" maps to 0/24. Store
+# types may declare other "open-close" patterns (StoreTypeProfile); these are
+# the historical defaults.
 OPERATING_HOURS_MAP: dict[str, tuple[int, int]] = {
     "6-22": (6, 22),
     "7-22": (7, 22),
@@ -53,7 +55,10 @@ def operating_window(operating_hours: str | None) -> tuple[int, int]:
     """``[open_hour, close_hour)`` of an ``operating_hours`` value."""
     if operating_hours is None:
         return DEFAULT_OPERATING_WINDOW
-    return OPERATING_HOURS_MAP.get(operating_hours.strip(), DEFAULT_OPERATING_WINDOW)
+    try:
+        return parse_operating_hours(operating_hours)
+    except ValueError:
+        return DEFAULT_OPERATING_WINDOW
 
 
 def is_closed_date(day: date) -> bool:
@@ -258,6 +263,7 @@ def plan_lanes(
     marketing_impressions_per_day: float,
     volume_scale: float = 1.0,
     rows_per_second: float | None = None,
+    growth: float = 1.0,
 ) -> LanePlan:
     """Size the rate source and the lanes from the historical configuration.
 
@@ -266,7 +272,9 @@ def plan_lanes(
     campaign archetype. The default rate is the smallest whole number of rows
     per second that covers the peak of every lane; an explicit
     ``rows_per_second`` only changes the resolution, not the volume, unless it
-    is below the peak (``clipped``).
+    is below the peak (``clipped``). ``growth`` is the volume trend multiplier
+    (``pricing.volume_growth``) of the stream's dates; the lanes apply it per
+    row, so it only sizes the peaks.
     """
     if volume_scale <= 0:
         raise ValueError("volume_scale must be positive")
@@ -280,8 +288,11 @@ def plan_lanes(
     )
     # Mean events per second of each lane at time factor 1, and its peak factor.
     base = {
-        "visits": (visits_per_second, visit_peak_factor),
-        "online": (online_per_second, max(monthly_factors(profile)) * max(online_hour_factors())),
+        "visits": (visits_per_second, visit_peak_factor * growth),
+        "online": (
+            online_per_second,
+            max(monthly_factors(profile)) * max(online_hour_factors()) * growth,
+        ),
         "marketing": (marketing_per_second, 1.0),
     }
     peaks = {lane: rate * peak * volume_scale for lane, (rate, peak) in base.items()}

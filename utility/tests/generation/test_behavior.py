@@ -1,7 +1,6 @@
 from pyspark.sql import functions as F
 
 from retail_setup.generation.behavior import (
-    customer_visit_tickets,
     pick_retail_product,
     retail_basket_size,
     retail_quantity,
@@ -56,16 +55,6 @@ def test_offer_causes_basket_lift_with_same_seed_and_customers(spark):
     row = frame.agg(F.avg("base"), F.avg("offer")).first()
     assert row[1] > row[0] * 1.12
     assert frame.filter("offer < base OR base < 1").count() == 0
-
-
-def test_customer_frequency_weights_are_persistent_and_heterogeneous(spark):
-    draws = seeded_draws(42)
-    frame = spark.range(10000).withColumn("tickets", customer_visit_tickets(draws, F.col("id")))
-    row = frame.agg(F.avg("tickets"), F.stddev_pop("tickets"), F.min("tickets")).first()
-    assert row[2] >= 1
-    assert row[1] / row[0] > 0.8
-    repeated = frame.repartition(3).withColumn("again", customer_visit_tickets(draws, F.col("id")))
-    assert repeated.filter("tickets != again").count() == 0
 
 
 def test_weighted_catalog_binary_search_handles_boundaries(spark):
