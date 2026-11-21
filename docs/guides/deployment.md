@@ -53,7 +53,7 @@ The current deploy plan:
     readiness queries can find them;
 12. for `full-demo`, runs the deployed ontology notebook to create or
     revalidate the target ontology and its derived graph;
-13. publishes both Data Agents and the complete task flow (14 tasks, 60
+13. publishes both Data Agents and the complete task flow (14 tasks, 62
     item references, 14 edges), then reads the graph back and compares every
     task, item binding, and edge;
 14. runs read-only readiness verification over the complete selected profile.
@@ -341,12 +341,13 @@ by the profile; see [Post-deploy automation](#post-deploy-automation).
 ### Post-deploy automation
 
 The deployment enables the nightly Delta maintenance schedule by default and
-leaves everything that runs continuously off:
+leaves everything that runs continuously off. The streaming schedule follows
+the stream: it is on whenever the deployment starts `stream-events`.
 
 ```yaml
 schedules:
-  daily_maintenance: true      # daily-maintenance at 00:00 Eastern
-  streaming_data_load: false   # streaming Silver/Gold every 30 minutes
+  daily_maintenance: true      # maintenance, 06/12 ML and agent signal refresh at 00:00 Eastern
+  streaming_data_load: null    # streaming Silver/Gold and anomaly alerts every 30 minutes; null follows start_after_deploy
 stream:
   start_after_deploy: false    # start stream-events after readiness
   rows_per_second: 5
@@ -361,7 +362,9 @@ stream:
 - Scheduled runs fail while the capacity is paused. Pause after midnight
   Eastern, or disable `daily_maintenance`.
 - `streaming_data_load` is useful only while `stream-events` produces events.
-  One Silver-then-Gold run took about 16 minutes on F64, so the committed
+  Left `null`, it is enabled exactly when `stream.start_after_deploy` is true,
+  because unprocessed events expire from Eventhouse after 7 to 14 days. Set it
+  to `true` or `false` to override. One Silver-then-Gold run took about 16 minutes on F64, so the committed
   interval is 30 minutes; the pipeline runs one instance at a time.
 - `stream.start_after_deploy` runs last, after readiness, so readiness
   evaluates the deployed baseline. It submits one `stream-events` notebook job
@@ -1028,7 +1031,7 @@ deployed `30-create-ontology` notebook to create or revalidate
 `RetailOntology_AutoGen`, waits for the item to appear, publishes both Data
 Agents, and deploys the
 source-controlled task flow. The task-flow write is read back and compared
-with all 14 tasks, 60 selected item references, and 14 edges before the command
+with all 14 tasks, 62 selected item references, and 14 edges before the command
 reports success.
 
 Use this recovery command when the final phase was interrupted or an operator

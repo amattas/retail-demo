@@ -29,7 +29,7 @@ deploy/.generated/<env>/readiness-report.json
 The report provides one structured result for each target, item inventory,
 binding, KQL object group, schedule, pipeline, and freshness expectation.
 An unselected capability is `SKIPPED`; selected checks must produce evidence.
-Contributors can find the exact 26-row taxonomy in the
+Contributors can find the exact 27-row taxonomy in the
 [operations runbook](../design/specifications/modules/operations/runbook.md).
 
 `full-demo` runs this taxonomy only after the ontology, both Data Agents, and

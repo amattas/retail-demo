@@ -39,8 +39,9 @@ retained for existing TMDL bindings.
 ### Other KQL tables
 
 - `unknown_event`
-- `anomaly_alerts`
-- `pricing_recommendation_created`
+- `anomaly_alerts` (written by `16-persist-anomaly-alerts`)
+- `anomaly_detection_runs` (one row per detection run)
+- `pricing_recommendation_created` (`PENDING` rows written by `14-ml-dynamic-pricing`)
 - `pricing_recommendation_approved`
 - `pricing_recommendation_rejected`
 

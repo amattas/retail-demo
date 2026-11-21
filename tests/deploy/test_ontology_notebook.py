@@ -103,8 +103,10 @@ def test_ontology_entities_are_business_entities_not_event_log_rows() -> None:
 
 
 def test_eventhouse_tables_bind_to_existing_business_entities() -> None:
+    # The bindings are kept ready but stay off while the ontology is historical-only.
     source = _notebook_source()
-    bindings = _literal_assignment(source, "EVENTHOUSE_ENTITY_BINDINGS")
+    assert _literal_assignment(source, "ENABLE_EVENTHOUSE_BINDINGS") is False
+    bindings = _literal_assignment(source, "_EVENTHOUSE_ENTITY_BINDINGS_WHEN_ENABLED")
     actual = {
         (binding["entity_name"], binding["source_table"])
         for binding in bindings
@@ -117,7 +119,7 @@ def test_eventhouse_tables_bind_to_existing_business_entities() -> None:
 
 def test_eventhouse_contextualizes_existing_business_relationships() -> None:
     source = _notebook_source()
-    contexts = _literal_assignment(source, "EVENTHOUSE_RELATIONSHIP_CONTEXTS")
+    contexts = _literal_assignment(source, "_EVENTHOUSE_RELATIONSHIP_CONTEXTS_WHEN_ENABLED")
     relationships = _literal_assignment(source, "RELATIONSHIPS")
     context_pairs = {
         (context["name"], context["source_table"])

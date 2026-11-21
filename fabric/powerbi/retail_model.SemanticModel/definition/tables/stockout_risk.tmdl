@@ -69,6 +69,17 @@ table stockout_risk
 
 		annotation SummarizationSetBy = Automatic
 
+	/// Stable store/product/horizon identifier used as the ontology entity key.
+	column 'Risk ID'
+		dataType: string
+		isHidden
+		lineageTag: c5e6e000-0000-0000-0003-000000000012
+		sourceLineageTag: risk_id
+		summarizeBy: none
+		sourceColumn: risk_id
+
+		annotation SummarizationSetBy = Automatic
+
 	column 'Inventory As Of'
 		dataType: dateTime
 		isHidden

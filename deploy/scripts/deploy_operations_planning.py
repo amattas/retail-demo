@@ -30,6 +30,8 @@ from deploy.scripts._operations_definition import (
     render_operations_instructions,
 )
 from deploy.scripts._operations_scenario import (
+    NO_ALERTABLE_CASE,
+    meets_alert_rule,
     scenario_signals,
     scenario_sql,
     signal_ingestion_query,
@@ -60,6 +62,11 @@ from deploy.scripts.fabric_runtime import decode_definition_parts, paginated_get
 from deploy.scripts.verify_readiness import _connect_lakehouse_sql, write_report_atomic
 
 ROOT = Path(__file__).resolve().parents[2]
+UNCOUNTED_ALERTABLE_CASES = (
+    "The recorded signals predate alert-rule counting, so it is unknown whether "
+    "any case would alert; the agent was left stopped. Rerun the full Operations "
+    "publication to reseed and count the signals, then activate it."
+)
 PLAN_NAME = "retail-replenishment"
 PLAN_MEASURES = (
     "Forecasted Units Next 7 Days", "Forecast Lower Bound Next 7 Days",
@@ -181,17 +188,27 @@ def _activate_agent(
     config: DeployConfig,
     workspace_id: str,
     report: dict[str, Any],
-) -> None:
+) -> str | None:
     """Start the published agent when configured.
 
-    A failure leaves the agent stopped and records a warning instead of failing
-    publication: the agent and its signals are already in place, and an operator
-    can start it from Fabric.
+    A Fabric failure leaves the agent stopped and records a warning instead of
+    failing publication: the agent and its signals are already in place, and an
+    operator can start it from Fabric. A watchlist in which no case meets an
+    alert rule is refused instead: the agent would run and never alert. The
+    refusal message is returned so the caller fails the step after it has
+    persisted the report.
     """
 
     if not config.operations_planning.activate_agent:
-        return
+        return None
     agent = report["operations_agent"]
+    alertable = report.get("alertable_signal_count")
+    if alertable is None:
+        agent["activation_refused"] = UNCOUNTED_ALERTABLE_CASES
+        return UNCOUNTED_ALERTABLE_CASES
+    if not isinstance(alertable, int) or isinstance(alertable, bool) or alertable < 1:
+        agent["activation_refused"] = NO_ALERTABLE_CASE
+        return NO_ALERTABLE_CASE
     try:
         result = activate_operations_agent(
             credential, workspace_id=workspace_id, agent_id=agent["id"]
@@ -202,6 +219,7 @@ def _activate_agent(
         return
     agent.update(state=result["state"], rule_count=result["rule_count"])
     report["acceptance"] = report["acceptance"].replace(_REVIEW_BEFORE_ACTIVATION, _RUNNING)
+    return None
 
 
 def _ensure_native_capacity(
@@ -374,6 +392,7 @@ def publish(
         "workspace_id": workspace_id,
         "observed_at": datetime.now(UTC).isoformat(),
         "signal_count": None,
+        "alertable_signal_count": None,
         "operations_agent": {"state": "PENDING", "name": AGENT_NAME},
         "action_notebook": {"id": action_id, "name": ACTION_NAME},
         "plan": {
@@ -417,6 +436,9 @@ def publish(
         )
         _verify_signals(kusto_uri, database_name, credential, signals)
         report["signal_count"] = len(signals)
+        report["alertable_signal_count"] = sum(
+            1 for signal in signals if meets_alert_rule(signal)
+        )
         write_report_atomic(report_path, report)
         agent_id = ensure_native_item(
             session,
@@ -459,7 +481,7 @@ def publish(
         "source_count": len(ui_configuration["dataSources"]),
         "action_count": len(ui_configuration["actions"]),
     }
-    _activate_agent(credential, config, workspace_id, report)
+    activation_refused = _activate_agent(credential, config, workspace_id, report)
     write_report_atomic(report_path, report)
     if plan_definition is not None:
         try:
@@ -489,6 +511,8 @@ def publish(
         if model_binding_warning:
             report["plan"]["model_binding_warning"] = model_binding_warning
         write_report_atomic(report_path, report)
+    if activation_refused:
+        raise NativeItemError(activation_refused)
     return report
 
 
@@ -590,8 +614,10 @@ def publish_existing_agent(
         "requires human approval. Review ops.replenishment_cases and the SSO "
         "report. No Plan, approval routing, writeback, or ERP execution."
     )
-    _activate_agent(credential, config, workspace_id, report)
+    activation_refused = _activate_agent(credential, config, workspace_id, report)
     write_report_atomic(report_path, report)
+    if activation_refused:
+        raise NativeItemError(activation_refused)
     return report
 
 

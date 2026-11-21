@@ -171,8 +171,12 @@ with an artifact built against an unvalidated schema.
 `30-create-ontology.ipynb`:
 
 - discovers the current workspace and source items;
-- represents business entities and relationships;
-- binds Lakehouse tables and Eventhouse time-series context;
+- represents the same entities, keys and relationships as the deploy builder
+  (`tests/deploy/test_ontology_model.py` resolves the notebook's column
+  candidates against the contracts and compares);
+- binds Lakehouse tables only; its prepared Eventhouse time-series bindings
+  stay off (`ENABLE_EVENTHOUSE_BINDINGS = False`) while the deploy builder's
+  event backing tables are disabled, so the ontology is historical-only;
 - prefers update-in-place for an existing ontology;
 - falls back to delete/recreate with polling and retry behavior when needed.
 
@@ -219,11 +223,18 @@ from the physical contracts, not from runtime inspection:
   item ID/name/kind, SQL endpoint, pin time) that Fabric uses to identify the
   backing item. Without them Data Agents can't resolve the ontology's
   underlying source. The publisher fails if readback drops them.
-  Eventhouse time series bind through the Bronze `cusn` shortcuts. The
-  publisher lists `Tables/cusn` in OneLake, and missing shortcuts drop only
-  their bindings.
-- The model has the same 12 entities and 17 relationship names as the
-  notebook; three of the relationships use junction tables. Keys and
+  Eventhouse time series would bind through the Bronze `cusn` shortcuts, but
+  `deploy_ontology._ENABLE_EVENT_BACKING_TABLES` is `False` because the
+  current service rejects multiple anonymous `additionalBackingTable`
+  declarations, so the published ontology is historical-only.
+- The model has the same 13 entities and 17 relationship names as the
+  notebook; two of the relationships use junction tables. `Promotion` is
+  keyed on `trace_id` (unique per `receipt_id_ext`, `promo_code`) and
+  `StockoutRisk` on `risk_id` (`store_id:product_id:forecast_horizon_days`),
+  not the per-run `ranking`. Both join columns of every relationship must have
+  the same type; Truck has no DistributionCenter relationship because
+  `dim_trucks.DCID` is a nullable double and `dim_distribution_centers.ID` is
+  int64. Keys and
   properties use `snake_case` column names, and time-series properties are
   named `<event_table>_<column>` and ordered by `ingest_timestamp`.
 - TOM relationships that `retail_model` marks inactive are also inactive

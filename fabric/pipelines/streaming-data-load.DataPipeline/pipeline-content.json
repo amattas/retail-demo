@@ -40,6 +40,22 @@
           "notebookId": "8b187f3d-b32f-4d15-ae0a-f20c518e29ec",
           "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
         }
+      },
+      {
+        "name": "16-persist-anomaly-alerts",
+        "type": "TridentNotebook",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureOutput": false,
+          "secureInput": false
+        },
+        "typeProperties": {
+          "notebookId": "4a19957e-1a82-53d4-9a7e-c632afa9be58",
+          "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471"
+        }
       }
     ]
   }

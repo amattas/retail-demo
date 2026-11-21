@@ -81,7 +81,7 @@ flowchart LR
     KQL --> Bronze --> S --> Silver --> G --> Gold
 ```
 
-This path uses `ag._watermarks`. Its schedule is enabled only by `schedules.streaming_data_load`.
+This path uses `ag._watermarks`. Its schedule is enabled by `schedules.streaming_data_load`, which defaults to `stream.start_after_deploy`.
 The Silver notebook defines the schema and routes for the streaming-only
 `fact_online_order_status` table. The manifest records its downstream exception,
 and Delta maintenance includes it in the table inventory.
@@ -95,7 +95,7 @@ flowchart LR
     Gold[(Gold)] --> Model --> Report[Power BI report]
     Silver --> Ontology[Ontology]
     Gold --> Ontology
-    Event[(Eventhouse)] -->|TimeSeries context| Ontology
+    Event[(Eventhouse)] -.->|TimeSeries context, disabled| Ontology
     Model --> SMAgent[Semantic-model agent]
     Ontology --> OntAgent[Ontology agent]
 ```

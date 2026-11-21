@@ -27,8 +27,10 @@ Lakehouse and Eventhouse sources.
 *The Relationship view shows Store connected to Geography, Receipt, Promotion,
 and the machine-learning StockoutRisk entity.*
 
-The ontology maps business concepts to existing Lakehouse and Eventhouse data.
-It does not replace the physical schema or copy the source data.
+The ontology maps business concepts to existing Lakehouse Silver and Gold
+data. It is historical-only: Eventhouse event bindings are disabled, so it
+does not show live stream events. It does not replace the physical schema or
+copy the source data.
 
 ## 2. Test a grounded data-agent answer
 

@@ -45,6 +45,9 @@ _CURRENT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000000"
 _DEFAULT_KQL_DATABASE_NAME = "retail_eventhouse"
 _KQL_TARGET_NOTEBOOKS = {
     "01-create-bronze-shortcuts",
+    "14-ml-dynamic-pricing",
+    "16-persist-anomaly-alerts",
+    "17-refresh-availability-signals",
     "30-create-ontology",
     "stream-events",
 }
@@ -156,6 +159,8 @@ NOTEBOOK_GROUPS = {
         "03-streaming-to-silver.ipynb",
         "04-streaming-to-gold.ipynb",
         "05-maintain-delta-tables.ipynb",
+        "16-persist-anomaly-alerts.ipynb",
+        "17-refresh-availability-signals.ipynb",
     ],
     "ml-required": [
         "06-ml-demand-forecast.ipynb",

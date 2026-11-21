@@ -16,7 +16,10 @@ Open the **Pipelines** folder. Use the deployed pipelines to explain how
 notebooks are grouped into repeatable operations:
 
 - `historical-data-load` loads historical data into the Lakehouse.
-- `streaming-data-load` runs Silver transformation before Gold aggregation.
+- `streaming-data-load` runs Silver transformation before Gold aggregation
+  and persists anomaly alerts alongside them.
+- `daily-maintenance` compacts Delta tables, reruns the demand-forecast and
+  stockout models, and refreshes the Operations Agent's signals.
 - `ml-required` runs the six Reporting producers (including market-basket
   mining and promotion/elasticity analysis) and contract validator.
 - `ml-optional` and `ml-experimental` isolate full-demo extensions after

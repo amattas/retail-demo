@@ -19,11 +19,15 @@ twins: {}
 # Committed pipeline schedules to enable; each applies only when the profile
 # deploys that pipeline. Scheduled runs fail while the capacity is paused.
 schedules:
-  # Nightly Delta OPTIMIZE/VACUUM at 00:00 Eastern (about 10 minutes on F64).
+  # Nightly at 00:00 Eastern: Delta OPTIMIZE/VACUUM (about 10 minutes on F64),
+  # then the demand-forecast and stockout models and the Operations Agent
+  # signal refresh (17-refresh-availability-signals).
   daily_maintenance: true
-  # Streaming Silver/Gold refresh every 30 minutes; useful only while
-  # stream-events is producing events.
-  streaming_data_load: false
+  # Every 30 minutes (UTC): streaming Silver then Gold, plus anomaly-alert
+  # persistence; useful only while stream-events is producing events. null
+  # follows stream.start_after_deploy, so a started stream is always moved to
+  # Silver before Eventhouse retention (7 days for some tables) purges it.
+  streaming_data_load: null
 # Start the live stream-events notebook after deployment. A running stream holds
 # a Spark session (and capacity) until it stops.
 stream:

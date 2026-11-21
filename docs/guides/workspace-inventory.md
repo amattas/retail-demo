@@ -54,8 +54,8 @@ both that constraint and Terraform's constraint in
 | Profile | Support | Logical assets | Groups | Pipelines | KQL scripts | Infrastructure | Reporting | Total |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `core` | core/explicit | 1 | 1 | 0 | 0 | 12 | 0 | 12 |
-| `standard` | supported/explicit | 8 | 4 | 5 | 6 | 37 | 2 | 39 |
-| `full-demo` | preview/default | 14 | 8 | 7 | 6 | 47 | 2 | 49 |
+| `standard` | supported/explicit | 8 | 4 | 5 | 6 | 39 | 2 | 41 |
+| `full-demo` | preview/default | 14 | 8 | 7 | 6 | 49 | 2 | 51 |
 
 The logical asset selections are:
 
@@ -149,7 +149,7 @@ The readiness report covers:
 Required checks protect the supported historical and Reporting paths. Optional
 checks cover manually started streaming and preview/extended experiences. This
 is why a usable workspace can report `DEGRADED` when the optional stream has
-not been started. Contributors can find the exact 26 check IDs in the
+not been started. Contributors can find the exact 27 check IDs in the
 [operations runbook](../design/specifications/modules/operations/runbook.md).
 
 Dry-run output, the deployment journal, artifact inventories, and readiness

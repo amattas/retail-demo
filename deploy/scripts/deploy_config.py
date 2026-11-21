@@ -357,9 +357,13 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
         raise ValueError("schedules must be a mapping")
     if not isinstance(stream, dict):
         raise ValueError("stream must be a mapping")
-    for flag in ("daily_maintenance", "streaming_data_load"):
-        if flag in schedules and not isinstance(schedules[flag], bool):
-            raise ValueError(f"schedules.{flag} must be a boolean")
+    if "daily_maintenance" in schedules and not isinstance(schedules["daily_maintenance"], bool):
+        raise ValueError("schedules.daily_maintenance must be a boolean")
+    # null (or omitted) follows stream.start_after_deploy.
+    if schedules.get("streaming_data_load") is not None and not isinstance(
+        schedules["streaming_data_load"], bool
+    ):
+        raise ValueError("schedules.streaming_data_load must be a boolean or null")
     if "start_after_deploy" in stream and not isinstance(stream["start_after_deploy"], bool):
         raise ValueError("stream.start_after_deploy must be a boolean")
     rows_per_second = stream.get("rows_per_second", 5)
@@ -504,7 +508,13 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
         ),
         schedules=SchedulesConfig(
             daily_maintenance=bool(schedules.get("daily_maintenance", True)),
-            streaming_data_load=bool(schedules.get("streaming_data_load", False)),
+            # A started stream without the schedule leaves its events in Eventhouse
+            # until retention purges them, so the schedule follows the stream.
+            streaming_data_load=(
+                start_stream
+                if schedules.get("streaming_data_load") is None
+                else bool(schedules["streaming_data_load"])
+            ),
         ),
         stream=StreamConfig(
             start_after_deploy=start_stream,

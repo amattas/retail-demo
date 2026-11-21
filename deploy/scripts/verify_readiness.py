@@ -72,6 +72,17 @@ OverallStatus = Literal["SUCCEEDED", "FAILED", "DEGRADED"]
 _SETUP_MAX_AGE = timedelta(days=7)
 _MODEL_MAX_AGE = timedelta(days=7)
 _STREAM_MAX_AGE = timedelta(minutes=30)
+# Unprocessed Eventhouse rows older than this are close to the shortest (7-day)
+# soft-delete retention of the streamed event tables.
+_SILVER_LAG_WARNING = timedelta(days=3)
+# Missed streaming-data-load intervals tolerated before anomaly detection is stale.
+_ANOMALY_MISSED_INTERVALS = 3
+# The Operations Agent query and case notebook reject evidence older than this.
+_OPERATIONS_SIGNAL_MAX_AGE = timedelta(days=7)
+_RETENTION_RE = re.compile(
+    r"(?im)^\s*\.alter-merge\s+table\s+([A-Za-z_][A-Za-z0-9_]*)\s+policy\s+"
+    r"retention\s+softdelete\s*=\s*(\d+)d\b"
+)
 _FUTURE_SKEW = timedelta(minutes=5)
 _CORRELATION_SKEW = timedelta(minutes=5)
 _MAX_EVIDENCE_STRING = 300
@@ -266,6 +277,8 @@ class ReadinessAdapter(Protocol):
     def model_signals(self, contracts: list[dict[str, Any]]) -> list[dict[str, Any]]: ...
 
     def alert_signal(self) -> dict[str, Any] | None: ...
+
+    def operations_signal(self) -> dict[str, Any] | None: ...
 
 
 def bound_evidence(value: Any, *, _depth: int = 0) -> Any:
@@ -1103,7 +1116,7 @@ class ReadinessRunner:
         self._producer_pipeline_ref_cache: dict[str, str] | None = None
 
     def run(self) -> list[CheckResult]:
-        """Run all 26 checks; unselected capabilities are explicit SKIPPED rows."""
+        """Run all 27 checks; unselected capabilities are explicit SKIPPED rows."""
 
         self._check(
             "target.identities",
@@ -2026,6 +2039,13 @@ class ReadinessRunner:
             required=False,
             function=self._alert_freshness,
         )
+        self._check(
+            "freshness.operations_signals",
+            "freshness",
+            selected=self.profile.provisions_eventhouse,
+            required=False,
+            function=self._operations_signal_freshness,
+        )
 
     def _setup_freshness(self) -> Observation:
         signal = self.adapter.setup_signal()
@@ -2073,12 +2093,30 @@ class ReadinessRunner:
         signal = self.adapter.watermark_signal()
         if not signal or int(signal.get("source_count") or 0) < 1:
             raise EvidenceNotObserved(_UNOBSERVED_STREAM_MESSAGES["freshness.watermarks"])
-        freshness = evaluate_freshness(
-            signal.get("updated_at"),
-            observed_at=self.context.observed_at,
-            max_age=_STREAM_MAX_AGE,
-            lineage="ag._watermarks maximum updated_at",
-        )
+        lag = self._silver_lag(signal)
+        if lag is not None and lag["lag_seconds"] >= lag["retention_days"] * 86400:
+            raise CheckFailed(
+                f"Silver is {lag['lag_seconds'] / 86400:.1f} days behind Eventhouse "
+                f"{lag['table']}, beyond its {lag['retention_days']}-day retention; "
+                "unprocessed events may already be purged.",
+                evidence=lag,
+            )
+        try:
+            freshness = evaluate_freshness(
+                signal.get("updated_at"),
+                observed_at=self.context.observed_at,
+                max_age=_STREAM_MAX_AGE,
+                lineage="ag._watermarks maximum updated_at",
+            )
+        except CheckFailed as exc:
+            if lag is not None and lag["lag_seconds"] > _SILVER_LAG_WARNING.total_seconds():
+                raise CheckFailed(
+                    f"{exc}; Silver is {lag['lag_seconds'] / 86400:.1f} days behind "
+                    f"Eventhouse {lag['table']} ({lag['retention_days']}-day retention). "
+                    "Run streaming-data-load before the events expire.",
+                    evidence=lag,
+                ) from exc
+            raise
         from deploy.scripts.data_consistency import (
             CONSISTENCY_FIELDS,
             SAMPLE_FIELDS,
@@ -2097,10 +2135,37 @@ class ReadinessRunner:
                 "The settled reconciliation window has insufficient receipt, "
                 "inventory or sales observations; retry after OneLake data settles."
             )
+        if lag is not None and lag["lag_seconds"] > _SILVER_LAG_WARNING.total_seconds():
+            raise EvidenceUnknown(
+                f"Silver is {lag['lag_seconds'] / 86400:.1f} days behind Eventhouse "
+                f"{lag['table']}; its {lag['retention_days']}-day retention will purge "
+                "unprocessed events. Run streaming-data-load or enable its schedule."
+            )
         return Observation(
             "Silver watermarks are recent and settled receipt/inventory/sales samples reconcile.",
-            {"source_count": int(signal["source_count"]), "consistency": counts},
+            {
+                "source_count": int(signal["source_count"]),
+                "consistency": counts,
+                "silver_lag": lag,
+            },
             freshness,
+        )
+
+    def _silver_lag(self, watermarks: dict[str, Any]) -> dict[str, Any] | None:
+        """Return the worst unprocessed Eventhouse backlog relative to retention."""
+
+        tables = _stream_event_tables(self.context.manifest)
+        try:
+            eventhouse = self.adapter.eventhouse_signal(tables) if tables else None
+        except Exception:  # noqa: BLE001 - freshness.eventhouse_ingestion reports it
+            return None
+        if not eventhouse:
+            return None
+        return silver_retention_lag(
+            watermarks.get("sources") or {},
+            eventhouse.get("table_ingestion") or {},
+            event_table_retention_days(self.context.repo_root),
+            observed_at=self.context.observed_at,
         )
 
     def _eventhouse_freshness(self) -> Observation:
@@ -2310,23 +2375,165 @@ class ReadinessRunner:
         signal = self.adapter.alert_signal()
         if signal is None:
             raise EvidenceUnknown("Alert signal could not be queried.")
-        latest = signal.get("latest_detection")
-        freshness = None
-        if latest:
-            freshness = evaluate_freshness(
-                latest,
-                observed_at=self.context.observed_at,
-                max_age=_MODEL_MAX_AGE,
-                lineage="Eventhouse anomaly_alerts latest detection_time",
+        evidence = {
+            "alert_count": int(signal.get("alert_count") or 0),
+            "severity_count": int(signal.get("severity_count") or 0),
+            "run_count": int(signal.get("run_count") or 0),
+        }
+        latest_run = signal.get("latest_run")
+        if evidence["run_count"] < 1 or not latest_run:
+            raise EvidenceUnknown(
+                "anomaly_detection_runs has no detection run, so an empty "
+                "anomaly_alerts table is not evidence of health. Run "
+                "streaming-data-load (16-persist-anomaly-alerts) or enable its schedule."
             )
+        max_age = self._anomaly_detection_max_age()
+        try:
+            freshness = evaluate_freshness(
+                latest_run,
+                observed_at=self.context.observed_at,
+                max_age=max_age,
+                lineage="Eventhouse anomaly_detection_runs latest completed_at",
+            )
+        except CheckFailed as exc:
+            message = (
+                f"The last anomaly detection run is older than the streaming-data-load "
+                f"schedule allows ({int(max_age.total_seconds() // 60)} minutes): {exc}."
+            )
+            if "streaming-data-load" in self.context.config.schedules.enabled_pipelines():
+                raise CheckFailed(message, evidence=evidence) from exc
+            raise EvidenceUnknown(
+                message + " The schedule is disabled, so detection only runs on demand."
+            ) from exc
         return Observation(
-            "Alert backlog query succeeded.",
-            {
-                "alert_count": int(signal.get("alert_count") or 0),
-                "severity_count": int(signal.get("severity_count") or 0),
-            },
+            "Anomaly detection ran within its schedule; alerts are persisted.",
+            evidence,
             freshness,
         )
+
+    def _anomaly_detection_max_age(self) -> timedelta:
+        interval = committed_schedule_interval(
+            self.context.repo_root, "streaming-data-load"
+        )
+        if interval is None:
+            return _STREAM_MAX_AGE * _ANOMALY_MISSED_INTERVALS
+        return interval * _ANOMALY_MISSED_INTERVALS
+
+    def _operations_signal_freshness(self) -> Observation:
+        native = getattr(
+            self.context.config, "operations_planning", OperationsPlanningConfig()
+        )
+        if not native.enabled:
+            return Observation(
+                "The Operations Agent is not enabled; no availability signals are expected.",
+                {"enabled": False},
+            )
+        signal = self.adapter.operations_signal()
+        if not signal or int(signal.get("case_count") or 0) < 1:
+            raise EvidenceUnknown(
+                "ops_availability_signals has no seeded case; publish the Operations "
+                "Agent pack before relying on it."
+            )
+        evidence = {
+            "case_count": int(signal["case_count"]),
+            "alertable_count": int(signal.get("alertable_count") or 0),
+        }
+        oldest = min(
+            _parse_time(signal.get(field))
+            for field in ("latest_source_as_of", "latest_forecast_as_of")
+        )
+        observed = self.context.observed_at.astimezone(UTC)
+        if oldest > observed + _FUTURE_SKEW:
+            raise CheckFailed(
+                "Operations Agent signal source time is in the future.", evidence=evidence
+            )
+        age = observed - oldest
+        if age > _OPERATIONS_SIGNAL_MAX_AGE:
+            raise EvidenceUnknown(
+                f"Operations Agent signals are stale: the newest source/forecast as-of is "
+                f"{age.total_seconds() / 86400:.1f} days old, beyond the agent's 7-day "
+                "window, so its query returns no case. Rerun the ML producers and "
+                "daily-maintenance (17-refresh-availability-signals)."
+            )
+        return Observation(
+            "Operations Agent signals are inside the agent's seven-day window.",
+            evidence,
+            {
+                "observed_at": observed.isoformat(),
+                "source_timestamp": oldest.isoformat(),
+                "age_seconds": max(0, int(age.total_seconds())),
+                "max_age_seconds": int(_OPERATIONS_SIGNAL_MAX_AGE.total_seconds()),
+                "lineage": "ops_availability_signals newest source_as_of/forecast_as_of",
+            },
+        )
+
+
+def committed_schedule_interval(repo_root: Path, pipeline: str) -> timedelta | None:
+    """Return a pipeline's committed Cron interval, if it has one."""
+
+    path = repo_root / "fabric" / "pipelines" / f"{pipeline}.DataPipeline" / ".schedules"
+    if not path.is_file():
+        return None
+    for item in json.loads(path.read_text(encoding="utf-8")).get("schedules", []):
+        configuration = item.get("configuration", {})
+        if configuration.get("type") == "Cron" and isinstance(
+            configuration.get("interval"), int
+        ):
+            return timedelta(minutes=configuration["interval"])
+    return None
+
+
+def event_table_retention_days(repo_root: Path) -> dict[str, int]:
+    """Parse each event table's soft-delete retention from the KQL DDL."""
+
+    text = (repo_root / "fabric" / "kql_database" / "01-create-tables.kql").read_text(
+        encoding="utf-8"
+    )
+    return {name: int(days) for name, days in _RETENTION_RE.findall(text)}
+
+
+def silver_retention_lag(
+    watermarks: dict[str, Any],
+    table_ingestion: dict[str, dict[str, Any]],
+    retention_days: dict[str, int],
+    *,
+    observed_at: datetime,
+) -> dict[str, Any] | None:
+    """Return the oldest unprocessed Eventhouse backlog, or None when caught up.
+
+    A table has a backlog when Eventhouse holds rows newer than its Silver
+    watermark (or any rows when it has no watermark). The backlog's age is
+    measured from the watermark, or from the oldest row for a new table, and
+    is reported against that table's retention so the caller can warn before
+    the rows are purged.
+    """
+
+    worst: dict[str, Any] | None = None
+    observed = observed_at.astimezone(UTC)
+    for table, ingestion in sorted(table_ingestion.items()):
+        latest = ingestion.get("latest")
+        if not latest or table not in retention_days:
+            continue
+        watermark = watermarks.get(table)
+        if watermark:
+            if _parse_time(latest) <= _parse_time(watermark) + _CORRELATION_SKEW:
+                continue
+            start = _parse_time(watermark)
+        elif ingestion.get("earliest"):
+            start = _parse_time(ingestion["earliest"])
+        else:
+            continue
+        lag_seconds = max(0, int((observed - start).total_seconds()))
+        retention = retention_days[table]
+        candidate = {
+            "table": table,
+            "lag_seconds": lag_seconds,
+            "retention_days": retention,
+            "retention_fraction": round(lag_seconds / (retention * 86400), 3),
+        }
+        if worst is None or candidate["retention_fraction"] > worst["retention_fraction"]:
+            worst = candidate
+    return worst
 
 
 def _taskflow_references(taskflow: dict[str, Any]) -> list[str]:
@@ -2657,16 +2864,20 @@ class FabricReadinessAdapter:
         if not inventory or int(inventory[0].get("table_count") or 0) == 0:
             return None
         rows = self._execute_sql(
-            "SELECT COUNT(*) AS source_count, MAX(updated_at) AS updated_at "
+            "SELECT source_table, last_processed_ts, updated_at "
             "FROM [ag].[_watermarks] "
             "WHERE source_table NOT LIKE '%:reconciliation'"
         )
         if not rows:
             return None
-        row = rows[0]
+        updated = [row.get("updated_at") for row in rows if row.get("updated_at") is not None]
         return {
-            "source_count": row.get("source_count"),
-            "updated_at": _iso_value(row.get("updated_at")),
+            "source_count": len(rows),
+            "updated_at": _iso_value(max(updated)) if updated else None,
+            "sources": {
+                str(row.get("source_table")): _iso_value(row.get("last_processed_ts"))
+                for row in rows
+            },
         }
 
     def eventhouse_signal(
@@ -2679,7 +2890,9 @@ class FabricReadinessAdapter:
         rows = self._execute_kql(
             f"union withsource=table_name {union} "
             "| summarize row_count=count(), "
-            "latest_ingestion=max(ingestion_time()) "
+            "latest_ingestion=max(ingestion_time()), "
+            "earliest_event=min(ingest_timestamp), "
+            "latest_event=max(ingest_timestamp) "
             "by table_name"
         )
         if not rows:
@@ -2695,6 +2908,14 @@ class FabricReadinessAdapter:
         return {
             "tables": [str(row.get("table_name", "")) for row in rows],
             "latest_ingestion": _iso_value(latest),
+            # Compared with ag._watermarks, which advance on ingest_timestamp.
+            "table_ingestion": {
+                str(row.get("table_name", "")): {
+                    "earliest": _iso_value(row.get("earliest_event")),
+                    "latest": _iso_value(row.get("latest_event")),
+                }
+                for row in rows
+            },
         }
 
     def data_consistency_signal(self) -> dict[str, Any] | None:
@@ -2767,18 +2988,46 @@ class FabricReadinessAdapter:
 
     def alert_signal(self) -> dict[str, Any] | None:
         rows = self._execute_kql(
-            "anomaly_alerts "
-            "| summarize alert_count=count(), "
-            "severity_count=dcount(severity), "
-            "latest_detection=max(detection_time)"
+            "print run_count=toscalar(anomaly_detection_runs | count), "
+            "latest_run=toscalar(anomaly_detection_runs | summarize max(completed_at)), "
+            "alert_count=toscalar(anomaly_alerts | count), "
+            "severity_count=toscalar(anomaly_alerts | summarize dcount(severity)), "
+            "latest_detection=toscalar(anomaly_alerts | summarize max(detection_time))"
         )
         if not rows:
             return None
         row = rows[0]
         return {
+            "run_count": row.get("run_count", 0),
+            "latest_run": _iso_value(row.get("latest_run")),
             "alert_count": row.get("alert_count", 0),
             "severity_count": row.get("severity_count", 0),
             "latest_detection": _iso_value(row.get("latest_detection")),
+        }
+
+    def operations_signal(self) -> dict[str, Any] | None:
+        from deploy.scripts._operations_scenario import (
+            HIGH_STOCKOUT_PROBABILITY,
+            LOW_DAYS_OF_INVENTORY,
+        )
+
+        rows = self._execute_kql(
+            "ops_availability_signals "
+            "| summarize arg_max(event_ts, *) by store_id, product_id "
+            "| summarize case_count=count(), "
+            f"alertable_count=countif(stockout_probability >= {HIGH_STOCKOUT_PROBABILITY} "
+            f"or days_of_inventory < {LOW_DAYS_OF_INVENTORY}), "
+            "latest_source_as_of=max(source_as_of), "
+            "latest_forecast_as_of=max(forecast_as_of)"
+        )
+        if not rows:
+            return None
+        row = rows[0]
+        return {
+            "case_count": row.get("case_count", 0),
+            "alertable_count": row.get("alertable_count", 0),
+            "latest_source_as_of": _iso_value(row.get("latest_source_as_of")),
+            "latest_forecast_as_of": _iso_value(row.get("latest_forecast_as_of")),
         }
 
     def _resolve_kql(self) -> tuple[str, str]:

@@ -20,8 +20,10 @@ outer fail-fast script; embedded or repeated wrappers are rejected.
 
 - 18 typed business event tables
 - `unknown_event`
-- `anomaly_alerts`
-- 3 pricing recommendation/decision tables
+- `anomaly_alerts` and its run log `anomaly_detection_runs`, written by
+  `16-persist-anomaly-alerts` in `streaming-data-load`
+- 3 pricing recommendation/decision tables; `14-ml-dynamic-pricing` appends
+  `PENDING` rows to `pricing_recommendation_created`
 - 5 core materialized views
 - 2 pricing decision metric materialized views
 - `fn_pending_recommendations()` for latest cross-event workflow state
@@ -31,6 +33,9 @@ Core materialized-view definitions are time-independent; seven-day retention is
 applied as a materialized-view policy. Anomaly functions build explicitly
 bounded hourly series with zero-value defaults, then sort severity through a
 numeric rank while preserving the public result schema.
+`fn_new_anomaly_alerts(lookback_hours, persist_hours, closed_end)` keeps only
+closed hourly bins and alert ids not yet in `anomaly_alerts`, so the scheduled
+persistence is idempotent.
 
 The direct live path writes typed tables and does not use the JSON ingestion
 mappings.
@@ -168,7 +173,11 @@ rollback execution remains a separate live gate.
 
 ## Maintenance
 
-`05-maintain-delta-tables.ipynb` skips genuinely absent optional tables,
+`05-maintain-delta-tables.ipynb` maintains every Silver table in
+`schemas.TABLES`, every Gold aggregate, every ML output, and the Silver
+control tables (`_watermarks`, `fact_online_order_status`, `setup_run_log`);
+`tests/test_maintenance_table_inventory.py` keeps the lists and their ZORDER
+columns equal to those contracts. It skips genuinely absent optional tables,
 including optional ML/streaming state; missing required historical tables
 fail its base-inventory check. Checks and maintenance statements use
 fully qualified configured Lakehouse/schema/table names. Only genuine table

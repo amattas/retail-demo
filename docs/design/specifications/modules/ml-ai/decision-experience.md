@@ -48,7 +48,10 @@ The bounded **Protect weekend availability** scenario seeds a watchlist of at
 most 20 of the network's riskiest observed positions. Positions that meet an
 agent alert rule (`stockout_probability >= 0.7` or `days_of_inventory < 3`)
 rank first, then the positions closest to one. Nothing is relabeled; when no
-position is at risk, the agent has nothing to alert on. When the native Plan
+position is at risk, the agent has nothing to alert on, so activation is
+refused: the report records `activation_refused` and
+`alertable_signal_count: 0`, the agent stays stopped, and the step fails. When
+the native Plan
 is selected, the watchlist stays inside the Plan's locked cohort (store IDs 1-5,
 product IDs 1-20) so every case can be reviewed there. The scenario takes
 current `au.stockout_risk`, keeps positions with a complete seven-day forecast
@@ -56,9 +59,13 @@ from `au.demand_forecast`, and resolves product names through
 `ag.dim_products`. Missing, non-finite, negative forecast, duplicate-grain,
 out-of-scope, stale, and future evidence fail closed. A known negative stock
 ledger is not inbound supply; the available-stock measure has a zero floor.
-Inventory's last movement time can precede the forecast's common source
+Every case's `source_as_of` is the risk snapshot's as-of time
+(`stockout_risk.predicted_at`), not the SKU's last ledger change, so an
+unchanged (often stocked-out) SKU is not dropped as stale by the agent's
+seven-day filter. The snapshot can precede the forecast's common source
 anchor. Both timestamps remain explicit; publication time does not replace
 either. Case identity includes store, product, and both source timestamps.
+Each signal also records `plan_cohort`, the cohort mode it was selected in.
 Risk retains its own `risk_horizon_days` (default three); it is not relabeled
 as seven-day risk. The Plan's additive `Next 7 Days` measures slice forecast
 dates rather than filtering horizon metadata: the demand model defaults to
@@ -67,9 +74,24 @@ fourteen days. Existing full-horizon measures remain unchanged.
 `fabric/operations/01-availability-tables.kql` owns
 `ops_availability_signals` and `ops_case_actions`. These are selected-pack
 tables, not the optional retail event stream. Seeding them must not satisfy
-stream watermarks, ingestion, or checkpoint freshness. Consumers select the
-latest monitoring event per case. Historical reorder rows do not establish
+stream watermarks, ingestion, or checkpoint freshness. The agent's canonical
+query (`fabric/operations/availability.instructions.md`) keeps the latest
+signal per store and product, so a refreshed case supersedes the older case
+for the same position, then left-anti joins `ops_case_actions` so a case with
+a DRAFT, APPROVED, or RESOLVED action never alerts again.
+`deploy/scripts/_operations_scenario.current_alert_cases` is the tested
+reference for those semantics. Historical reorder rows do not establish
 open commitments, confirmed inbound, reservations, or shared DC availability.
+
+The deploy seeds the signals once. `17-refresh-availability-signals` reseeds
+them nightly in `daily-maintenance` after `06-ml-demand-forecast` and
+`12-ml-stockout-prediction`, using the same selection and validation (a test
+requires identical SQL and signals) and the `plan_cohort` recorded by the
+deploy. It skips cleanly when the pack is not deployed, and writes nothing
+when the Gold snapshot is older than seven days. Without new stream data the
+snapshot does not advance, so the readiness check
+`freshness.operations_signals` reports the signals `UNKNOWN` once they leave
+the agent's seven-day window.
 
 `retail-availability-operations` publishes stopped with its KQL database and
 instructions. The REST publisher omits the empty `playbook` object so the UI
@@ -96,7 +118,10 @@ autonomous purchasing. Teams destination review remains an operator step.
 
 The `prepare-replenishment-case` action validates a selected case against
 live signals, freezes the inspected snapshot, and merges a DRAFT into
-`<lakehouse>.ops.replenishment_cases`. It never overwrites an existing case.
+`<lakehouse>.ops.replenishment_cases`. The deploy renders `PLAN_COHORT` into
+its parameters; the Plan's store/product bounds are enforced only when a Plan
+is published, so operations-only cases anywhere in the network are accepted.
+It never overwrites an existing case.
 Existing APPROVED or RESOLVED cases are not relabeled or audited as DRAFT.
 An idempotently tagged Kusto audit follows the durable Delta write. The
 two services are not an atomic transaction: failures propagate and a retry

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import math
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
@@ -15,19 +15,114 @@ MAX_SIGNALS = 20
 # The native Plan's locked synthetic cohort (fabric/planning/retail-replenishment.Plan).
 PLAN_STORE_IDS = range(1, 6)
 PLAN_PRODUCT_IDS = range(1, 21)
+# The agent query and the case notebook reject evidence older than this.
+SIGNAL_MAX_AGE_DAYS = 7
+# Action states that suppress further alerts for a case (availability.instructions.md).
+ACTED_STATUSES = ("DRAFT", "APPROVED", "RESOLVED")
 
 
-def scenario_sql(*, plan_cohort: bool) -> str:
+def meets_alert_rule(signal: dict[str, Any]) -> bool:
+    """Return whether a signal row satisfies one of the agent's two alert rules."""
+
+    probability = signal.get("stockout_probability")
+    cover = signal.get("days_of_inventory")
+    return (probability is not None and float(probability) >= HIGH_STOCKOUT_PROBABILITY) or (
+        cover is not None and float(cover) < LOW_DAYS_OF_INVENTORY
+    )
+
+
+def current_alert_cases(
+    signals: list[dict[str, Any]],
+    actions: list[dict[str, Any]],
+    observed_at: datetime,
+) -> list[dict[str, Any]]:
+    """Reference semantics of the agent's canonical KQL query.
+
+    Keep the newest signal per store/product so a superseded case cannot alert
+    twice, drop cases whose source or forecast time is outside the seven-day
+    window, then drop cases that already have a DRAFT, APPROVED or RESOLVED
+    action. ``availability.instructions.md`` expresses the same steps in KQL.
+    """
+
+    def as_time(value: Any) -> datetime:
+        if isinstance(value, str):
+            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+    latest: dict[tuple[int, int], dict[str, Any]] = {}
+    for signal in signals:
+        key = (int(signal["store_id"]), int(signal["product_id"]))
+        if key not in latest or as_time(signal["event_ts"]) > as_time(latest[key]["event_ts"]):
+            latest[key] = signal
+    oldest = observed_at - timedelta(days=SIGNAL_MAX_AGE_DAYS)
+    acted = {action["case_id"] for action in actions if action["status"] in ACTED_STATUSES}
+    return [
+        signal
+        for signal in latest.values()
+        if all(
+            oldest <= as_time(signal[field]) <= observed_at
+            for field in ("source_as_of", "forecast_as_of")
+        )
+        and signal["case_id"] not in acted
+    ]
+
+
+NO_ALERTABLE_CASE = (
+    "No seeded availability case meets an agent rule (stockout_probability >= "
+    f"{HIGH_STOCKOUT_PROBABILITY} or days_of_inventory < {LOW_DAYS_OF_INVENTORY}), so the "
+    "agent would never alert; it was left stopped. Refresh the stockout and forecast "
+    "outputs, republish the signals, then activate it."
+)
+
+
+def require_alertable(signals: list[dict[str, Any]]) -> int:
+    """Return how many signals meet a rule; refuse a watchlist with none."""
+
+    count = sum(1 for signal in signals if meets_alert_rule(signal))
+    if count == 0:
+        raise ValueError(NO_ALERTABLE_CASE)
+    return count
+
+
+def scenario_sql(
+    *,
+    plan_cohort: bool,
+    dialect: str = "tsql",
+    catalog: str = "",
+    silver: str = "ag",
+    gold: str = "au",
+) -> str:
     """Select a watchlist of the riskiest observed store/product positions.
 
     Every position that meets an agent alert rule ranks first, then the
     positions closest to one. Nothing is relabeled or invented: when no
-    position is at risk, the agent has nothing to alert on. Only positions with
-    a complete seven-day forecast qualify. With ``plan_cohort`` the watchlist
-    stays inside the native Plan's locked cohort so every case can be reviewed
-    there.
+    position is at risk, the agent has nothing to alert on and activation is
+    refused (``require_alertable``). Only positions with a complete seven-day
+    forecast qualify. ``source_as_of`` is the risk snapshot's as-of time
+    (``predicted_at``), not each SKU's last ledger change, so a stocked-out
+    SKU with no recent movement is not dropped as stale. With ``plan_cohort``
+    the watchlist stays inside the native Plan's locked cohort so every case
+    can be reviewed there.
+
+    ``dialect="tsql"`` targets the Lakehouse SQL endpoint used at deploy time;
+    ``dialect="spark"`` is the same query for the scheduled refresh notebook
+    (``fabric/lakehouse/17-refresh-availability-signals.ipynb``).
     """
 
+    if dialect == "tsql":
+        def table(schema: str, name: str) -> str:
+            return f"[{schema}].[{name}]"
+
+        horizon_end = "DATEADD(day, 7, CAST(source_as_of AS date))"
+        top, limit = f"TOP ({MAX_SIGNALS})\n       ", ""
+    elif dialect == "spark":
+        def table(schema: str, name: str) -> str:
+            return ".".join(part for part in (catalog, schema, name) if part)
+
+        horizon_end = "date_add(CAST(source_as_of AS date), 7)"
+        top, limit = "", f"\nLIMIT {MAX_SIGNALS}"
+    else:
+        raise ValueError(f"Unsupported scenario dialect: {dialect!r}")
     cohort = (
         f"AND risk.store_id BETWEEN {PLAN_STORE_IDS.start} AND {PLAN_STORE_IDS.stop - 1}\n"
         f"  AND risk.product_id BETWEEN {PLAN_PRODUCT_IDS.start} AND {PLAN_PRODUCT_IDS.stop - 1}"
@@ -39,20 +134,19 @@ WITH demand AS (
     SELECT store_id, product_id, SUM(predicted_units) AS forecast_units_7d,
            MIN(source_as_of) AS forecast_as_of, COUNT(DISTINCT forecast_date) AS forecast_days,
            COUNT(*) AS forecast_rows, COUNT(DISTINCT source_as_of) AS forecast_versions
-    FROM [au].[demand_forecast]
+    FROM {table(gold, "demand_forecast")}
     WHERE forecast_date > CAST(source_as_of AS date)
-      AND forecast_date <= DATEADD(day, 7, CAST(source_as_of AS date))
+      AND forecast_date <= {horizon_end}
     GROUP BY store_id, product_id
 )
-SELECT TOP ({MAX_SIGNALS})
-       risk.store_id, risk.product_id, product.ProductName AS product_name,
+SELECT {top}risk.store_id, risk.product_id, product.ProductName AS product_name,
        risk.current_inventory, demand.forecast_units_7d,
        risk.stockout_probability, risk.days_of_inventory,
        risk.forecast_horizon_days AS risk_horizon_days,
-       risk.inventory_as_of AS source_as_of, demand.forecast_as_of, demand.forecast_days,
+       risk.predicted_at AS source_as_of, demand.forecast_as_of, demand.forecast_days,
        demand.forecast_rows, demand.forecast_versions
-FROM [au].[stockout_risk] AS risk
-JOIN [ag].[dim_products] AS product ON product.ID = risk.product_id
+FROM {table(gold, "stockout_risk")} AS risk
+JOIN {table(silver, "dim_products")} AS product ON product.ID = risk.product_id
 JOIN demand ON demand.store_id = risk.store_id AND demand.product_id = risk.product_id
 WHERE demand.forecast_days = 7 AND demand.forecast_rows = 7 AND demand.forecast_versions = 1
   {cohort}
@@ -60,7 +154,7 @@ ORDER BY
     CASE WHEN risk.stockout_probability >= {HIGH_STOCKOUT_PROBABILITY}
            OR risk.days_of_inventory < {LOW_DAYS_OF_INVENTORY} THEN 0 ELSE 1 END,
     risk.stockout_probability DESC, risk.days_of_inventory ASC,
-    risk.store_id, risk.product_id
+    risk.store_id, risk.product_id{limit}
 """
 
 FIELDS = (
@@ -79,6 +173,7 @@ FIELDS = (
     ("shortage_units", "long"),
     ("scenario", "string"),
     ("provenance", "string"),
+    ("plan_cohort", "bool"),
 )
 
 
@@ -93,6 +188,7 @@ def scenario_signals(
         raise ValueError("Scenario monitoring time must be timezone-aware.")
     result = []
     keys = set()
+    snapshot_times = []
     for row in rows:
         store_id, product_id = int(row["store_id"]), int(row["product_id"])
         if store_id < 1 or product_id < 1:
@@ -112,9 +208,7 @@ def scenario_signals(
             raise ValueError("Availability source time is missing.")
         if source_time.tzinfo is None:
             source_time = source_time.replace(tzinfo=UTC)
-        # A row's source time is that SKU's last ledger change: a slow mover can
-        # be unchanged for days while the snapshot itself is current, so per row
-        # only reject the future; snapshot freshness is checked once below.
+        snapshot_times.append(source_time)
         if source_time > observed_at:
             raise ValueError(
                 f"Availability source for store {store_id} product {product_id} is "
@@ -153,19 +247,12 @@ def scenario_signals(
             or risk_horizon < 1
         ):
             raise ValueError("Availability metrics violate the ML contract.")
-        case_id = str(
-            uuid5(
-                NAMESPACE_URL,
-                f"retail-availability:{store_id}:{product_id}:"
-                f"{source_time.astimezone(UTC).isoformat()}:{forecast_time.astimezone(UTC).isoformat()}",
-            )
-        )
         result.append(
             {
                 "event_ts": observed_at.astimezone(UTC).isoformat(),
-                "source_as_of": source_time.astimezone(UTC).isoformat(),
+                "source_as_of": None,
                 "forecast_as_of": forecast_time.astimezone(UTC).isoformat(),
-                "case_id": case_id,
+                "case_id": None,
                 "store_id": store_id,
                 "product_id": product_id,
                 "product_name": str(row["product_name"]),
@@ -178,17 +265,38 @@ def scenario_signals(
                 "scenario": "Protect weekend availability",
                 "provenance": "Synthetic retail demo; observed from current Gold forecast/risk outputs. "
                 "Reservations and confirmed inbound are unverified, not assumed available.",
+                "plan_cohort": plan_cohort,
             }
+        )
+    # Every case carries the snapshot's as-of time. Older sources reported a
+    # SKU's last ledger change, which dropped unchanged (often stocked-out) SKUs.
+    snapshot = max(snapshot_times).astimezone(UTC).isoformat()
+    for signal in result:
+        signal["source_as_of"] = snapshot
+        signal["case_id"] = case_identity(
+            signal["store_id"], signal["product_id"], snapshot, signal["forecast_as_of"]
         )
     for label, field in (("Availability", "source_as_of"), ("Forecast", "forecast_as_of")):
         latest = max(datetime.fromisoformat(signal[field]) for signal in result)
         age_days = (observed_at - latest).total_seconds() / 86400
-        if age_days > 7:
+        if age_days > SIGNAL_MAX_AGE_DAYS:
             raise ValueError(
                 f"{label} snapshot is stale: newest {field} {latest.isoformat()} is "
-                f"{age_days:.1f} days old (limit 7); refresh inputs and required ML first."
+                f"{age_days:.1f} days old (limit {SIGNAL_MAX_AGE_DAYS}); refresh inputs "
+                "and required ML first."
             )
     return result
+
+
+def case_identity(store_id: int, product_id: int, source_as_of: str, forecast_as_of: str) -> str:
+    """Deterministic case id for one position and one source/forecast snapshot."""
+
+    return str(
+        uuid5(
+            NAMESPACE_URL,
+            f"retail-availability:{store_id}:{product_id}:{source_as_of}:{forecast_as_of}",
+        )
+    )
 
 
 def signal_ingestion_query(signals: list[dict[str, Any]]) -> str:

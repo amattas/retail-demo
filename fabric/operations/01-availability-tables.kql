@@ -15,7 +15,8 @@
     days_of_inventory:real,
     shortage_units:long,
     scenario:string,
-    provenance:string
+    provenance:string,
+    plan_cohort:bool
 )
 
 .create-merge table ops_case_actions (
