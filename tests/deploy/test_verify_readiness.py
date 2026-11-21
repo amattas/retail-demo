@@ -550,6 +550,39 @@ def test_checkpoint_signal_parses_kusto_wrapped_tags_and_rejects_mismatches() ->
     assert signal["stream_id_hash"]
 
 
+def test_checkpoint_signal_follows_the_newest_incarnation_across_extent_tags() -> None:
+    rows = [
+        # A reset checkpoint: the old incarnation reached batch 900.
+        {
+            "TableName": "receipt_created",
+            "Tags": "ingest-by:retail-demo:stream-a:0a1b2c3d:receipt_created:900",
+            "MaxCreatedOn": "2026-07-21T08:00:00Z",
+        },
+        # A merged extent lists several tags, newline separated.
+        {
+            "TableName": "receipt_created",
+            "Tags": "drop-by:x\r\ningest-by:retail-demo:stream-a:ffee0011:receipt_created:4"
+            "\r\ningest-by:retail-demo:stream-a:ffee0011:receipt_created:5",
+            "MaxCreatedOn": "2026-07-21T09:58:00Z",
+        },
+        {
+            "TableName": "payment_processed",
+            "Tags": "ingest-by:retail-demo:stream-a:ffee0011:payment_processed:5",
+            "MaxCreatedOn": "2026-07-21T09:57:00Z",
+        },
+    ]
+
+    signal = checkpoint_signal_from_rows(
+        rows, frozenset({"receipt_created", "payment_processed"})
+    )
+
+    assert signal is not None
+    assert signal["latest_batch_id"] == 5
+    assert signal["table_count"] == 2
+    assert signal["incarnation_hash"]
+    assert signal["latest_extent"] == "2026-07-21T09:58:00Z"
+
+
 def test_sql_signals_normalize_driver_datetimes_without_credentials() -> None:
     timestamp = datetime(2026, 7, 21, 9, 58)
     adapter = object.__new__(FabricReadinessAdapter)

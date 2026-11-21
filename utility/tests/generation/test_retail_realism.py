@@ -39,7 +39,9 @@ def test_supercenter_ticket_calibration_and_live_basket_continuity(spark):
         (F.col("id") % 1000 + 1).alias("customer_id"),
         F.lit(800).alias("store_bps"),
     )
-    live = attach_stream_baskets(spark, purchases, products, dictionaries.profile, cfg.seed).cache()
+    live = attach_stream_baskets(
+        spark, purchases, products, dictionaries.profile, cfg.seed, cfg.end_date
+    ).cache()
     try:
         row = live.agg(F.min("basket_n"), F.max("basket_n"), F.countDistinct("basket_n")).first()
         assert row[0] == 1 and row[1] > 4 and row[2] > 5
@@ -53,6 +55,47 @@ def test_supercenter_ticket_calibration_and_live_basket_continuity(spark):
         assert 50 < gross < 125, gross
     finally:
         live.unpersist()
+
+
+def test_live_baskets_replay_from_the_recorded_catalog_date(spark):
+    cfg = GenerationConfig(
+        start_date=date(2025, 7, 1),
+        end_date=date(2025, 7, 3),
+        store_count=2,
+        seed=42,
+    )
+    dictionaries = load_dictionaries(cfg.resolved_dictionary_root, cfg.store_type)
+    products = generate_dimensions(spark, dictionaries, cfg)["dim_products"].select(
+        F.col("ID").alias("product_id"),
+        "SalePrice",
+        "taxability",
+        F.col("Department").alias("department"),
+        F.to_date("LaunchDate").alias("launch_date"),
+    )
+    purchases = spark.range(500).select(
+        F.concat(F.lit("RCP-stream-a-0a1b2c3d-"), "id").alias("receipt_id"),
+        (F.col("id") % 97 + 1).alias("customer_id"),
+        F.lit(800).alias("store_bps"),
+    )
+
+    def lines(catalog_date):
+        live = attach_stream_baskets(
+            spark, purchases, products, dictionaries.profile, cfg.seed, catalog_date
+        )
+        return sorted(
+            (row.receipt_id, row.line.line_num, row.line.product_id, row.line.quantity)
+            for row in live.select("receipt_id", F.explode("basket_lines").alias("line")).collect()
+        )
+
+    # A replay on a later day rebuilds the batch from the recorded date, so it
+    # regenerates exactly the same lines.
+    first = lines(cfg.end_date)
+    assert first == lines(cfg.end_date)
+    launched = {
+        row.product_id
+        for row in products.where(F.col("launch_date") <= F.lit(cfg.end_date)).collect()
+    }
+    assert {product_id for _receipt, _line, product_id, _qty in first} <= launched
 
 
 @pytest.mark.parametrize("seed", [7, 42, 101])

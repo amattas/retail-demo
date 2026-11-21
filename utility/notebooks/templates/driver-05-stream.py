@@ -128,6 +128,28 @@ def _resolve_stream_id(root, requested):
 STREAM_ID = _resolve_stream_id(checkpoint_path, stream_id)
 print(f"stream identity: {STREAM_ID}")
 
+# Each sink has its own Spark checkpoint, and bounded (smoke) runs never share
+# offsets with the live run. Every checkpoint has an incarnation record beside
+# stream_id: its nonce goes into ingest tags and business IDs, so deleting only
+# the Spark checkpoint can never reuse tags Kusto already holds (the connector
+# would silently skip those writes). The record also pins the catalog date, so
+# a replayed batch regenerates the same baskets. Inconsistent folders stop here.
+from datetime import datetime as _datetime, timezone as _timezone
+
+CHECKPOINT_NAME = stream_checkpoint_name(sink, int(run_seconds))
+CHECKPOINT_LOCATION = f"{checkpoint_path.rstrip('/')}/{CHECKPOINT_NAME}"
+INCARNATION_PLAN = plan_incarnation(
+    mssparkutils.fs, checkpoint_path, CHECKPOINT_NAME, STREAM_ID,
+    _datetime.now(_timezone.utc).date(),
+)
+INCARNATION = INCARNATION_PLAN.incarnation
+CATALOG_DATE = INCARNATION_PLAN.catalog_date
+STREAM_NAMESPACE = INCARNATION_PLAN.namespace
+print(f"checkpoint {CHECKPOINT_LOCATION}: incarnation {INCARNATION} "
+      f"({'resumed' if INCARNATION_PLAN.resumed else 'new'}), catalog date {CATALOG_DATE}"
+      + (f", replaying batch {INCARNATION_PLAN.pending_batch}"
+         if INCARNATION_PLAN.pending_batch is not None else ""))
+
 # %%
 # Dimension ID ranges — read from the Silver dims that setup-02 wrote, so events
 # carry valid foreign keys. Missing/empty dimensions cannot produce a valid stream.
@@ -258,7 +280,7 @@ def slot(cond, event_type, payload, ts, pkey, trace_seed, session=None, parent=N
         et.alias("event_type"),
         payload.alias("payload"),
         F.concat(F.lit("TRC-"),
-                 F.abs(F.xxhash64(F.lit(STREAM_ID), trace_seed, et)).cast("string")).alias("trace_id"),
+                 F.abs(F.xxhash64(F.lit(STREAM_NAMESPACE), trace_seed, et)).cast("string")).alias("trace_id"),
         _iso(ts).alias("ingest_timestamp"),
         F.lit("1.0").alias("schema_version"),
         F.lit(event_source).alias("source"),
@@ -279,7 +301,7 @@ rate = cap_backlog(rate, int(max_lag_seconds))
 
 v = F.col("value")
 ts = F.col("timestamp")
-stream_prefix = F.lit(f"{STREAM_ID}-")
+stream_prefix = F.lit(f"{STREAM_NAMESPACE}-")
 # scenario is applied AFTER the select below, so it must reference the renamed
 # column `v` (not the source `value`).
 # store_attributed/online_attributed are deterministic IMP-007 live mirrors:
@@ -315,7 +337,7 @@ b0 = b0.join(_bcast(STORE_ATTR), F.col("store_id") == F.col("as_id"), "left").wi
         F.raise_error("Live purchase references a missing store tax rate")
     )
 )
-b0 = attach_stream_baskets(spark, b0, STREAM_PRODUCTS, STREAM_PROFILE, SEED)
+b0 = attach_stream_baskets(spark, b0, STREAM_PRODUCTS, STREAM_PROFILE, SEED, CATALOG_DATE)
 b = (b0
      .withColumn("subtotal", F.aggregate(
          "basket_lines", F.lit(0).cast("long"), lambda acc, line: acc + line["gross_cents"]
@@ -817,7 +839,7 @@ def _kusto_columns(event_type):
 
 def _kusto_write_metadata(event_type, batch_id):
     """Return deterministic connector metadata for an idempotent table batch."""
-    identity = f"retail-demo:{STREAM_ID}:{event_type}:{int(batch_id)}"
+    identity = ingest_tag(STREAM_ID, INCARNATION, event_type, batch_id)
     ingestion_properties = json.dumps({
         "flushImmediately": True,
         "ingestByTags": [identity],
@@ -935,11 +957,7 @@ def _resolve_kusto_uri(database_name):
 
 
 # %%
-# Write the stream to the chosen sink. Each sink has its own checkpoint, and
-# bounded (smoke) runs never share offsets with the live run, so a short test
-# can't leave a half-processed batch in front of the live stream.
-CHECKPOINT_NAME = stream_checkpoint_name(sink, int(run_seconds))
-CHECKPOINT_LOCATION = f"{checkpoint_path.rstrip('/')}/{CHECKPOINT_NAME}"
+# Write the stream to the chosen sink from its own checkpoint (resolved above).
 TRIGGER_SECONDS = trigger_interval_seconds(int(run_seconds), int(trigger_seconds))
 
 if sink == "eventhouse":
@@ -968,6 +986,8 @@ def start_query():
 
 print(f"streaming ~{source_rows_per_second} bundles/s to {sink} every {TRIGGER_SECONDS}s "
       f"(checkpoint {CHECKPOINT_LOCATION}, max lag {int(max_lag_seconds)}s)")
+# Record the incarnation only now, after every startup check has passed.
+INCARNATION_PLAN = persist_incarnation(mssparkutils.fs, INCARNATION_PLAN)
 restarts = run_supervised(start_query, run_seconds=int(run_seconds),
                           max_restarts=int(max_restarts))
 if int(run_seconds) > 0:

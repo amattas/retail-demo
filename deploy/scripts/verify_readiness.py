@@ -23,6 +23,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
+from retail_setup.generation.stream_control import parse_ingest_tag
+
 from deploy.scripts import _output as console
 from deploy.scripts._auth import build_credential
 from deploy.scripts.apply_kql import resolve_kql_database
@@ -2603,6 +2605,17 @@ def _stream_event_tables(manifest: SolutionManifest) -> frozenset[str]:
     return frozenset()
 
 
+def _row_ingest_tags(row: dict[str, Any]) -> list[dict[str, Any]]:
+    """Parse every stream ingest tag on an extent row (``tag`` or raw ``Tags``)."""
+
+    raw = row.get("tag") if row.get("tag") is not None else row.get("Tags")
+    if isinstance(raw, list | tuple):
+        values = [str(value) for value in raw]
+    else:
+        values = re.split(r"[\s,\"\[\]]+", str(raw or ""))
+    return [parsed for value in values if (parsed := parse_ingest_tag(value)) is not None]
+
+
 def checkpoint_signal_from_rows(
     rows: list[dict[str, Any]],
     expected_tables: frozenset[str],
@@ -2611,36 +2624,26 @@ def checkpoint_signal_from_rows(
 
     parsed: list[dict[str, Any]] = []
     for row in rows:
-        tag = str(row.get("tag", ""))
-        marker = tag.find("retail-demo:")
-        parts = tag[marker:].split(":") if marker >= 0 else []
-        if len(parts) != 4 or parts[0] != "retail-demo":
-            continue
         table = str(row.get("TableName", ""))
-        if table not in expected_tables or parts[2] != table:
+        if table not in expected_tables:
             continue
-        try:
-            batch_id = int(parts[3])
-        except ValueError:
-            continue
-        parsed.append(
-            {
-                "table": table,
-                "stream_id": parts[1],
-                "batch_id": batch_id,
-                "created": row.get("MaxCreatedOn"),
-            }
-        )
+        for tag in _row_ingest_tags(row):
+            if tag["event_type"] != table:
+                continue
+            parsed.append({**tag, "table": table, "created": row.get("MaxCreatedOn")})
     if not parsed:
         return None
     latest_row = max(
         parsed,
-        key=lambda row: _parse_time(_iso_value(row["created"])),
+        key=lambda row: (_parse_time(_iso_value(row["created"])), row["batch_id"]),
     )
-    stream_id = str(latest_row["stream_id"])
-    same_stream = [row for row in parsed if row["stream_id"] == stream_id]
+    identity = (latest_row["stream_id"], latest_row["incarnation"])
+    same_stream = [
+        row for row in parsed if (row["stream_id"], row["incarnation"]) == identity
+    ]
     return {
-        "stream_id_hash": _hash_identifier(stream_id),
+        "stream_id_hash": _hash_identifier(latest_row["stream_id"]),
+        "incarnation_hash": _hash_identifier(latest_row["incarnation"]),
         "latest_batch_id": max(int(row["batch_id"]) for row in same_stream),
         "latest_extent": _iso_value(latest_row["created"]),
         "table_count": len({str(row["table"]) for row in same_stream}),

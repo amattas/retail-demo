@@ -11,8 +11,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-
-from retail_setup.generation.stream_control import call_with_retry
+from retail_setup.generation.stream_control import call_with_retry, ingest_tag
 
 ROOT = Path(__file__).resolve().parents[1]
 STREAM_TEMPLATE = ROOT / "utility" / "notebooks" / "templates" / "driver-05-stream.py"
@@ -147,17 +146,26 @@ def test_live_driver_requires_nonempty_real_dimensions(count) -> None:
 def test_eventhouse_batch_uses_idempotent_transaction_metadata() -> None:
     source = STREAM_TEMPLATE.read_text(encoding="utf-8")
     tree = ast.parse(source)
-    namespace = _exec_nodes(
-        tree,
-        {"_kusto_write_metadata"},
-        {"json": json, "uuid": uuid, "STREAM_ID": "stream-a"},
-    )
 
-    properties_json, request_id = namespace["_kusto_write_metadata"](
-        "receipt_created", 17
-    )
-    properties = json.loads(properties_json)
-    expected_tag = "retail-demo:stream-a:receipt_created:17"
+    def metadata(incarnation: str, batch_id: int) -> tuple[dict, str]:
+        namespace = _exec_nodes(
+            tree,
+            {"_kusto_write_metadata"},
+            {
+                "json": json,
+                "uuid": uuid,
+                "ingest_tag": ingest_tag,
+                "STREAM_ID": "stream-a",
+                "INCARNATION": incarnation,
+            },
+        )
+        properties_json, request_id = namespace["_kusto_write_metadata"](
+            "receipt_created", batch_id
+        )
+        return json.loads(properties_json), request_id
+
+    properties, request_id = metadata("0a1b2c3d", 17)
+    expected_tag = "retail-demo:stream-a:0a1b2c3d:receipt_created:17"
 
     assert properties == {
         "flushImmediately": True,
@@ -165,6 +173,12 @@ def test_eventhouse_batch_uses_idempotent_transaction_metadata() -> None:
         "ingestIfNotExists": [expected_tag],
     }
     assert uuid.UUID(request_id)
+    # A replay of the same batch reuses its tag and request ID; a reset
+    # checkpoint (new incarnation, batch IDs from 0 again) never does.
+    assert metadata("0a1b2c3d", 17) == (properties, request_id)
+    reset_properties, reset_request = metadata("ffee0011", 17)
+    assert reset_properties["ingestIfNotExists"] != [expected_tag]
+    assert reset_request != request_id
 
     write_source = ast.get_source_segment(source, _function(tree, "_write_event_table"))
     assert write_source is not None
@@ -278,8 +292,9 @@ def test_generator_dedupe_ids_include_persistent_stream_and_row_identity() -> No
     slot_source = ast.get_source_segment(source, _function(tree, "slot"))
 
     assert slot_source is not None
-    assert "F.xxhash64(F.lit(STREAM_ID), trace_seed, et)" in slot_source
-    assert 'stream_prefix = F.lit(f"{STREAM_ID}-")' in source
+    assert "F.xxhash64(F.lit(STREAM_NAMESPACE), trace_seed, et)" in slot_source
+    assert 'stream_prefix = F.lit(f"{STREAM_NAMESPACE}-")' in source
+    assert "STREAM_NAMESPACE = INCARNATION_PLAN.namespace" in source
     assert (
         'F.concat(F.lit("TXN-"), stream_prefix, '
         'F.col("v").cast("string")).alias("transaction_id")'
