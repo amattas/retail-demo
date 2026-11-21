@@ -24,9 +24,10 @@ before starting the stream.
 Foreign keys come only from IDs that exist. The driver numbers each
 dimension's IDs and picks one per row with a seeded hash, through a broadcast
 join, so gaps in the IDs (a custom layout or a filtered publish) are safe.
-Inventory, stockout, and reorder events use only products whose `LaunchDate`
-is on or before the checkpoint's catalog date. A dimension with contiguous IDs
-`1..n` gets the same IDs as the earlier `1..count` draw.
+Baskets, and therefore inventory, stockout and reorder events, use only
+products whose `LaunchDate` is on or before the checkpoint's catalog date. A
+dimension with contiguous IDs `1..n` gets the same IDs as the earlier
+`1..count` draw.
 
 ### History handoff
 
@@ -56,9 +57,10 @@ decline model come from `retail_setup.generation.vocabulary`, which the build
 inlines into the notebook, so live values match history: `MOBILE_PAY`, base-36
 BLE IDs padded to six characters, `BEACON_%03d_<zone>` and `SENSOR_%03d_<zone>`
 IDs, upper-case devices, `CAMP<yyyyMMdd><NN>` campaign IDs, and padded `AdId`s.
-The two remaining differences (S-12: online fulfillment modes are picked
-uniformly, and online payments are never declined) are listed as known gaps in
-`utility/tests/generation/test_vocabulary.py`. That test fails when a gap
+Online orders use the same fulfillment mix, online tenders, decline model,
+cancellation and backorder rates, promo codes and stage delays
+(`vocabulary.ONLINE_*`) as history. No known gap is left; new ones are listed
+in `utility/tests/generation/test_vocabulary.py`, which fails when a listed gap
 closes, so the list only shrinks.
 
 ## Volume, hours and customers
@@ -71,11 +73,10 @@ history:
   rate from the store count, the historical `transactions_per_store_day`
   (rendered into the notebook), `online_orders_per_day`, and the marketing
   volume: the smallest whole rate that covers every lane at its peak. Each row
-  goes to one lane (store visits, online orders, marketing, inventory,
-  logistics) and is kept with that lane's calendar weight, so a larger explicit
-  rate adds resolution, not volume. `volume_scale` multiplies every calibrated
-  volume. Inventory and logistics keep their previous per-store rates until
-  their state machines replace them.
+  goes to one lane (store visits, online orders, marketing) and is kept with
+  that lane's calendar weight, so a larger explicit rate adds resolution, not
+  volume. `volume_scale` multiplies every calibrated volume. Inventory and
+  truck events have no lane: they follow from the purchases (below).
 - **Store visits.** A visit picks a store weighted by `daily_traffic_multiplier`
   and is kept with the profile's hourly, daily and monthly weights evaluated in
   the store's local time (`dim_stores.TimeZone`, daylight saving included). The
@@ -110,25 +111,113 @@ history:
   about one day in seven), cost bands by channel and device, padded `AdId`s,
   and a 5% CRM match, at `store_count / 86` of the archetype volumes.
 
+## Store inventory
+
+`stream_supply` keeps a running on-hand balance per store and product and
+replays, in time order, everything that changes it in a micro-batch:
+
+- **Sales.** Every receipt line, and every line of a ship-from-store or BOPIS
+  online order (at order time), takes its quantity from the store:
+  `inventory_updated` with `reason = SALE`, `source = CUSTOMER_PURCHASE` or
+  `ONLINE_ORDER`, a negative `quantity_delta` and the demand in
+  `requested_quantity`. Ship-from-DC lines draw on the DC, which, as in
+  history, is an unconstrained supplier.
+- **Lost sales.** A line the store cannot fill whole becomes
+  `reason = LOST_SALE` with `quantity_delta = 0`, like history's policy: the
+  line is left off its receipt or order (and its totals), and a purchase with no
+  line left emits nothing. Balances never go negative.
+- **Stockouts.** A sale that takes the balance below
+  `calibration.STOCKOUT_QUANTITY_THRESHOLD` (to zero) emits
+  `stockout_detected` with the stock it took (`last_known_quantity`), once per
+  store, product and UTC day, the crossing `fact_stockouts` records in history.
+- **Reorders.** After each sale or lost sale the shared replenishment policy
+  (`inventory_policy`: smoothed daily demand, reorder point of 4 days, order-up-to
+  target of 8 days, 12-unit case pack, `URGENT` when the shelf is empty,
+  `HIGH` below two days of demand) compares the position (on hand plus
+  inbound) with the reorder point and emits `reorder_triggered`.
+- **Receipts of stock.** A truck unload adds its units:
+  `reason = INBOUND_SHIPMENT`, `source` = the shipment ID.
+
+Every inventory, stockout and reorder event carries the store's DC (`dc_id`),
+the nearest DC by geography, as in the historical inventory chain
+(`network.store_dc_map`). A store and product the stream has not touched yet
+starts from its latest Silver `fact_store_inventory_txn` balance as of the
+incarnation start (never below zero) and the mean daily demand of the 7 days
+before it; one Silver has never seen starts from history's opening stock. The
+seed time is kept in the meta state, so a restart seeds the same way. History's
+shipments that were still on the road when history ended are not carried over;
+the policy reorders that stock.
+
+## Trucks
+
+A reorder joins its store's pending load at the DC. Each store takes one
+consolidated delivery a day: at the store's daily delivery slot (a stable
+minute of the UTC day, so the slots spread over the day), the next free truck
+of the DC's fleet (`dim_trucks.DCID`; pool trucks only for a DC with none)
+loads the whole pending load for `TRUCK_LOAD_MINUTES`, drives the lane (a
+stable 1-4 hour draw per DC and store), and arrives. Each DC's fleet is sized
+to the stores it serves (`network.TRUCKS_PER_STORE`, at least two trucks), so
+a typical fleet is busy about 70% of the day. `planned_arrival_time` is set at
+dispatch; the actual arrival is the planned time plus `delay_minutes`, which
+stays 0 with no `delay_reason` until the logistics incident model adds delays
+(`SupplyBatch.held_dcs` already lets an incident stop a DC dispatching). The
+unload takes `TRUCK_UNLOAD_BASE_MINUTES` plus the load at
+`TRUCK_UNLOAD_UNITS_PER_MINUTE`, scaled by a per-store dock factor, with a few
+minutes of noise (`estimated_unload_duration` is the plan, the departure's
+`actual_unload_duration` the outcome). A typical load unloads inside the
+normal 30-75 minute range; an unusually large one can breach the 90-minute SLA.
+The truck departs when the unload is done, which restocks the store, and drives
+back. A truck carries one shipment at a time, so it is never in two places at
+once, and `truck_arrived` and `truck_departed` are emitted only once their time
+has passed.
+
+## Online orders
+
+Online orders arrive at `online_orders_per_day`, shaped by the profile's
+monthly weights and the online hourly curve (`vocabulary.ONLINE_HOURLY_WEIGHTS`,
+UTC, peaking in the US evening; history uses the same curve). Each order has
+one fulfillment mode and node, drawn by the historical mix (60% ship from a DC,
+30% ship from a store, 10% BOPIS). Its lifecycle runs over hours and days:
+
+| Event | When |
+| --- | --- |
+| `online_order_created` and one `online_order_line_added` per line | order time |
+| `payment_processed` (`order_id`, no store) | after the online tender's processing time |
+| `online_order_picked` | 30-240 minutes later (BOPIS: 4-24 hours, ready for pickup) |
+| `online_order_shipped` | 2-4 hours after picking; never for BOPIS |
+| `online_order_delivered` | 1-3 days after shipping; BOPIS: 1-24 hours after picking, when the customer collects it |
+
+2% of orders are cancelled at once: zero totals, no payment and no fulfillment.
+8% of shippable orders are backordered: shipped but not delivered. Payments use
+the online tenders (no cash) and decline like history; a declined order is
+still fulfilled, as in history. Lines carry history's online promo codes, and
+tax is the fulfilling store's rate for store-fulfilled orders and the
+customer's destination rate (mean store rate of their geography) for DC
+shipments. Orders still in progress live in the order state.
+
 ## Stream state
 
-Events that span micro-batches need state. A visit's later events (pings,
-receipt, payment) are emitted in the batch whose time they fall in, and the
-store hours need each store's open/closed state. The state lives in Lakehouse
-Delta tables in the Silver schema:
+Events that span micro-batches need state. A visit's and an online order's
+later events are emitted in the batch whose time they fall in, the store hours
+need each store's open/closed state, and stock and trucks carry over between
+batches. The state lives in Lakehouse Delta tables in the Silver schema:
 
 | Table | Key | Contents |
 | --- | --- | --- |
 | `_stream_state_stores` | store ID | Open or closed, and when it last changed. |
-| `_stream_state_visits` | visit (rate row) | Visits whose last event is still in the future. |
-| `_stream_state_meta` | `clock` | The time of the last micro-batch. |
+| `_stream_state_visits` | visit (rate row) | Visits whose last event is still in the future, with their lost-sale lines. |
+| `_stream_state_orders` | order (rate row) | Online orders whose last stage is still in the future, with their lost-sale lines. |
+| `_stream_state_inventory` | `inv:<store>:<product>` | On hand, inbound, smoothed daily demand and the last stockout day of each store and product the stream has touched. |
+| `_stream_state_logistics` | `pending:<store>`, `shipment:<id>`, `truck:<id>` | Loads waiting at the DC, shipments on the road and where each truck is. |
+| `_stream_state_meta` | `clock`, `seed` | The time of the last micro-batch, and the inventory seed time. |
 
 Each row also carries the checkpoint `incarnation` (stream ID and nonce),
 `batch_id`, the JSON `payload` and a `deleted` flag. Micro-batch N reads, per
 entity, the latest version written before N, and writes its changes with
 `batch_id = N` using a Delta `replaceWhere` on `batch_id >= N`. A replay of N
 therefore reads the same state, regenerates the same events, and replaces its
-own versions: nothing is applied twice. Superseded versions are deleted every
+own versions: nothing is applied twice. Store inventory is read only for the
+store-products a batch touches. Superseded versions are deleted every
 60 batches. A new incarnation has no rows; at startup it seeds each store from
 its last Silver `fact_store_ops` row (or its hours) as `batch_id = -1`. Rows of
 an earlier incarnation are ignored and can be deleted.
@@ -169,15 +258,15 @@ Payload fields are event-specific and mapped by `EVENT_PAYLOADS`.
 16. `online_order_created`
 17. `online_order_picked`
 18. `online_order_shipped`
-19. `logistics_incident_started` (declared, not yet emitted)
-20. `logistics_incident_resolved` (declared, not yet emitted)
-21. `online_order_line_added` (declared, not yet emitted)
-22. `online_order_delivered` (declared, not yet emitted)
+19. `online_order_line_added`
+20. `online_order_delivered`
+21. `logistics_incident_started` (declared, not yet emitted)
+22. `logistics_incident_resolved` (declared, not yet emitted)
 
-Types 19-22 are declared end to end (KQL table, mapping, `EVENT_PAYLOADS`,
-Silver route, contract path and fixture) so the logistics-incident and
-online-order lifecycle models can start emitting them without another
-contract change. The stream emits the first eighteen today.
+Types 21-22 are declared end to end (KQL table, mapping, `EVENT_PAYLOADS`,
+Silver route, contract path and fixture) so the logistics-incident model can
+start emitting them without another contract change. The stream emits the
+first twenty today.
 
 - `logistics_incident_started` carries `incident_id`, `incident_type`
   (`DC_OUTAGE`, `LANE_DELAY`, `WEATHER`, `HOLIDAY`, `SUPPLIER_SHORT_SHIP`),
@@ -189,9 +278,19 @@ contract change. The stream emits the first eighteen today.
   resolution whose start has aged out of Bronze only updates an existing row.
 - `online_order_line_added` carries the order line (`line_number`,
   `product_id`, `quantity`, prices, `promo_code`) and its fulfillment node; it
-  lands in `fact_online_order_lines` with status `PENDING`.
+  lands in `fact_online_order_lines` with status `PENDING`. Each Silver run
+  then moves recent live lines with their order: `PICKED`, `SHIPPED`,
+  `DELIVERED` (with the stage timestamps), or `CANCELLED` when the order's
+  header has zero totals.
 - `online_order_delivered` adds a `DELIVERED` row to the streaming-only
   `fact_online_order_status` table, like picked and shipped.
+- `inventory_updated.requested_quantity` is the customer's demand of a `SALE`
+  or `LOST_SALE` (0 for stock receipts). Silver writes it to
+  `requested_quantity` and, for a lost sale, to `unfulfilled_quantity`. The KQL
+  script restates the table with `.alter table` so the column sits before the
+  envelope, as the positional writes need.
+- A live store stockout keeps `DCID` NULL in Silver `fact_stockouts`, as history
+  does; the event's `dc_id` names the store's DC.
 
 KQL defines an additional `unknown_event` catch-all table. It is not a
 generated business event. The current notebook rejects unmapped
@@ -341,10 +440,9 @@ inventories from the driver, KQL, `schemas.py`, notebooks, and active TMDL.
 ## Truck lifecycle
 
 `truck_arrived` and `truck_departed` share `truck_id`, `dc_id`, `store_id`, and
-`shipment_id`. The departure payload and envelope timestamp are later than the
-arrival timestamp. Normal dwell is a deterministic 30-75 minutes; every fifth
-eligible logistics value takes the deterministic 120-minute late path, above the
-90-minute dwell SLA. These values come from
+`shipment_id`. The departure is emitted when the unload completes, after the
+arrival and never ahead of the stream clock; the dwell follows the load-size
+and dock model under [Trucks](#trucks). Its parameters come from
 `utility/src/retail_setup/generation/calibration.py`, the same module the rules,
 anomaly functions, and semantic model are checked against.
 

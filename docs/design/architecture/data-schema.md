@@ -36,8 +36,8 @@ retained for existing TMDL bindings.
 `ad_impression`, `promotion_applied`, `online_order_created`,
 `online_order_picked`, `online_order_shipped`, `online_order_line_added`,
 `online_order_delivered`, `logistics_incident_started`, and
-`logistics_incident_resolved`. The last four are declared for the online-order
-and logistics-incident lifecycle models; the stream does not emit them yet.
+`logistics_incident_resolved`. The last two are declared for the
+logistics-incident model; the stream does not emit them yet.
 
 ### Other KQL tables
 
