@@ -108,3 +108,30 @@ def test_live_replay_preserves_historical_unfulfilled_demand(spark):
     assert rows["lost"].unfulfilled_quantity == 15
     assert rows["sale"].requested_quantity == 2
     assert rows["sale"].unfulfilled_quantity == 0
+
+
+def test_live_lost_sales_carry_their_requested_quantity(spark):
+    existing = spark.sql("""
+        SELECT timestamp'2026-09-01 08:00:00' AS event_ts, 'seed' AS trace_id,
+               1L AS store_id, 1L AS product_id, 2L AS quantity, 2L AS balance,
+               'INITIAL' AS txn_type, 'seed' AS source, date'2026-09-01' AS event_date,
+               1L AS __index_level_0__, 0L AS requested_quantity, 0L AS unfulfilled_quantity
+    """)
+    incoming = spark.sql("""
+        SELECT timestamp'2026-09-01 10:00:00' AS ingest_timestamp, 'lost' AS trace_id,
+               1L AS store_id, 1L AS product_id, 0L AS quantity_delta,
+               'LOST_SALE' AS reason, 'CUSTOMER_PURCHASE' AS payload_source,
+               3L AS requested_quantity
+        UNION ALL
+        SELECT timestamp'2026-09-01 11:00:00', 'sale', 1L, 1L, -2L, 'SALE',
+               'ONLINE_ORDER', 2L
+        UNION ALL
+        SELECT timestamp'2026-09-01 12:00:00', 'unload', 1L, 1L, 24L, 'INBOUND_SHIPMENT',
+               'SHP-1', 0L
+    """)
+    rows = {row.trace_id: row for row in _notebook_functions(spark, existing)(incoming).collect()}
+    assert (rows["lost"].quantity, rows["lost"].balance) == (0, 2)
+    assert (rows["lost"].requested_quantity, rows["lost"].unfulfilled_quantity) == (3, 3)
+    assert (rows["sale"].requested_quantity, rows["sale"].unfulfilled_quantity) == (2, 0)
+    assert (rows["sale"].balance, rows["unload"].balance) == (0, 24)
+    assert rows["unload"].requested_quantity == 0
