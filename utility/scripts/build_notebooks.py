@@ -138,12 +138,18 @@ STREAM_MODULES = [
     "generation/runtime.py",
     "generation/vocabulary.py",
     "generation/calibration.py",
+    "generation/stream_calendar.py",
     "generation/behavior.py",
     "generation/traffic.py",
     "generation/receipts.py",
+    "generation/store_activity.py",
+    "generation/marketing.py",
+    "generation/attribution.py",
     "generation/stream_baskets.py",
     "generation/stream_control.py",
     "generation/stream_frames.py",
+    "generation/stream_state.py",
+    "generation/stream_events.py",
 ]
 
 _PKG_IMPORT = re.compile(r"^\s*(from retail_setup|import retail_setup)")

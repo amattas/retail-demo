@@ -1,18 +1,38 @@
 # %% [markdown]
 # # Stream live events
 # Part of the retail-demo setup utility. A Spark Structured Streaming generator
-# that continuously emits synthetic retail events as JSON `EventEnvelope`s,
-# replacing datagen's Python streamer. Each event is written **directly to the
-# Fabric Eventhouse** with the Spark Kusto connector — routed by `event_type` to
-# its KQL event table (`receipt_created`, `inventory_updated`, …) → Silver → Gold
-# (unchanged). Everything stays inside Fabric: no Eventstream, no Event Hubs.
+# that continuously emits synthetic retail events as JSON `EventEnvelope`s and
+# writes each one **directly to the Fabric Eventhouse** with the Spark Kusto
+# connector, routed by `event_type` to its KQL event table (`receipt_created`,
+# `inventory_updated`, …) → Silver → Gold. Everything stays inside Fabric: no
+# Eventstream, no Event Hubs.
+#
+# The live stream continues the history the setup notebooks wrote, with the same
+# models (embedded below):
+#
+# - **Volume and hours.** The default rate comes from the store count and the
+#   historical `transactions_per_store_day`. Each store's visits follow the
+#   profile's hourly, daily and monthly weights in the store's **local** time,
+#   its traffic multiplier and its operating hours (no sales while closed).
+#   Stores open and close at their local operating-hour boundaries.
+# - **Customers.** Shoppers come from each store's local pool, weighted by visit
+#   frequency like history; about 22% of visits buy. Visits follow an ordered
+#   path (entrance → zones → checkout) with realistic dwell times, and their
+#   BLE IDs resolve to `dim_customers.BLEId`.
+# - **Purchases and marketing.** Baskets, per-line promotions, the tender mix,
+#   declines and campaigns use the historical catalogs. Marketing journey
+#   touches carry their touch time in `impression_time` and arrive with the
+#   purchase, so notebook 03 never skips them.
+#
+# State that spans micro-batches (store open/closed, visits in progress) lives
+# in Lakehouse Delta tables `<silver>._stream_state_*`, versioned by micro-batch,
+# so a replayed batch regenerates exactly the same events.
 #
 # The connector write pattern follows the Real-Time Intelligence tutorial
 # "Use a notebook with Apache Spark to query a KQL database"
 # (https://learn.microsoft.com/fabric/real-time-intelligence/spark-connector):
-# `df.write.format("com.microsoft.kusto.spark.synapse.datasource")`. In-stream the
-# write runs inside `foreachBatch`, splitting each micro-batch by `event_type` so
-# every event lands in the same typed table the batch pipeline uses.
+# `df.write.format("com.microsoft.kusto.spark.synapse.datasource")`, inside
+# `foreachBatch`, one write per event table.
 #
 # Run this AFTER the setup notebooks (the KQL tables must already exist). It is the
 # optional **live driver**, not part of the ordered batch setup. Stop the streaming
@@ -26,13 +46,12 @@
 # If a table looks empty or rows seem dropped, run `.show ingestion failures` in the
 # KQL database — rows that fail schema/type validation are reported there, not lost
 # silently.
-#
-# This notebook embeds the shared shopping behavior used by the batch engine.
 
 # %% [parameters]
 # Fabric parameters — override per run via the pipeline/parameterization.
-source_rows_per_second = 5     # rate-source rows/sec. Each row emits ONE scenario
-                               # bundle, so actual events/sec is several× this.
+source_rows_per_second = 0     # 0 = derive from the store count and history volume;
+                               # a larger value only adds resolution, not volume
+volume_scale = 1.0             # multiply every calibrated live volume (1.0 = history)
 sink = "eventhouse"            # "eventhouse" | "delta"
 run_seconds = 0                # 0 = run forever; >0 = stop after N seconds (test/smoke)
 trigger_seconds = 60           # live micro-batch interval; bounded runs use at most 10
@@ -69,6 +88,11 @@ LAKEHOUSE_NAME = _param("{{LAKEHOUSE_NAME}}", "retail_lakehouse")
 SILVER_DB = _param("{{SILVER_DB}}", "ag")
 STORE_TYPE = _param("{{STORE_TYPE}}", "supercenter")
 SEED = int(_param("{{SEED}}", "42"))
+# The historical volume the live stream continues, and the first history day
+# (campaign windows are anchored on it).
+TRANSACTIONS_PER_STORE_DAY = int(_param("{{TRANSACTIONS_PER_STORE_DAY}}", "400"))
+ONLINE_ORDERS_PER_DAY = int(_param("{{ONLINE_ORDERS_PER_DAY}}", "0"))
+HISTORY_START = _param("{{START_DATE}}", "")
 
 spark.conf.set("spark.sql.session.timeZone", "UTC")  # ingest_timestamp depends on it
 
@@ -182,12 +206,11 @@ TRUCK_IDS, TRUCK_COUNT = _ids("dim_trucks")
 print(f"ids: stores={STORE_COUNT} customers={CUSTOMER_COUNT} launched products={PRODUCT_COUNT} "
       f"dcs={DC_COUNT} trucks={TRUCK_COUNT}")
 
-# Dimension ATTRIBUTES as small broadcast frames for stream-static joins, so the
-# live feed's money matches the historical batch: real product prices/taxability
-# and the store's real tax rate. Customer geography affinity is not applied in
-# the stream (a fixed-rate stream has no per-store demand signal) — a documented
-# live-feed approximation.
+# Store, customer and product attributes for the calibrated live models: local
+# time zones and hours, traffic multipliers, customer pools by geography, and
+# real product prices and store tax rates.
 import json
+from datetime import date as _date
 
 STREAM_PROFILE = StoreTypeProfile.model_validate(json.loads(
     mssparkutils.fs.head(f"Files/setup/dictionaries/{STORE_TYPE}/profile.json", 65536)
@@ -196,20 +219,16 @@ STREAM_PRODUCTS = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_products").sele
     _F.col("ID").alias("product_id"), "SalePrice", "taxability",
     _F.col("Department").alias("department"), _F.to_date("LaunchDate").alias("launch_date"),
 )
-
-STORE_ATTR = (spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_stores")
-              .select(_F.col("ID").alias("as_id"),
-                      _F.round(_F.col("tax_rate") * 10000).cast("long").alias("as_bps")))
-_untaxed = STORE_ATTR.where(_F.col("as_bps").isNull()).count()
-if _untaxed:
-    raise ValueError(f"{_untaxed} dim_stores rows have no tax_rate; live purchases need one")
-print("attrs: using real dim_products / dim_stores prices+tax")
+DIM_STORES = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_stores")
+DIM_CUSTOMERS = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_customers")
 
 # History-to-stream handoff: history should end within a day before now. A new
 # stream refuses a gap or overlap unless allow_history_gap is set; a resumed
 # checkpoint only warns (its own downtime is an expected gap).
-_history_end = (spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.fact_receipts")
-                .agg(_F.max("event_ts").cast("long").alias("end")).first()["end"])
+_history = (spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.fact_receipts")
+            .agg(_F.max("event_ts").cast("long").alias("end"),
+                 _F.min("event_date").alias("start")).first())
+_history_end = _history["end"]
 enforce_history_handoff(
     check_history_handoff(
         None if _history_end is None
@@ -219,549 +238,86 @@ enforce_history_handoff(
     resumed=INCARNATION_PLAN.resumed,
     allow_gap=bool(allow_history_gap),
 )
+if not HISTORY_START:
+    HISTORY_START = (_history["start"] or CATALOG_DATE).isoformat()
+HISTORY_START_DATE = _date.fromisoformat(HISTORY_START)
+if ONLINE_ORDERS_PER_DAY <= 0:
+    ONLINE_ORDERS_PER_DAY = STORE_COUNT * 8
+
+_store_rows = DIM_STORES.select("daily_traffic_multiplier", "operating_hours").collect()
+# The rate source takes whole rows per second; 0 derives the rate from history.
+_requested_rate = float(source_rows_per_second)
+LANE_PLAN = plan_lanes(
+    STREAM_PROFILE,
+    store_count=STORE_COUNT,
+    multiplier_total=sum(float(r["daily_traffic_multiplier"]) for r in _store_rows),
+    operating_hours=[r["operating_hours"] for r in _store_rows],
+    transactions_per_store_day=TRANSACTIONS_PER_STORE_DAY,
+    online_orders_per_day=ONLINE_ORDERS_PER_DAY,
+    marketing_impressions_per_day=sum(entry[2] for entry in CAMPAIGN_ARCHETYPES),
+    volume_scale=float(volume_scale),
+    rows_per_second=max(1, round(_requested_rate)) if _requested_rate > 0 else None,
+)
+RATE_ROWS_PER_SECOND = int(LANE_PLAN.rows_per_second)
+if LANE_PLAN.clipped:
+    print(f"WARNING source_rows_per_second={source_rows_per_second} is below the peak "
+          f"{sum(LANE_PLAN.peaks.values()):.2f} rows/s; peak hours will be under-produced")
+
+STREAM_CONTEXT = build_stream_context(
+    spark,
+    seed=SEED,
+    namespace=STREAM_NAMESPACE,
+    source=event_source,
+    profile=STREAM_PROFILE,
+    history_start=HISTORY_START_DATE,
+    dim_stores=DIM_STORES,
+    dim_customers=DIM_CUSTOMERS,
+    ids={
+        "stores": (STORE_IDS, STORE_COUNT),
+        "customers": (CUSTOMER_IDS, CUSTOMER_COUNT),
+        "products": (LAUNCHED_PRODUCT_IDS, PRODUCT_COUNT),
+        "dcs": (DC_IDS, DC_COUNT),
+        "trucks": (TRUCK_IDS, TRUCK_COUNT),
+    },
+    baskets=prepare_basket_catalog(spark, STREAM_PRODUCTS, STREAM_PROFILE, SEED, CATALOG_DATE),
+    lanes=LANE_PLAN,
+)
+print(f"live volume: {RATE_ROWS_PER_SECOND} source rows/s; lane shares "
+      + ", ".join(f"{lane}={share:.3f}" for lane, share in LANE_PLAN.shares.items()))
+
+# Stateful features keep their state in Delta tables, one incarnation each. A
+# new incarnation seeds store open/closed from the last historical operation.
+STREAM_STATE = DeltaStateStore(spark, f"{LAKEHOUSE_NAME}.{SILVER_DB}", STREAM_NAMESPACE)
+
+
+def _last_store_operations():
+    """{store_id: (UTC time, operation)} of each store's last Silver operation."""
+    try:
+        ops = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.fact_store_ops")
+    except Exception:  # noqa: BLE001 - no history yet; seed from operating hours
+        return {}
+    rows = ops.groupBy("store_id").agg(
+        _F.max(_F.unix_timestamp("event_ts")).alias("at"),
+        _F.max_by("operation_type", "event_ts").alias("operation"),
+    ).collect()
+    return {
+        int(r["store_id"]): (_datetime.fromtimestamp(r["at"], _timezone.utc), r["operation"])
+        for r in rows if r["at"] is not None
+    }
+
+
+if not STREAM_STATE.has_rows("stores"):
+    STREAM_STATE.write("stores", SEED_BATCH_ID, seed_store_state(
+        STREAM_CONTEXT.store_hours, _last_store_operations(), _datetime.now(_timezone.utc)))
+    print(f"seeded live store state for incarnation {STREAM_NAMESPACE}")
 
 # %%
 # ruff: noqa: F821, E402  (Fabric-injected globals; imports live in notebook cells)
-# Deterministic-draw helpers (same xxhash64 family as retail_setup.runtime) and
-# the event-envelope builder. All expressions are pure Catalyst — no UDFs.
+# Every micro-batch is generated by `generate_stream_batch` (stream_events in the
+# behavior cell above): calibrated lanes of the rate source, store visits with
+# their state, purchases, store operations, online orders, marketing, inventory
+# and logistics.
 from pyspark.sql import functions as F
-
-# Zones, fulfillment modes and ID formats come from the shared vocabulary
-# (retail_setup.generation.vocabulary, inlined in the behavior cell). The LIVE_*
-# values below still differ from it; tests/generation/test_vocabulary.py lists
-# each difference as a known gap until the stream adopts the shared value.
-LIVE_TENDERS = ["CREDIT_CARD", "DEBIT_CARD", "CASH", "MOBILE"]
-LIVE_CHANNELS = ["SEARCH", "EMAIL", "SOCIAL", "DISPLAY"]
-LIVE_DEVICES = ["mobile", "desktop", "tablet"]
-# Truck dwell, stockout and reorder thresholds come from the shared calibration
-# (retail_setup.generation.calibration, inlined in the behavior cell).
-
-# Named promo catalog for the live feed (a subset of vocabulary.PROMO_CATALOG):
-# (code, discount_pct, eligible_months | None, min_subtotal_dollars, kind)
-LIVE_NAMED_PROMOS = [
-    ("SAVE10", 10, None, 0.0, "PCT"),
-    ("SAVE20", 20, None, 50.0, "PCT"),
-    ("CLEARANCE30", 30, None, 0.0, "PCT"),
-    ("BOGO50", 50, None, 0.0, "BOGO"),
-    ("NEWYEAR15", 15, [1, 2], 0.0, "PCT"),
-    ("SPRINGSALE20", 20, [3, 4, 5], 0.0, "PCT"),
-    ("SUMMER25", 25, [6, 7, 8], 0.0, "PCT"),
-    ("BACKTOSCHOOL20", 20, [8, 9], 0.0, "PCT"),
-    ("BFRIDAY30", 30, [11], 0.0, "PCT"),
-    ("HOLIDAY20", 20, [12], 0.0, "PCT"),
-]
-LIVE_EVERGREEN_PROMOS = [("SAVE10", 10), ("CLEARANCE30", 30)]
-
-
-def _taxmult(taxa):
-    return (F.when(taxa == "TAXABLE", F.lit(1.0))
-            .when(taxa == "REDUCED_RATE", F.lit(0.5)).otherwise(F.lit(0.0)))
-
-
-def _promo_elig(idx, month, subtotal):
-    """True when the LIVE_NAMED_PROMOS entry at idx is in-month and meets its min."""
-    expr = None
-    for i, (_c, _p, months, mn, _k) in enumerate(LIVE_NAMED_PROMOS):
-        e = F.lit(True) if months is None else month.isin(*months)
-        if mn:
-            e = e & (subtotal >= F.lit(mn))
-        cond = idx == F.lit(i)
-        expr = F.when(cond, e) if expr is None else expr.when(cond, e)
-    return expr.otherwise(F.lit(False))
-
-
-def _u(key, salt):
-    """Uniform [0, 1) keyed on a column + seed."""
-    return F.pmod(F.xxhash64(key, F.lit(f"{salt}|{SEED}")), F.lit(1_000_000)) / F.lit(1_000_000.0)
-
-
-def _h(key, salt, n):
-    """Non-negative int in [0, n)."""
-    return F.pmod(F.xxhash64(key, F.lit(f"{salt}|{SEED}")), F.lit(int(n)))
-
-
-def _pick(key, salt, values):
-    arr = F.array(*[F.lit(v) for v in values])
-    return F.element_at(arr, (_h(key, salt, len(values)) + F.lit(1)).cast("int"))
-
-
-def _iso(col):
-    return F.date_format(col, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
-
-
-def _str(value):
-    return value if value is not None else F.lit(None).cast("string")
-
-
-def slot(cond, event_type, payload, ts, pkey, trace_seed, session=None, parent=None,
-         correlation=None):
-    """A conditional event: struct(key, value=envelope JSON) when `cond`, else null.
-
-    ``correlation`` is IMP-007's ``attribution_journey_id``: pass it (a column
-    expression) only for touch/purchase/promotion/payment events that belong to
-    a deterministic attributed journey; every other event leaves it NULL, same
-    as the pre-existing ``session``/``parent`` optional linkage columns.
-    """
-    et = event_type if not isinstance(event_type, str) else F.lit(event_type)
-    value = F.to_json(F.struct(
-        et.alias("event_type"),
-        payload.alias("payload"),
-        F.concat(F.lit("TRC-"),
-                 F.abs(F.xxhash64(F.lit(STREAM_NAMESPACE), trace_seed, et)).cast("string")).alias("trace_id"),
-        _iso(ts).alias("ingest_timestamp"),
-        F.lit("1.0").alias("schema_version"),
-        F.lit(event_source).alias("source"),
-        _str(correlation).alias("correlation_id"),
-        pkey.alias("partition_key"),
-        _str(session).alias("session_id"),
-        _str(parent).alias("parent_event_id"),
-    ))
-    return F.when(cond, F.struct(pkey.alias("key"), value.alias("value"), et.alias("event_type")))
-
-# %%
-# Build the event stream: one `rate` row -> a referentially-consistent bundle of
-# events for that row's scenario, emitted in a single pass (explode of a built
-# array, no self-union).
-rate = spark.readStream.format("rate").option("rowsPerSecond", int(source_rows_per_second)).load()
-# Cap catch-up after a stop: keep only the newest `max_lag_seconds` of rows.
-rate = cap_backlog(rate, int(max_lag_seconds))
-
-v = F.col("value")
-ts = F.col("timestamp")
-stream_prefix = F.lit(f"{STREAM_NAMESPACE}-")
-# scenario is applied AFTER the select below, so it must reference the renamed
-# column `v` (not the source `value`).
-# store_attributed/online_attributed are deterministic IMP-007 live mirrors:
-# a small, fixed share of purchase rows carries a full 2-touch marketing
-# journey (see the attribution block below), additive to — not carved out of
-# — the background "marketing" (organic ad_impression) scenario, so organic
-# marketing/shopping/online traffic keeps flowing unattributed.
-scenario = (F.when(_u(F.col("v"), "scenario") < 0.50, "shopping")
-            .when(_u(F.col("v"), "scenario") < 0.53, "store_attributed")
-            .when(_u(F.col("v"), "scenario") < 0.68, "inventory")
-            .when(_u(F.col("v"), "scenario") < 0.76, "online")
-            .when(_u(F.col("v"), "scenario") < 0.78, "online_attributed")
-            .when(_u(F.col("v"), "scenario") < 0.88, "logistics")
-            .when(_u(F.col("v"), "scenario") < 0.94, "marketing")
-            .otherwise("store_ops"))
-
-from pyspark.sql.functions import broadcast as _bcast  # noqa: E402
-
-b0 = rate.select(ts.alias("ts"), v.alias("v")).withColumn("scenario", scenario)
-# Foreign keys come only from IDs that exist (inventory products: launched by
-# the catalog date), never from an assumed contiguous 1..count range.
-for _name, _salt, _lookup, _n in (
-    ("store_id", "store", STORE_IDS, STORE_COUNT),
-    ("customer_id", "cust", CUSTOMER_IDS, CUSTOMER_COUNT),
-    ("dc_id", "dc", DC_IDS, DC_COUNT),
-    ("truck_num", "truck", TRUCK_IDS, TRUCK_COUNT),
-    ("inv_product_id", "iprod", LAUNCHED_PRODUCT_IDS, PRODUCT_COUNT),
-):
-    b0 = attach_sampled_id(b0, F.col("v"), _salt, SEED, _lookup, _n, _name)
-b0 = (b0
-      .withColumn("receipt_id", F.concat(F.lit("RCP-"), stream_prefix, F.col("v").cast("string")))
-      .withColumn("order_id", F.concat(F.lit("ONL-"), stream_prefix, F.col("v").cast("string")))
-      .withColumn("shipment_id", F.concat(F.lit("SHP-"), stream_prefix, F.col("v").cast("string")))
-      .withColumn("session_id", F.concat(F.lit("SES-"), stream_prefix, F.col("v").cast("string")))
-      .withColumn("ble_id", F.concat(F.lit("BLE"), F.col("customer_id").cast("string")))
-      .withColumn("zone", _pick(F.col("v"), "zone", FOOT_TRAFFIC_ZONES))
-      .withColumn("tender", _pick(F.col("v"), "tender", LIVE_TENDERS)))
-# Every sampled store has a tax rate (checked at startup); the guard only
-# applies to rows that price a basket, so other scenarios can never trip it.
-_prices_basket = F.col("scenario").isin(
-    "shopping", "store_attributed", "online", "online_attributed")
-b0 = b0.join(_bcast(STORE_ATTR), F.col("store_id") == F.col("as_id"), "left").withColumn(
-    "store_bps", F.when(F.col("as_bps").isNotNull(), F.col("as_bps"))
-    .when(~_prices_basket, F.lit(0).cast("long"))
-    .otherwise(F.raise_error(F.lit("Live purchase references a missing store tax rate")))
-)
-b0 = attach_stream_baskets(spark, b0, STREAM_PRODUCTS, STREAM_PROFILE, SEED, CATALOG_DATE)
-b = (b0
-     .withColumn("subtotal", F.aggregate(
-         "basket_lines", F.lit(0).cast("long"), lambda acc, line: acc + line["gross_cents"]
-     ) / 100.0)
-     .withColumn("tax", F.aggregate(
-         "basket_lines", F.lit(0).cast("long"),
-         lambda acc, line: acc + F.floor(
-             line["gross_cents"] * _taxmult(line["taxability"]) * F.col("store_bps") / 10000.0 + 0.5
-         ).cast("long")
-     ) / 100.0)
-     .withColumn("total", F.round(F.col("subtotal") + F.col("tax"), 2))
-     # named promo (month-eligible + min-purchase + BOGO), evergreen fallback
-     .withColumn("_pidx", _h(F.col("v"), "promoidx", len(LIVE_NAMED_PROMOS)))
-     .withColumn("_pelig", _promo_elig(
-         F.col("_pidx"), F.month(F.col("ts")), F.col("subtotal")))
-     .withColumn("_evidx", _h(F.col("v"), "promoev", len(LIVE_EVERGREEN_PROMOS)))
-     .withColumn("promo_code", F.when(F.col("_pelig"), F.element_at(
-         F.array(*[F.lit(t[0]) for t in LIVE_NAMED_PROMOS]), (F.col("_pidx") + F.lit(1)).cast("int")))
-         .otherwise(F.element_at(
-             F.array(*[F.lit(c) for c, _ in LIVE_EVERGREEN_PROMOS]), (F.col("_evidx") + F.lit(1)).cast("int"))))
-     .withColumn("_ppct", F.when(F.col("_pelig"), F.element_at(
-         F.array(*[F.lit(t[1]) for t in LIVE_NAMED_PROMOS]), (F.col("_pidx") + F.lit(1)).cast("int")))
-         .otherwise(F.element_at(
-             F.array(*[F.lit(p) for _, p in LIVE_EVERGREEN_PROMOS]), (F.col("_evidx") + F.lit(1)).cast("int"))))
-     .withColumn("promo_type", F.when(
-         F.col("promo_code").startswith("BOGO"), F.lit("BOGO")).otherwise(F.lit("PERCENTAGE")))
-     .withColumn("pkey", F.concat(F.lit("store_"), F.col("store_id").cast("string"))))
-
-shop = F.col("scenario").isin("shopping", "store_attributed")
-store_pkey = F.col("pkey")
-
-
-def _line(line):
-    lk = F.concat(F.col("v"), F.lit("-"), line["line_num"])
-    payload = F.struct(
-        F.col("receipt_id"),
-        line["line_num"].cast("long").alias("line_number"),
-        line["product_id"].alias("product_id"),
-        line["quantity"].cast("long").alias("quantity"),
-        (line["unit_cents"] / 100.0).alias("unit_price"),
-        (line["net_cents"] / 100.0).alias("extended_price"),
-        F.when(line["discount_cents"] > 0, F.col("promo_code")).alias("promo_code"),
-    )
-    return slot(shop, "receipt_line_added", payload, F.col("ts"), store_pkey, lk,
-                session=F.col("session_id"), parent=F.col("receipt_id"))
-
-
-def _ping(idx):
-    pk = F.concat(F.col("v"), F.lit(f"-p{idx}"))
-    payload = F.struct(
-        F.col("store_id"),
-        F.concat(F.lit("BEACON_"), F.col("store_id").cast("string"), F.lit("_"), F.col("zone")).alias("beacon_id"),
-        F.col("ble_id").alias("customer_ble_id"),
-        (F.lit(-40) - _h(pk, "rssi", 70)).cast("long").alias("rssi"),
-        F.col("zone"),
-    )
-    return slot(shop, "ble_ping_detected", payload, F.col("ts"), store_pkey, pk,
-                session=F.col("session_id"))
-
-
-inv = F.col("scenario") == "inventory"
-onl = F.col("scenario").isin("online", "online_attributed")
-log = F.col("scenario") == "logistics"
-mkt = F.col("scenario") == "marketing"
-ops = F.col("scenario") == "store_ops"
-store_attr = F.col("scenario") == "store_attributed"
-online_attr = F.col("scenario") == "online_attributed"
-attr = store_attr | online_attr
-
-# Discounts apply to variable-length baskets before per-line tax.
-def _price_live_line(line):
-    discount = F.when(
-        F.col("_offer"),
-        F.floor(
-            F.when(
-                F.col("promo_type") == "BOGO",
-                F.floor(line["quantity"] / 2) * line["unit_cents"],
-            ).otherwise(line["gross_cents"]) * F.col("_ppct") / 100.0 + 0.5
-        ).cast("long"),
-    ).otherwise(F.lit(0).cast("long"))
-    net = line["gross_cents"] - discount
-    tax = F.floor(
-        net * _taxmult(line["taxability"]) * F.col("store_bps") / 10000.0 + 0.5
-    ).cast("long")
-    return line.withField("discount_cents", discount).withField("net_cents", net).withField(
-        "tax_cents", tax
-    )
-
-
-b = b.withColumn("priced_lines", F.transform("basket_lines", _price_live_line))
-gross_subtotal_cents = F.aggregate(
-    "priced_lines", F.lit(0).cast("long"), lambda acc, line: acc + line["gross_cents"]
-)
-store_discount_cents = F.aggregate(
-    "priced_lines", F.lit(0).cast("long"), lambda acc, line: acc + line["discount_cents"]
-)
-has_promo = store_discount_cents > 0
-store_subtotal_cents = gross_subtotal_cents - store_discount_cents
-store_tax_cents = F.aggregate(
-    "priced_lines", F.lit(0).cast("long"), lambda acc, line: acc + line["tax_cents"]
-)
-store_total_cents = store_subtotal_cents + store_tax_cents
-store_subtotal = F.round(store_subtotal_cents.cast("double") / F.lit(100.0), 2)
-store_tax = F.round(store_tax_cents.cast("double") / F.lit(100.0), 2)
-store_total = F.round(store_total_cents.cast("double") / F.lit(100.0), 2)
-
-# Online: no promotion in the live feed, so gross == net and discount is 0;
-# the *_cents fields are just the existing dollar fields expressed in cents.
-online_gross_subtotal_cents = F.round(F.col("subtotal") * F.lit(100)).cast("long")
-online_discount_cents = F.lit(0).cast("long")
-online_subtotal_cents = online_gross_subtotal_cents
-online_tax_cents = F.round(F.col("tax") * F.lit(100)).cast("long")
-online_total_cents = F.round(F.col("total") * F.lit(100)).cast("long")
-
-# --- IMP-007 (live mirror): deterministic 2-touch attribution journey. One
-# journey id per purchase row; the two touches share journey/customer/
-# campaign/session and differ only in impression/creative/timestamp. Both
-# touches land strictly BEFORE purchase_ts (== `ts`, the rate source's
-# current timestamp) and within the 7-day attribution window, so no future
-# timestamps are ever produced.
-journey_id = F.concat(F.lit("JRNLIVE"), stream_prefix, F.col("v").cast("string"))
-attr_campaign_id = F.concat(
-    F.lit("CMP-"), (_h(F.col("v"), "attrcamp", 20) + F.lit(1)).cast("string"))
-attr_creative_id = F.concat(
-    F.lit("CRVLIVE"), stream_prefix, (_h(F.col("v"), "attrcrv", 50) + F.lit(1)).cast("string"))
-attr_channel = _pick(F.col("v"), "attrchan", LIVE_CHANNELS)
-attr_device = _pick(F.col("v"), "attrdev", LIVE_DEVICES)
-attr_customer_ad_id = ad_id_column(F.col("customer_id"))
-# session shared by the two touches: the shopping session for a store
-# journey, the order id (the online "session") for an online journey.
-attr_session = F.when(online_attr, F.col("order_id")).otherwise(F.col("session_id"))
-ATTR_OLDER_OFFSET_MIN_S = 3 * 86400  # 3 days before purchase
-ATTR_OLDER_OFFSET_MAX_S = 7 * 86400  # 7 days before purchase (window edge)
-ATTR_NEWER_OFFSET_MIN_S = 60  # 1 minute before purchase
-ATTR_NEWER_OFFSET_MAX_S = 2 * 86400  # 2 days before purchase
-attr_older_offset = (
-    F.lit(ATTR_OLDER_OFFSET_MIN_S)
-    + _u(F.col("v"), "attrolder") * F.lit(ATTR_OLDER_OFFSET_MAX_S - ATTR_OLDER_OFFSET_MIN_S)
-).cast("long")
-attr_newer_offset = (
-    F.lit(ATTR_NEWER_OFFSET_MIN_S)
-    + _u(F.col("v"), "attrnewer") * F.lit(ATTR_NEWER_OFFSET_MAX_S - ATTR_NEWER_OFFSET_MIN_S)
-).cast("long")
-attr_touch_ts_older = F.timestamp_seconds(F.unix_timestamp(F.col("ts")) - attr_older_offset)
-attr_touch_ts_newer = F.timestamp_seconds(F.unix_timestamp(F.col("ts")) - attr_newer_offset)
-attr_impression_id_older = F.concat(
-    F.lit("IMPLIVE"), stream_prefix, F.col("v").cast("string"), F.lit("-OLDER"))
-attr_impression_id_newer = F.concat(
-    F.lit("IMPLIVE"), stream_prefix, F.col("v").cast("string"), F.lit("-NEWER"))
-# The NEWER touch is the one carried as the purchase's own impression_id
-# (last-touch semantics — same convention as attribution.py).
-attr_purchase_impression_id = attr_impression_id_newer
-attr_correlation_store = F.when(store_attr, journey_id).otherwise(F.lit(None).cast("string"))
-attr_correlation_online = F.when(online_attr, journey_id).otherwise(F.lit(None).cast("string"))
-attr_receipt_campaign_id = F.when(store_attr, attr_campaign_id).otherwise(F.lit(None).cast("string"))
-attr_receipt_impression_id = F.when(
-    store_attr, attr_purchase_impression_id).otherwise(F.lit(None).cast("string"))
-attr_order_campaign_id = F.when(online_attr, attr_campaign_id).otherwise(F.lit(None).cast("string"))
-attr_order_impression_id = F.when(
-    online_attr, attr_purchase_impression_id).otherwise(F.lit(None).cast("string"))
-
-
-def _attr_touch(which, touch_ts, impression_id):
-    """One of the journey's two ad_impression touches (older | newer)."""
-    key = F.concat(F.col("v"), F.lit(f"-attr{which}"))
-    payload = F.struct(
-        attr_channel.alias("channel"),
-        attr_campaign_id.alias("campaign_id"),
-        F.concat(attr_creative_id, F.lit(f"-{which.upper()}")).alias("creative_id"),
-        attr_customer_ad_id.alias("customer_ad_id"),
-        impression_id.alias("impression_id"),
-        F.round(_u(key, "attrcost") * F.lit(2.0) + F.lit(0.1), 4).alias("cost"),
-        attr_device.alias("device_type"),
-        F.col("customer_id"),
-    )
-    return slot(attr, "ad_impression", payload, touch_ts, F.concat(F.lit("camp_"), attr_campaign_id),
-                key, session=attr_session, correlation=journey_id)
-
-
-# online derived fields
-node_type = F.when(_pick(F.col("v"), "omode", FULFILLMENT_MODES) == "SHIP_FROM_DC", "DC").otherwise("STORE")
-node_id = F.when(node_type == "DC", F.col("dc_id")).otherwise(F.col("store_id"))
-inv_qty = _h(F.col("v"), "iqty", 60).cast("long")  # 0..59
-# Supply-chain disruption: ~6% of inventory events are a disruption (sudden
-# stock crash -> guaranteed stockout + urgent reorder, tagged DISRUPTION /
-# DC_OUTAGE). Schema-safe — uses existing event types + free-text reason.
-disrupted = inv & (_u(F.col("v"), "disrupt") < F.lit(0.06))
-inv_qty_eff = F.when(disrupted, F.lit(0).cast("long")).otherwise(inv_qty)
-inv_delta = (F.when(disrupted, (-(inv_qty + F.lit(50))).cast("long"))
-             .when(_h(F.col("v"), "delta", 40) == 20, F.lit(-5).cast("long"))
-             .otherwise((_h(F.col("v"), "delta", 40) - F.lit(20)).cast("long")))
-inv_reason = F.when(disrupted, F.lit("DISRUPTION")).otherwise(F.lit("SALE"))
-inv_source = F.when(disrupted, F.lit("DC_OUTAGE")).otherwise(F.lit("STORE"))
-op_type = F.when(_u(F.col("v"), "op") < 0.5, "opened").otherwise("closed")
-truck_id = F.concat(F.lit("TRK"), F.lpad(F.col("truck_num").cast("string"), 4, "0"))
-truck_estimated_unload_minutes = (
-    _h(
-        F.col("v"),
-        "unload",
-        TRUCK_NORMAL_DWELL_MINUTES_MAX - TRUCK_NORMAL_DWELL_MINUTES_MIN + 1,
-    )
-    + F.lit(TRUCK_NORMAL_DWELL_MINUTES_MIN)
-).cast("long")
-truck_is_late = (
-    F.pmod(F.col("v"), F.lit(TRUCK_LATE_BUCKET_MODULUS)) == F.lit(0)
-)
-truck_dwell_minutes = F.when(
-    truck_is_late,
-    F.lit(TRUCK_LATE_DWELL_MINUTES).cast("long"),
-).otherwise(truck_estimated_unload_minutes)
-truck_arrival_ts = F.timestamp_seconds(F.unix_timestamp(F.col("ts")))
-truck_departure_ts = F.timestamp_seconds(
-    F.unix_timestamp(truck_arrival_ts) + truck_dwell_minutes * F.lit(60)
-)
-
-events_arr = F.array(
-    # --- shopping session ---
-    slot(shop, "customer_entered", F.struct(
-        F.col("store_id"),
-        F.concat(F.lit("SENSOR_"), F.col("store_id").cast("string"), F.lit("_"), F.col("zone")).alias("sensor_id"),
-        F.col("zone"),
-        F.lit(1).cast("long").alias("customer_count"),
-        _h(F.col("v"), "dwell", 300).cast("long").alias("dwell_time"),
-    ), F.col("ts"), store_pkey, F.col("v"), session=F.col("session_id")),
-    _ping(1), _ping(2),
-    slot(shop, "customer_zone_changed", F.struct(
-        F.col("store_id"), F.col("ble_id").alias("customer_ble_id"),
-        F.lit("ENTRANCE_MAIN").alias("from_zone"), F.col("zone").alias("to_zone"),
-        _iso(F.col("ts")).alias("timestamp"),
-    ), F.col("ts"), store_pkey, F.col("v"), session=F.col("session_id")),
-    slot(shop, "receipt_created", F.struct(
-        F.col("store_id"), F.col("customer_id"), F.col("receipt_id"),
-        # existing real-valued fields (kept for compatibility): now NET of any
-        # line-1 promo discount, computed before tax (discount-before-tax).
-        store_subtotal.alias("subtotal"), store_tax.alias("tax"), store_total.alias("total"),
-        F.col("tender").alias("tender_type"), F.col("basket_n").cast("long").alias("item_count"),
-        attr_receipt_campaign_id.alias("campaign_id"),
-        attr_receipt_impression_id.alias("impression_id"),
-        gross_subtotal_cents.alias("gross_subtotal_cents"),
-        store_discount_cents.alias("discount_cents"),
-        store_subtotal_cents.alias("subtotal_cents"),
-        store_tax_cents.alias("tax_cents"),
-        store_total_cents.alias("total_cents"),
-    ), F.col("ts"), store_pkey, F.col("v"), session=F.col("session_id"),
-        correlation=attr_correlation_store),
-    slot(shop, "payment_processed", F.struct(
-        F.col("receipt_id"), F.lit(None).cast("string").alias("order_id"),
-        F.col("tender").alias("payment_method"), store_total.alias("amount"),
-        store_total_cents.alias("amount_cents"),
-        F.concat(F.lit("TXN-"), stream_prefix, F.col("v").cast("string")).alias("transaction_id"),
-        _iso(F.col("ts")).alias("processing_time"),
-        (_h(F.col("v"), "ptime", 3000) + F.lit(200)).cast("int").alias("processing_time_ms"),
-        F.lit("APPROVED").alias("status"), F.lit(None).cast("string").alias("decline_reason"),
-        F.col("store_id"), F.col("customer_id"),
-    ), F.col("ts"), store_pkey, F.col("v"), session=F.col("session_id"), parent=F.col("receipt_id"),
-        correlation=attr_correlation_store),
-    slot(shop & has_promo, "promotion_applied", F.struct(
-        F.col("receipt_id"), F.col("promo_code"),
-        F.round(store_discount_cents.cast("double") / F.lit(100.0), 2).alias("discount_amount"),
-        store_discount_cents.alias("discount_cents"),
-        F.col("promo_type").alias("discount_type"),
-        F.size(F.array_distinct(F.transform(
-            F.filter("priced_lines", lambda line: line["discount_cents"] > 0),
-            lambda line: line["product_id"],
-        ))).cast("long").alias("product_count"),
-        F.array_distinct(F.transform(
-            F.filter("priced_lines", lambda line: line["discount_cents"] > 0),
-            lambda line: line["product_id"],
-        )).alias("product_ids"),
-        F.col("store_id"), F.col("customer_id"),
-    ), F.col("ts"), store_pkey, F.col("v"), session=F.col("session_id"),
-        correlation=attr_correlation_store),
-
-    # --- inventory ---
-    slot(inv, "inventory_updated", F.struct(
-        F.col("store_id"), F.lit(None).cast("long").alias("dc_id"),
-        F.col("inv_product_id").alias("product_id"),
-        inv_delta.alias("quantity_delta"),
-        inv_reason.alias("reason"), inv_source.alias("source"),
-    ), F.col("ts"), store_pkey, F.col("v")),
-    slot(inv & ((inv_qty < F.lit(STOCKOUT_QUANTITY_THRESHOLD)) | disrupted), "stockout_detected", F.struct(
-        F.col("store_id"), F.lit(None).cast("long").alias("dc_id"),
-        F.col("inv_product_id").alias("product_id"),
-        inv_qty_eff.alias("last_known_quantity"), _iso(F.col("ts")).alias("detection_time"),
-    ), F.col("ts"), store_pkey, F.col("v")),
-    slot(inv & ((inv_qty < F.lit(REORDER_POINT)) | disrupted), "reorder_triggered", F.struct(
-        F.col("store_id"), F.lit(None).cast("long").alias("dc_id"),
-        F.col("inv_product_id").alias("product_id"),
-        inv_qty_eff.alias("current_quantity"),
-        (_h(F.col("v"), "roq", 200) + F.lit(50)).cast("long").alias("reorder_quantity"),
-        F.lit(REORDER_POINT).cast("long").alias("reorder_point"),
-        F.when(disrupted | (inv_qty < F.lit(URGENT_REORDER_QUANTITY_THRESHOLD)), "URGENT").otherwise("HIGH").alias("priority"),
-    ), F.col("ts"), store_pkey, F.col("v")),
-
-    # --- store ops ---
-    slot(ops, F.concat(F.lit("store_"), op_type), F.struct(  # event_type: store_opened|store_closed
-        F.col("store_id"), _iso(F.col("ts")).alias("operation_time"), op_type.alias("operation_type"),
-    ), F.col("ts"), store_pkey, F.col("v")),
-
-    # --- logistics (truck arrived + departed share truck/shipment) ---
-    slot(log, "truck_arrived", F.struct(
-        truck_id.alias("truck_id"), F.col("dc_id"), F.col("store_id"), F.col("shipment_id"),
-        _iso(truck_arrival_ts).alias("arrival_time"),
-        truck_estimated_unload_minutes.alias("estimated_unload_duration"),
-        # Live trucks arrive as planned until the incident model adds delays.
-        _iso(truck_arrival_ts).alias("planned_arrival_time"),
-        F.lit(0).cast("long").alias("delay_minutes"),
-        F.lit(None).cast("string").alias("delay_reason"),
-    ), truck_arrival_ts, F.concat(F.lit("dc_"), F.col("dc_id").cast("string")), F.col("v"),
-        session=F.col("shipment_id")),
-    slot(log, "truck_departed", F.struct(
-        truck_id.alias("truck_id"), F.col("dc_id"), F.col("store_id"), F.col("shipment_id"),
-        _iso(truck_departure_ts).alias("departure_time"),
-        truck_dwell_minutes.alias("actual_unload_duration"),
-    ), truck_departure_ts, F.concat(F.lit("dc_"), F.col("dc_id").cast("string")), F.col("v"),
-        session=F.col("shipment_id")),
-
-    # --- marketing ---
-    slot(mkt, "ad_impression", F.struct(
-        _pick(F.col("v"), "chan", LIVE_CHANNELS).alias("channel"),
-        F.concat(F.lit("CMP-"), (_h(F.col("v"), "camp", 20) + F.lit(1)).cast("string")).alias("campaign_id"),
-        F.concat(F.lit("CRV-"), (_h(F.col("v"), "crv", 50) + F.lit(1)).cast("string")).alias("creative_id"),
-        F.concat(F.lit("AD"), F.col("customer_id").cast("string")).alias("customer_ad_id"),
-        F.concat(F.lit("IMP-"), stream_prefix, F.col("v").cast("string")).alias("impression_id"),
-        F.round(_u(F.col("v"), "cost") * F.lit(2.0) + F.lit(0.1), 4).alias("cost"),
-        _pick(F.col("v"), "dev", LIVE_DEVICES).alias("device_type"),
-        F.col("customer_id"),
-    ), F.col("ts"), F.concat(F.lit("camp_"), (_h(F.col("v"), "camp", 20) + F.lit(1)).cast("string")), F.col("v")),
-
-    # --- IMP-007 (live mirror): the journey's two linked touches, emitted
-    # only for store_attributed/online_attributed rows (`attr`). Exactly one
-    # older + one newer touch per attributed purchase; both share journey,
-    # customer, campaign and session, and differ in impression/creative/ts.
-    _attr_touch("older", attr_touch_ts_older, attr_impression_id_older),
-    _attr_touch("newer", attr_touch_ts_newer, attr_impression_id_newer),
-
-    # --- online order (created -> picked -> shipped share order_id) ---
-    slot(onl, "online_order_created", F.struct(
-        F.col("order_id"), F.col("customer_id"),
-        _pick(F.col("v"), "omode", FULFILLMENT_MODES).alias("fulfillment_mode"),
-        node_type.alias("node_type"), node_id.alias("node_id"),
-        F.col("basket_n").cast("long").alias("item_count"),
-        F.col("subtotal"), F.col("tax"), F.col("total"), F.col("tender").alias("tender_type"),
-        attr_order_campaign_id.alias("campaign_id"),
-        attr_order_impression_id.alias("impression_id"),
-        online_gross_subtotal_cents.alias("gross_subtotal_cents"),
-        online_discount_cents.alias("discount_cents"),
-        online_subtotal_cents.alias("subtotal_cents"),
-        online_tax_cents.alias("tax_cents"),
-        online_total_cents.alias("total_cents"),
-    ), F.col("ts"), F.concat(F.lit("order_"), F.col("order_id")), F.col("v"), session=F.col("order_id"),
-        correlation=attr_correlation_online),
-    slot(onl, "payment_processed", F.struct(
-        F.lit(None).cast("string").alias("receipt_id"), F.col("order_id"),
-        F.col("tender").alias("payment_method"), F.col("total").alias("amount"),
-        online_total_cents.alias("amount_cents"),
-        F.concat(F.lit("TXN-ONL-"), stream_prefix, F.col("v").cast("string")).alias("transaction_id"),
-        _iso(F.col("ts")).alias("processing_time"),
-        (_h(F.col("v"), "online_ptime", 3000) + F.lit(200)).cast("int").alias("processing_time_ms"),
-        F.lit("APPROVED").alias("status"), F.lit(None).cast("string").alias("decline_reason"),
-        F.when(node_type == "STORE", node_id).otherwise(F.lit(None).cast("long")).alias("store_id"),
-        F.col("customer_id"),
-    ), F.col("ts"), F.concat(F.lit("order_"), F.col("order_id")), F.col("v"),
-        session=F.col("order_id"), parent=F.col("order_id"),
-        correlation=attr_correlation_online),
-    slot(onl, "online_order_picked", F.struct(
-        F.col("order_id"), node_type.alias("node_type"), node_id.alias("node_id"),
-        _pick(F.col("v"), "omode", FULFILLMENT_MODES).alias("fulfillment_mode"),
-        _iso(F.col("ts")).alias("picked_time"),
-    ), F.col("ts"), F.concat(F.lit("order_"), F.col("order_id")), F.col("v"),
-        session=F.col("order_id"), parent=F.col("order_id"),
-        correlation=attr_correlation_online),
-    slot(onl, "online_order_shipped", F.struct(
-        F.col("order_id"), node_type.alias("node_type"), node_id.alias("node_id"),
-        _pick(F.col("v"), "omode", FULFILLMENT_MODES).alias("fulfillment_mode"),
-        _iso(F.col("ts")).alias("shipped_time"),
-    ), F.col("ts"), F.concat(F.lit("order_"), F.col("order_id")), F.col("v"),
-        session=F.col("order_id"), parent=F.col("order_id"),
-        correlation=attr_correlation_online),
-)
-
-events_arr = F.concat(events_arr, F.transform("priced_lines", _line))
-events = (b.select(F.explode(events_arr).alias("e"))
-          .where(F.col("e").isNotNull())
-          .select(F.col("e.key").alias("key"), F.col("e.value").alias("value"),
-                  F.col("e.event_type").alias("event_type")))
 
 # %%
 # Eventhouse (Kusto) routing. Each micro-batch is split by `event_type` and each
@@ -807,7 +363,7 @@ EVENT_PAYLOADS = {
     "truck_departed": [("truck_id", "truck_id", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("shipment_id", "shipment_id", "string"), ("departure_time", "departure_time", "datetime"), ("actual_unload_duration", "actual_unload_duration", "long")],
     "store_opened": [("store_id", "store_id", "long"), ("operation_time", "operation_time", "datetime"), ("operation_type", "operation_type", "string")],
     "store_closed": [("store_id", "store_id", "long"), ("operation_time", "operation_time", "datetime"), ("operation_type", "operation_type", "string")],
-    "ad_impression": [("channel", "channel", "string"), ("campaign_id", "campaign_id", "string"), ("creative_id", "creative_id", "string"), ("customer_ad_id", "customer_ad_id", "string"), ("impression_id", "impression_id", "string"), ("cost", "cost", "real"), ("device_type", "device_type", "string"), ("customer_id", "customer_id", "long")],
+    "ad_impression": [("channel", "channel", "string"), ("campaign_id", "campaign_id", "string"), ("creative_id", "creative_id", "string"), ("customer_ad_id", "customer_ad_id", "string"), ("impression_id", "impression_id", "string"), ("cost", "cost", "real"), ("device_type", "device_type", "string"), ("customer_id", "customer_id", "long"), ("impression_time", "impression_time", "datetime")],
     "promotion_applied": [("receipt_id", "receipt_id", "string"), ("promo_code", "promo_code", "string"), ("discount_amount", "discount_amount", "real"), ("discount_cents", "discount_cents", "long"), ("discount_type", "discount_type", "string"), ("product_count", "product_count", "long"), ("product_ids", "product_ids", "dynamic"), ("store_id", "store_id", "long"), ("customer_id", "customer_id", "long")],
     "online_order_created": [("order_id", "order_id", "string"), ("customer_id", "customer_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("item_count", "item_count", "long"), ("subtotal", "subtotal", "real"), ("tax", "tax", "real"), ("total", "total", "real"), ("tender_type", "tender_type", "string"), ("campaign_id", "campaign_id", "string"), ("impression_id", "impression_id", "string"), ("gross_subtotal_cents", "gross_subtotal_cents", "long"), ("discount_cents", "discount_cents", "long"), ("subtotal_cents", "subtotal_cents", "long"), ("tax_cents", "tax_cents", "long"), ("total_cents", "total_cents", "long")],
     "online_order_picked": [("order_id", "order_id", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("picked_time", "picked_time", "datetime")],
@@ -969,6 +525,36 @@ def write_to_eventhouse(batch_df, batch_id):
         batch_df.unpersist()
 
 
+def write_to_delta(batch_df, batch_id):
+    """Append a micro-batch to the debug landing table, once per batch id."""
+    (batch_df.write.format("delta").mode("append")
+        .option("txnAppId", f"retail-stream-{STREAM_NAMESPACE}")
+        .option("txnVersion", int(batch_id))
+        .saveAsTable(delta_landing_table))
+
+
+def process_batch(source_df, batch_id):
+    """foreachBatch: generate the micro-batch's events, write them, then commit state.
+
+    State is read as of the previous batch, so if this batch fails after its
+    writes and Spark replays it, the replay regenerates the same events (the
+    sinks ignore the duplicate writes) and replaces its own state versions.
+    """
+    rows = source_df.select(F.col("timestamp").alias("ts"), F.col("value").alias("v")).persist()
+    try:
+        batch = generate_stream_batch(STREAM_CONTEXT, rows, batch_id, STREAM_STATE)
+        try:
+            if sink == "eventhouse":
+                write_to_eventhouse(batch.events, batch_id)
+            else:
+                write_to_delta(batch.events, batch_id)
+            commit_stream_batch(STREAM_STATE, batch_id, batch)
+        finally:
+            batch.release()
+    finally:
+        rows.unpersist()
+
+
 def _resolve_kusto_uri(database_name):
     """Resolve the KQL database Query URI from the current Fabric workspace.
 
@@ -1018,15 +604,18 @@ else:
 
 def start_query():
     """Start (or restart) the streaming query from the sink checkpoint."""
-    writer = (events.writeStream
-              .option("checkpointLocation", CHECKPOINT_LOCATION)
-              .trigger(processingTime=f"{TRIGGER_SECONDS} seconds"))
-    if sink == "eventhouse":
-        return writer.foreachBatch(write_to_eventhouse).start()
-    return writer.format("delta").toTable(delta_landing_table)
+    rate = (spark.readStream.format("rate")
+            .option("rowsPerSecond", RATE_ROWS_PER_SECOND).load())
+    # Cap catch-up after a stop: keep only the newest `max_lag_seconds` of rows.
+    rate = cap_backlog(rate, int(max_lag_seconds))
+    return (rate.writeStream
+            .option("checkpointLocation", CHECKPOINT_LOCATION)
+            .trigger(processingTime=f"{TRIGGER_SECONDS} seconds")
+            .foreachBatch(process_batch)
+            .start())
 
 
-print(f"streaming ~{source_rows_per_second} bundles/s to {sink} every {TRIGGER_SECONDS}s "
+print(f"streaming {RATE_ROWS_PER_SECOND} source rows/s to {sink} every {TRIGGER_SECONDS}s "
       f"(checkpoint {CHECKPOINT_LOCATION}, max lag {int(max_lag_seconds)}s)")
 # Record the incarnation only now, after every startup check has passed.
 INCARNATION_PLAN = persist_incarnation(mssparkutils.fs, INCARNATION_PLAN)

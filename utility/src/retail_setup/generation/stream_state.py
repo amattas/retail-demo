@@ -16,6 +16,12 @@ first attempt's versions instead of applying them twice.
 State belongs to a checkpoint incarnation: a new incarnation finds no rows
 and seeds its state once (``batch_id = -1``) from current Silver values.
 
+The live stream keeps three state tables:
+
+- ``_stream_state_stores``: each store's open/closed state and last change
+- ``_stream_state_visits``: customer visits still in progress
+- ``_stream_state_meta``: the clock of the last micro-batch
+
 The transitions are pure Python over plain dicts (``apply_*_batch``), so they
 are unit-tested without Spark. :class:`MemoryStateStore` keeps the rows in
 memory with the same semantics as :class:`DeltaStateStore`, which is the
@@ -35,6 +41,7 @@ from pyspark.sql import functions as F
 from retail_setup.generation.stream_calendar import StoreHours, is_open_at, store_boundaries
 
 STATE_TABLE_PREFIX = "_stream_state_"
+STATE_NAMES = ("stores", "visits", "meta")
 SEED_BATCH_ID = -1
 STATE_SCHEMA = (
     "incarnation string, batch_id long, entity_key string, payload string, deleted boolean"

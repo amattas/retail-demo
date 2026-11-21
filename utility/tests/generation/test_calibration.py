@@ -28,6 +28,9 @@ TRUCK_DWELL_TMDL = (
 STREAM_TEMPLATE = (REPO / "utility" / "notebooks" / "templates" / "driver-05-stream.py").read_text(
     encoding="utf-8"
 )
+STREAM_EVENTS = (
+    REPO / "utility" / "src" / "retail_setup" / "generation" / "stream_events.py"
+).read_text(encoding="utf-8")
 
 
 def _rule(title_prefix: str) -> str:
@@ -134,11 +137,11 @@ def test_anomaly_functions_use_calibrated_detector_parameters() -> None:
     assert cal.anomaly_severity(1.49) == "low"
 
 
-def test_stream_template_reads_thresholds_from_calibration() -> None:
-    tree = ast.parse(STREAM_TEMPLATE)
+def test_stream_reads_thresholds_from_calibration() -> None:
     assigned = {
         target.id
-        for node in tree.body
+        for source in (STREAM_TEMPLATE, STREAM_EVENTS)
+        for node in ast.parse(source).body
         if isinstance(node, ast.Assign)
         for target in node.targets
         if isinstance(target, ast.Name)
@@ -154,5 +157,5 @@ def test_stream_template_reads_thresholds_from_calibration() -> None:
         "REORDER_POINT",
         "URGENT_REORDER_QUANTITY_THRESHOLD",
     ):
-        assert re.search(rf"\b{name}\b", STREAM_TEMPLATE), name
-    assert not re.search(r"inv_qty < F\.lit\(\d+\)", STREAM_TEMPLATE)
+        assert re.search(rf"\b{name}\b", STREAM_EVENTS), name
+    assert not re.search(r"quantity < F\.lit\(\d+\)", STREAM_EVENTS)

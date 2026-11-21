@@ -1,6 +1,4 @@
-import ast
 from datetime import date
-from pathlib import Path
 
 import pytest
 from pyspark.sql import functions as F
@@ -120,16 +118,11 @@ def test_conversion_is_visit_first_not_four_fixed_bands(spark, seed):
 
 
 def test_variable_live_lines_reconcile_discount_and_tax(spark):
-    path = Path(__file__).resolve().parents[2] / "notebooks" / "templates" / "driver-05-stream.py"
-    nodes = [
-        node
-        for node in ast.parse(path.read_text(encoding="utf-8")).body
-        if isinstance(node, ast.FunctionDef) and node.name in {"_taxmult", "_price_live_line"}
-    ]
-    namespace = {"F": F}
-    exec(compile(ast.Module(body=nodes, type_ignores=[]), str(path), "exec"), namespace)
+    from retail_setup.generation.runtime import seeded_draws
+    from retail_setup.generation.stream_events import price_line
+
     frame = spark.sql("""
-        SELECT true AS _offer, 'BOGO' AS promo_type, 50 AS _ppct, 800 AS store_bps,
+        SELECT true AS _offer, 'RCP-x-1' AS receipt_id, 6 AS month, 800 AS store_bps,
                array(named_struct('line_num', 1, 'quantity', 3, 'unit_cents', 199L,
                                   'gross_cents', 597L, 'taxability', 'TAXABLE'),
                      named_struct('line_num', 2, 'quantity', 1, 'unit_cents', 299L,
@@ -138,10 +131,29 @@ def test_variable_live_lines_reconcile_discount_and_tax(spark):
                                   'gross_cents', 1000L, 'taxability', 'REDUCED_RATE')) AS lines
     """)
     priced = (
-        frame.select(F.transform("lines", namespace["_price_live_line"]).alias("lines"))
+        frame.select(
+            F.transform(
+                "lines",
+                lambda line: price_line(
+                    seeded_draws(7),
+                    line,
+                    F.col("receipt_id"),
+                    F.col("month"),
+                    F.col("_offer"),
+                    F.col("store_bps"),
+                ),
+            ).alias("lines")
+        )
         .first()
         .lines
     )
-    assert [line.discount_cents for line in priced] == [100, 0, 250]
-    assert [line.net_cents for line in priced] == [497, 299, 750]
-    assert [line.tax_cents for line in priced] == [40, 0, 30]
+    # Every line of an offered receipt gets its own code; the discount comes off
+    # before tax (taxable 100%, non-taxable 0%, reduced rate 50%).
+    assert all(line.promo_code for line in priced)
+    assert all(line.discount_cents > 0 for line in priced)
+    for line in priced:
+        assert line.net_cents == line.gross_cents - line.discount_cents
+    share = {"TAXABLE": 1.0, "NON_TAXABLE": 0.0, "REDUCED_RATE": 0.5}
+    assert [line.tax_cents for line in priced] == [
+        int(line.net_cents * share[line.taxability] * 800 / 10000 + 0.5) for line in priced
+    ]

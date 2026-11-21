@@ -1530,6 +1530,8 @@ def render(
         "END_DATE": generation.end_date.isoformat(),
         "ANCHOR_DATE": generation.anchor_date.isoformat(),
         "STORE_COUNT": str(generation.store_count),
+        "TRANSACTIONS_PER_STORE_DAY": str(generation.transactions_per_store_day),
+        "ONLINE_ORDERS_PER_DAY": str(generation.online_orders_per_day),
         "SEED": str(generation.seed),
         "DICTIONARY_REF": _resolve_dictionary_ref(repo_root, ref),
         # Custom layouts are uploaded to the Lakehouse by deploy; setup-01 verifies

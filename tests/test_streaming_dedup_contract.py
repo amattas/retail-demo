@@ -15,6 +15,7 @@ from retail_setup.generation.stream_control import call_with_retry, ingest_tag
 
 ROOT = Path(__file__).resolve().parents[1]
 STREAM_TEMPLATE = ROOT / "utility" / "notebooks" / "templates" / "driver-05-stream.py"
+STREAM_EVENTS = ROOT / "utility" / "src" / "retail_setup" / "generation" / "stream_events.py"
 SILVER_NOTEBOOK = ROOT / "fabric" / "lakehouse" / "03-streaming-to-silver.ipynb"
 KQL_TABLES = ROOT / "fabric" / "kql_database" / "01-create-tables.kql"
 
@@ -328,21 +329,22 @@ def test_eventhouse_sink_retries_transient_writes_with_a_fresh_token(permanent) 
 
 def test_generator_dedupe_ids_include_persistent_stream_and_row_identity() -> None:
     source = STREAM_TEMPLATE.read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    slot_source = ast.get_source_segment(source, _function(tree, "slot"))
+    events = STREAM_EVENTS.read_text(encoding="utf-8")
+    tree = ast.parse(events)
+    envelope = ast.get_source_segment(events, _function(tree, "envelope"))
+    prefixed = ast.get_source_segment(events, _function(tree, "_prefixed"))
 
-    assert slot_source is not None
-    assert "F.xxhash64(F.lit(STREAM_NAMESPACE), trace_seed, et)" in slot_source
-    assert 'stream_prefix = F.lit(f"{STREAM_NAMESPACE}-")' in source
+    assert envelope is not None and prefixed is not None
+    assert "F.xxhash64(F.lit(ctx.namespace), trace_seed, et)" in envelope
+    assert 'F.lit(f"{prefix}-{ctx.namespace}-")' in prefixed
     assert "STREAM_NAMESPACE = INCARNATION_PLAN.namespace" in source
+    assert "namespace=STREAM_NAMESPACE" in source
+    assert '_prefixed(ctx, "TXN", F.col("v")).alias("transaction_id")' in events
+    assert '_prefixed(ctx, "TXN-ONL", v).alias("transaction_id")' in events
+    # Delta state belongs to the same incarnation namespace as the IDs.
     assert (
-        'F.concat(F.lit("TXN-"), stream_prefix, '
-        'F.col("v").cast("string")).alias("transaction_id")'
-    ) in source
-    assert (
-        'F.concat(F.lit("TXN-ONL-"), stream_prefix, '
-        'F.col("v").cast("string")).alias("transaction_id")'
-    ) in source
+        'DeltaStateStore(spark, f"{LAKEHOUSE_NAME}.{SILVER_DB}", STREAM_NAMESPACE)' in source
+    )
 
 
 def test_silver_replay_uses_complete_dedupe_key_contract() -> None:
