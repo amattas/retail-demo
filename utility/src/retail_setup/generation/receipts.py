@@ -37,24 +37,14 @@ from retail_setup.generation.runtime import (
 )
 from retail_setup.generation.schemas import column_names
 from retail_setup.generation.traffic import generate_hourly_visits
-
-# (method, mix weight, decline multiplier, processing_ms lo, processing_ms hi)
-TENDERS = [
-    ("CREDIT_CARD", 0.4, 1.0, 1500, 4000),
-    ("DEBIT_CARD", 0.3, 0.8, 1200, 3500),
-    ("CASH", 0.2, 0.0, 500, 2000),
-    ("MOBILE_PAY", 0.1, 1.2, 800, 2500),
-]
-BASE_DECLINE = 0.025
-DECLINE_REASONS = [
-    "INSUFFICIENT_FUNDS",
-    "CARD_EXPIRED",
-    "INVALID_CVV",
-    "NETWORK_ERROR",
-    "FRAUD_SUSPECTED",
-    "CARD_BLOCKED",
-    "LIMIT_EXCEEDED",
-]
+from retail_setup.generation.vocabulary import (
+    BASE_DECLINE,
+    DECLINE_REASONS,
+    EVERGREEN_PROMOS,
+    PROMO_CATALOG,
+    TENDERS,
+    promo_eligible_column,
+)
 
 # Share of in-store receipts whose customer lives in the store's geography
 # (datagen home-store locality). The rest draw a network-wide customer.
@@ -85,32 +75,6 @@ SEASONAL_LIFT: dict[str, list[float]] = {
     "beauty": [1.2, 1.05, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.05, 1.2, 1.5],
     "automotive": [1.0, 1.0, 1.05, 1.1, 1.2, 1.2, 1.2, 1.1, 1.0, 1.0, 1.0, 1.0],
 }
-
-# Named promo catalog (datagen promotion_utils parity): seasonal codes apply
-# only in their eligible months; evergreen SAVE/CLEARANCE codes fill in
-# otherwise. Some codes carry a minimum-purchase threshold; BOGO is a qty-based
-# buy-one-get-one. (code, discount_pct, eligible_months | None, min_cents, kind)
-PROMO_CATALOG: list[tuple[str, int, list[int] | None, int, str]] = [
-    ("SAVE10", 10, None, 0, "PCT"),
-    ("SAVE15", 15, None, 2500, "PCT"),  # min $25
-    ("SAVE20", 20, None, 5000, "PCT"),  # min $50
-    ("SAVE25", 25, None, 7500, "PCT"),  # min $75
-    ("CLEARANCE30", 30, None, 0, "PCT"),
-    ("BOGO50", 50, None, 0, "BOGO"),  # buy one get one 50% off (qty >= 2)
-    ("NEWYEAR15", 15, [1, 2], 0, "PCT"),
-    ("SPRINGSALE20", 20, [3, 4, 5], 0, "PCT"),
-    ("SUMMER25", 25, [6, 7, 8], 0, "PCT"),
-    ("BACKTOSCHOOL20", 20, [8, 9], 0, "PCT"),
-    ("BFRIDAY30", 30, [11], 0, "PCT"),
-    ("BFRIDAY40", 40, [11], 10000, "PCT"),  # min $100
-    ("HOLIDAY20", 20, [12], 0, "PCT"),
-]
-# Evergreen fallback: always eligible, no minimum, percentage only.
-EVERGREEN: list[tuple[str, int]] = [
-    ("SAVE10", 10),
-    ("CLEARANCE30", 30),
-    ("DEAL15", 15),
-]
 
 # Per-customer shopping segments (datagen CustomerJourney segment distribution).
 SEGMENT_WEIGHTS: list[tuple[str, float]] = [
@@ -233,15 +197,7 @@ def _promo_eligible_expr(
 ) -> Column:
     """True when the catalog entry at idx_col is eligible: in-month, line value
     meets any minimum, and BOGO needs qty >= 2."""
-    branches: list[tuple[Column, object]] = []
-    for i, (_, _, months, min_cents, kind) in enumerate(PROMO_CATALOG):
-        e = F.lit(True) if months is None else month_col.isin(*months)
-        if min_cents:
-            e = e & (ext_before >= F.lit(min_cents))
-        if kind == "BOGO":
-            e = e & (qty >= F.lit(2))
-        branches.append((idx_col == F.lit(i), e))
-    return case_when(branches).otherwise(F.lit(False))
+    return promo_eligible_column(idx_col, month_col, ext_before, qty)
 
 
 def _apply_churn_lifecycle(
@@ -636,13 +592,17 @@ def generate_receipts_group(
         )
         .withColumn(
             "_evidx",
-            (d.h64(["receipt_id_ext", "line_num"], "pcodeev") % F.lit(len(EVERGREEN))).cast("int"),
+            (d.h64(["receipt_id_ext", "line_num"], "pcodeev") % F.lit(len(EVERGREEN_PROMOS))).cast(
+                "int"
+            ),
         )
         .withColumn(
-            "_evcode", F.element_at(F.array(*[F.lit(c) for c, _ in EVERGREEN]), F.col("_evidx") + 1)
+            "_evcode",
+            F.element_at(F.array(*[F.lit(c) for c, _ in EVERGREEN_PROMOS]), F.col("_evidx") + 1),
         )
         .withColumn(
-            "_evpct", F.element_at(F.array(*[F.lit(p) for _, p in EVERGREEN]), F.col("_evidx") + 1)
+            "_evpct",
+            F.element_at(F.array(*[F.lit(p) for _, p in EVERGREEN_PROMOS]), F.col("_evidx") + 1),
         )
         .withColumn(
             "promo_code",
@@ -754,6 +714,7 @@ def generate_receipts_group(
             "attribution_journey_id",
             "campaign_id",
             "impression_id_ext",
+            F.hour("event_ts").alias("local_hour"),
         )
         .select(*column_names("fact_receipts"))
     )

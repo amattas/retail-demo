@@ -28,8 +28,6 @@ from retail_setup.generation.behavior import (
 )
 from retail_setup.dictionaries.models import StoreTypeProfile
 from retail_setup.generation.receipts import (
-    BASE_DECLINE,
-    DECLINE_REASONS,
     _fmt,
     _with_seasonal_department,
 )
@@ -40,17 +38,12 @@ from retail_setup.generation.runtime import (
     seeded_draws,
 )
 from retail_setup.generation.schemas import column_names
-
-# Online tender mix per plan: 60% CC / 25% DC / 10% PAYPAL / 5% OTHER.
-# (method, mix weight, decline multiplier, processing_ms lo, processing_ms hi)
-# CC/DC constants carried from the Plan-2a TENDERS table; PAYPAL/OTHER are the
-# online-only additions (PAYPAL x1.1 decline, OTHER x0.5 decline).
-ONLINE_TENDERS = [
-    ("CREDIT_CARD", 0.60, 1.0, 1500, 4000),
-    ("DEBIT_CARD", 0.25, 0.8, 1200, 3500),
-    ("PAYPAL", 0.10, 1.1, 2000, 5000),
-    ("OTHER", 0.05, 0.5, 1500, 4000),
-]
+from retail_setup.generation.vocabulary import (
+    BASE_DECLINE,
+    DECLINE_REASONS,
+    ONLINE_FULFILLMENT_MIX,
+    ONLINE_TENDERS,
+)
 
 CANCEL_RATE = 0.02
 # Fraction of shippable (non-BOPIS) lines that backorder: ship but not yet
@@ -197,7 +190,7 @@ def generate_online_orders(
     mode = d.pick_by_weights(
         ["order_id_ext", "line_num"],
         "onl_mode",
-        [("SHIP_FROM_DC", 0.60), ("SHIP_FROM_STORE", 0.30), ("BOPIS", 0.10)],
+        ONLINE_FULFILLMENT_MIX,
     )
 
     # store tax rate (bps) for destination-based tax on store-fulfilled lines

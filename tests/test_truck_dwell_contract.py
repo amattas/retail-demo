@@ -18,6 +18,7 @@ QUERYSET = ROOT / "fabric" / "querysets" / "q_truck_dwell_by_site.kql"
 RULES = ROOT / "fabric" / "rules" / "definitions.kql"
 DASHBOARD = ROOT / "fabric" / "dashboards" / "retail-ops.template.json"
 SCHEMAS = ROOT / "utility" / "src" / "retail_setup" / "generation" / "schemas.py"
+CALIBRATION = ROOT / "utility" / "src" / "retail_setup" / "generation" / "calibration.py"
 
 LIFECYCLE_KEYS = ["truck_id", "dc_id", "store_id", "shipment_id"]
 
@@ -58,11 +59,12 @@ def _kql_columns(table: str) -> list[str]:
 def test_generator_emits_shared_keys_and_positive_late_dwell() -> None:
     source = STREAM_TEMPLATE.read_text(encoding="utf-8")
     tree = ast.parse(source)
+    calibration = ast.parse(CALIBRATION.read_text(encoding="utf-8"))
     payloads = _assignment(tree, "EVENT_PAYLOADS")
-    threshold = _assignment(tree, "TRUCK_DWELL_THRESHOLD_MINUTES")
-    normal_min = _assignment(tree, "TRUCK_NORMAL_DWELL_MINUTES_MIN")
-    normal_max = _assignment(tree, "TRUCK_NORMAL_DWELL_MINUTES_MAX")
-    late_minutes = _assignment(tree, "TRUCK_LATE_DWELL_MINUTES")
+    threshold = _assignment(calibration, "TRUCK_DWELL_SLA_MINUTES")
+    normal_min = _assignment(calibration, "TRUCK_NORMAL_DWELL_MINUTES_MIN")
+    normal_max = _assignment(calibration, "TRUCK_NORMAL_DWELL_MINUTES_MAX")
+    late_minutes = _assignment(calibration, "TRUCK_LATE_DWELL_MINUTES")
 
     for event_type in ("truck_arrived", "truck_departed"):
         assert [column for column, _field, _type in payloads[event_type]][
@@ -92,6 +94,7 @@ def test_generator_emits_shared_keys_and_positive_late_dwell() -> None:
 def test_generated_stream_notebook_contains_lifecycle_timing_contract() -> None:
     source = _notebook_source(STREAM_NOTEBOOK)
     assert "TRUCK_LATE_DWELL_MINUTES = 120" in source
+    assert "TRUCK_DWELL_SLA_MINUTES = 90" in source
     assert '_iso(truck_departure_ts).alias("departure_time")' in source
     assert re.search(r"\),\s*truck_departure_ts,", source)
 

@@ -231,6 +231,34 @@
     shipment_id:string,
     arrival_time:datetime,
     estimated_unload_duration:long,
+    planned_arrival_time:datetime,
+    delay_minutes:long,
+    delay_reason:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+// .create-merge appends new columns to an existing table, but the stream writes
+// columns by position. Restate the full schema so existing Eventhouses take the
+// declared order (planned_arrival_time, delay_minutes and delay_reason before the
+// envelope). Every existing column keeps its type, so no data is dropped.
+.alter table truck_arrived (
+    truck_id:string,
+    dc_id:long,
+    store_id:long,
+    shipment_id:string,
+    arrival_time:datetime,
+    estimated_unload_duration:long,
+    planned_arrival_time:datetime,
+    delay_minutes:long,
+    delay_reason:string,
     event_type:string,
     trace_id:string,
     ingest_timestamp:datetime,
@@ -398,6 +426,87 @@
     parent_event_id:string
 )
 
+// LOGISTICS INCIDENTS (DC outages, lane delays, weather, holidays, supplier
+// short-ships). Started and resolved events share incident_id.
+
+.create-merge table logistics_incident_started (
+    incident_id:string,
+    incident_type:string,
+    dc_id:long,
+    store_id:long,
+    started_at:datetime,
+    severity:string,
+    affected_store_count:long,
+    description:string,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table logistics_incident_resolved (
+    incident_id:string,
+    incident_type:string,
+    dc_id:long,
+    store_id:long,
+    resolved_at:datetime,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+// ONLINE ORDER LINES AND DELIVERY
+
+.create-merge table online_order_line_added (
+    order_id:string,
+    line_number:long,
+    product_id:long,
+    quantity:long,
+    unit_price:real,
+    extended_price:real,
+    promo_code:string,
+    fulfillment_mode:string,
+    node_type:string,
+    node_id:long,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+.create-merge table online_order_delivered (
+    order_id:string,
+    node_type:string,
+    node_id:long,
+    fulfillment_mode:string,
+    delivered_time:datetime,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
 // CATCH-ALL FOR UNKNOWN EVENTS
 // This table captures any events that don't match a known event type.
 // The payload is stored as dynamic to preserve all data for investigation.
@@ -458,6 +567,10 @@
 
 .alter-merge table store_closed policy retention softdelete = 14d
 
+.alter-merge table logistics_incident_started policy retention softdelete = 14d
+
+.alter-merge table logistics_incident_resolved policy retention softdelete = 14d
+
 // --- MARKETING: 14 days for campaign analytics ---
 .alter-merge table ad_impression policy retention softdelete = 14d
 
@@ -469,6 +582,10 @@
 .alter-merge table online_order_picked policy retention softdelete = 30d
 
 .alter-merge table online_order_shipped policy retention softdelete = 30d
+
+.alter-merge table online_order_line_added policy retention softdelete = 30d
+
+.alter-merge table online_order_delivered policy retention softdelete = 30d
 
 // --- UNKNOWN EVENTS: 7 days for investigation ---
 .alter-merge table unknown_event policy retention softdelete = 7d
@@ -511,6 +628,10 @@
 
 .alter table store_closed policy streamingingestion enable
 
+.alter table logistics_incident_started policy streamingingestion enable
+
+.alter table logistics_incident_resolved policy streamingingestion enable
+
 // --- MARKETING EVENTS ---
 .alter table ad_impression policy streamingingestion enable
 
@@ -522,6 +643,10 @@
 .alter table online_order_picked policy streamingingestion enable
 
 .alter table online_order_shipped policy streamingingestion enable
+
+.alter table online_order_line_added policy streamingingestion enable
+
+.alter table online_order_delivered policy streamingingestion enable
 
 // --- UNKNOWN EVENTS ---
 .alter table unknown_event policy streamingingestion enable
@@ -699,6 +824,42 @@
 ```
 
 .alter table online_order_shipped policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:02:00",
+    "MaximumNumberOfItems": 200,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table logistics_incident_started policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:02:00",
+    "MaximumNumberOfItems": 50,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table logistics_incident_resolved policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:02:00",
+    "MaximumNumberOfItems": 50,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table online_order_line_added policy ingestionbatching
+```
+{
+    "MaximumBatchingTimeSpan": "00:01:00",
+    "MaximumNumberOfItems": 1000,
+    "MaximumRawDataSizeMB": 100
+}
+```
+
+.alter table online_order_delivered policy ingestionbatching
 ```
 {
     "MaximumBatchingTimeSpan": "00:02:00",

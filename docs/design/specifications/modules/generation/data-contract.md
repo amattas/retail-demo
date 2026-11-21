@@ -22,7 +22,56 @@ outputs, and `gold.py` builds the ten aggregates.
 `fact_promo_lines`,
 `fact_online_order_headers`, `fact_online_order_lines`, `fact_reorders`,
 `fact_truck_moves`, `fact_truck_inventory`, `fact_dc_inventory_txn`,
-`fact_store_inventory_txn`, and `fact_stockouts`.
+`fact_store_inventory_txn`, `fact_stockouts`, and `fact_logistics_incidents`.
+
+`fact_logistics_incidents` holds one row per logistics disruption
+(`incident_type` is `DC_OUTAGE`, `LANE_DELAY`, `WEATHER`, `HOLIDAY`, or
+`SUPPLIER_SHORT_SHIP`), with `resolved_at` null while the incident is open and
+`store_id` null for DC- or network-wide incidents. History publishes it empty
+until the incident model lands; the live stream fills it from incident events.
+`fact_truck_moves` carries `planned_arrival_time`, `delay_minutes`, and
+`delay_reason`; historical trucks arrive as planned (`planned_arrival_time =
+eta`, zero delay, no reason) for now.
+
+### Time convention
+
+Generation runs in each store's local wall-clock time: opening hours, the
+hourly traffic curve, store operations, and the inventory schedule are local.
+Silver stores true UTC, the same convention as the live stream:
+
+- `dim_stores.TimeZone` is the store's IANA zone, from its geography's state
+  (`generation/timezones.py`, `STATE_TIME_ZONES`).
+- Every published timestamp column is UTC, and `event_date` is the UTC date of
+  `event_ts`. An evening sale on the West Coast can therefore carry the next
+  day's `event_date`.
+- Store events convert with their store's zone; receipt and promotion lines
+  use the store encoded in `receipt_id_ext`. A shipment's whole lifecycle
+  (truck moves, truck loads and unloads, and the DC rows that mirror the
+  loads) uses the destination store's zone, so one shipment never mixes zones
+  and DC balances follow UTC order.
+- Online orders and marketing impressions are not tied to store hours. They
+  are generated directly in UTC and not converted. Attribution runs on UTC
+  purchases.
+- `fact_receipts.local_hour` is the store-local hour (0-23) for hour-of-day
+  reporting. Notebook 03 sets it for streamed receipts from
+  `dim_stores.TimeZone`.
+
+Invariants that depend on the local clock (operating hours, returns at noon)
+convert back with the store's zone. Existing environments must re-run setup
+after this change; Silver written before it has local timestamps and no
+`TimeZone` or `local_hour`.
+
+### Shared vocabulary and calibration
+
+`generation/vocabulary.py` owns the names and formats both producers use:
+tenders and the decline model, the promotion catalog and per-line eligibility,
+BLE, ad, beacon, sensor, and campaign ID formats, zones, marketing channels
+and cost bands, device types, and fulfillment modes. `generation/calibration.py`
+owns thresholds that consumers repeat as literals: the 90-minute truck dwell
+SLA, stockout and reorder thresholds, zone-surge thresholds, the high-value
+receipt rule (3 x the store type's `avg_ticket_target`), and the anomaly
+detector parameters. Contract tests fail when the stream, rules, KQL
+functions, or semantic model drift from them.
 
 ### Operational output
 
@@ -75,10 +124,10 @@ source.
 ML output tables are not part of this base contract.
 
 The source-derived live-route check compares this inventory with declared
-event paths. Seven dimensions, `fact_promo_lines`,
-`fact_online_order_lines`, `fact_truck_inventory`,
+event paths. Seven dimensions, `fact_promo_lines`, `fact_truck_inventory`,
 `fact_dc_inventory_txn`, and `dc_inventory_position_current` are the named
-historical-only boundary. The manifest records those targets and rationale;
+historical-only boundary. `fact_online_order_lines` and
+`fact_logistics_incidents` have declared live routes. The manifest records those targets and rationale;
 `schemas.py` continues to own their fields, types, nullability behavior, and
 mixed-case compatibility.
 
@@ -126,8 +175,9 @@ a test compares the notebook path with single-session `generate_all` row for row
 
 Stage outputs that a later notebook needs are written as `gen__<stage>__<output>`
 Delta tables in the Silver staging schema. Each records the generation
-fingerprint (a hash of the generation configuration) in its Delta commit, and
-loading a handoff produced for another configuration fails. Setup-10 promotes
+fingerprint (a hash of the generation configuration and of the dictionary
+files generation reads) in its Delta commit, and loading a handoff produced
+for another configuration or other dictionary content fails. Setup-10 promotes
 single-handoff facts directly from their handoffs and drops every handoff only
 after publication succeeds, so a failed publication can be retried without
 regenerating. Within a notebook, other stage frames are checkpointed under
@@ -187,6 +237,17 @@ All decisions retain stable key/seed salts, independent of Spark partitioning.
 The changed simulation intentionally produces different data from older code
 with the same seed; reproducibility requires the same code, dictionaries,
 configuration, and date window.
+
+Dimensions depend only on the seed, the scale settings, and
+`anchor_date`, never on the run date. Product launch dates are placed around
+`anchor_date`, which `retail-setup configure` pins once per environment and
+render passes to the setup notebooks (it defaults to `start_date`). Rendering
+the same `months` configuration on a later day therefore regenerates
+identical stores, geographies, customers, and products; only the fact window
+moves. Each department's first product still launches before the history
+starts, even when the history begins before the anchor. Floating-point
+catalog weights are summed in product order, so they are bit-identical
+regardless of how Spark delivers rows.
 
 ### Inventory feedback and unfulfilled demand
 
@@ -265,7 +326,11 @@ Current invariant checks include:
 - stockout location exclusivity;
 - physical stock, transfer conservation, and explicit unfulfilled-demand accounting;
 - truck timing and inventory relationships;
-- sales only within each store's operating hours;
+- sales only within each store's operating hours, evaluated in store-local
+  time, and `local_hour` equal to the store-local hour of `event_ts`;
+- returns posted at local noon;
+- logistics incidents reference known DCs and stores and resolve after they
+  start;
 - no receipt line sold before its product's launch date;
 - returns posted strictly after the originating sale (never same-day);
 - product lifecycle dates present (no degenerate lifecycles).

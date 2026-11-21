@@ -684,6 +684,12 @@ def notebook_python_source(path: Path) -> str:
     return "\n".join(code)
 
 
+_PAIRED_STREAMING_ROUTES = (
+    ("process_truck_lifecycles", "TRUCK_LIFECYCLE_KEYS", "truck lifecycle"),
+    ("process_logistics_incidents", "LOGISTICS_INCIDENT_KEYS", "logistics incidents"),
+)
+
+
 def streaming_silver_contract(path: Path) -> StreamingSilverContract:
     """Parse declared streaming transformations and dedupe keys from the notebook."""
 
@@ -701,20 +707,19 @@ def streaming_silver_contract(path: Path) -> StreamingSilverContract:
     raw_dedupe = _python_symbol_from_tree(tree, "STREAM_DEDUPE_KEYS")
     dedupe_keys = _string_sequence_mapping(raw_dedupe, "STREAM_DEDUPE_KEYS")
 
-    lifecycle = _function_node(tree, "process_truck_lifecycles")
-    lifecycle_sources = {
-        _string_constant(call.args[0], "truck lifecycle source")
-        for call in ast.walk(lifecycle)
-        if _named_call(call, "streaming_table_exists") and call.args
-    }
-    lifecycle_target = _single_qualified_table(lifecycle, "fact_", "truck lifecycle")
-    lifecycle_keys = _string_sequence(
-        _python_symbol_from_tree(tree, "TRUCK_LIFECYCLE_KEYS"),
-        "TRUCK_LIFECYCLE_KEYS",
-    )
-    for event_type in sorted(lifecycle_sources):
-        _add_unique(routes, event_type, lifecycle_target, "streaming routes")
-        _add_unique(dedupe_keys, event_type, lifecycle_keys, "streaming dedupe keys")
+    # Paired routes combine two event tables into one keyed Silver row.
+    for function_name, keys_symbol, context in _PAIRED_STREAMING_ROUTES:
+        function = _function_node(tree, function_name)
+        sources = {
+            _string_constant(call.args[0], f"{context} source")
+            for call in ast.walk(function)
+            if _named_call(call, "streaming_table_exists") and call.args
+        }
+        target = _single_qualified_table(function, "fact_", context)
+        keys = _string_sequence(_python_symbol_from_tree(tree, keys_symbol), keys_symbol)
+        for event_type in sorted(sources):
+            _add_unique(routes, event_type, target, "streaming routes")
+            _add_unique(dedupe_keys, event_type, keys, "streaming dedupe keys")
 
     derived_function = _function_node(tree, "process_marketing_attribution")
     required = _local_literal(derived_function, "required")

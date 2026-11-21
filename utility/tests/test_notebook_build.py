@@ -105,8 +105,16 @@ def test_stream_template_emits_declared_eventhouse_event_types():
     kql = (UTILITY.parent / "fabric" / "kql_database" / "01-create-tables.kql").read_text()
     kql_tables = set(re.findall(r"^\.create-merge table ([a-z_]+) \(", kql, re.MULTILINE))
 
-    assert len(declared_events) == 18
-    assert stream_events == declared_events
+    # Declared (KQL, mappings, Silver routes) ahead of the incident and online
+    # lifecycle models that will emit them; shrink this set as they land.
+    not_yet_emitted = {
+        "logistics_incident_started",
+        "logistics_incident_resolved",
+        "online_order_line_added",
+        "online_order_delivered",
+    }
+    assert len(declared_events) == 22
+    assert stream_events == declared_events - not_yet_emitted
     assert declared_events <= kql_tables
     assert "unknown_event" in kql_tables - declared_events
 

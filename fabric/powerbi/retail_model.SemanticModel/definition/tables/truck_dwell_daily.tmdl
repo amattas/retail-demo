@@ -15,8 +15,8 @@ table truck_dwell_daily
 		displayFolder: Logistics\Dwell
 		lineageTag: 01a1a1c7-0001-0001-0001-000000000002
 
-	/// Daily site rows where average dwell exceeds 45 minutes.
-	measure 'Truck Dwell Breach Days' = COUNTROWS(FILTER('truck_dwell_daily', 'truck_dwell_daily'[Average Dwell Minutes] > 45))
+	/// Daily site rows where average dwell exceeds the 90-minute dwell SLA.
+	measure 'Truck Dwell Breach Days' = COUNTROWS(FILTER('truck_dwell_daily', 'truck_dwell_daily'[Average Dwell Minutes] > 90))
 		formatString: #,0
 		displayFolder: Logistics\Dwell
 		lineageTag: c1130001-0000-0000-0000-000000000001

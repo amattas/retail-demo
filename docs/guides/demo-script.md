@@ -28,7 +28,8 @@ Talk track:
 
 - Setup notebooks create repeatable historical data. Silver is the cleaned,
   detailed layer; Gold is the business-ready summary layer.
-- `stream-events.ipynb` writes eighteen live event types directly to Eventhouse.
+- `stream-events.ipynb` writes eighteen live event types directly to Eventhouse
+  (four more are declared for upcoming logistics and online-order models).
 - KQL (Kusto Query Language) answers recent event questions; Lakehouse stores
   durable history and summaries.
 - Power BI uses Direct Lake, which reads Lakehouse data without importing a

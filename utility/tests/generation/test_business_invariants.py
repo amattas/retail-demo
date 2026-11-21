@@ -12,6 +12,11 @@ from retail_setup.generation.dims import generate_dimensions
 from retail_setup.generation.invariants import InvariantReport, _run_business_invariants
 from retail_setup.generation.receipts import generate_receipts_group
 from retail_setup.generation.returns import build_return_headers, generate_returns
+from retail_setup.generation.timezones import (
+    localize_by_store,
+    localize_receipt_lines,
+    with_local_hour,
+)
 
 
 @pytest.fixture(scope="module")
@@ -33,9 +38,15 @@ def generated(spark):
     dims = generate_dimensions(spark, dicts, cfg)
     sales = generate_receipts_group(spark, dims, dicts.profile, cfg)
     rets = generate_returns(spark, sales, dims, cfg)
+    # Publish the way the engine does: store-local generation, UTC storage.
+    receipts = localize_by_store(
+        sales["fact_receipts"].unionByName(rets["fact_receipts"]), dims, ["event_ts"]
+    )
     t = {
-        "fact_receipts": sales["fact_receipts"].unionByName(rets["fact_receipts"]),
-        "fact_receipt_lines": sales["fact_receipt_lines"].unionByName(rets["fact_receipt_lines"]),
+        "fact_receipts": with_local_hour(receipts, dims),
+        "fact_receipt_lines": localize_receipt_lines(
+            sales["fact_receipt_lines"].unionByName(rets["fact_receipt_lines"]), dims
+        ),
         "dim_stores": dims["dim_stores"],
         "dim_products": dims["dim_products"],
     }
@@ -52,6 +63,8 @@ def test_business_invariants_pass_on_generated_data(generated):
     assert "fact_receipts within store operating hours" in names
     assert "fact_receipt_lines no pre-launch sales" in names
     assert "fact_receipts no return before first sale" in names
+    assert "fact_receipts local_hour matches the store time zone" in names
+    assert "fact_receipts returns posted at local noon" in names
 
 
 def test_no_pre_launch_sales_on_generated_data(generated):
@@ -96,10 +109,15 @@ def _minimal(spark, receipts_rows, stores_rows, line_rows, product_rows):
     # Build event_ts from a string via to_timestamp (as the generator does) so
     # hour() is evaluated in the session timezone, not shifted by the driver's
     # local zone the way a naive python datetime would be.
-    receipts = spark.createDataFrame(
-        receipts_rows, "store_id long, event_ts string, event_date date, receipt_type string"
-    ).withColumn("event_ts", F.to_timestamp("event_ts"))
-    stores = spark.createDataFrame(stores_rows, "ID long, operating_hours string")
+    stores = spark.createDataFrame(stores_rows, "ID long, operating_hours string, TimeZone string")
+    receipts = with_local_hour(
+        spark.createDataFrame(
+            receipts_rows, "store_id long, event_ts string, event_date date, receipt_type string"
+        )
+        .withColumn("event_ts", F.to_timestamp("event_ts"))
+        .withColumn("local_hour", F.lit(None).cast("int")),
+        {"dim_stores": stores},
+    )
     lines = spark.createDataFrame(line_rows, "product_id long, quantity int, event_date date")
     products = spark.createDataFrame(product_rows, "ID long, LaunchDate timestamp")
     return {
@@ -115,7 +133,7 @@ def test_hours_invariant_catches_closed_sale(spark):
     t = _minimal(
         spark,
         [(1, "2025-01-02 03:00:00", date(2025, 1, 2), "SALE")],
-        [(1, "7-22")],
+        [(1, "7-22", "UTC")],
         [(1, 1, date(2025, 1, 2))],
         [(1, datetime(2024, 1, 1, 0, 0))],
     )
@@ -125,12 +143,32 @@ def test_hours_invariant_catches_closed_sale(spark):
     assert any("operating hours" in f for f in r.failures)
 
 
+def test_hours_invariant_evaluates_store_local_time(spark):
+    # A Los Angeles store open 07:00-22:00. 12:00 UTC is 04:00 local (closed);
+    # 03:00 UTC is 19:00 local the previous evening (open). A UTC-hour check
+    # would get both wrong.
+    def failures(utc_ts: str) -> list[str]:
+        t = _minimal(
+            spark,
+            [(1, utc_ts, date(2025, 1, 2), "SALE")],
+            [(1, "7-22", "America/Los_Angeles")],
+            [(1, 1, date(2025, 1, 2))],
+            [(1, datetime(2024, 1, 1, 0, 0))],
+        )
+        r = InvariantReport()
+        _run_business_invariants(r, t)
+        return r.failures
+
+    assert any("operating hours" in f for f in failures("2025-01-02 12:00:00"))
+    assert failures("2025-01-02 03:00:00") == []
+
+
 def test_pre_launch_invariant_catches_early_sale(spark):
     # product launches 2025-06-01 but is sold 2025-01-02 -> flagged
     t = _minimal(
         spark,
         [(1, "2025-01-02 10:00:00", date(2025, 1, 2), "SALE")],
-        [(1, "24h")],
+        [(1, "24h", "UTC")],
         [(1, 1, date(2025, 1, 2))],
         [(1, datetime(2025, 6, 1, 0, 0))],
     )

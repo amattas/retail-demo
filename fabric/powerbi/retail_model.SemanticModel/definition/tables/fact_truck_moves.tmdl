@@ -150,6 +150,45 @@ table fact_truck_moves
 
 		annotation SummarizationSetBy = Automatic
 
+	/// Arrival time planned when the shipment was scheduled.
+	column 'Planned Arrival Time'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: c2200105-0000-0000-0000-000000000005
+		sourceLineageTag: planned_arrival_time
+		summarizeBy: none
+		sourceColumn: planned_arrival_time
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Minutes the truck arrived after its planned arrival time (0 when on time).
+	column 'Delay Minutes'
+		dataType: double
+		lineageTag: c2200105-0000-0000-0000-000000000006
+		sourceLineageTag: delay_minutes
+		summarizeBy: none
+		sourceColumn: delay_minutes
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	/// Cause of a late arrival (an incident type); blank when on time.
+	column 'Delay Reason'
+		dataType: string
+		lineageTag: c2200105-0000-0000-0000-000000000007
+		sourceLineageTag: delay_reason
+		summarizeBy: none
+		sourceColumn: delay_reason
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
 	partition fact_truck_moves = entity
 		mode: directLake
 		source

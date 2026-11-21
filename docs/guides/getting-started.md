@@ -450,7 +450,8 @@ In the Fabric workspace, run setup notebooks 01 through 11 in order. This is
 the smallest supported path and creates:
 
 - **Silver (`ag`)**: cleaned, typed historical data, including seven descriptive
-  dimensions, nineteen business facts, and setup-run metadata.
+  dimensions, twenty business facts, and setup-run metadata. Timestamps are
+  UTC; each store's time zone is in `dim_stores`.
 - **Gold (`au`)**: ten business-ready summary tables used for analysis.
 
 The names `ag` and `au` are the short schema identifiers used throughout this

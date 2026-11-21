@@ -38,8 +38,23 @@ seven-day materialized-view retention policies. Current pending pricing state
 is exposed by `fn_pending_recommendations()` because it must reconcile creation,
 approval, and rejection event tables at query time.
 
-The live stream targets eighteen typed business event tables. `unknown_event`
-is a catch-all KQL table, not a nineteenth generated business event.
+The live stream declares twenty-two typed business event tables and emits
+eighteen of them today. `logistics_incident_started`,
+`logistics_incident_resolved`, `online_order_line_added`, and
+`online_order_delivered` are declared for the incident and online-order
+lifecycle models; they follow the same retention, streaming-ingestion, and
+batching policies as their operational and omnichannel peers. `unknown_event`
+is a catch-all KQL table, not a generated business event.
+
+The Spark Kusto writes are positional, so a new column in an existing event
+table must keep the payload-then-envelope order. `01-create-tables.kql`
+restates `truck_arrived` with `.alter table` after its `.create-merge` for
+that reason.
+
+Thresholds in `06-ml-anomaly-detection.kql` (detector threshold, seasonality,
+trend, severity bands, lookback) must equal
+`utility/src/retail_setup/generation/calibration.py`;
+`utility/tests/generation/test_calibration.py` checks them.
 
 See the [event contract](../../docs/design/specifications/modules/streaming/event-contract.md),
 [Fabric analytics specification](../../docs/design/specifications/modules/analytics/fabric-analytics.md),

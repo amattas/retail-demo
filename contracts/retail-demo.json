@@ -2150,6 +2150,74 @@
             "timezone": "UTC",
             "description": "Shipped time is primary; envelope time is the fallback."
           }
+        },
+        {
+          "id": "event.logistics-incident-started",
+          "event_type": "logistics_incident_started",
+          "business_keys": [
+            "incident_id"
+          ],
+          "dedupe_keys": [
+            "incident_id"
+          ],
+          "event_time": {
+            "field": "started_at",
+            "fallback_field": "ingest_timestamp",
+            "timezone": "UTC",
+            "description": "Start time opens the incident."
+          }
+        },
+        {
+          "id": "event.logistics-incident-resolved",
+          "event_type": "logistics_incident_resolved",
+          "business_keys": [
+            "incident_id"
+          ],
+          "dedupe_keys": [
+            "incident_id"
+          ],
+          "event_time": {
+            "field": "resolved_at",
+            "fallback_field": "ingest_timestamp",
+            "timezone": "UTC",
+            "description": "Resolution time closes the incident."
+          }
+        },
+        {
+          "id": "event.online-order-line-added",
+          "event_type": "online_order_line_added",
+          "business_keys": [
+            "order_id",
+            "line_number"
+          ],
+          "dedupe_keys": [
+            "order_id",
+            "line_num"
+          ],
+          "event_time": {
+            "field": "ingest_timestamp",
+            "fallback_field": null,
+            "timezone": "UTC",
+            "description": "Envelope ingestion time orders online order lines."
+          }
+        },
+        {
+          "id": "event.online-order-delivered",
+          "event_type": "online_order_delivered",
+          "business_keys": [
+            "order_id",
+            "delivered_time"
+          ],
+          "dedupe_keys": [
+            "order_id_ext",
+            "status"
+          ],
+          "event_time": {
+            "field": "delivered_time",
+            "fallback_field": "ingest_timestamp",
+            "timezone": "UTC",
+            "description": "Delivered time is primary; envelope time is the fallback."
+          }
         }
       ],
       "fixture_sources": [
@@ -3195,6 +3263,188 @@
       "mode": "direct-spark-kusto-to-streaming-only-silver"
     },
     {
+      "id": "event-path.logistics-incident-started",
+      "name": "Logistics incident start to incident reporting",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Incident starts open one keyed incident row in Silver.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.logistics-incident-started"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "logistics_incident_started"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_logistics_incidents"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_logistics_incidents"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "paired-lifecycle-to-silver"
+    },
+    {
+      "id": "event-path.logistics-incident-resolved",
+      "name": "Logistics incident resolution to incident reporting",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Incident resolutions set resolved_at on the incident's Silver row.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.logistics-incident-resolved"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "logistics_incident_resolved"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_logistics_incidents"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_logistics_incidents"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "paired-lifecycle-to-silver"
+    },
+    {
+      "id": "event-path.online-order-line-added",
+      "name": "Online order line to order-line reporting",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Typed online order lines flow to the online order-line fact.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        },
+        {
+          "path": "fabric/powerbi/retail_model.SemanticModel/definition/model.tmdl",
+          "selector": {
+            "kind": "tmdl_active_table_schemas"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.semantic-model",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.online-order-line-added"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "online_order_line_added"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_online_order_lines"
+        },
+        {
+          "layer": "semantic",
+          "name": "fact_online_order_lines"
+        }
+      ],
+      "terminal_exception_id": null,
+      "mode": "direct-spark-kusto-to-silver"
+    },
+    {
+      "id": "event-path.online-order-delivered",
+      "name": "Online order delivered operational status",
+      "owner": "owner.streaming",
+      "support_status": "optional",
+      "description": "Delivered status stops at the intentionally streaming-only status table.",
+      "sources": [
+        {
+          "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+          "selector": {
+            "kind": "notebook_streaming_contract"
+          }
+        }
+      ],
+      "source_asset_id": "asset.stream-events",
+      "target_asset_id": "asset.lakehouse",
+      "contract_ids": [
+        "data-contract.events",
+        "data-contract.historical",
+        "data-contract.semantic-model"
+      ],
+      "path_kind": "emitted",
+      "event_ids": [
+        "event.online-order-delivered"
+      ],
+      "targets": [
+        {
+          "layer": "eventhouse",
+          "name": "online_order_delivered"
+        },
+        {
+          "layer": "silver",
+          "name": "fact_online_order_status"
+        }
+      ],
+      "terminal_exception_id": "exception.streaming.online-order-status",
+      "mode": "direct-spark-kusto-to-streaming-only-silver"
+    },
+    {
       "id": "event-path.marketing-attribution",
       "name": "Derived last-touch marketing attribution",
       "owner": "owner.analytics",
@@ -3295,7 +3545,7 @@
       "name": "Streaming-only online order status",
       "owner": "owner.streaming",
       "support_status": "optional",
-      "description": "Picked and shipped events intentionally stop at an owned streaming-only Silver status table maintained by the Delta maintenance notebook.",
+      "description": "Picked, shipped and delivered events intentionally stop at an owned streaming-only Silver status table maintained by the Delta maintenance notebook.",
       "sources": [
         {
           "path": "fabric/lakehouse/03-streaming-to-silver.ipynb",
@@ -3318,11 +3568,12 @@
         }
       ],
       "kind": "streaming-only",
-      "rationale": "The active transform records and maintains operational PICKED/SHIPPED state, but no historical schema or semantic table owns that status grain.",
+      "rationale": "The active transform records and maintains operational PICKED/SHIPPED/DELIVERED state, but no historical schema or semantic table owns that status grain.",
       "verification_owner": "owner.streaming",
       "event_ids": [
         "event.online-order-picked",
-        "event.online-order-shipped"
+        "event.online-order-shipped",
+        "event.online-order-delivered"
       ],
       "target_names": [
         "fact_online_order_status"
@@ -3370,7 +3621,6 @@
         "dim_products",
         "dim_date",
         "fact_promo_lines",
-        "fact_online_order_lines",
         "fact_truck_inventory",
         "fact_dc_inventory_txn",
         "dc_inventory_position_current"

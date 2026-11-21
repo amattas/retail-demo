@@ -40,11 +40,15 @@ def test_truck_lifecycle_pairs_only_complete_authoritative_keys(spark):
     arrivals = spark.sql("""
         SELECT 'TRUCK_7' AS truck_id, 1L AS dc_id, 2L AS store_id,
                'S1' AS shipment_id, timestamp'2026-09-01 10:00:00' AS arrival_time,
-               timestamp'2026-09-01 15:00:00' AS ingest_timestamp, 'a1' AS trace_id
+               timestamp'2026-09-01 15:00:00' AS ingest_timestamp, 'a1' AS trace_id,
+               timestamp'2026-09-01 10:00:00' AS planned_arrival_time,
+               0L AS delay_minutes, CAST(NULL AS STRING) AS delay_reason
         UNION ALL SELECT 'TRUCK_7', 1L, 3L, 'S1',
-               timestamp'2026-09-01 11:00:00', timestamp'2026-09-01 16:00:00', 'a2'
+               timestamp'2026-09-01 11:00:00', timestamp'2026-09-01 16:00:00', 'a2',
+               timestamp'2026-09-01 10:15:00', 45L, 'LANE_DELAY'
         UNION ALL SELECT 'TRUCK_7', 1L, 2L, 'UNFINISHED',
-               timestamp'2026-09-01 11:00:00', timestamp'2026-09-01 16:00:00', 'a3'
+               timestamp'2026-09-01 11:00:00', timestamp'2026-09-01 16:00:00', 'a3',
+               timestamp'2026-09-01 11:00:00', 0L, NULL
     """)
     departures = spark.sql("""
         SELECT 'TRUCK_7' AS truck_id, 1L AS dc_id, 2L AS store_id,
@@ -66,6 +70,14 @@ def test_truck_lifecycle_pairs_only_complete_authoritative_keys(spark):
         "store_id",
         "shipment_id",
         ((F.col("etd").cast("long") - F.col("eta").cast("long")) / 60).alias("dwell"),
+        ((F.col("eta").cast("long") - F.col("planned_arrival_time").cast("long")) / 60).alias(
+            "late_by"
+        ),
+        "delay_minutes",
+        "delay_reason",
     )
     rows = sorted(tuple(row) for row in result.collect())
-    assert rows == [(7, 1, 2, "S1", 30.0), (7, 1, 3, "S1", 120.0)]
+    assert rows == [
+        (7, 1, 2, "S1", 30.0, 0.0, 0.0, None),
+        (7, 1, 3, "S1", 120.0, 45.0, 45.0, "LANE_DELAY"),
+    ]

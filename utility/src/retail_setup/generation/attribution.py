@@ -48,19 +48,19 @@ from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
 from retail_setup.config.generation import GenerationConfig
-from retail_setup.generation.marketing import (
-    ARCHETYPES,
-    CHANNEL_COSTS,
-    DEVICE_MULTIPLIERS,
-    DEVICE_WEIGHTS,
-)
 from retail_setup.generation.runtime import (
     case_when,
-    fixed_width_decimal,
     legacy_index,
     seeded_draws,
 )
 from retail_setup.generation.schemas import column_names
+from retail_setup.generation.vocabulary import (
+    CAMPAIGN_ARCHETYPES,
+    CHANNEL_COSTS,
+    DEVICE_MULTIPLIERS,
+    DEVICE_WEIGHTS,
+    campaign_id_column,
+)
 
 ATTRIBUTION_MODEL = "LAST_TOUCH_7D"
 ATTRIBUTION_WINDOW_DAYS = 7
@@ -70,8 +70,8 @@ SELECTION_RATE = 0.05  # deterministic bounded share (~5%) of eligible purchases
 # marketing.py. Their 14/30-day durations provide real background spend while
 # still allowing a conversion up to seven days after the selected touch.
 JOURNEY_CAMPAIGNS = [
-    (2, ARCHETYPES[1][1], ARCHETYPES[1][3]),
-    (3, ARCHETYPES[2][1], ARCHETYPES[2][3]),
+    (2, CAMPAIGN_ARCHETYPES[1][1], CAMPAIGN_ARCHETYPES[1][3]),
+    (3, CAMPAIGN_ARCHETYPES[2][1], CAMPAIGN_ARCHETYPES[2][3]),
 ]
 
 # Touch offsets (seconds before purchase_ts). The ranges never overlap
@@ -374,11 +374,7 @@ def generate_attribution(
         )
         .withColumn(
             "campaign_id",
-            F.concat(
-                F.lit("CAMP"),
-                F.date_format("_campaign_start", "yyyyMMdd"),
-                fixed_width_decimal(F.col("_campaign_index"), 2, "campaign archetype index"),
-            ),
+            campaign_id_column(F.col("_campaign_start"), F.col("_campaign_index")),
         )
     )
 

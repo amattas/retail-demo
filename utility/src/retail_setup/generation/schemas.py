@@ -105,6 +105,9 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("store_format", "string"),
         ("operating_hours", "string"),
         ("daily_traffic_multiplier", "double"),
+        # IANA time zone from the store geography's state. Generation works in
+        # this local time; Silver timestamps are UTC (see timezones.py).
+        ("TimeZone", "string"),
     ],
     "dim_distribution_centers": [
         ("ID", "long"),
@@ -191,6 +194,8 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("attribution_journey_id", "string"),
         ("campaign_id", "string"),
         ("impression_id_ext", "string"),
+        # Store-local hour (0-23) of the UTC event_ts, for hour-of-day reporting.
+        ("local_hour", "int"),
     ],
     "fact_receipt_lines": [
         ("receipt_id_ext", "string"),
@@ -482,6 +487,11 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("actual_unload_duration", "double"),
         ("event_date", "date"),
         ("__index_level_0__", "long"),
+        # Planned vs actual arrival. Historical moves arrive as planned (delay
+        # 0, no reason) until the logistics incident model populates delays.
+        ("planned_arrival_time", "timestamp"),
+        ("delay_minutes", "double"),
+        ("delay_reason", "string"),
     ],
     "fact_truck_inventory": [
         # TMDL-bound: truck_id (int64→long), shipment_id, product_id (int64→long),
@@ -554,6 +564,24 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("LastKnownQuantity", "long"),
         ("event_date", "date"),
         ("__index_level_0__", "long"),
+    ],
+    # Logistics disruptions (DC outages, lane delays, weather, holidays,
+    # supplier short-ships): one row per incident, resolved_at NULL while open.
+    # store_id is NULL for network- or DC-wide incidents. Historical
+    # generation publishes an empty table until the incident model lands; the
+    # live stream fills it from logistics_incident_started/_resolved.
+    "fact_logistics_incidents": [
+        ("incident_id", "string"),
+        ("incident_type", "string"),
+        ("dc_id", "long"),
+        ("store_id", "long"),
+        ("started_at", "timestamp"),
+        ("resolved_at", "timestamp"),
+        ("severity", "string"),
+        ("affected_store_count", "long"),
+        ("description", "string"),
+        ("trace_id", "string"),
+        ("event_date", "date"),
     ],
     # -----------------------------------------------------------------------
     # Plan 2c: 10 Gold (au) aggregate tables

@@ -91,6 +91,33 @@ def test_determinism(spark, small_cfg, dicts):
     )
 
 
+def test_dimensions_do_not_depend_on_the_history_window(spark, dicts):
+    # The same seed and pinned anchor, rendered for a later (months-based)
+    # window, must regenerate identical dimensions (B-13).
+    base = dict(store_type="grocery", store_count=4, dc_count=2, customer_count=200, seed=42)
+    first = GenerationConfig(
+        **base,
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 3, 31),
+        anchor_date=date(2025, 1, 1),
+    )
+    later = GenerationConfig(
+        **base, start_date=date(2025, 2, 9), end_date=date(2025, 5, 8), anchor_date=date(2025, 1, 1)
+    )
+    a = generate_dimensions(spark, dicts, first)
+    b = generate_dimensions(spark, dicts, later)
+    assert set(a) == set(b)
+    for table in a:
+        assert sorted(map(tuple, a[table].collect())) == sorted(map(tuple, b[table].collect())), (
+            table
+        )
+
+
+def test_anchor_defaults_to_the_history_start():
+    cfg = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 7))
+    assert cfg.anchor_date == date(2025, 1, 1)
+
+
 def test_customers_are_generated_from_a_spark_range(dims):
     plan = dims["dim_customers"]._jdf.queryExecution().logical().toString()
     assert "Range" in plan

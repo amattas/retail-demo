@@ -405,6 +405,17 @@ table fact_receipts
 
 		annotation SummarizationSetBy = Automatic
 
+	/// Store-local hour (0-23) of the receipt. Event Timestamp is UTC; use this column for hour-of-day analysis.
+	column 'Local Hour'
+		dataType: int64
+		formatString: 0
+		lineageTag: a1a1a1a1-0000-0000-0000-000000000012
+		sourceLineageTag: local_hour
+		summarizeBy: none
+		sourceColumn: local_hour
+
+		annotation SummarizationSetBy = Automatic
+
 	partition fact_receipts = entity
 		mode: directLake
 		source

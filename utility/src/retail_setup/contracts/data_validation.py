@@ -307,8 +307,8 @@ def _validate_physical_event_contract(
     event_types = set(snapshot.driver.payloads)
     if len(snapshot.driver.envelope) != 9:
         raise ManifestSourceError("driver envelope must contain exactly nine fields")
-    if len(event_types) != 18:
-        raise ManifestSourceError("driver must declare exactly eighteen event types")
+    if len(event_types) != 22:
+        raise ManifestSourceError("driver must declare exactly twenty-two event types")
     if set(declarations) != event_types:
         raise ManifestSourceError("manifest and driver event inventories differ")
     if set(snapshot.kql_tables) != set(snapshot.kql_mappings):

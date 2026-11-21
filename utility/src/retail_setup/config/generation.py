@@ -40,6 +40,11 @@ class GenerationConfig(BaseModel):
     months: int | None = Field(default=None, ge=1, le=120)
     start_date: date
     end_date: date
+    # Anchor for dimension dates (product launch dates). Dimensions depend on
+    # the seed and this anchor only, never on the run date, so re-rendering a
+    # ``months`` config on a later day regenerates identical dimensions.
+    # `retail-setup configure` pins it; it defaults to ``start_date``.
+    anchor_date: date
     store_count: int = Field(default=50, gt=0, le=2000)
     seed: int = 42
     silver_db: str = "ag"
@@ -85,6 +90,8 @@ class GenerationConfig(BaseModel):
                 data["start_date"] = _subtract_months(end, months)
         elif data.get("start_date") is None or data.get("end_date") is None:
             raise ValueError("provide `months`, or both `start_date` and `end_date`")
+        if data.get("anchor_date") is None:
+            data["anchor_date"] = data["start_date"]
         store_count = data.get("store_count", cls.model_fields["store_count"].default)
         if isinstance(store_count, int) and not isinstance(store_count, bool):
             if data.get("dc_count") is None:

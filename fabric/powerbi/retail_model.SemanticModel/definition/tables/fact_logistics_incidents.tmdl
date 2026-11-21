@@ -1,0 +1,157 @@
+table fact_logistics_incidents
+	lineageTag: c2300000-0000-0000-0000-000000000001
+	sourceLineageTag: [ag].[fact_logistics_incidents]
+
+	/// Count of logistics incidents (DC outages, lane delays, weather, holidays, supplier short-ships).
+	measure 'Logistics Incidents' = COUNTROWS('fact_logistics_incidents')
+		formatString: #,0
+		displayFolder: Logistics\Incidents
+		lineageTag: c2300002-0000-0000-0000-000000000001
+
+	/// Incidents that have started and are not yet resolved.
+	measure 'Open Logistics Incidents' = COUNTROWS(FILTER('fact_logistics_incidents', ISBLANK('fact_logistics_incidents'[Resolved At])))
+		formatString: #,0
+		displayFolder: Logistics\Incidents
+		lineageTag: c2300002-0000-0000-0000-000000000002
+
+	column 'Incident ID'
+		dataType: string
+		lineageTag: c2300001-0000-0000-0000-000000000001
+		sourceLineageTag: incident_id
+		summarizeBy: none
+		sourceColumn: incident_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	/// DC_OUTAGE, LANE_DELAY, WEATHER, HOLIDAY or SUPPLIER_SHORT_SHIP.
+	column 'Incident Type'
+		dataType: string
+		lineageTag: c2300001-0000-0000-0000-000000000002
+		sourceLineageTag: incident_type
+		summarizeBy: none
+		sourceColumn: incident_type
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'DC ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: c2300001-0000-0000-0000-000000000003
+		sourceLineageTag: dc_id
+		summarizeBy: none
+		sourceColumn: dc_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	/// Affected store; blank for DC- or network-wide incidents.
+	column 'Store ID'
+		dataType: int64
+		formatString: 0
+		lineageTag: c2300001-0000-0000-0000-000000000004
+		sourceLineageTag: store_id
+		summarizeBy: none
+		sourceColumn: store_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	/// UTC start of the incident.
+	column 'Started At'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: c2300001-0000-0000-0000-000000000005
+		sourceLineageTag: started_at
+		summarizeBy: none
+		sourceColumn: started_at
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	/// UTC resolution time; blank while the incident is open.
+	column 'Resolved At'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: c2300001-0000-0000-0000-000000000006
+		sourceLineageTag: resolved_at
+		summarizeBy: none
+		sourceColumn: resolved_at
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Severity
+		dataType: string
+		lineageTag: c2300001-0000-0000-0000-000000000007
+		sourceLineageTag: severity
+		summarizeBy: none
+		sourceColumn: severity
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Affected Store Count'
+		dataType: int64
+		formatString: 0
+		lineageTag: c2300001-0000-0000-0000-000000000008
+		sourceLineageTag: affected_store_count
+		summarizeBy: sum
+		sourceColumn: affected_store_count
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column Description
+		dataType: string
+		lineageTag: c2300001-0000-0000-0000-000000000009
+		sourceLineageTag: description
+		summarizeBy: none
+		sourceColumn: description
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Trace ID'
+		dataType: string
+		isHidden
+		lineageTag: c2300001-0000-0000-0000-000000000010
+		sourceLineageTag: trace_id
+		summarizeBy: none
+		sourceColumn: trace_id
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	/// UTC date the incident started. Used for the dim_date relationship.
+	column 'Event Date'
+		dataType: dateTime
+		formatString: Short Date
+		isHidden
+		lineageTag: c2300001-0000-0000-0000-000000000011
+		sourceLineageTag: event_date
+		summarizeBy: none
+		sourceColumn: event_date
+
+		changedProperty = Name
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_logistics_incidents = entity
+		mode: directLake
+		source
+			entityName: fact_logistics_incidents
+			schemaName: ag
+			expressionSource: 'DirectLake - retail_lakehouse'
+

@@ -1,3 +1,4 @@
+import shutil
 from datetime import date
 
 import pytest
@@ -18,11 +19,18 @@ CFG = GenerationConfig(
 )
 
 
-def test_fingerprint_tracks_generation_settings_not_dictionary_location():
-    moved = CFG.model_copy(update={"dictionary_root": "/elsewhere"})
+def test_fingerprint_tracks_generation_settings_and_dictionary_content(tmp_path):
+    for folder in ("_shared", CFG.store_type):
+        shutil.copytree(CFG.resolved_dictionary_root / folder, tmp_path / folder)
+    moved = CFG.model_copy(update={"dictionary_root": str(tmp_path)})
     reseeded = CFG.model_copy(update={"seed": 100})
     assert generation_fingerprint(moved) == generation_fingerprint(CFG)
     assert generation_fingerprint(reseeded) != generation_fingerprint(CFG)
+
+    # Same settings, edited dictionary content: older handoffs must not match.
+    products = tmp_path / CFG.store_type / "products.json"
+    products.write_text(products.read_text(encoding="utf-8").replace("1", "2", 1), encoding="utf-8")
+    assert generation_fingerprint(moved) != generation_fingerprint(CFG)
 
 
 def test_handoffs_round_trip_and_reject_other_generations(spark, tmp_path):

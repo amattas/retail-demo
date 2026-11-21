@@ -169,21 +169,19 @@ print("attrs: using real dim_products / dim_stores prices+tax")
 # the event-envelope builder. All expressions are pure Catalyst — no UDFs.
 from pyspark.sql import functions as F
 
-ZONES = ["ENTRANCE_MAIN", "ENTRANCE_SIDE", "AISLES_A", "AISLES_B", "CHECKOUT"]
-TENDERS = ["CREDIT_CARD", "DEBIT_CARD", "CASH", "MOBILE"]
-CHANNELS = ["SEARCH", "EMAIL", "SOCIAL", "DISPLAY"]
-DEVICES = ["mobile", "desktop", "tablet"]
-PROMOS = ["SAVE10", "BFRIDAY30", "SUMMER25"]
-FULFILL = ["SHIP_FROM_DC", "SHIP_FROM_STORE", "BOPIS"]
-TRUCK_DWELL_THRESHOLD_MINUTES = 90
-TRUCK_NORMAL_DWELL_MINUTES_MIN = 30
-TRUCK_NORMAL_DWELL_MINUTES_MAX = 75
-TRUCK_LATE_DWELL_MINUTES = 120
-TRUCK_LATE_BUCKET_MODULUS = 5
+# Zones, fulfillment modes and ID formats come from the shared vocabulary
+# (retail_setup.generation.vocabulary, inlined in the behavior cell). The LIVE_*
+# values below still differ from it; tests/generation/test_vocabulary.py lists
+# each difference as a known gap until the stream adopts the shared value.
+LIVE_TENDERS = ["CREDIT_CARD", "DEBIT_CARD", "CASH", "MOBILE"]
+LIVE_CHANNELS = ["SEARCH", "EMAIL", "SOCIAL", "DISPLAY"]
+LIVE_DEVICES = ["mobile", "desktop", "tablet"]
+# Truck dwell, stockout and reorder thresholds come from the shared calibration
+# (retail_setup.generation.calibration, inlined in the behavior cell).
 
-# Named promo catalog for the live feed (mirrors batch receipts.PROMO_CATALOG):
+# Named promo catalog for the live feed (a subset of vocabulary.PROMO_CATALOG):
 # (code, discount_pct, eligible_months | None, min_subtotal_dollars, kind)
-NAMED_PROMOS = [
+LIVE_NAMED_PROMOS = [
     ("SAVE10", 10, None, 0.0, "PCT"),
     ("SAVE20", 20, None, 50.0, "PCT"),
     ("CLEARANCE30", 30, None, 0.0, "PCT"),
@@ -195,7 +193,7 @@ NAMED_PROMOS = [
     ("BFRIDAY30", 30, [11], 0.0, "PCT"),
     ("HOLIDAY20", 20, [12], 0.0, "PCT"),
 ]
-EVERGREEN_PROMOS = [("SAVE10", 10), ("CLEARANCE30", 30)]
+LIVE_EVERGREEN_PROMOS = [("SAVE10", 10), ("CLEARANCE30", 30)]
 
 
 def _taxmult(taxa):
@@ -204,9 +202,9 @@ def _taxmult(taxa):
 
 
 def _promo_elig(idx, month, subtotal):
-    """True when the NAMED_PROMOS entry at idx is in-month and meets its min."""
+    """True when the LIVE_NAMED_PROMOS entry at idx is in-month and meets its min."""
     expr = None
-    for i, (_c, _p, months, mn, _k) in enumerate(NAMED_PROMOS):
+    for i, (_c, _p, months, mn, _k) in enumerate(LIVE_NAMED_PROMOS):
         e = F.lit(True) if months is None else month.isin(*months)
         if mn:
             e = e & (subtotal >= F.lit(mn))
@@ -305,8 +303,8 @@ b0 = (rate.select(ts.alias("ts"), v.alias("v"))
       .withColumn("shipment_id", F.concat(F.lit("SHP-"), stream_prefix, F.col("v").cast("string")))
       .withColumn("session_id", F.concat(F.lit("SES-"), stream_prefix, F.col("v").cast("string")))
       .withColumn("ble_id", F.concat(F.lit("BLE"), F.col("customer_id").cast("string")))
-      .withColumn("zone", _pick(F.col("v"), "zone", ZONES))
-      .withColumn("tender", _pick(F.col("v"), "tender", TENDERS)))
+      .withColumn("zone", _pick(F.col("v"), "zone", FOOT_TRAFFIC_ZONES))
+      .withColumn("tender", _pick(F.col("v"), "tender", LIVE_TENDERS)))
 b0 = b0.join(_bcast(STORE_ATTR), F.col("store_id") == F.col("as_id"), "left").withColumn(
     "store_bps", F.when(F.col("as_bps").isNotNull(), F.col("as_bps")).otherwise(
         F.raise_error("Live purchase references a missing store tax rate")
@@ -325,18 +323,18 @@ b = (b0
      ) / 100.0)
      .withColumn("total", F.round(F.col("subtotal") + F.col("tax"), 2))
      # named promo (month-eligible + min-purchase + BOGO), evergreen fallback
-     .withColumn("_pidx", _h(F.col("v"), "promoidx", len(NAMED_PROMOS)))
+     .withColumn("_pidx", _h(F.col("v"), "promoidx", len(LIVE_NAMED_PROMOS)))
      .withColumn("_pelig", _promo_elig(
          F.col("_pidx"), F.month(F.col("ts")), F.col("subtotal")))
-     .withColumn("_evidx", _h(F.col("v"), "promoev", len(EVERGREEN_PROMOS)))
+     .withColumn("_evidx", _h(F.col("v"), "promoev", len(LIVE_EVERGREEN_PROMOS)))
      .withColumn("promo_code", F.when(F.col("_pelig"), F.element_at(
-         F.array(*[F.lit(t[0]) for t in NAMED_PROMOS]), (F.col("_pidx") + F.lit(1)).cast("int")))
+         F.array(*[F.lit(t[0]) for t in LIVE_NAMED_PROMOS]), (F.col("_pidx") + F.lit(1)).cast("int")))
          .otherwise(F.element_at(
-             F.array(*[F.lit(c) for c, _ in EVERGREEN_PROMOS]), (F.col("_evidx") + F.lit(1)).cast("int"))))
+             F.array(*[F.lit(c) for c, _ in LIVE_EVERGREEN_PROMOS]), (F.col("_evidx") + F.lit(1)).cast("int"))))
      .withColumn("_ppct", F.when(F.col("_pelig"), F.element_at(
-         F.array(*[F.lit(t[1]) for t in NAMED_PROMOS]), (F.col("_pidx") + F.lit(1)).cast("int")))
+         F.array(*[F.lit(t[1]) for t in LIVE_NAMED_PROMOS]), (F.col("_pidx") + F.lit(1)).cast("int")))
          .otherwise(F.element_at(
-             F.array(*[F.lit(p) for _, p in EVERGREEN_PROMOS]), (F.col("_evidx") + F.lit(1)).cast("int"))))
+             F.array(*[F.lit(p) for _, p in LIVE_EVERGREEN_PROMOS]), (F.col("_evidx") + F.lit(1)).cast("int"))))
      .withColumn("promo_type", F.when(
          F.col("promo_code").startswith("BOGO"), F.lit("BOGO")).otherwise(F.lit("PERCENTAGE")))
      .withColumn("pkey", F.concat(F.lit("store_"), F.col("store_id").cast("string"))))
@@ -438,10 +436,9 @@ attr_campaign_id = F.concat(
     F.lit("CMP-"), (_h(F.col("v"), "attrcamp", 20) + F.lit(1)).cast("string"))
 attr_creative_id = F.concat(
     F.lit("CRVLIVE"), stream_prefix, (_h(F.col("v"), "attrcrv", 50) + F.lit(1)).cast("string"))
-attr_channel = _pick(F.col("v"), "attrchan", CHANNELS)
-attr_device = _pick(F.col("v"), "attrdev", DEVICES)
-attr_customer_ad_id = F.concat(
-    F.lit("AD"), F.lpad(F.col("customer_id").cast("string"), 8, "0"))
+attr_channel = _pick(F.col("v"), "attrchan", LIVE_CHANNELS)
+attr_device = _pick(F.col("v"), "attrdev", LIVE_DEVICES)
+attr_customer_ad_id = ad_id_column(F.col("customer_id"))
 # session shared by the two touches: the shopping session for a store
 # journey, the order id (the online "session") for an online journey.
 attr_session = F.when(online_attr, F.col("order_id")).otherwise(F.col("session_id"))
@@ -494,7 +491,7 @@ def _attr_touch(which, touch_ts, impression_id):
 
 
 # online derived fields
-node_type = F.when(_pick(F.col("v"), "omode", FULFILL) == "SHIP_FROM_DC", "DC").otherwise("STORE")
+node_type = F.when(_pick(F.col("v"), "omode", FULFILLMENT_MODES) == "SHIP_FROM_DC", "DC").otherwise("STORE")
 node_id = F.when(node_type == "DC", F.col("dc_id")).otherwise(F.col("store_id"))
 inv_qty = _h(F.col("v"), "iqty", 60).cast("long")  # 0..59
 # Supply-chain disruption: ~6% of inventory events are a disruption (sudden
@@ -594,18 +591,18 @@ events_arr = F.array(
         inv_delta.alias("quantity_delta"),
         inv_reason.alias("reason"), inv_source.alias("source"),
     ), F.col("ts"), store_pkey, F.col("v")),
-    slot(inv & ((inv_qty < F.lit(5)) | disrupted), "stockout_detected", F.struct(
+    slot(inv & ((inv_qty < F.lit(STOCKOUT_QUANTITY_THRESHOLD)) | disrupted), "stockout_detected", F.struct(
         F.col("store_id"), F.lit(None).cast("long").alias("dc_id"),
         _id(F.col("v"), "iprod", PRODUCT_COUNT).alias("product_id"),
         inv_qty_eff.alias("last_known_quantity"), _iso(F.col("ts")).alias("detection_time"),
     ), F.col("ts"), store_pkey, F.col("v")),
-    slot(inv & ((inv_qty < F.lit(10)) | disrupted), "reorder_triggered", F.struct(
+    slot(inv & ((inv_qty < F.lit(REORDER_POINT)) | disrupted), "reorder_triggered", F.struct(
         F.col("store_id"), F.lit(None).cast("long").alias("dc_id"),
         _id(F.col("v"), "iprod", PRODUCT_COUNT).alias("product_id"),
         inv_qty_eff.alias("current_quantity"),
         (_h(F.col("v"), "roq", 200) + F.lit(50)).cast("long").alias("reorder_quantity"),
-        F.lit(10).cast("long").alias("reorder_point"),
-        F.when(disrupted | (inv_qty < F.lit(3)), "URGENT").otherwise("HIGH").alias("priority"),
+        F.lit(REORDER_POINT).cast("long").alias("reorder_point"),
+        F.when(disrupted | (inv_qty < F.lit(URGENT_REORDER_QUANTITY_THRESHOLD)), "URGENT").otherwise("HIGH").alias("priority"),
     ), F.col("ts"), store_pkey, F.col("v")),
 
     # --- store ops ---
@@ -618,6 +615,10 @@ events_arr = F.array(
         truck_id.alias("truck_id"), F.col("dc_id"), F.col("store_id"), F.col("shipment_id"),
         _iso(truck_arrival_ts).alias("arrival_time"),
         truck_estimated_unload_minutes.alias("estimated_unload_duration"),
+        # Live trucks arrive as planned until the incident model adds delays.
+        _iso(truck_arrival_ts).alias("planned_arrival_time"),
+        F.lit(0).cast("long").alias("delay_minutes"),
+        F.lit(None).cast("string").alias("delay_reason"),
     ), truck_arrival_ts, F.concat(F.lit("dc_"), F.col("dc_id").cast("string")), F.col("v"),
         session=F.col("shipment_id")),
     slot(log, "truck_departed", F.struct(
@@ -629,13 +630,13 @@ events_arr = F.array(
 
     # --- marketing ---
     slot(mkt, "ad_impression", F.struct(
-        _pick(F.col("v"), "chan", CHANNELS).alias("channel"),
+        _pick(F.col("v"), "chan", LIVE_CHANNELS).alias("channel"),
         F.concat(F.lit("CMP-"), (_h(F.col("v"), "camp", 20) + F.lit(1)).cast("string")).alias("campaign_id"),
         F.concat(F.lit("CRV-"), (_h(F.col("v"), "crv", 50) + F.lit(1)).cast("string")).alias("creative_id"),
         F.concat(F.lit("AD"), _id(F.col("v"), "adcust", CUSTOMER_COUNT).cast("string")).alias("customer_ad_id"),
         F.concat(F.lit("IMP-"), stream_prefix, F.col("v").cast("string")).alias("impression_id"),
         F.round(_u(F.col("v"), "cost") * F.lit(2.0) + F.lit(0.1), 4).alias("cost"),
-        _pick(F.col("v"), "dev", DEVICES).alias("device_type"),
+        _pick(F.col("v"), "dev", LIVE_DEVICES).alias("device_type"),
         _id(F.col("v"), "adcust", CUSTOMER_COUNT).alias("customer_id"),
     ), F.col("ts"), F.concat(F.lit("camp_"), (_h(F.col("v"), "camp", 20) + F.lit(1)).cast("string")), F.col("v")),
 
@@ -649,7 +650,7 @@ events_arr = F.array(
     # --- online order (created -> picked -> shipped share order_id) ---
     slot(onl, "online_order_created", F.struct(
         F.col("order_id"), F.col("customer_id"),
-        _pick(F.col("v"), "omode", FULFILL).alias("fulfillment_mode"),
+        _pick(F.col("v"), "omode", FULFILLMENT_MODES).alias("fulfillment_mode"),
         node_type.alias("node_type"), node_id.alias("node_id"),
         F.col("basket_n").cast("long").alias("item_count"),
         F.col("subtotal"), F.col("tax"), F.col("total"), F.col("tender").alias("tender_type"),
@@ -677,14 +678,14 @@ events_arr = F.array(
         correlation=attr_correlation_online),
     slot(onl, "online_order_picked", F.struct(
         F.col("order_id"), node_type.alias("node_type"), node_id.alias("node_id"),
-        _pick(F.col("v"), "omode", FULFILL).alias("fulfillment_mode"),
+        _pick(F.col("v"), "omode", FULFILLMENT_MODES).alias("fulfillment_mode"),
         _iso(F.col("ts")).alias("picked_time"),
     ), F.col("ts"), F.concat(F.lit("order_"), F.col("order_id")), F.col("v"),
         session=F.col("order_id"), parent=F.col("order_id"),
         correlation=attr_correlation_online),
     slot(onl, "online_order_shipped", F.struct(
         F.col("order_id"), node_type.alias("node_type"), node_id.alias("node_id"),
-        _pick(F.col("v"), "omode", FULFILL).alias("fulfillment_mode"),
+        _pick(F.col("v"), "omode", FULFILLMENT_MODES).alias("fulfillment_mode"),
         _iso(F.col("ts")).alias("shipped_time"),
     ), F.col("ts"), F.concat(F.lit("order_"), F.col("order_id")), F.col("v"),
         session=F.col("order_id"), parent=F.col("order_id"),
@@ -737,7 +738,7 @@ EVENT_PAYLOADS = {
     "customer_entered": [("store_id", "store_id", "long"), ("sensor_id", "sensor_id", "string"), ("zone", "zone", "string"), ("customer_count", "customer_count", "long"), ("dwell_time", "dwell_time", "long")],
     "customer_zone_changed": [("store_id", "store_id", "long"), ("customer_ble_id", "customer_ble_id", "string"), ("from_zone", "from_zone", "string"), ("to_zone", "to_zone", "string"), ("timestamp", "timestamp", "datetime")],
     "ble_ping_detected": [("store_id", "store_id", "long"), ("beacon_id", "beacon_id", "string"), ("customer_ble_id", "customer_ble_id", "string"), ("rssi", "rssi", "long"), ("zone", "zone", "string")],
-    "truck_arrived": [("truck_id", "truck_id", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("shipment_id", "shipment_id", "string"), ("arrival_time", "arrival_time", "datetime"), ("estimated_unload_duration", "estimated_unload_duration", "long")],
+    "truck_arrived": [("truck_id", "truck_id", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("shipment_id", "shipment_id", "string"), ("arrival_time", "arrival_time", "datetime"), ("estimated_unload_duration", "estimated_unload_duration", "long"), ("planned_arrival_time", "planned_arrival_time", "datetime"), ("delay_minutes", "delay_minutes", "long"), ("delay_reason", "delay_reason", "string")],
     "truck_departed": [("truck_id", "truck_id", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("shipment_id", "shipment_id", "string"), ("departure_time", "departure_time", "datetime"), ("actual_unload_duration", "actual_unload_duration", "long")],
     "store_opened": [("store_id", "store_id", "long"), ("operation_time", "operation_time", "datetime"), ("operation_type", "operation_type", "string")],
     "store_closed": [("store_id", "store_id", "long"), ("operation_time", "operation_time", "datetime"), ("operation_type", "operation_type", "string")],
@@ -746,6 +747,12 @@ EVENT_PAYLOADS = {
     "online_order_created": [("order_id", "order_id", "string"), ("customer_id", "customer_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("item_count", "item_count", "long"), ("subtotal", "subtotal", "real"), ("tax", "tax", "real"), ("total", "total", "real"), ("tender_type", "tender_type", "string"), ("campaign_id", "campaign_id", "string"), ("impression_id", "impression_id", "string"), ("gross_subtotal_cents", "gross_subtotal_cents", "long"), ("discount_cents", "discount_cents", "long"), ("subtotal_cents", "subtotal_cents", "long"), ("tax_cents", "tax_cents", "long"), ("total_cents", "total_cents", "long")],
     "online_order_picked": [("order_id", "order_id", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("picked_time", "picked_time", "datetime")],
     "online_order_shipped": [("order_id", "order_id", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("shipped_time", "shipped_time", "datetime")],
+    # Declared for the incident and online-order lifecycle models; the stream
+    # does not emit these yet.
+    "logistics_incident_started": [("incident_id", "incident_id", "string"), ("incident_type", "incident_type", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("started_at", "started_at", "datetime"), ("severity", "severity", "string"), ("affected_store_count", "affected_store_count", "long"), ("description", "description", "string")],
+    "logistics_incident_resolved": [("incident_id", "incident_id", "string"), ("incident_type", "incident_type", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("resolved_at", "resolved_at", "datetime")],
+    "online_order_line_added": [("order_id", "order_id", "string"), ("line_number", "line_number", "long"), ("product_id", "product_id", "long"), ("quantity", "quantity", "long"), ("unit_price", "unit_price", "real"), ("extended_price", "extended_price", "real"), ("promo_code", "promo_code", "string"), ("fulfillment_mode", "fulfillment_mode", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long")],
+    "online_order_delivered": [("order_id", "order_id", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("delivered_time", "delivered_time", "datetime")],
 }
 
 # Columns present in the KQL table but NOT produced by the stream. They sit

@@ -19,6 +19,7 @@ from datetime import date
 
 from pyspark import inheritable_thread_target
 from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.loader import DictionarySet
@@ -36,6 +37,11 @@ from retail_setup.generation import (
 )
 from retail_setup.generation.fulfillment import FulfillmentResult, resolve_fulfillment
 from retail_setup.generation.handoff import HandoffStore, delete_lakehouse_path
+from retail_setup.generation.timezones import (
+    localize_by_store,
+    localize_receipt_lines,
+    with_local_hour,
+)
 
 
 @dataclass
@@ -118,26 +124,39 @@ def _build_refunds(ctx: GenerationContext, plan: StageOutputs) -> StageOutputs:
     )
 
 
+# Stages generate in store-local time. Each published output is converted to
+# UTC by the stage that produces it (see timezones.py); outputs that later
+# stages consume in local time are converted by their final consumer or at
+# assembly (fact_receipt_lines).
+
+
 def _build_promos(ctx: GenerationContext, plan: StageOutputs) -> StageOutputs:
     promos, promo_lines = promotions.generate_promotions(ctx.spark, _accepted(plan))
-    return {"fact_promotions": promos, "fact_promo_lines": promo_lines}
+    # fact_promotions is converted by the attribution stage, its final producer.
+    return {
+        "fact_promotions": promos,
+        "fact_promo_lines": localize_receipt_lines(promo_lines, ctx.dims),
+    }
 
 
 def _build_store_ops(ctx: GenerationContext) -> StageOutputs:
-    return {"fact_store_ops": store_activity.generate_store_ops(ctx.spark, ctx.dims, ctx.cfg)}
+    ops = store_activity.generate_store_ops(ctx.spark, ctx.dims, ctx.cfg)
+    return {"fact_store_ops": localize_by_store(ops, ctx.dims, ["event_ts"])}
 
 
 def _build_foot_traffic(ctx: GenerationContext, plan: StageOutputs) -> StageOutputs:
-    return {
-        "fact_foot_traffic": store_activity.generate_foot_traffic(
-            ctx.spark, plan["fact_receipts"], ctx.dims, ctx.cfg
-        )
-    }
+    traffic = store_activity.generate_foot_traffic(
+        ctx.spark, plan["fact_receipts"], ctx.dims, ctx.cfg
+    )
+    return {"fact_foot_traffic": localize_by_store(traffic, ctx.dims, ["event_ts"])}
 
 
 def _build_ble(ctx: GenerationContext, plan: StageOutputs) -> StageOutputs:
     pings, zone_changes = sensors.generate_ble(ctx.spark, plan["fact_receipts"], ctx.dims, ctx.cfg)
-    return {"fact_ble_pings": pings, "fact_customer_zone_changes": zone_changes}
+    return {
+        "fact_ble_pings": localize_by_store(pings, ctx.dims, ["event_ts"]),
+        "fact_customer_zone_changes": localize_by_store(zone_changes, ctx.dims, ["event_ts"]),
+    }
 
 
 def _build_ledgers(ctx: GenerationContext, plan: StageOutputs) -> StageOutputs:
@@ -165,18 +184,23 @@ def _build_attributed(
     ads: StageOutputs,
 ) -> StageOutputs:
     # IMP-007: deterministic last-touch attribution over every purchase stream.
+    # Attribution runs in UTC: store purchases, their payments and promotions
+    # are converted first; online orders and impressions are already UTC.
+    dims = ctx.dims
+    receipts = _union([plan["fact_receipts"], refunds["fact_receipts"]])
+    payments = _union([plan["fact_payments"], refunds["fact_payments"], online["payments"]])
     inputs = {
-        **ctx.dims,
-        **promos,
+        **dims,
         **ads,
-        "fact_receipts": _union([plan["fact_receipts"], refunds["fact_receipts"]]),
-        "fact_receipt_lines": _union([plan["fact_receipt_lines"], refunds["fact_receipt_lines"]]),
+        "fact_promotions": localize_by_store(promos["fact_promotions"], dims, ["event_ts"]),
+        "fact_receipts": localize_by_store(receipts, dims, ["event_ts"]),
         "fact_online_order_headers": online["fact_online_order_headers"],
-        "fact_payments": _union(
-            [plan["fact_payments"], refunds["fact_payments"], online["payments"]]
+        "fact_payments": localize_by_store(
+            payments, dims, ["event_ts"], convert=F.col("receipt_id_ext").isNotNull()
         ),
     }
     out = attribution.generate_attribution(ctx.spark, inputs, ctx.cfg)
+    out["fact_receipts"] = with_local_hour(out["fact_receipts"], dims)
     return {name: out[name] for name in _ATTRIBUTED}
 
 
@@ -195,6 +219,7 @@ _LEDGERS = (
     "fact_truck_inventory",
     "fact_reorders",
     "fact_stockouts",
+    "fact_logistics_incidents",
 )
 
 STAGES: tuple[Stage, ...] = (
@@ -282,6 +307,15 @@ SILVER_SOURCES: dict[str, tuple[tuple[str, str], ...]] = {
     **{name: (("ledgers", name),) for name in _LEDGERS},
 }
 _PUBLISHED_STAGES = {stage for sources in SILVER_SOURCES.values() for stage, _ in sources}
+# Published tables whose stage outputs are still store-local; they are
+# converted to UTC when the sources are assembled.
+_LOCAL_AT_ASSEMBLY = {"fact_receipt_lines": localize_receipt_lines}
+
+
+def _assemble(name: str, frames: list[DataFrame], dims: dict[str, DataFrame]) -> DataFrame:
+    table = _union(frames)
+    localize = _LOCAL_AT_ASSEMBLY.get(name)
+    return table if localize is None else localize(table, dims)
 
 
 def setup_notebook_dependencies() -> dict[str, tuple[str, ...]]:
@@ -350,7 +384,7 @@ def generate_all(
     tables = {
         **dims,
         **{
-            name: _union([out[stage][output] for stage, output in sources])
+            name: _assemble(name, [out[stage][output] for stage, output in sources], dims)
             for name, sources in SILVER_SOURCES.items()
         },
     }
@@ -425,8 +459,9 @@ def load_publication(
     tables = _checkpoint_frames(generate_dimension_frames(spark, dicts, cfg), reliable)
     prestaged: dict[str, str] = {}
     for name, sources in SILVER_SOURCES.items():
-        tables[name] = _union([store.load(stage, output) for stage, output in sources])
-        if len(sources) == 1:
+        frames = [store.load(stage, output) for stage, output in sources]
+        tables[name] = _assemble(name, frames, tables)
+        if len(sources) == 1 and name not in _LOCAL_AT_ASSEMBLY:
             prestaged[name] = store.name(*sources[0])
     return tables, prestaged
 

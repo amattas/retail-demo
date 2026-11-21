@@ -250,7 +250,7 @@
     },
     {
       "id": "truck-lifecycle",
-      "description": "Arrival and departure share all four lifecycle keys and ordered UTC times.",
+      "description": "Arrival and departure share all four lifecycle keys and ordered UTC times; a DC outage opens and resolves under one incident ID.",
       "events": [
         {
           "event_type": "truck_arrived",
@@ -268,7 +268,10 @@
             "store_id": 3,
             "shipment_id": "SHP-FIX-001",
             "arrival_time": "2026-07-20T15:00:00.000Z",
-            "estimated_unload_duration": 60
+            "estimated_unload_duration": 60,
+            "planned_arrival_time": "2026-07-20T15:00:00.000Z",
+            "delay_minutes": 0,
+            "delay_reason": null
           }
         },
         {
@@ -288,6 +291,45 @@
             "shipment_id": "SHP-FIX-001",
             "departure_time": "2026-07-20T17:00:00.000Z",
             "actual_unload_duration": 120
+          }
+        },
+        {
+          "event_type": "logistics_incident_started",
+          "trace_id": "TRC-FIX-INC-001",
+          "ingest_timestamp": "2026-07-21T08:00:00.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "dc_2",
+          "session_id": null,
+          "parent_event_id": null,
+          "payload": {
+            "incident_id": "INC-FIX-001",
+            "incident_type": "DC_OUTAGE",
+            "dc_id": 2,
+            "store_id": null,
+            "started_at": "2026-07-21T08:00:00.000Z",
+            "severity": "HIGH",
+            "affected_store_count": 5,
+            "description": "Power outage at DC 2"
+          }
+        },
+        {
+          "event_type": "logistics_incident_resolved",
+          "trace_id": "TRC-FIX-INC-002",
+          "ingest_timestamp": "2026-07-21T11:30:00.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "dc_2",
+          "session_id": null,
+          "parent_event_id": null,
+          "payload": {
+            "incident_id": "INC-FIX-001",
+            "incident_type": "DC_OUTAGE",
+            "dc_id": 2,
+            "store_id": null,
+            "resolved_at": "2026-07-21T11:30:00.000Z"
           }
         }
       ]
@@ -332,7 +374,7 @@
     },
     {
       "id": "online-create-pick-ship",
-      "description": "Online creation, payment, picking, and shipping retain one order/session identity.",
+      "description": "Online creation, lines, payment, picking, shipping, and delivery retain one order/session identity.",
       "events": [
         {
           "event_type": "online_order_created",
@@ -423,6 +465,47 @@
             "node_id": 2,
             "fulfillment_mode": "SHIP_FROM_DC",
             "shipped_time": "2026-07-20T16:40:00.000Z"
+          }
+        },
+        {
+          "event_type": "online_order_line_added",
+          "trace_id": "TRC-FIX-OLINE-001",
+          "ingest_timestamp": "2026-07-21T09:00:00.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "order_ONL-FIX-001",
+          "session_id": "ONL-FIX-001",
+          "parent_event_id": "ONL-FIX-001",
+          "payload": {
+            "order_id": "ONL-FIX-001",
+            "line_number": 1,
+            "product_id": 501,
+            "quantity": 2,
+            "unit_price": 10.0,
+            "extended_price": 20.0,
+            "promo_code": null,
+            "fulfillment_mode": "SHIP_FROM_DC",
+            "node_type": "DC",
+            "node_id": 2
+          }
+        },
+        {
+          "event_type": "online_order_delivered",
+          "trace_id": "TRC-FIX-ODEL-001",
+          "ingest_timestamp": "2026-07-23T15:00:00.000Z",
+          "schema_version": "1.0",
+          "source": "contract-fixture",
+          "correlation_id": null,
+          "partition_key": "order_ONL-FIX-001",
+          "session_id": "ONL-FIX-001",
+          "parent_event_id": "ONL-FIX-001",
+          "payload": {
+            "order_id": "ONL-FIX-001",
+            "node_type": "DC",
+            "node_id": 2,
+            "fulfillment_mode": "SHIP_FROM_DC",
+            "delivered_time": "2026-07-23T15:00:00.000Z"
           }
         }
       ]

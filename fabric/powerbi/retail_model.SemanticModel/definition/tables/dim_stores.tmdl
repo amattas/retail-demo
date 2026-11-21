@@ -254,6 +254,16 @@ table dim_stores
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 
+	/// IANA time zone of the store (from its state). Event timestamps are UTC; this zone converts them to store-local time.
+	column 'Time Zone'
+		dataType: string
+		lineageTag: 5d0c3c1e-7a4b-4f7e-9a51-2b7f0e6c1d01
+		sourceLineageTag: TimeZone
+		summarizeBy: none
+		sourceColumn: TimeZone
+
+		annotation SummarizationSetBy = Automatic
+
 	hierarchy 'Store Profile Hierarchy'
 		lineageTag: c2040001-0000-0000-0000-000000000001
 

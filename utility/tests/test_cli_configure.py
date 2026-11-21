@@ -2,6 +2,8 @@ from pathlib import Path
 
 import pytest
 import yaml
+
+from retail_setup.config.generation import GenerationConfig
 from typer.testing import CliRunner
 
 from retail_setup.cli.main import app
@@ -245,12 +247,21 @@ def test_configure_prompts_show_defaults_and_store_types(tmp_path):
     assert "Estimated records" in result.output
 
     gen = yaml.safe_load((tmp_path / "utility/config/environments/retail-demo.yaml").read_text())
+    anchor = GenerationConfig(store_type="supercenter", months=3).start_date
     assert gen == {
         "store_type": "supercenter",
         "months": 3,
         "store_count": 50,
         "seed": 42,
+        "anchor_date": anchor.isoformat(),
     }
+
+    # Re-configuring later keeps the pinned anchor, so dimensions stay identical.
+    path = tmp_path / "utility/config/environments/retail-demo.yaml"
+    path.write_text(path.read_text().replace(anchor.isoformat(), "2020-02-02"))
+    again = runner.invoke(app, ["configure", "--repo-root", str(tmp_path)], input="\n" * 13)
+    assert again.exit_code == 0, again.output
+    assert yaml.safe_load(path.read_text())["anchor_date"] == "2020-02-02"
 
 
 def test_configure_selects_full_demo_custom_spark_pool(tmp_path):

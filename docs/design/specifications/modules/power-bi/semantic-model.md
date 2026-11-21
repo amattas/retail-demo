@@ -13,12 +13,12 @@ Lakehouse.
 
 ## Active table set
 
-`definition/model.tmdl` currently contains 42 active table references. TMDL
+`definition/model.tmdl` currently contains 43 active table references. TMDL
 means Tabular Model Definition Language, the text format used to define the
 model:
 
 - 7 dimensions
-- 19 facts
+- 20 facts
 - 10 Gold aggregates
 - 6 ML tables
 

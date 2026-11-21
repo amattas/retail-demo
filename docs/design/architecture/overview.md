@@ -56,7 +56,8 @@ historical-load notebook.
 
 ## Optional live path
 
-`stream-events` emits eighteen business event types to Eventhouse through
+`stream-events` emits eighteen of its twenty-two declared business event types
+to Eventhouse through
 the Spark Kusto connector, which is the Kusto software component for Apache
 Spark. KQL supplies the recent-event query path. Optional
 Eventhouse shortcuts and streaming transforms project events into Lakehouse

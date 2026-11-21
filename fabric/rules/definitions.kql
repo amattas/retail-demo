@@ -35,8 +35,10 @@ customer_entered
 | where arrivals > 50 or avg_arrival_dwell_seconds > 600
 | project store_id, zone, arrivals, avg_arrival_dwell_seconds
 
-// High-value receipt: threshold on total
+// High-value receipt: total above 3 x the store type's average ticket
+// (calibration.HIGH_VALUE_TICKET_MULTIPLE x profile.avg_ticket_target).
+// 255.0 is the supercenter value (3 x $85); set it for the deployed store type.
 receipt_created
 | where ingest_timestamp > ago(5m)
-| where total > 200.0
+| where total > 255.0
 | project store_id, receipt_id, total, trace_id

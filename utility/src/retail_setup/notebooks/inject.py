@@ -19,6 +19,7 @@ REQUIRED_TOKENS = [
     "STORE_TYPE",
     "START_DATE",
     "END_DATE",
+    "ANCHOR_DATE",
     "STORE_COUNT",
     "SEED",
     "DICTIONARY_REF",

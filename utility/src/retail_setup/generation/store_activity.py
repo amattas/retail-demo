@@ -17,6 +17,11 @@ from retail_setup.dictionaries.loader import load_dictionaries
 from retail_setup.generation.runtime import case_when, seeded_draws, store_day_grid
 from retail_setup.generation.schemas import column_names
 from retail_setup.generation.traffic import generate_hourly_visits
+from retail_setup.generation.vocabulary import (
+    FOOT_TRAFFIC_ZONE_DWELL,
+    FOOT_TRAFFIC_ZONES,
+    sensor_id_column,
+)
 
 # operating_hours literal -> (open_hour, close_hour); "24h" maps to 0/24
 OPERATING_HOURS_MAP = {"6-22": (6, 22), "7-22": (7, 22), "7-23": (7, 23), "24h": (0, 24)}
@@ -30,14 +35,8 @@ WEEKEND_MULTIPLIER = 0.9
 BASE_HOURLY_BROWSERS = 8
 
 # zone -> (dwell_lo_seconds, dwell_hi_seconds)
-ZONE_DWELL = {
-    "ENTRANCE_MAIN": (45, 90),
-    "ENTRANCE_SIDE": (30, 75),
-    "AISLES_A": (180, 420),
-    "AISLES_B": (120, 300),
-    "CHECKOUT": (90, 240),
-}
-ZONES = list(ZONE_DWELL)
+ZONE_DWELL = FOOT_TRAFFIC_ZONE_DWELL
+ZONES = FOOT_TRAFFIC_ZONES
 
 # store_format -> zone share, ordered as ZONES
 FORMAT_ZONE_SHARES = {
@@ -165,7 +164,7 @@ def generate_foot_traffic(
             F.col("z.zone"),
         ).alias("trace_id"),
         F.col("store_id").cast("long").alias("store_id"),
-        F.format_string("SENSOR_%03d_%s", F.col("store_id"), F.col("z.zone")).alias("sensor_id"),
+        sensor_id_column(F.col("store_id"), F.col("z.zone")).alias("sensor_id"),
         F.col("z.zone").alias("zone"),
         F.floor(F.col("z.dwell_lo") + dwell_u * (F.col("z.dwell_hi") - F.col("z.dwell_lo") + 1))
         .cast("long")
