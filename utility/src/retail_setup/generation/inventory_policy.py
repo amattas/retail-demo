@@ -30,6 +30,36 @@ def opening_stock(seed: int, store_id: int, product_id: int) -> int:
     return 40 + stable_int(seed, store_id, product_id, "opening") % 81
 
 
+# The replenishment policy, shared by history (``simulate_sku``) and the live
+# stream (``stream_supply``).
+
+
+def smooth_demand(rate: float, attempted: int) -> float:
+    """Close a day: fold its attempted demand into the EWMA daily demand rate."""
+    return 0.75 * rate + 0.25 * attempted
+
+
+def decay_demand(rate: float, quiet_days: int) -> float:
+    """EWMA rate after ``quiet_days`` closed days without any attempted demand."""
+    return rate * 0.75 ** max(0, quiet_days)
+
+
+def reorder_levels(rate: float) -> tuple[int, int]:
+    """(reorder point, order-up-to target) for a smoothed daily demand ``rate``."""
+    point = max(CASE_PACK, ceil(rate * 4))
+    target = max(point + CASE_PACK, ceil(rate * 8))
+    return point, target
+
+
+def reorder_quantity(target: int, position: int) -> int:
+    """Whole cases that lift the inventory position to the target."""
+    return ceil((target - position) / CASE_PACK) * CASE_PACK
+
+
+def reorder_priority(on_hand: int, rate: float) -> str:
+    return "URGENT" if on_hand == 0 else ("HIGH" if on_hand < rate * 2 else "NORMAL")
+
+
 @dataclass(frozen=True)
 class Demand:
     event_ts: datetime
@@ -202,9 +232,8 @@ def simulate_sku(
                 inbound -= event.quantity
             event.balance = on_hand
             yield event
-        rate = 0.75 * rate + 0.25 * attempted
-        point = max(CASE_PACK, ceil(rate * 4))
-        target = max(point + CASE_PACK, ceil(rate * 8))
+        rate = smooth_demand(rate, attempted)
+        point, target = reorder_levels(rate)
         # Only near-term returns reduce the order. A distant return cannot
         # cover demand before the service lead time has elapsed.
         near_returns = (
@@ -218,8 +247,8 @@ def simulate_sku(
         )
         position = on_hand + inbound + near_returns
         if position <= point:
-            quantity = ceil((target - position) / CASE_PACK) * CASE_PACK
-            priority = "URGENT" if on_hand == 0 else ("HIGH" if on_hand < rate * 2 else "NORMAL")
+            quantity = reorder_quantity(target, position)
+            priority = reorder_priority(on_hand, rate)
             yield InventoryEvent(
                 store_id,
                 product_id,

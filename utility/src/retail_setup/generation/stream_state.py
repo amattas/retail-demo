@@ -16,11 +16,17 @@ first attempt's versions instead of applying them twice.
 State belongs to a checkpoint incarnation: a new incarnation finds no rows
 and seeds its state once (``batch_id = -1``) from current Silver values.
 
-The live stream keeps three state tables:
+The live stream keeps these state tables:
 
 - ``_stream_state_stores``: each store's open/closed state and last change
 - ``_stream_state_visits``: customer visits still in progress
-- ``_stream_state_meta``: the clock of the last micro-batch
+- ``_stream_state_orders``: online orders whose lifecycle is still running
+- ``_stream_state_inventory``: on-hand, inbound and smoothed demand of each
+  store and product the stream has touched (``stream_supply``)
+- ``_stream_state_logistics``: pending loads, shipments on the road and truck
+  positions (``stream_supply``)
+- ``_stream_state_meta``: the clock of the last micro-batch and the
+  incarnation's inventory seed time
 
 The transitions are pure Python over plain dicts (``apply_*_batch``), so they
 are unit-tested without Spark. :class:`MemoryStateStore` keeps the rows in
@@ -33,7 +39,7 @@ import json
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeVar
 
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
@@ -41,7 +47,7 @@ from pyspark.sql import functions as F
 from retail_setup.generation.stream_calendar import StoreHours, is_open_at, store_boundaries
 
 STATE_TABLE_PREFIX = "_stream_state_"
-STATE_NAMES = ("stores", "visits", "meta")
+STATE_NAMES = ("stores", "visits", "orders", "inventory", "logistics", "meta")
 SEED_BATCH_ID = -1
 STATE_SCHEMA = (
     "incarnation string, batch_id long, entity_key string, payload string, deleted boolean"
@@ -141,11 +147,14 @@ def replace_condition(incarnation: str, batch_id: int) -> str:
     return f"incarnation = '{incarnation}' AND batch_id >= {int(batch_id)}"
 
 
+Emitted = TypeVar("Emitted")
+
+
 def apply_batch(
     state: StateMap,
     inputs: Any,
-    transition: Callable[[StateMap, Any], tuple[StateMap, list[Any]]],
-) -> tuple[StateMap, list[Any]]:
+    transition: Callable[[StateMap, Any], tuple[StateMap, Emitted]],
+) -> tuple[StateMap, Emitted]:
     """Run one micro-batch transition on a copy of ``state``: ``(new_state, emitted)``."""
     return transition({key: dict(value) for key, value in state.items()}, inputs)
 
@@ -286,6 +295,8 @@ class StateStore(Protocol):
 
     def read(self, name: str, batch_id: int) -> StateMap: ...
 
+    def read_keys(self, name: str, batch_id: int, keys: Iterable[str]) -> StateMap: ...
+
     def write(self, name: str, batch_id: int, changes: Changes) -> None: ...
 
     def has_rows(self, name: str) -> bool: ...
@@ -302,6 +313,11 @@ class MemoryStateStore:
 
     def read(self, name: str, batch_id: int) -> StateMap:
         return state_as_of(self.rows.get(name, []), self.incarnation, batch_id)
+
+    def read_keys(self, name: str, batch_id: int, keys: Iterable[str]) -> StateMap:
+        wanted = set(keys)
+        rows = [row for row in self.rows.get(name, []) if row.entity_key in wanted]
+        return state_as_of(rows, self.incarnation, batch_id)
 
     def write(self, name: str, batch_id: int, changes: Changes) -> None:
         self.rows[name] = replace_batch(
@@ -342,19 +358,32 @@ class DeltaStateStore:
             self._ready.add(name)
         return table
 
-    def _versions(self, name: str, batch_id: int) -> DataFrame:
+    def _versions(self, name: str, batch_id: int, keys: DataFrame | None = None) -> DataFrame:
         rows = self.spark.table(self._ensure(name)).where(
             (F.col("incarnation") == self.incarnation) & (F.col("batch_id") < int(batch_id))
         )
+        if keys is not None:
+            rows = rows.join(F.broadcast(keys), "entity_key")
         newest = Window.partitionBy("entity_key").orderBy(F.col("batch_id").desc())
         return rows.withColumn("_version", F.row_number().over(newest))
 
-    def read(self, name: str, batch_id: int) -> StateMap:
-        latest = self._versions(name, batch_id).where((F.col("_version") == 1) & ~F.col("deleted"))
+    def _latest(self, versions: DataFrame) -> StateMap:
+        latest = versions.where((F.col("_version") == 1) & ~F.col("deleted"))
         return {
             row["entity_key"]: decode_payload(row["payload"])
             for row in latest.select("entity_key", "payload").collect()
         }
+
+    def read(self, name: str, batch_id: int) -> StateMap:
+        return self._latest(self._versions(name, batch_id))
+
+    def read_keys(self, name: str, batch_id: int, keys: Iterable[str]) -> StateMap:
+        """Latest versions of only ``keys`` (large tables such as store inventory)."""
+        wanted = sorted(set(keys))
+        if not wanted:
+            return {}
+        frame = self.spark.createDataFrame([(key,) for key in wanted], "entity_key string")
+        return self._latest(self._versions(name, batch_id, frame))
 
     def write(self, name: str, batch_id: int, changes: Changes) -> None:
         rows = version_rows(self.incarnation, batch_id, changes)

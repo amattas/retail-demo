@@ -15,6 +15,9 @@ SILVER_CONTROL_TABLES = {
     "_stream_state_stores": "utility/src/retail_setup/generation/stream_state.py",
     "_stream_state_visits": "utility/src/retail_setup/generation/stream_state.py",
     "_stream_state_meta": "utility/src/retail_setup/generation/stream_state.py",
+    "_stream_state_orders": "utility/src/retail_setup/generation/stream_state.py",
+    "_stream_state_inventory": "utility/src/retail_setup/generation/stream_state.py",
+    "_stream_state_logistics": "utility/src/retail_setup/generation/stream_state.py",
     "fact_online_order_status": "fabric/lakehouse/03-streaming-to-silver.ipynb",
     "setup_run_log": "fabric/lakehouse/04-streaming-to-gold.ipynb",
 }

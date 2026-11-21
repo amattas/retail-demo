@@ -3,7 +3,6 @@
 import ast
 import json
 import re
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 STREAM_TEMPLATE = ROOT / "utility" / "notebooks" / "templates" / "driver-05-stream.py"
 STREAM_NOTEBOOK = ROOT / "utility" / "notebooks" / "stream-events.ipynb"
 STREAM_EVENTS = ROOT / "utility" / "src" / "retail_setup" / "generation" / "stream_events.py"
+STREAM_SUPPLY = ROOT / "utility" / "src" / "retail_setup" / "generation" / "stream_supply.py"
 SILVER_NOTEBOOK = ROOT / "fabric" / "lakehouse" / "03-streaming-to-silver.ipynb"
 GOLD_NOTEBOOK = ROOT / "fabric" / "lakehouse" / "04-streaming-to-gold.ipynb"
 KQL_TABLES = ROOT / "fabric" / "kql_database" / "01-create-tables.kql"
@@ -57,7 +57,7 @@ def _kql_columns(table: str) -> list[str]:
     return re.findall(r"^\s*([a-z_]+):", match.group(1), re.MULTILINE)
 
 
-def test_generator_emits_shared_keys_and_positive_late_dwell() -> None:
+def test_generator_emits_shared_keys_and_departures_from_the_truck_state() -> None:
     source = STREAM_TEMPLATE.read_text(encoding="utf-8")
     tree = ast.parse(source)
     calibration = ast.parse(CALIBRATION.read_text(encoding="utf-8"))
@@ -65,7 +65,6 @@ def test_generator_emits_shared_keys_and_positive_late_dwell() -> None:
     threshold = _assignment(calibration, "TRUCK_DWELL_SLA_MINUTES")
     normal_min = _assignment(calibration, "TRUCK_NORMAL_DWELL_MINUTES_MIN")
     normal_max = _assignment(calibration, "TRUCK_NORMAL_DWELL_MINUTES_MAX")
-    late_minutes = _assignment(calibration, "TRUCK_LATE_DWELL_MINUTES")
 
     for event_type in ("truck_arrived", "truck_departed"):
         assert [column for column, _field, _type in payloads[event_type]][
@@ -74,29 +73,27 @@ def test_generator_emits_shared_keys_and_positive_late_dwell() -> None:
         assert [
             column for column, _field, _type in payloads[event_type]
         ] == _kql_columns(event_type)[: len(payloads[event_type])]
+    assert 0 < normal_min <= normal_max < threshold == 90
 
-    arrival = datetime(2026, 7, 13, 12, 0, tzinfo=UTC)
-    departure = arrival + timedelta(minutes=late_minutes)
-    assert 0 < normal_min <= normal_max < threshold
-    assert late_minutes > threshold == 90
-    assert departure > arrival
-    assert (departure - arrival).total_seconds() > 0
-
+    # Arrival and departure are emitted at their own (past) instants by the
+    # truck state machine; the departure carries the actual unload dwell.
     events = STREAM_EVENTS.read_text(encoding="utf-8")
-    assert 'iso(arrival).alias("arrival_time")' in events
-    assert 'iso(departure).alias("departure_time")' in events
-    assert "F.unix_timestamp(arrival) + dwell * F.lit(60)" in events
-    assert 'dwell.alias("actual_unload_duration")' in events
-    assert events.count("session=shipment_id") == 2
-    assert "F.pmod(v, F.lit(TRUCK_LATE_BUCKET_MODULUS))" in events
+    assert 'iso(ts).alias("arrival_time")' in events
+    assert 'iso(_ms_ts(F.col("planned_ms"))).alias("planned_arrival_time")' in events
+    assert 'iso(ts).alias("departure_time")' in events
+    assert 'F.col("unload_minutes").alias("actual_unload_duration")' in events
+    assert events.count("session=shipment") == 2
+    supply = STREAM_SUPPLY.read_text(encoding="utf-8")
+    assert "while queue and queue[0][0] <= batch.clock_ms:" in supply
+    assert '"done_ms": arrival_ms + unload * _MINUTE_MS' in supply
+    assert "TRUCK_LATE" not in events + supply
 
 
 def test_generated_stream_notebook_contains_lifecycle_timing_contract() -> None:
     source = _notebook_source(STREAM_NOTEBOOK)
-    assert "TRUCK_LATE_DWELL_MINUTES = 120" in source
     assert "TRUCK_DWELL_SLA_MINUTES = 90" in source
-    assert 'iso(departure).alias("departure_time")' in source
-    assert re.search(r"\),\s*departure,", source)
+    assert "def apply_supply_batch(" in source
+    assert 'iso(ts).alias("departure_time")' in source
 
 
 def test_silver_joins_one_completed_lifecycle_on_authoritative_keys() -> None:

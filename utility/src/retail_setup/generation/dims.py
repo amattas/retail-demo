@@ -13,6 +13,7 @@ from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.loader import DictionarySet
+from retail_setup.generation.network import fleet_sizes, nearest_dc, pool_size
 from retail_setup.generation.runtime import (
     date_grid,
     derive_seed,
@@ -206,14 +207,29 @@ def generate_dimensions(
         )
     out["dim_stores"] = spark.createDataFrame(store_rows, spark_schema("dim_stores"))
 
-    # --- trucks: 85% assigned round-robin to DCs, 15% pool (DCID NULL); 40% refrigerated
-    n_trucks = max(cfg.dc_count * 3, 6)
-    n_assigned = int(round(n_trucks * 0.85))
+    # --- trucks: each DC's fleet is sized to the stores it serves (its nearest
+    #     stores by geography, the routing network.store_dc_map uses), plus a
+    #     shared pool with no DC (DCID NULL); 40% are refrigerated.
+    dc_sites = [
+        (i + 1, geos[int(dc_geo_idx[i])].State, geos[int(dc_geo_idx[i])].Region)
+        for i in range(cfg.dc_count)
+    ]
+    served: dict[int, int] = {}
+    for gi in store_geo_indices:
+        dc = nearest_dc(geos[gi].State, geos[gi].Region, dc_sites)
+        served[dc] = served.get(dc, 0) + 1
+    fleets = fleet_sizes(served, range(1, cfg.dc_count + 1))
+    truck_dcs: list[float | None] = [float(dc) for dc, size in fleets.items() for _ in range(size)]
+    truck_dcs += [None] * pool_size(len(truck_dcs))
+    # The first trucks consume the main generator exactly as the earlier fixed
+    # fleet did, so products (drawn after trucks) stay unchanged; any further
+    # trucks draw from their own generator.
+    legacy = [bool(rng.random() < 0.4) for _ in range(max(cfg.dc_count * 3, 6))]
+    extra = np.random.default_rng(derive_seed(cfg.seed, "trucks", 0, DIMENSION_SEED_DAY))
     truck_rows = []
-    for tid in range(1, n_trucks + 1):
+    for tid, dcid in enumerate(truck_dcs, start=1):
         plate = f"TRK{tid:04d}{chr(65 + tid % 26)}"
-        refrig = bool(rng.random() < 0.4)
-        dcid = float((tid - 1) % cfg.dc_count + 1) if tid <= n_assigned else None
+        refrig = legacy[tid - 1] if tid <= len(legacy) else bool(extra.random() < 0.4)
         truck_rows.append((tid, plate, refrig, dcid))
     out["dim_trucks"] = spark.createDataFrame(truck_rows, spark_schema("dim_trucks"))
 
