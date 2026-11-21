@@ -135,6 +135,7 @@ STREAM_MODULES = [
     "generation/schemas.py",
     "generation/runtime.py",
     "generation/vocabulary.py",
+    "generation/calibration.py",
     "generation/behavior.py",
     "generation/traffic.py",
     "generation/receipts.py",

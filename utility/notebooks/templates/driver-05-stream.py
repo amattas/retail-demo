@@ -176,11 +176,8 @@ from pyspark.sql import functions as F
 LIVE_TENDERS = ["CREDIT_CARD", "DEBIT_CARD", "CASH", "MOBILE"]
 LIVE_CHANNELS = ["SEARCH", "EMAIL", "SOCIAL", "DISPLAY"]
 LIVE_DEVICES = ["mobile", "desktop", "tablet"]
-TRUCK_DWELL_THRESHOLD_MINUTES = 90
-TRUCK_NORMAL_DWELL_MINUTES_MIN = 30
-TRUCK_NORMAL_DWELL_MINUTES_MAX = 75
-TRUCK_LATE_DWELL_MINUTES = 120
-TRUCK_LATE_BUCKET_MODULUS = 5
+# Truck dwell, stockout and reorder thresholds come from the shared calibration
+# (retail_setup.generation.calibration, inlined in the behavior cell).
 
 # Named promo catalog for the live feed (a subset of vocabulary.PROMO_CATALOG):
 # (code, discount_pct, eligible_months | None, min_subtotal_dollars, kind)
@@ -594,18 +591,18 @@ events_arr = F.array(
         inv_delta.alias("quantity_delta"),
         inv_reason.alias("reason"), inv_source.alias("source"),
     ), F.col("ts"), store_pkey, F.col("v")),
-    slot(inv & ((inv_qty < F.lit(5)) | disrupted), "stockout_detected", F.struct(
+    slot(inv & ((inv_qty < F.lit(STOCKOUT_QUANTITY_THRESHOLD)) | disrupted), "stockout_detected", F.struct(
         F.col("store_id"), F.lit(None).cast("long").alias("dc_id"),
         _id(F.col("v"), "iprod", PRODUCT_COUNT).alias("product_id"),
         inv_qty_eff.alias("last_known_quantity"), _iso(F.col("ts")).alias("detection_time"),
     ), F.col("ts"), store_pkey, F.col("v")),
-    slot(inv & ((inv_qty < F.lit(10)) | disrupted), "reorder_triggered", F.struct(
+    slot(inv & ((inv_qty < F.lit(REORDER_POINT)) | disrupted), "reorder_triggered", F.struct(
         F.col("store_id"), F.lit(None).cast("long").alias("dc_id"),
         _id(F.col("v"), "iprod", PRODUCT_COUNT).alias("product_id"),
         inv_qty_eff.alias("current_quantity"),
         (_h(F.col("v"), "roq", 200) + F.lit(50)).cast("long").alias("reorder_quantity"),
-        F.lit(10).cast("long").alias("reorder_point"),
-        F.when(disrupted | (inv_qty < F.lit(3)), "URGENT").otherwise("HIGH").alias("priority"),
+        F.lit(REORDER_POINT).cast("long").alias("reorder_point"),
+        F.when(disrupted | (inv_qty < F.lit(URGENT_REORDER_QUANTITY_THRESHOLD)), "URGENT").otherwise("HIGH").alias("priority"),
     ), F.col("ts"), store_pkey, F.col("v")),
 
     # --- store ops ---
