@@ -19,6 +19,7 @@ VALUES = {
     "STORE_TYPE": "hardware",
     "START_DATE": "2025-01-01",
     "END_DATE": "2025-02-28",
+    "ANCHOR_DATE": "2024-12-01",
     "STORE_COUNT": "12",
     "SEED": "7",
     "DICTIONARY_REF": "abc123",

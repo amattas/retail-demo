@@ -72,6 +72,8 @@ GOLD_DB = _param("{{GOLD_DB}}", "au")
 STORE_TYPE = _param("{{STORE_TYPE}}", "supercenter")
 START_DATE = _param("{{START_DATE}}", "2025-01-01")
 END_DATE = _param("{{END_DATE}}", "2025-03-31")
+# Dimension anchor pinned by `retail-setup configure` (see GenerationConfig.anchor_date).
+ANCHOR_DATE = _param("{{ANCHOR_DATE}}", START_DATE)
 STORE_COUNT = int(_param("{{STORE_COUNT}}", "50"))
 SEED = int(_param("{{SEED}}", "42"))
 DICTIONARY_REF = _param("{{DICTIONARY_REF}}", "main")
@@ -97,6 +99,7 @@ cfg = GenerationConfig(
     store_type=STORE_TYPE,
     start_date=date.fromisoformat(START_DATE),
     end_date=date.fromisoformat(END_DATE),
+    anchor_date=date.fromisoformat(ANCHOR_DATE),
     store_count=STORE_COUNT,
     seed=SEED,
     silver_db=SILVER_DB,

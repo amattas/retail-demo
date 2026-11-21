@@ -1049,10 +1049,14 @@ def configure(
         raise typer.Exit(code=1)
 
     dumped = generation.model_dump(mode="json")
+    saved = {key: dumped[key] for key in _GENERATION_KEYS}
+    # Pin the dimension anchor once per environment: later renders of the same
+    # seed then regenerate identical dimensions even though `months` moves the
+    # history window (B-13).
+    previous = _load_yaml_mapping(gen_path) if gen_path.is_file() else {}
+    saved["anchor_date"] = str(previous.get("anchor_date") or dumped["anchor_date"])
     gen_path.parent.mkdir(parents=True, exist_ok=True)
-    gen_path.write_text(
-        yaml.safe_dump({key: dumped[key] for key in _GENERATION_KEYS}, sort_keys=False)
-    )
+    gen_path.write_text(yaml.safe_dump(saved, sort_keys=False))
 
     typer.echo(f"Wrote {env_yml}")
     typer.echo(f"Wrote {gen_path}")
@@ -1524,6 +1528,7 @@ def render(
         "STORE_TYPE": generation.store_type,
         "START_DATE": generation.start_date.isoformat(),
         "END_DATE": generation.end_date.isoformat(),
+        "ANCHOR_DATE": generation.anchor_date.isoformat(),
         "STORE_COUNT": str(generation.store_count),
         "SEED": str(generation.seed),
         "DICTIONARY_REF": _resolve_dictionary_ref(repo_root, ref),

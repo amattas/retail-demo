@@ -45,6 +45,8 @@ VOLUME_FORMATS = {
     "kiosk": ["express"],
 }
 OPERATING_HOURS = ["6-22", "7-22", "7-23", "24h"]
+# Fixed day for the dimension RNG seed: dimensions depend on the seed alone.
+DIMENSION_SEED_DAY = date(2000, 1, 1)
 DEFAULT_TAX_RATE = 0.07407  # datagen receipts_mixin fallback
 REFRIGERATED_CATEGORIES = {
     "Produce",
@@ -130,7 +132,7 @@ def _addr(rng: np.random.Generator) -> str:
 def generate_dimensions(
     spark: SparkSession, dicts: DictionarySet, cfg: GenerationConfig
 ) -> dict[str, DataFrame]:
-    rng = np.random.default_rng(derive_seed(cfg.seed, "dims", 0, cfg.start_date))
+    rng = np.random.default_rng(derive_seed(cfg.seed, "dims", 0, DIMENSION_SEED_DAY))
     out: dict[str, DataFrame] = {}
 
     # --- geographies: sample from dictionary, sequential IDs
@@ -296,8 +298,13 @@ def generate_dimensions(
         brands_by_cat.setdefault(b.Category.strip().lower(), []).append(b)
     all_brands = list(dicts.brands)
     tags_by_product = {t.ProductName: t.Tags for t in dicts.tags}
-    # Use naive UTC datetimes — Spark session timezone is UTC (set in conftest fixture)
-    hist_start = datetime.combine(cfg.start_date, datetime.min.time())
+    # Use naive UTC datetimes — Spark session timezone is UTC (set in conftest fixture).
+    # Launch dates are placed around the pinned anchor, not the run window, so
+    # they do not move when the same seed is rendered on another day.
+    hist_start = datetime.combine(cfg.anchor_date, datetime.min.time())
+    # A department's pinned product must launch before the first sale day even
+    # when the history starts before the anchor.
+    latest_pinned_launch = datetime.combine(cfg.start_date, datetime.min.time()) - timedelta(days=1)
     # Guarantee every department has at least one product available from the
     # first day of history: without this, an adversarial seed could push every
     # product in a department past `hist_start`, leaving a sale-eligible
@@ -336,7 +343,10 @@ def generate_dimensions(
                 # First product seen for this department: pin pre-history so the
                 # department is sale-eligible on day one. Draw the RNG regardless
                 # (above) to keep every other product's launch stream unchanged.
-                launch = hist_start - timedelta(days=int(rng.integers(30, 1500)))
+                launch = min(
+                    hist_start - timedelta(days=int(rng.integers(30, 1500))),
+                    latest_pinned_launch,
+                )
                 dept_covered.add(p.Department)
             elif launch_r < 0.6:
                 launch = hist_start - timedelta(days=int(rng.integers(30, 1500)))

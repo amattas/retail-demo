@@ -37,10 +37,30 @@ def delete_lakehouse_path(spark: SparkSession, path: str) -> None:
     hadoop_path.getFileSystem(spark._jsc.hadoopConfiguration()).delete(hadoop_path, True)
 
 
-def generation_fingerprint(cfg: GenerationConfig) -> str:
-    """Stable identity of everything that shapes generated data."""
+def dictionary_fingerprint(root: Path, store_type: str) -> str:
+    """Content hash of the dictionary files generation reads (shared + store type)."""
+    digest = hashlib.sha256()
+    for folder in ("_shared", store_type):
+        base = root / folder
+        for path in sorted(base.rglob("*.json")) if base.is_dir() else []:
+            relative = path.relative_to(root).as_posix()
+            digest.update(relative.encode("utf-8") + b"\0")
+            digest.update(hashlib.sha256(path.read_bytes()).digest())
+    return digest.hexdigest()
+
+
+def generation_fingerprint(cfg: GenerationConfig, dictionary_hash: str | None = None) -> str:
+    """Stable identity of everything that shapes generated data.
+
+    Covers the configuration and the dictionary content, so a handoff
+    generated from older dictionaries (for example after the dictionary ref
+    moved) is rejected instead of being mixed with new data.
+    """
     payload = cfg.model_dump_json(exclude={"dictionary_root"})
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:32]
+    if dictionary_hash is None:
+        dictionary_hash = dictionary_fingerprint(cfg.resolved_dictionary_root, cfg.store_type)
+    identity = f"{payload}|dictionaries={dictionary_hash}"
+    return hashlib.sha256(identity.encode("utf-8")).hexdigest()[:32]
 
 
 class HandoffMismatchError(RuntimeError):

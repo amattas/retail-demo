@@ -68,29 +68,39 @@ def retail_catalog(products: DataFrame, dates: DataFrame, draws: seeded_draws) -
         F.exp(0.8 * draws.gauss(["product_id"], "retail-popularity") - 0.32)
         / F.pow(F.col("SalePrice"), 1.15),
     )
-    group = Window.partitionBy("event_date", "department")
-    ordered = group.orderBy("product_id").rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    # Floating-point sums run in product_id order over the whole department, so
+    # they are bit-identical whatever order the shuffle delivers rows in.
+    by_product = Window.partitionBy("event_date", "department").orderBy("product_id")
+    ordered = by_product.rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    whole = by_product.rowsBetween(Window.unboundedPreceding, Window.unboundedFollowing)
+    taxable_share = (
+        F.when(F.col("taxability") == "TAXABLE", 1.0)
+        .when(F.col("taxability") == "REDUCED_RATE", 0.5)
+        .otherwise(0.0)
+    )
     eligible = (
-        eligible.withColumn("_total_weight", F.sum("_popularity").over(group))
+        eligible.withColumn("_total_weight", F.sum("_popularity").over(whole))
         .withColumn("_probability", F.col("_popularity") / F.col("_total_weight"))
         .withColumn("_cdf", F.sum("_probability").over(ordered))
         .withColumn(
             "_unit_value",
             F.col("SalePrice") / (1.0 - repeat_purchase_probability(F.col("department"))),
         )
+        .withColumn(
+            "_expected_line_value",
+            F.sum(F.col("_probability") * F.col("_unit_value")).over(whole),
+        )
+        .withColumn(
+            "_expected_taxable_value",
+            F.sum(F.col("_probability") * F.col("_unit_value") * taxable_share).over(whole),
+        )
     )
     return eligible.groupBy("event_date", "department").agg(
         F.sort_array(
             F.collect_list(F.struct("_cdf", "product_id", "SalePrice", "taxability"))
         ).alias("_catalog"),
-        F.sum(F.col("_probability") * F.col("_unit_value")).alias("_expected_line_value"),
-        F.sum(
-            F.col("_probability")
-            * F.col("_unit_value")
-            * F.when(F.col("taxability") == "TAXABLE", 1.0)
-            .when(F.col("taxability") == "REDUCED_RATE", 0.5)
-            .otherwise(0.0)
-        ).alias("_expected_taxable_value"),
+        F.first("_expected_line_value").alias("_expected_line_value"),
+        F.first("_expected_taxable_value").alias("_expected_taxable_value"),
     )
 
 
