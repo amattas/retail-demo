@@ -1391,6 +1391,15 @@
           "data_type": "Double",
           "description": null,
           "children": []
+        },
+        {
+          "id": "5d0c3c1e-7a4b-4f7e-9a51-2b7f0e6c1d01",
+          "is_selected": true,
+          "display_name": "Time Zone",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
         }
       ]
     },
@@ -3648,6 +3657,15 @@
           "display_name": "Event Date",
           "type": "semantic_model.column",
           "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "a1a1a1a1-0000-0000-0000-000000000012",
+          "is_selected": true,
+          "display_name": "Local Hour",
+          "type": "semantic_model.column",
+          "data_type": "Int64",
           "description": null,
           "children": []
         }

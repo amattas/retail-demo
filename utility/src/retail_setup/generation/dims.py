@@ -21,6 +21,7 @@ from retail_setup.generation.runtime import (
     seeded_draws,
 )
 from retail_setup.generation.schemas import spark_schema
+from retail_setup.generation.timezones import state_time_zone
 from retail_setup.generation.vocabulary import ad_id_column, ble_id_column
 
 # datagen StoreProfiler equivalents (volume class -> traffic multiplier range).
@@ -198,6 +199,7 @@ def generate_dimensions(
                 str(rng.choice(VOLUME_FORMATS[vc])),
                 str(rng.choice(OPERATING_HOURS)),
                 float(np.round(rng.uniform(lo, hi), 2)),
+                state_time_zone(g.State),
             )
         )
     out["dim_stores"] = spark.createDataFrame(store_rows, spark_schema("dim_stores"))

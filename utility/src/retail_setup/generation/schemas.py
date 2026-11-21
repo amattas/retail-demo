@@ -105,6 +105,9 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("store_format", "string"),
         ("operating_hours", "string"),
         ("daily_traffic_multiplier", "double"),
+        # IANA time zone from the store geography's state. Generation works in
+        # this local time; Silver timestamps are UTC (see timezones.py).
+        ("TimeZone", "string"),
     ],
     "dim_distribution_centers": [
         ("ID", "long"),
@@ -191,6 +194,8 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("attribution_journey_id", "string"),
         ("campaign_id", "string"),
         ("impression_id_ext", "string"),
+        # Store-local hour (0-23) of the UTC event_ts, for hour-of-day reporting.
+        ("local_hour", "int"),
     ],
     "fact_receipt_lines": [
         ("receipt_id_ext", "string"),

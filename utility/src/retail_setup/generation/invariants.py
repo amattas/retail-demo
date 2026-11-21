@@ -680,16 +680,22 @@ def _run_business_invariants(r: InvariantReport, t: dict[str, DataFrame]) -> Non
     sales while a store is closed, pre-launch sales, same-day returns, or
     same-time dimension lifecycles."""
     from retail_setup.generation.receipts import _open_close_cols
+    from retail_setup.generation.timezones import local_hour
 
     receipts = t["fact_receipts"]
 
-    # --- sales-while-closed: every SALE receipt's local hour must fall inside
-    # its store's operating window. RETURN rows are stamped at noon, always open.
-    store_hours = t["dim_stores"].select(F.col("ID").alias("store_id"), "operating_hours")
+    # --- sales-while-closed: every SALE receipt's store-local hour must fall
+    # inside its store's operating window. event_ts is UTC, so the local hour
+    # comes from the store's time zone; local_hour must agree with it.
+    # RETURN rows are stamped at local noon, always open.
+    store_hours = t["dim_stores"].select(
+        F.col("ID").alias("store_id"), "operating_hours", F.col("TimeZone").alias("_tz")
+    )
     open_h, close_h = _open_close_cols(F.col("operating_hours"))
     hour_checked = (
-        receipts.select("store_id", F.hour("event_ts").alias("_h"))
+        receipts.select("store_id", "event_ts", "local_hour", "receipt_type")
         .join(store_hours, "store_id")
+        .withColumn("_h", local_hour(F.col("event_ts"), F.col("_tz")))
         .withColumn("_open", open_h)
         .withColumn("_close", close_h)
     )
@@ -699,6 +705,11 @@ def _run_business_invariants(r: InvariantReport, t: dict[str, DataFrame]) -> Non
         lambda: hour_checked.filter(
             (F.col("_h") < F.col("_open")) | (F.col("_h") >= F.col("_close"))
         ).count(),
+    )
+    _check(
+        r,
+        "fact_receipts local_hour matches the store time zone",
+        lambda: hour_checked.filter(~F.col("local_hour").eqNullSafe(F.col("_h"))).count(),
     )
 
     # --- pre-launch sales: no receipt line may sell a product before its
@@ -738,8 +749,10 @@ def _run_business_invariants(r: InvariantReport, t: dict[str, DataFrame]) -> Non
         )
     _check(
         r,
-        "fact_receipts returns posted at noon",
-        lambda: returns.filter(F.hour("event_ts") != F.lit(12)).count(),
+        "fact_receipts returns posted at local noon",
+        lambda: hour_checked.filter(
+            (F.col("receipt_type") == "RETURN") & (F.col("_h") != F.lit(12))
+        ).count(),
     )
 
     # --- same-time lifecycles: a product's LaunchDate must be a single instant

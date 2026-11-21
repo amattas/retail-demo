@@ -714,6 +714,7 @@ def generate_receipts_group(
             "attribution_journey_id",
             "campaign_id",
             "impression_id_ext",
+            F.hour("event_ts").alias("local_hour"),
         )
         .select(*column_names("fact_receipts"))
     )

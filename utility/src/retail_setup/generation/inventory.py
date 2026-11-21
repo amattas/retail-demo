@@ -23,6 +23,7 @@ from retail_setup.generation.runtime import (
     seeded_draws,
 )
 from retail_setup.generation.schemas import column_names
+from retail_setup.generation.timezones import localize_by_store
 
 
 def _with_index(df: DataFrame, table: str) -> DataFrame:
@@ -329,16 +330,29 @@ def generate_inventory_chain(
     d = seeded_draws(cfg.seed)
     events = fulfillment.events
     store_dc = _store_dc_map(dims)
-    reorders = _reorders(events, store_dc)
+    # The policy runs in store-local time. Outputs are converted to UTC with
+    # the store's zone; a shipment's whole lifecycle (and the DC rows that
+    # mirror its loads) uses its destination store's zone, and DC balances are
+    # computed after conversion so they follow UTC order.
+    reorders = localize_by_store(_reorders(events, store_dc), dims, ["event_ts"])
     planned = events.filter(F.col("kind") == "SHIPMENT").join(store_dc, "store_id")
     shipments = _shipments(spark, planned, dims, cfg)
-    truck_moves = _truck_moves(shipments)
-    truck_inv = _truck_inventory(shipments).filter(F.col("event_date") <= F.lit(cfg.end_date))
+    truck_moves = localize_by_store(
+        _truck_moves(shipments), dims, ["event_ts", "eta", "etd", "departure_time"]
+    )
+    truck_inv = localize_by_store(
+        _truck_inventory(shipments).filter(F.col("event_date") <= F.lit(cfg.end_date)),
+        dims,
+        ["event_ts"],
+    )
     dc_raw = _dc_txns(truck_inv)
-    store_bal = (
+    store_bal = localize_by_store(
         events.filter(~F.col("kind").isin("REORDER", "SHIPMENT"))
         .withColumnRenamed("store_id", "node_id")
-        .withColumnRenamed("kind", "txn_type")
+        .withColumnRenamed("kind", "txn_type"),
+        dims,
+        ["event_ts"],
+        store_id=F.col("node_id"),
     )
     dc_keys = (
         dims["dim_distribution_centers"]
