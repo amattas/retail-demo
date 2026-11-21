@@ -27,7 +27,8 @@ from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
 from retail_setup.dictionaries.models import StoreTypeProfile
-from retail_setup.generation.runtime import seeded_draws
+from retail_setup.generation.pricing import elasticity_column, inflation_column
+from retail_setup.generation.runtime import bind, seeded_draws
 from retail_setup.generation.vocabulary import PROMO_CATALOG
 
 # Share of lines that bring their complementary product along.
@@ -149,13 +150,8 @@ def basket_promotion(
 
     # The subtotal and the chosen code are evaluated once per basket and bound
     # to lambda variables, which keeps the expression (and planning) small.
-    code = _bind(gross, choose)
-    return _bind(code, lambda chosen: F.transform(lines, lambda line: priced(line, chosen)))
-
-
-def _bind(value: Column, body: Callable[[Column], Column]) -> Column:
-    """``body(value)`` with ``value`` evaluated once (a one-element lambda binding)."""
-    return F.element_at(F.transform(F.array(value), body), 1)
+    code = bind(gross, choose)
+    return bind(code, lambda chosen: F.transform(lines, lambda line: priced(line, chosen)))
 
 
 def merge_lines(lines: Column) -> Column:
@@ -226,8 +222,8 @@ def complement_partners(products: DataFrame, seed: int) -> DataFrame:
 def basket_products(dim_products: DataFrame, seed: int) -> DataFrame:
     """Catalog input of ``behavior.retail_catalog``: SKUs with their complementary partner.
 
-    ``product_id, SalePrice, taxability, department, launch_date`` plus the
-    partner's ``partner_id, partner_price, partner_taxability, partner_launch``
+    ``product_id, SalePrice, taxability, department, launch_date, inflation,
+    elasticity`` plus the partner's ``partner_id, partner_price, partner_taxability, partner_launch``
     (NULL for a department of one product).
     """
     products = dim_products.select(
@@ -236,6 +232,10 @@ def basket_products(dim_products: DataFrame, seed: int) -> DataFrame:
         "taxability",
         F.col("Department").alias("department"),
         F.to_date("LaunchDate").alias("launch_date"),
+        # Department price trend and elasticity (pricing.DEPARTMENT_PRICING),
+        # resolved once per SKU here instead of in every price expression.
+        inflation_column(F.col("Department")).alias("inflation"),
+        elasticity_column(F.col("Department")).alias("elasticity"),
     )
     partner = products.select(
         F.col("product_id").alias("partner_id"),

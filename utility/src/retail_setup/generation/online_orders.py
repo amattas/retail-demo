@@ -205,7 +205,7 @@ def generate_online_orders(
     # --- lines: shared popularity and shelf prices over products launched by
     # the order date
     products = basket_products(dims["dim_products"], cfg.seed)
-    order_dates = orders.select("event_date").distinct()
+    order_dates = date_grid(spark, cfg.start_date, cfg.end_date, "event_date")
     catalog = retail_catalog(products, order_dates, d, PriceSchedule(cfg.seed, cfg.anchor_date))
 
     qty = retail_quantity(d, ["order_id_ext", "line_num"], F.col("department"))

@@ -35,12 +35,12 @@ from functools import cached_property, lru_cache
 from math import exp
 
 import numpy as np
-from pyspark.sql import Column, DataFrame, SparkSession
+from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
 from retail_setup.generation.behavior import pick_retail_product
-from retail_setup.generation.runtime import case_when, seeded_draws
+from retail_setup.generation.runtime import bind, case_when, seeded_draws
 
 # Shopping segments (datagen CustomerJourney distribution) and their relative
 # churn hazard.
@@ -227,10 +227,6 @@ def budget_gauss(draws: seeded_draws, key: Column) -> Column:
     return draws.gauss([key], "retail-budget")
 
 
-def customer_segment(draws: seeded_draws, customer_id: Column) -> Column:
-    return draws.pick_by_weights([customer_key(customer_id)], "customer-segment", SEGMENT_WEIGHTS)
-
-
 def relative_rate_column(draws: seeded_draws, customer_id: Column) -> Column:
     """Column form of :func:`relative_visit_rate` for a customer."""
     gauss = draws.gauss([customer_key(customer_id)], "visit-propensity")
@@ -247,18 +243,14 @@ def visit_tickets(lc: CustomerLifecycle, customer_id: Column) -> Column:
     return F.greatest(F.lit(1), F.round(rate / lc.ticket_unit)).cast("int")
 
 
-def _hazard_column(lc: CustomerLifecycle, customer_id: Column) -> Column:
-    draws = seeded_draws(lc.seed)
-    segment = customer_segment(draws, customer_id)
-    segment_factor = case_when(
-        (segment == name, F.lit(factor)) for name, factor in SEGMENT_HAZARD.items()
-    ).otherwise(F.lit(1.0))
-    return (
-        F.lit(lc.base_hazard)
-        * segment_factor
-        * F.pow(relative_rate_column(draws, customer_id), F.lit(FREQUENCY_HAZARD_EXPONENT))
-        * F.exp(F.lit(SPEND_HAZARD_COEFFICIENT) * budget_gauss(draws, customer_key(customer_id)))
-    )
+def _segment_hazard(segment_draw: Column) -> Column:
+    """Hazard factor of the segment a uniform draw picks (``SEGMENT_WEIGHTS`` order)."""
+    total = sum(weight for _, weight in SEGMENT_WEIGHTS)
+    cumulative, branches = 0.0, []
+    for name, weight in SEGMENT_WEIGHTS[:-1]:
+        cumulative += weight / total
+        branches.append((segment_draw < F.lit(cumulative), F.lit(SEGMENT_HAZARD[name])))
+    return case_when(branches).otherwise(F.lit(SEGMENT_HAZARD[SEGMENT_WEIGHTS[-1][0]]))
 
 
 def lifecycle_struct(lc: CustomerLifecycle, customer_id: Column) -> Column:
@@ -266,28 +258,42 @@ def lifecycle_struct(lc: CustomerLifecycle, customer_id: Column) -> Column:
     draws = seeded_draws(lc.seed)
     key = [customer_key(customer_id)]
     pre = lc.pre_history_share
-    join_draw = draws.u(key, "customer-signup")
-    tenure = PRE_HISTORY_MIN_TENURE_DAYS + F.floor(
-        draws.u(key, "customer-tenure")
-        * (PRE_HISTORY_MAX_TENURE_DAYS - PRE_HISTORY_MIN_TENURE_DAYS)
+    inputs = F.struct(
+        draws.u(key, "customer-signup").alias("join"),
+        draws.u(key, "customer-tenure").alias("tenure"),
+        draws.u(key, "customer-churn").alias("churn"),
+        draws.u(key, "customer-taper").alias("taper"),
+        draws.u(key, "customer-segment").alias("segment"),
+        relative_rate_column(draws, customer_id).alias("rate"),
+        budget_gauss(draws, customer_key(customer_id)).alias("budget"),
     )
-    joined = F.floor((join_draw - F.lit(pre)) / F.lit(1.0 - pre) * lc.history_days)
-    is_pre = join_draw < F.lit(pre)
-    signup_day = F.when(is_pre, -tenure).otherwise(joined).cast("int")
-    # Exponential lifetime from the hazard, counted from history start for
-    # pre-history customers (memoryless) and from signup for the rest.
-    lifetime_days = F.floor(
-        -F.log(F.lit(1.0) - draws.u(key, "customer-churn"))
-        / _hazard_column(lc, customer_id)
-        * DAYS_PER_YEAR
-    )
-    churn_day = (F.when(is_pre, F.lit(0)).otherwise(signup_day) + lifetime_days).cast("long")
-    tapered = draws.u(key, "customer-taper") < F.lit(TAPERED_SHARE)
-    return F.struct(
-        signup_day.alias("signup_day"),
-        churn_day.alias("churn_day"),
-        tapered.alias("tapered"),
-    )
+
+    def build(r: Column) -> Column:
+        hazard = (
+            F.lit(lc.base_hazard)
+            * _segment_hazard(r["segment"])
+            * F.pow(r["rate"], F.lit(FREQUENCY_HAZARD_EXPONENT))
+            * F.exp(F.lit(SPEND_HAZARD_COEFFICIENT) * r["budget"])
+        )
+        is_pre = r["join"] < F.lit(pre)
+        tenure = PRE_HISTORY_MIN_TENURE_DAYS + F.floor(
+            r["tenure"] * (PRE_HISTORY_MAX_TENURE_DAYS - PRE_HISTORY_MIN_TENURE_DAYS)
+        )
+        joined = F.floor((r["join"] - F.lit(pre)) / F.lit(1.0 - pre) * lc.history_days)
+        signup_day = F.when(is_pre, -tenure).otherwise(joined).cast("int")
+        # Exponential lifetime from the hazard, counted from history start for
+        # pre-history customers (memoryless) and from signup for the rest.
+        lifetime_days = F.floor(-F.log(F.lit(1.0) - r["churn"]) / hazard * DAYS_PER_YEAR)
+        churn_start = F.when(is_pre, F.lit(0)).otherwise(joined).cast("long")
+        return F.struct(
+            signup_day.alias("signup_day"),
+            (churn_start + lifetime_days).cast("long").alias("churn_day"),
+            (r["taper"] < F.lit(TAPERED_SHARE)).alias("tapered"),
+        )
+
+    # The draws are evaluated once and bound to a lambda variable, which
+    # keeps the expression (and query planning) small.
+    return bind(inputs, build)
 
 
 def activity_column(lc: CustomerLifecycle, customer_id: Column, day: Column) -> Column:
@@ -310,9 +316,7 @@ def activity_column(lc: CustomerLifecycle, customer_id: Column, day: Column) -> 
             .otherwise(F.lit(1.0))
         )
 
-    # The lifecycle is evaluated once and bound to a lambda variable, which
-    # keeps the expression (and query planning) small.
-    return F.element_at(F.transform(F.array(lifecycle_struct(lc, customer_id)), from_life), 1)
+    return bind(lifecycle_struct(lc, customer_id), from_life)
 
 
 # ---------------------------------------------------------------------------
@@ -320,24 +324,33 @@ def activity_column(lc: CustomerLifecycle, customer_id: Column, day: Column) -> 
 # ---------------------------------------------------------------------------
 
 
-def store_picker(spark: SparkSession, stores: list[tuple[int, float]]) -> DataFrame:
-    """One row, ``_stores``: a CDF over ``(store_id, multiplier)`` for weighted store picks."""
+def store_picker(stores: list[tuple[int, float]]) -> Column:
+    """A literal CDF over ``(store_id, multiplier)`` for store picks weighted by traffic.
+
+    A literal (at most ``store_count`` entries) rather than a joined frame:
+    joining a one-row frame lets the optimizer push upstream filters into the
+    join condition, which copies large expressions into the plan.
+    """
     if not stores:
         raise ValueError("customer lifecycles need at least one store")
     total = sum(weight for _, weight in stores)
     cumulative, entries = 0.0, []
     for store_id, weight in sorted(stores):
         cumulative += weight / total
-        entries.append((cumulative, int(store_id)))
-    return spark.createDataFrame([(entries,)], "_stores array<struct<_cdf:double,store_id:bigint>>")
+        entries.append(
+            F.struct(
+                F.lit(cumulative).alias("_cdf"), F.lit(int(store_id)).cast("long").alias("store_id")
+            )
+        )
+    return F.array(*entries)
 
 
-def picked_store(draw: Column) -> Column:
-    """The store of a ``_stores`` row (:func:`store_picker`) at a uniform draw."""
-    return pick_retail_product(F.col("_stores"), draw)["store_id"].cast("long")
+def picked_store(picker: Column, draw: Column) -> Column:
+    """The store of a :func:`store_picker` CDF at a uniform draw."""
+    return bind(picker, lambda cdf: pick_retail_product(cdf, draw)["store_id"]).cast("long")
 
 
-def with_home_store(seed: int, customers: DataFrame, picker: DataFrame) -> DataFrame:
+def with_home_store(seed: int, customers: DataFrame, picker: Column) -> DataFrame:
     """Add ``HomeStoreID``, drawn in proportion to store traffic, to customers with ``ID``.
 
     Depends on the seed and the stores only, so dimensions stay independent
@@ -345,11 +358,7 @@ def with_home_store(seed: int, customers: DataFrame, picker: DataFrame) -> DataF
     """
     draws = seeded_draws(seed)
     draw = draws.u([customer_key(F.col("ID"))], "customer-home-store")
-    return (
-        customers.crossJoin(F.broadcast(picker))
-        .withColumn("HomeStoreID", picked_store(draw))
-        .drop("_stores")
-    )
+    return customers.withColumn("HomeStoreID", picked_store(picker, draw))
 
 
 def ticket_pool(lc: CustomerLifecycle, customers: DataFrame) -> DataFrame:
@@ -378,7 +387,7 @@ def assign_customers(
     visits: DataFrame,
     pool: DataFrame,
     sizes: DataFrame,
-    picker: DataFrame,
+    picker: Column,
     key: str,
     store: str,
     day: str,
@@ -390,19 +399,12 @@ def assign_customers(
     """
     draws = seeded_draws(lc.seed)
     k = [F.col(key)]
-    frame = (
-        visits.crossJoin(F.broadcast(picker))
-        .withColumn(
-            "_pool_store",
-            F.when(
-                draws.u(k, "customer-home-visit") < F.lit(HOME_STORE_SHARE), F.col(store)
-            ).otherwise(picked_store(draws.u(k, "customer-away-store"))),
-        )
-        .drop("_stores")
-        .join(
-            F.broadcast(sizes.withColumnRenamed("pool_store", "_pool_store")), "_pool_store", "left"
-        )
-    )
+    frame = visits.withColumn(
+        "_pool_store",
+        F.when(draws.u(k, "customer-home-visit") < F.lit(HOME_STORE_SHARE), F.col(store)).otherwise(
+            picked_store(picker, draws.u(k, "customer-away-store"))
+        ),
+    ).join(F.broadcast(sizes.withColumnRenamed("pool_store", "_pool_store")), "_pool_store", "left")
     frame = frame.withColumn(
         "_rank", (draws.h64(k, "customer-ticket") % F.col("pool_tickets") + 1).cast("long")
     )
@@ -425,7 +427,7 @@ def assign_online_customers(
     orders: DataFrame,
     pool: DataFrame,
     sizes: DataFrame,
-    picker: DataFrame,
+    picker: Column,
     key: str,
     day: str,
 ) -> DataFrame:
@@ -441,12 +443,9 @@ def assign_online_customers(
         F.explode(F.sequence(F.lit(1), F.lit(ONLINE_CUSTOMER_ATTEMPTS))).alias("_try"),
     )
     k = [F.col("_order"), F.col("_try")]
-    tries = (
-        tries.crossJoin(F.broadcast(picker))
-        .withColumn("_pool_store", picked_store(draws.u(k, "online-customer-store")))
-        .drop("_stores")
-        .join(F.broadcast(sizes.withColumnRenamed("pool_store", "_pool_store")), "_pool_store")
-    )
+    tries = tries.withColumn(
+        "_pool_store", picked_store(picker, draws.u(k, "online-customer-store"))
+    ).join(F.broadcast(sizes.withColumnRenamed("pool_store", "_pool_store")), "_pool_store")
     tries = tries.withColumn(
         "_rank", (draws.h64(k, "online-customer-ticket") % F.col("pool_tickets") + 1).cast("long")
     ).join(

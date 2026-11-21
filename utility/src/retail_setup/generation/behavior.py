@@ -71,12 +71,12 @@ def retail_catalog(
     eligible = eligible.withColumn(
         "_price",
         shelf_price_struct(
-            schedule, F.col("product_id"), F.col("SalePrice"), F.col("department"), day
+            schedule, F.col("product_id"), F.col("SalePrice"), F.col("inflation"), day
         ),
     ).withColumn(
         "_partner_price",
         shelf_price_struct(
-            schedule, F.col("partner_id"), F.col("partner_price"), F.col("department"), day
+            schedule, F.col("partner_id"), F.col("partner_price"), F.col("inflation"), day
         ),
     )
     eligible = eligible.withColumn(
@@ -84,7 +84,7 @@ def retail_catalog(
         F.exp(0.8 * draws.gauss(["product_id"], "retail-popularity") - 0.32)
         / F.pow(F.col("SalePrice"), 1.15)
         * demand_response(
-            F.col("_price.price_cents"), F.col("_price.trend_cents"), F.col("department")
+            F.col("_price.price_cents"), F.col("_price.trend_cents"), F.col("elasticity")
         ),
     ).withColumn("unit_cents", F.col("_price.price_cents"))
     # Floating-point sums run in product_id order over the whole department, so

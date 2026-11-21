@@ -220,7 +220,7 @@ def sales(spark):
         .select(
             "product_id",
             shelf_price_struct(
-                schedule, F.col("product_id"), F.col("SalePrice"), F.col("department"), F.col("day")
+                schedule, F.col("product_id"), F.col("SalePrice"), F.col("inflation"), F.col("day")
             )["price_cents"].alias("price_cents"),
         )
         .groupBy("product_id", "price_cents")

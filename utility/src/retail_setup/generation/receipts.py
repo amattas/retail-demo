@@ -55,6 +55,7 @@ from retail_setup.generation.customers import (
 from retail_setup.generation.pricing import PriceSchedule
 from retail_setup.generation.runtime import (
     case_when,
+    date_grid,
     fixed_width_decimal,
     seeded_draws,
 )
@@ -184,7 +185,7 @@ def _with_seasonal_department(
 
 def customer_pools(
     lifecycle: CustomerLifecycle, dims: dict[str, DataFrame]
-) -> tuple[DataFrame, DataFrame, DataFrame]:
+) -> tuple[DataFrame, DataFrame, Column]:
     """(ticket pool, pool sizes, store picker) of the customer dimension.
 
     Replicated selection tickets give persistent, long-tailed visit frequency;
@@ -193,8 +194,7 @@ def customer_pools(
     pool = ticket_pool(lifecycle, dims["dim_customers"])
     stores = dims["dim_stores"].select("ID", "daily_traffic_multiplier").collect()
     picker = store_picker(
-        pool.sparkSession,
-        [(int(row["ID"]), float(row["daily_traffic_multiplier"])) for row in stores],
+        [(int(row["ID"]), float(row["daily_traffic_multiplier"])) for row in stores]
     )
     return pool, pool_sizes(pool), picker
 
@@ -363,7 +363,10 @@ def generate_receipts_group(
             f"profile department_weights reference departments missing from the catalog: {sorted(unknown)}"
         )
 
-    sale_dates = receipts.select("event_date").distinct()
+    # Catalog days come from the history window, not from the receipts: deriving
+    # them from receipts lets the optimizer push the visit filter into the
+    # traffic grid and copy its large expressions into the plan.
+    sale_dates = date_grid(spark, cfg.start_date, cfg.end_date, "event_date")
     catalog = retail_catalog(products, sale_dates, d, PriceSchedule(cfg.seed, cfg.anchor_date))
     department_weight = sum(
         (

@@ -30,7 +30,7 @@ from datetime import date
 from pyspark.sql import Column
 from pyspark.sql import functions as F
 
-from retail_setup.generation.runtime import case_when, seeded_draws
+from retail_setup.generation.runtime import bind, case_when, seeded_draws
 
 PRICE_EPOCH = date(2000, 1, 3)
 PRICE_REVIEW_WEEKS = 13
@@ -174,56 +174,82 @@ def shelf_price_struct(
     schedule: PriceSchedule,
     product_id: Column,
     base_price: Column,
-    department: Column,
+    inflation: Column,
     day: Column,
 ) -> Column:
     """``struct<regular_cents long, price_cents long, trend_cents double, markdown boolean>``.
 
     Column form of :func:`shelf_price` for a SKU (``base_price`` in dollars,
-    ``dim_products.SalePrice``) on a date column.
+    ``dim_products.SalePrice``; ``inflation`` its department's yearly trend,
+    :func:`inflation_column`) on a date column.
     """
     draws = seeded_draws(schedule.seed)
+    epoch_offset = (PRICE_EPOCH - schedule.anchor_date).days
+    base_cents = F.round(base_price * 100)
+    growth = F.lit(1.0) + inflation
     week = F.floor(F.datediff(day, F.lit(PRICE_EPOCH)) / 7)
     phase = draws.h64([product_id], "price-phase") % PRICE_REVIEW_WEEKS
-    period = F.floor((week + phase) / PRICE_REVIEW_WEEKS)
-    period_start = period * PRICE_REVIEW_WEEKS - phase
-    epoch_offset = (PRICE_EPOCH - schedule.anchor_date).days
-    years = (period_start * 7 + F.lit(epoch_offset)) / DAYS_PER_YEAR
-    trend_years = F.datediff(day, F.lit(schedule.anchor_date)) / DAYS_PER_YEAR
-    growth = F.lit(1.0) + inflation_column(department)
-    keys = [product_id, period]
-    base_cents = F.round(base_price * 100)
-    regular = (
-        base_cents
-        * F.pow(growth, years)
-        * (1 + REGULAR_PRICE_SPREAD * (2 * draws.u(keys, "price-review") - 1))
-    )
-    low, high = MARKDOWN_WEEKS
-    length = low + F.floor(draws.u(keys, "markdown-length") * (high - low + 1))
-    first = F.floor(draws.u(keys, "markdown-start") * (PRICE_REVIEW_WEEKS - length + 1))
-    into = week - period_start
-    marked = (
-        (draws.u(keys, "markdown") < F.lit(MARKDOWN_PROBABILITY))
-        & (into >= first)
-        & (into < first + length)
-    )
-    depth_low, depth_high = MARKDOWN_DEPTH
-    depth = F.when(
-        marked, F.lit(depth_low) + draws.u(keys, "markdown-depth") * (depth_high - depth_low)
-    ).otherwise(F.lit(0.0))
-    return F.struct(
-        F.greatest(F.lit(1), F.floor(regular + 0.5)).cast("long").alias("regular_cents"),
-        F.greatest(F.lit(1), F.floor(regular * (1 - depth) + 0.5))
-        .cast("long")
-        .alias("price_cents"),
-        (base_cents * F.pow(growth, trend_years)).alias("trend_cents"),
-        marked.alias("markdown"),
+    calendar = F.struct(
+        week.alias("week"),
+        F.floor((week + phase) / PRICE_REVIEW_WEEKS).alias("period"),
+        phase.alias("phase"),
     )
 
+    def in_period(c: Column) -> Column:
+        period_start = c["period"] * PRICE_REVIEW_WEEKS - c["phase"]
+        keys = [product_id, c["period"]]
+        period_draws = F.struct(
+            draws.u(keys, "price-review").alias("review"),
+            draws.u(keys, "markdown").alias("markdown"),
+            draws.u(keys, "markdown-length").alias("length"),
+            draws.u(keys, "markdown-start").alias("start"),
+            draws.u(keys, "markdown-depth").alias("depth"),
+        )
 
-def demand_response(price_cents: Column, trend_cents: Column, department: Column) -> Column:
+        def price(r: Column) -> Column:
+            years = (period_start * 7 + F.lit(epoch_offset)) / DAYS_PER_YEAR
+            low, high = MARKDOWN_WEEKS
+            length = low + F.floor(r["length"] * (high - low + 1))
+            first = F.floor(r["start"] * (PRICE_REVIEW_WEEKS - length + 1))
+            into = c["week"] - period_start
+            marked = (
+                (r["markdown"] < F.lit(MARKDOWN_PROBABILITY))
+                & (into >= first)
+                & (into < first + length)
+            )
+            depth_low, depth_high = MARKDOWN_DEPTH
+            return F.struct(
+                (
+                    base_cents
+                    * F.pow(growth, years)
+                    * (1 + REGULAR_PRICE_SPREAD * (2 * r["review"] - 1))
+                ).alias("regular"),
+                F.when(marked, F.lit(depth_low) + r["depth"] * (depth_high - depth_low))
+                .otherwise(F.lit(0.0))
+                .alias("depth"),
+                marked.alias("markdown"),
+            )
+
+        return bind(period_draws, price)
+
+    def shelf(r: Column) -> Column:
+        trend_years = F.datediff(day, F.lit(schedule.anchor_date)) / DAYS_PER_YEAR
+        return F.struct(
+            F.greatest(F.lit(1), F.floor(r["regular"] + 0.5)).cast("long").alias("regular_cents"),
+            F.greatest(F.lit(1), F.floor(r["regular"] * (1 - r["depth"]) + 0.5))
+            .cast("long")
+            .alias("price_cents"),
+            (base_cents * F.pow(growth, trend_years)).alias("trend_cents"),
+            r["markdown"].alias("markdown"),
+        )
+
+    # Each step binds its inputs once, which keeps the expression small.
+    return bind(bind(calendar, in_period), shelf)
+
+
+def demand_response(price_cents: Column, trend_cents: Column, elasticity: Column) -> Column:
     """Choice-weight multiplier of a SKU priced off its trend: ``(price / trend) ** elasticity``."""
-    return F.pow(price_cents / trend_cents, elasticity_column(department))
+    return F.pow(price_cents / trend_cents, elasticity)
 
 
 def volume_growth(annual_growth: float, anchor: date, day: date) -> float:

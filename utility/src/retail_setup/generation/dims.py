@@ -243,7 +243,7 @@ def generate_dimensions(
     first = [n.Name for n in dicts.first_names]
     last = [n.Name for n in dicts.last_names]
     customer_draws = seeded_draws(cfg.seed)
-    picker = store_picker(spark, [(row[0], row[8]) for row in store_rows])
+    picker = store_picker([(row[0], row[8]) for row in store_rows])
     customers = with_home_store(
         cfg.seed,
         spark.range(1, cfg.customer_count + 1).select(F.col("id").cast("long").alias("ID")),

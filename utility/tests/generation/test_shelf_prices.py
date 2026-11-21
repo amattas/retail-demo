@@ -105,7 +105,11 @@ def test_price_column_matches_the_python_schedule(spark) -> None:
             draws.u(keys, "markdown-depth"),
         ).alias("markdown_draws"),
         pricing.shelf_price_struct(
-            schedule, F.col("product_id"), F.col("price"), F.col("department"), F.col("day")
+            schedule,
+            F.col("product_id"),
+            F.col("price"),
+            pricing.inflation_column(F.col("department")),
+            F.col("day"),
         ).alias("shelf"),
     ).collect()
     inflation, _ = pricing.department_pricing("Grocery")
