@@ -39,6 +39,7 @@ ENGINE_MODULES = [
     "generation/runtime.py",
     "generation/vocabulary.py",
     "generation/timezones.py",
+    "generation/stream_calendar.py",
     "generation/behavior.py",
     "generation/traffic.py",
     "generation/dims.py",
