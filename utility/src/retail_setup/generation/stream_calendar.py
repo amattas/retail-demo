@@ -7,10 +7,12 @@ same weights, evaluated in each store's own time zone, so live volume and its
 time-of-day curve continue the history.
 
 The stream is driven by a ``rate`` source. Each source row is assigned to one
-lane (store visits, online orders, marketing, inventory, logistics) and is
+lane (store visits, online orders, marketing) and is
 kept with an emit probability, so the kept rows form a Poisson process with
 the calibrated rate (thinning). :func:`plan_lanes` sizes the rate and the
 lane shares so the emit probability never needs to exceed 1 at peak.
+Inventory and logistics have no lane: they follow from the emitted purchases
+(``stream_supply``).
 
 Pure Python plus Column helpers; ``build_notebooks.py`` inlines this module
 into the stream notebook.
@@ -26,6 +28,7 @@ from pyspark.sql import functions as F
 
 from retail_setup.dictionaries.models import StoreTypeProfile
 from retail_setup.generation.runtime import seeded_draws
+from retail_setup.generation.vocabulary import ONLINE_HOURLY_WEIGHTS
 
 # ---------------------------------------------------------------------------
 # Operating hours
@@ -99,6 +102,17 @@ def daily_factors(profile: StoreTypeProfile) -> list[float]:
 def monthly_factors(profile: StoreTypeProfile) -> list[float]:
     """Month multipliers, January first, averaging 1."""
     return [w * 12 / sum(profile.monthly_weights) for w in profile.monthly_weights]
+
+
+def online_hour_factors() -> list[float]:
+    """Online-order multiplier of each UTC hour, averaging 1."""
+    total = sum(ONLINE_HOURLY_WEIGHTS)
+    return [w * 24 / total for w in ONLINE_HOURLY_WEIGHTS]
+
+
+def online_hour_factor_column(ts: Column) -> Column:
+    """Column form of :func:`online_hour_factors` for a UTC timestamp column."""
+    return F.element_at(F.array(*[F.lit(w) for w in online_hour_factors()]), F.hour(ts) + 1)
 
 
 def daily_factor_column(profile: StoreTypeProfile, day: Column) -> Column:
@@ -206,13 +220,8 @@ def is_open_at(store: StoreHours, instant: datetime) -> bool:
 # Marketing volumes in vocabulary.CAMPAIGN_ARCHETYPES are per day at this
 # legacy fleet size (marketing.py scales them by store_count / 86).
 MARKETING_LEGACY_FLEET_SIZE = 86
-# Inventory and logistics lanes keep the event rates the stream had at its old
-# fixed 5 rows/s with 50 stores (15% and 10% of rows), per store, until their
-# state machines replace them.
-LEGACY_INVENTORY_EVENTS_PER_STORE_DAY = 1296
-LEGACY_LOGISTICS_EVENTS_PER_STORE_DAY = 864
 
-STREAM_LANES = ("visits", "online", "marketing", "inventory", "logistics")
+STREAM_LANES = ("visits", "online", "marketing")
 
 
 @dataclass(frozen=True)
@@ -272,10 +281,8 @@ def plan_lanes(
     # Mean events per second of each lane at time factor 1, and its peak factor.
     base = {
         "visits": (visits_per_second, visit_peak_factor),
-        "online": (online_per_second, max(monthly_factors(profile))),
+        "online": (online_per_second, max(monthly_factors(profile)) * max(online_hour_factors())),
         "marketing": (marketing_per_second, 1.0),
-        "inventory": (store_count * LEGACY_INVENTORY_EVENTS_PER_STORE_DAY / 86400.0, 1.0),
-        "logistics": (store_count * LEGACY_LOGISTICS_EVENTS_PER_STORE_DAY / 86400.0, 1.0),
     }
     peaks = {lane: rate * peak * volume_scale for lane, (rate, peak) in base.items()}
     total_peak = sum(peaks.values())

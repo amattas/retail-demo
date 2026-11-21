@@ -59,20 +59,7 @@ def _present(pattern: str) -> Callable[[], bool]:
 # Each detector returns True while the gap still exists. When a later change
 # makes the stream use the shared definition, its detector turns False and this
 # test fails until the entry is removed, so the allowlist only shrinks.
-KNOWN_STREAM_GAPS: dict[str, tuple[str, Callable[[], bool]]] = {
-    "fulfillment-mix": (
-        "S-12: live fulfillment modes are picked uniformly, not by ONLINE_FULFILLMENT_MIX",
-        lambda: (
-            re.search(r'h64\(\[v\], "omode"\) % len\(FULFILLMENT_MODES\)', STREAM_SOURCE)
-            is not None
-            and "ONLINE_FULFILLMENT_MIX" not in STREAM_SOURCE
-        ),
-    ),
-    "online-payment-declines": (
-        "S-12: live online payments are always APPROVED (no decline model)",
-        _present(r'\.withColumn\("status", F\.lit\("APPROVED"\)\)'),
-    ),
-}
+KNOWN_STREAM_GAPS: dict[str, tuple[str, Callable[[], bool]]] = {}
 
 
 def test_format_helpers_match_the_historical_dimension_formats() -> None:
@@ -146,6 +133,12 @@ def test_stream_uses_the_shared_definitions() -> None:
         'ad_id_column(F.col("customer_pick"))',
         "ONLINE_TENDERS",
         "BLE_ZONE_DWELL",
+        # Online orders: the historical fulfillment mix and the decline model.
+        'd.pick_by_weights(key, "online-mode", ONLINE_FULFILLMENT_MIX)',
+        'payment_status_column(d, key, F.col("tender"), ONLINE_TENDERS, "online-decline")',
+        "ONLINE_CANCEL_RATE",
+        "ONLINE_BACKORDER_RATE",
+        "ONLINE_PROMOS",
     ):
         assert usage in EVENTS_SOURCE, usage
     assert set(vocab.BLE_ZONE_DWELL) == set(vocab.BLE_ZONES)

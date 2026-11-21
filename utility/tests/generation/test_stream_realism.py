@@ -1,8 +1,10 @@
-"""Live stream vs history: volume, hours, conversion, identities and payments.
+"""Live stream vs history: volume, hours, conversion, identities, payments,
+store inventory, trucks and online order lifecycles.
 
 Runs the inlined stream functions offline over simulated micro-batches (an
 in-memory state store, the same code the notebook runs per foreachBatch) and
-compares the result with a small generated history over the same dates.
+compares the result with a small generated history over the same dates. One
+simulation feeds every assertion; it is the slow part of this module.
 """
 
 from __future__ import annotations
@@ -19,7 +21,11 @@ import pytest
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.loader import load_dictionaries
 from retail_setup.generation import vocabulary as vocab
-from retail_setup.generation.calibration import REFERENCE_STORE_TYPE
+from retail_setup.generation.calibration import (
+    REFERENCE_STORE_TYPE,
+    STOCKOUT_QUANTITY_THRESHOLD,
+    TRUCK_LOAD_MINUTES,
+)
 from retail_setup.generation.stream_calendar import operating_window, plan_lanes
 from retail_setup.generation.stream_state import (
     SEED_BATCH_ID,
@@ -36,6 +42,10 @@ TRANSACTIONS = 60
 BATCH = timedelta(hours=24)
 # notebook 03 replays this far behind its arrival watermark
 REPLAY_OVERLAP = timedelta(hours=3)
+# Seeded store stock: low enough that shelves empty, reorders ship and trucks
+# unload within the simulated days.
+SEED_STOCK_MODULUS = 25
+SEED_RATE = 1.5
 NAMESPACE = "sim-0a1b2c3d"
 REPLAYED_BATCHES = {2}
 CODEGEN_OFF = {
@@ -80,6 +90,7 @@ def _simulate(spark):
     from pyspark.sql import functions as F
 
     from retail_setup.generation.dims import generate_dimensions
+    from retail_setup.generation.network import dc_fleets, store_dc_map
     from retail_setup.generation.receipts import generate_receipts_group
     from retail_setup.generation.sensors import generate_ble
     from retail_setup.generation.stream_baskets import prepare_basket_catalog
@@ -89,6 +100,7 @@ def _simulate(spark):
         generate_stream_batch,
     )
     from retail_setup.generation.stream_frames import dense_id_lookup
+    from retail_setup.generation.stream_supply import SupplyNetwork
     from retail_setup.generation.traffic import generate_hourly_visits
 
     cfg = GenerationConfig(
@@ -136,12 +148,42 @@ def _simulate(spark):
         online_orders_per_day=cfg.online_orders_per_day,
         marketing_impressions_per_day=sum(entry[2] for entry in vocab.CAMPAIGN_ARCHETYPES),
     )
-    # Keep the simulation small: run at the peak rate and drop the flat
-    # inventory/logistics lanes, which these checks do not read.
-    shares = dict(plan.shares, inventory=0.0, logistics=0.0)
-    rate = sum(plan.peaks.values()) - plan.peaks["inventory"] - plan.peaks["logistics"]
-    shares = {lane: share * plan.rows_per_second / rate for lane, share in shares.items()}
+    # Keep the simulation small: run at the peak rate.
+    rate = sum(plan.peaks.values())
+    shares = {lane: share * plan.rows_per_second / rate for lane, share in plan.shares.items()}
     lanes = replace(plan, rows_per_second=rate, shares=shares)
+    store_dc = {
+        row["store_id"]: row["dc_id"]
+        for row in store_dc_map(
+            dims["dim_stores"], dims["dim_geographies"], dims["dim_distribution_centers"]
+        ).collect()
+    }
+    trucks = dims["dim_trucks"].select("ID", "DCID").collect()
+    fleets = dc_fleets(
+        ((row["ID"], row["DCID"]) for row in trucks),
+        [row["ID"] for row in dims["dim_distribution_centers"].collect()],
+    )
+    network = SupplyNetwork(
+        seed=cfg.seed,
+        namespace=NAMESPACE,
+        store_dc=store_dc,
+        fleets=fleets,
+        daily_prior=TRANSACTIONS * 10.0 / dims["dim_products"].count(),
+    )
+    stock = (
+        dims["dim_stores"]
+        .select(F.col("ID").cast("long").alias("store_id"))
+        .crossJoin(dims["dim_products"].select(F.col("ID").cast("long").alias("product_id")))
+        .select(
+            "store_id",
+            "product_id",
+            F.pmod(F.col("product_id") * 7 + F.col("store_id"), F.lit(SEED_STOCK_MODULUS))
+            .cast("long")
+            .alias("on_hand"),
+            F.lit(SEED_RATE).alias("rate"),
+        )
+        .persist()
+    )
     ctx = build_stream_context(
         spark,
         seed=cfg.seed,
@@ -154,6 +196,8 @@ def _simulate(spark):
         ids=ids,
         baskets=prepare_basket_catalog(spark, products, profile, cfg.seed, START),
         lanes=lanes,
+        supply=network,
+        inventory_seed=stock,
     )
 
     state = MemoryStateStore(NAMESPACE)
@@ -174,7 +218,7 @@ def _simulate(spark):
         events = [json.loads(value) for value in values]
         commit_stream_batch(state, batch_id, batch)
         batch.release()
-        batches.append((batch_id, events))
+        batches.append((batch_id, events, batch.clock_ms))
         clock += BATCH
         batch_id += 1
 
@@ -189,8 +233,12 @@ def _simulate(spark):
         "pings": ping_rows,
         "ble_ids": {row["BLEId"] for row in dims["dim_customers"].select("BLEId").collect()},
         "batches": batches,
-        "events": [event for _, events in batches for event in events],
+        "events": [event for _, events, _ in batches for event in events],
         "state": state,
+        "network": network,
+        "truck_dc": {row["ID"]: row["DCID"] for row in trucks},
+        "store_bps": {row["ID"]: round(row["tax_rate"] * 10000) for row in store_rows},
+        "batch_count": batch_id,
     }
 
 
@@ -369,7 +417,7 @@ def test_purchase_money_reconciles_across_events(world) -> None:
 def test_journey_touches_arrive_inside_the_silver_replay_window(world) -> None:
     newest_seen = None
     touches = 0
-    for _batch_id, events in world["batches"]:
+    for _batch_id, events, _clock in world["batches"]:
         arrivals = [e["ingest_timestamp"] for e in events]
         for event in events:
             if event["event_type"] != "ad_impression" or not event.get("correlation_id"):
@@ -410,3 +458,267 @@ def test_store_operations_pair_at_local_boundaries(world) -> None:
                 else ((23, 59) if close_hour == 24 else (close_hour, 0))
             )
             assert (local.hour, local.minute) == expected, (store_id, op, local)
+
+
+# ---------------------------------------------------------------------------
+# Store inventory, trucks and online orders (stream_supply, plan_orders)
+# ---------------------------------------------------------------------------
+
+MINUTE_MS = 60_000
+
+
+def _ms(iso: str) -> int:
+    return round(datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp() * 1000)
+
+
+def _seed_stock(store_id: int, product_id: int) -> int:
+    return (product_id * 7 + store_id) % SEED_STOCK_MODULUS
+
+
+def _ledger(world) -> dict[tuple[int, int], list[tuple[int, int, int]]]:
+    """(ms, balance before, balance after) per store and product, from the live moves."""
+    if "ledger" not in world:
+        deltas: dict[tuple[int, int], dict[int, int]] = {}
+        for event in _of(world, "inventory_updated"):
+            payload = event["payload"]
+            key = (payload["store_id"], payload["product_id"])
+            at = _ms(event["ingest_timestamp"])
+            deltas.setdefault(key, {})[at] = (
+                deltas.setdefault(key, {}).get(at, 0) + payload["quantity_delta"]
+            )
+        ledger = {}
+        for key, by_ms in deltas.items():
+            balance, steps = _seed_stock(*key), []
+            for at in sorted(by_ms):
+                steps.append((at, balance, balance + by_ms[at]))
+                balance += by_ms[at]
+            ledger[key] = steps
+        world["ledger"] = ledger
+    return world["ledger"]
+
+
+def test_no_event_is_emitted_before_its_time(world) -> None:
+    for _batch_id, events, clock_ms in world["batches"]:
+        assert all(_ms(e["ingest_timestamp"]) <= clock_ms for e in events)
+
+
+def test_store_stock_never_goes_negative_and_reconciles_with_sales_and_unloads(world) -> None:
+    ledger = _ledger(world)
+    assert ledger
+    assert all(after >= 0 for steps in ledger.values() for _at, _before, after in steps)
+    inventory = world["state"].read("inventory", world["batch_count"])
+    for key, entry in inventory.items():
+        _, store, product = key.split(":")
+        steps = ledger.get((int(store), int(product)))
+        expected = steps[-1][2] if steps else _seed_stock(int(store), int(product))
+        assert entry["on_hand"] == expected, key
+
+    moves = [e["payload"] for e in _of(world, "inventory_updated")]
+    network = world["network"]
+    assert all(m["dc_id"] == network.dc_of(m["store_id"]) for m in moves)
+    lost = [m for m in moves if m["reason"] == "LOST_SALE"]
+    assert lost and all(m["quantity_delta"] == 0 and m["requested_quantity"] > 0 for m in lost)
+
+    # Every unit a store sold is on an emitted receipt line or a store-fulfilled
+    # online line, and no lost sale is.
+    sold: dict[tuple[int, int], int] = {}
+    for m in moves:
+        if m["reason"] == "SALE":
+            assert m["requested_quantity"] == -m["quantity_delta"] > 0
+            key = (m["store_id"], m["product_id"])
+            sold[key] = sold.get(key, 0) - m["quantity_delta"]
+    receipt_store = {
+        e["payload"]["receipt_id"]: e["payload"]["store_id"] for e in _of(world, "receipt_created")
+    }
+    cancelled = {
+        e["payload"]["order_id"]
+        for e in _of(world, "online_order_created")
+        if e["payload"]["total_cents"] == 0
+    }
+    lines: dict[tuple[int, int], int] = {}
+    for e in _of(world, "receipt_line_added"):
+        key = (receipt_store[e["payload"]["receipt_id"]], e["payload"]["product_id"])
+        lines[key] = lines.get(key, 0) + e["payload"]["quantity"]
+    for e in _of(world, "online_order_line_added"):
+        payload = e["payload"]
+        if payload["node_type"] == "STORE" and payload["order_id"] not in cancelled:
+            key = (payload["node_id"], payload["product_id"])
+            lines[key] = lines.get(key, 0) + payload["quantity"]
+    assert sold == lines
+    print(
+        f"STAT live lines lost={len(lost)} sold={sum(sold.values())} units, "
+        f"{len(ledger)} store-products moved"
+    )
+
+
+def test_stockouts_fire_only_when_a_sale_empties_the_shelf(world) -> None:
+    ledger = _ledger(world)
+    stockouts = [e["payload"] for e in _of(world, "stockout_detected")]
+    assert stockouts
+    seen = set()
+    for payload in stockouts:
+        key = (payload["store_id"], payload["product_id"])
+        at = _ms(payload["detection_time"])
+        before, after = next((b, a) for t, b, a in ledger[key] if t == at)
+        # Sales of one SKU in the same instant share a ledger step.
+        assert after < STOCKOUT_QUANTITY_THRESHOLD <= payload["last_known_quantity"] <= before
+        assert payload["dc_id"] == world["network"].dc_of(payload["store_id"])
+        day = (key, payload["detection_time"][:10])
+        assert day not in seen
+        seen.add(day)
+    for key, steps in ledger.items():
+        crossings = [t for t, b, a in steps if b >= STOCKOUT_QUANTITY_THRESHOLD > a]
+        reported = [
+            _ms(p["detection_time"]) for p in stockouts if (p["store_id"], p["product_id"]) == key
+        ]
+        assert set(reported) <= set(crossings)
+        assert len({t // 86_400_000 for t in crossings}) == len(reported), key
+    print(f"STAT live stockouts={len(stockouts)}")
+
+
+def test_reorders_ship_on_the_dc_fleet_and_unload_into_stock(world) -> None:
+    network = world["network"]
+    reorders = [e["payload"] for e in _of(world, "reorder_triggered")]
+    assert reorders
+    ordered: dict[tuple[int, int], int] = {}
+    for r in reorders:
+        assert r["reorder_quantity"] > 0 and r["reorder_quantity"] % 12 == 0
+        assert r["current_quantity"] >= 0 and r["dc_id"] == network.dc_of(r["store_id"])
+        assert (r["priority"] == "URGENT") == (r["current_quantity"] == 0)
+        key = (r["store_id"], r["product_id"])
+        ordered[key] = ordered.get(key, 0) + r["reorder_quantity"]
+
+    arrivals = {e["payload"]["shipment_id"]: e["payload"] for e in _of(world, "truck_arrived")}
+    departures = {e["payload"]["shipment_id"]: e["payload"] for e in _of(world, "truck_departed")}
+    assert departures and set(departures) <= set(arrivals)
+    received: dict[tuple[int, int], int] = {}
+    for e in _of(world, "inventory_updated"):
+        payload = e["payload"]
+        if payload["reason"] == "INBOUND_SHIPMENT":
+            departure = departures[payload["source"]]
+            assert _ms(e["ingest_timestamp"]) == _ms(departure["departure_time"])
+            key = (payload["store_id"], payload["product_id"])
+            received[key] = received.get(key, 0) + payload["quantity_delta"]
+    in_flight: dict[tuple[int, int], int] = {}
+    logistics = world["state"].read("logistics", world["batch_count"])
+    for key, payload in logistics.items():
+        if key.startswith(("pending:", "shipment:")):
+            store = int(payload.get("store_id", key.split(":")[-1]))
+            for product, quantity in payload["lines"].items():
+                in_flight[(store, int(product))] = (
+                    in_flight.get((store, int(product)), 0) + quantity
+                )
+    for key, quantity in ordered.items():
+        assert quantity == received.get(key, 0) + in_flight.get(key, 0), key
+
+    by_truck: dict[str, list[dict]] = {}
+    dwell = []
+    for shipment_id, arrival in arrivals.items():
+        truck = int(arrival["truck_id"][3:])
+        home = world["truck_dc"][truck]
+        assert home is None or int(home) == arrival["dc_id"]
+        assert truck in network.fleets[arrival["dc_id"]]
+        assert arrival["dc_id"] == network.dc_of(arrival["store_id"])
+        assert arrival["planned_arrival_time"] == arrival["arrival_time"]
+        # On time until the incident model adds delays: no reason (JSON omits nulls).
+        assert arrival["delay_minutes"] == 0 and arrival.get("delay_reason") is None
+        departure = departures.get(shipment_id)
+        if departure is not None:
+            minutes = (_ms(departure["departure_time"]) - _ms(arrival["arrival_time"])) / MINUTE_MS
+            assert minutes == departure["actual_unload_duration"] > 0
+            dwell.append(minutes)
+        by_truck.setdefault(arrival["truck_id"], []).append({**arrival, "departure": departure})
+    for trips in by_truck.values():
+        trips.sort(key=lambda trip: _ms(trip["arrival_time"]))
+        for previous, following in zip(trips, trips[1:]):
+            assert previous["departure"] is not None
+            back = (
+                _ms(previous["departure"]["departure_time"])
+                + (
+                    network.transit_minutes(previous["store_id"])
+                    + TRUCK_LOAD_MINUTES
+                    + network.transit_minutes(following["store_id"])
+                )
+                * MINUTE_MS
+            )
+            assert _ms(following["arrival_time"]) >= back
+    print(
+        f"STAT trucks shipments={len(arrivals)} on {len(by_truck)} trucks, "
+        f"mean dwell={mean(dwell):.1f} min, max dwell={max(dwell):.0f} min"
+    )
+
+
+def test_online_orders_follow_a_staged_lifecycle(world) -> None:
+    created = {e["payload"]["order_id"]: e for e in _of(world, "online_order_created")}
+    assert created
+    lines: dict[str, list[dict]] = {}
+    for e in _of(world, "online_order_line_added"):
+        lines.setdefault(e["payload"]["order_id"], []).append(e["payload"])
+    payments = {
+        e["payload"]["order_id"]: e["payload"]
+        for e in _of(world, "payment_processed")
+        if e["payload"].get("order_id")
+    }
+    stages = {
+        name: {e["payload"]["order_id"]: _ms(e["payload"][field]) for e in _of(world, name)}
+        for name, field in (
+            ("online_order_picked", "picked_time"),
+            ("online_order_shipped", "shipped_time"),
+            ("online_order_delivered", "delivered_time"),
+        )
+    }
+    picked, shipped, delivered = stages.values()
+    modes: dict[str, int] = {}
+    for order_id, event in created.items():
+        order = event["payload"]
+        at = _ms(event["ingest_timestamp"])
+        modes[order["fulfillment_mode"]] = modes.get(order["fulfillment_mode"], 0) + 1
+        order_lines = lines[order_id]
+        assert len(order_lines) == order["item_count"]
+        assert {line["fulfillment_mode"] for line in order_lines} == {order["fulfillment_mode"]}
+        assert order["gross_subtotal_cents"] - order["discount_cents"] == order["subtotal_cents"]
+        assert order["subtotal_cents"] + order["tax_cents"] == order["total_cents"]
+        if order["total_cents"] == 0:
+            assert order_id not in payments and order_id not in picked
+            continue
+        assert (
+            sum(round(line["extended_price"] * 100) for line in order_lines)
+            == (order["subtotal_cents"])
+        )
+        assert order["tender_type"] in vocab.tender_names(vocab.ONLINE_TENDERS)
+        assert payments[order_id]["amount_cents"] == order["total_cents"]
+        assert payments[order_id].get("store_id") is None
+        if order["node_type"] == "STORE":
+            assert order["node_id"] in world["stores"]
+        if order_id not in picked:
+            continue
+        bopis = order["fulfillment_mode"] == "BOPIS"
+        low, high = vocab.ONLINE_PICK_SECONDS["BOPIS" if bopis else "SHIP"]
+        assert low * 1000 <= picked[order_id] - at <= high * 1000
+        if bopis:
+            assert order_id not in shipped
+            if order_id in delivered:
+                assert delivered[order_id] > picked[order_id]
+        else:
+            if order_id in shipped:
+                assert shipped[order_id] > picked[order_id]
+            if order_id in delivered:
+                assert delivered[order_id] > shipped[order_id]
+    assert set(shipped) <= set(picked) and set(delivered) <= set(picked)
+    assert delivered and any(
+        created[o]["payload"]["fulfillment_mode"] == "BOPIS" for o in delivered
+    )
+    days = (END - START).days + 1
+    in_window = sum(
+        1
+        for e in created.values()
+        if START <= datetime.fromisoformat(e["ingest_timestamp"][:10]).date() <= END
+    )
+    expected = world["cfg"].online_orders_per_day * days
+    ship_from_dc = modes.get("SHIP_FROM_DC", 0) / len(created)
+    print(
+        f"STAT online orders={in_window} expected~{expected} "
+        f"delivered={len(delivered)} ship_from_dc={ship_from_dc:.2f}"
+    )
+    assert 0.6 * expected <= in_window <= 1.4 * expected
+    assert 0.45 <= ship_from_dc <= 0.75

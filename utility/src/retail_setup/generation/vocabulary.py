@@ -429,3 +429,28 @@ ONLINE_FULFILLMENT_MIX: list[tuple[str, float]] = [
     ("BOPIS", 0.10),
 ]
 FULFILLMENT_MODES = [mode for mode, _ in ONLINE_FULFILLMENT_MIX]
+
+# Order-level outcomes and stage delays shared by history (online_orders.py)
+# and the live stream. Cancelled orders have zero totals, no payment and no
+# fulfillment; backordered (never BOPIS) orders ship but are not delivered yet.
+ONLINE_CANCEL_RATE = 0.02
+ONLINE_BACKORDER_RATE = 0.08
+# Promo codes with their percentage discount; each order puts a promo on a
+# share of its lines drawn uniformly from ONLINE_PROMO_LINE_SHARE.
+ONLINE_PROMOS: list[tuple[str, int]] = [("PROMO05", 5), ("PROMO10", 10), ("PROMO20", 20)]
+ONLINE_PROMO_LINE_SHARE = (0.10, 0.30)
+# Stage delays in seconds, uniform in [low, high): picking after the order
+# (BOPIS orders are picked for the pickup counter, ship orders for the
+# carrier), shipping after picking, delivery after shipping, and the BOPIS
+# customer pickup after the order is ready.
+ONLINE_PICK_SECONDS = {"BOPIS": (4 * 3600, 24 * 3600), "SHIP": (30 * 60, 240 * 60)}
+ONLINE_SHIP_SECONDS = (2 * 3600, 4 * 3600)
+ONLINE_DELIVER_SECONDS = (86400, 3 * 86400)
+ONLINE_PICKUP_SECONDS = (3600, 24 * 3600)
+# Relative weight of online orders in each UTC hour (0-23). Most customers
+# are in US time zones, so orders peak in the US evening (00-03 UTC) and are
+# fewest in the US night (07-10 UTC).
+ONLINE_HOURLY_WEIGHTS = [
+    6.5, 6.5, 6.0, 5.0, 3.8, 2.6, 1.6, 1.0, 0.8, 0.9, 1.3, 2.0,
+    2.9, 3.6, 4.1, 4.4, 4.6, 4.7, 4.7, 4.8, 5.0, 5.4, 5.9, 6.3,
+]  # fmt: skip

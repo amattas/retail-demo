@@ -105,6 +105,7 @@
   {"column":"quantity_delta","path":"$.payload.quantity_delta","datatype":"long"},
   {"column":"reason","path":"$.payload.reason","datatype":"string"},
   {"column":"payload_source","path":"$.payload.source","datatype":"string"},
+  {"column":"requested_quantity","path":"$.payload.requested_quantity","datatype":"long"},
   {"column":"event_type","path":"$.event_type","datatype":"string"},
   {"column":"trace_id","path":"$.trace_id","datatype":"string"},
   {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},

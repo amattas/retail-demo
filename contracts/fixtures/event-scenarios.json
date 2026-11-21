@@ -128,7 +128,7 @@
     },
     {
       "id": "inventory-stockout-reorder",
-      "description": "A store inventory adjustment triggers verified stockout and reorder payloads.",
+      "description": "A sale empties a store's shelf: the stock move, its stockout and the policy reorder to the store's DC.",
       "events": [
         {
           "event_type": "inventory_updated",
@@ -142,11 +142,12 @@
           "parent_event_id": null,
           "payload": {
             "store_id": 3,
-            "dc_id": null,
+            "dc_id": 2,
             "product_id": 501,
             "quantity_delta": -4,
             "reason": "SALE",
-            "source": "POS"
+            "source": "CUSTOMER_PURCHASE",
+            "requested_quantity": 4
           }
         },
         {
@@ -161,9 +162,9 @@
           "parent_event_id": null,
           "payload": {
             "store_id": 3,
-            "dc_id": null,
+            "dc_id": 2,
             "product_id": 501,
-            "last_known_quantity": 0,
+            "last_known_quantity": 4,
             "detection_time": "2026-07-20T13:00:00.100Z"
           }
         },
@@ -179,11 +180,11 @@
           "parent_event_id": null,
           "payload": {
             "store_id": 3,
-            "dc_id": null,
+            "dc_id": 2,
             "product_id": 501,
             "current_quantity": 0,
-            "reorder_quantity": 100,
-            "reorder_point": 10,
+            "reorder_quantity": 96,
+            "reorder_point": 48,
             "priority": "URGENT"
           }
         }
