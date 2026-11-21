@@ -127,21 +127,34 @@ def test_stream_identity_persists_with_checkpoint_metadata() -> None:
 @pytest.mark.parametrize("count", [0, 5])
 def test_live_driver_requires_nonempty_real_dimensions(count) -> None:
     spark = Mock()
-    spark.table.return_value.count.return_value = count
+    lookups = []
+
+    def dense_id_lookup(frame):
+        lookups.append(frame)
+        return "lookup", count
+
     namespace = _exec_nodes(
         ast.parse(STREAM_TEMPLATE.read_text(encoding="utf-8")),
-        {"_count"},
-        {"spark": spark, "LAKEHOUSE_NAME": "lh", "SILVER_DB": "ag"},
+        {"_ids"},
+        {
+            "spark": spark,
+            "LAKEHOUSE_NAME": "lh",
+            "SILVER_DB": "ag",
+            "dense_id_lookup": dense_id_lookup,
+        },
     )
     if count:
-        assert namespace["_count"]("dim_stores") == count
+        assert namespace["_ids"]("dim_stores") == ("lookup", count)
+        assert lookups == [spark.table.return_value]
+        namespace["_ids"]("dim_products", "launched")
+        spark.table.return_value.where.assert_called_once_with("launched")
     else:
         with pytest.raises(ValueError, match="Required streaming dimension"):
-            namespace["_count"]("dim_stores")
-    spark.table.assert_called_once_with("lh.ag.dim_stores")
+            namespace["_ids"]("dim_stores")
+    spark.table.assert_any_call("lh.ag.dim_stores")
     spark.table.side_effect = RuntimeError("permission denied")
     with pytest.raises(RuntimeError, match="permission denied"):
-        namespace["_count"]("dim_stores")
+        namespace["_ids"]("dim_stores")
 
 
 def test_eventhouse_batch_uses_idempotent_transaction_metadata() -> None:

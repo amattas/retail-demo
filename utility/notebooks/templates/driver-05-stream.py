@@ -38,6 +38,7 @@ run_seconds = 0                # 0 = run forever; >0 = stop after N seconds (tes
 trigger_seconds = 60           # live micro-batch interval; bounded runs use at most 10
 max_lag_seconds = 600          # after a stop, skip source rows older than this
 max_restarts = 5               # supervised restarts of a failed live query
+allow_history_gap = False      # start a new stream even if history ends >1 day ago or overlaps now
 event_source = "retail-datagen"  # envelope `source`; kept compatible with downstream
 stream_id = ""                 # blank = persist a UUID beside the checkpoint
 
@@ -153,28 +154,39 @@ print(f"checkpoint {CHECKPOINT_LOCATION}: incarnation {INCARNATION} "
          if INCARNATION_PLAN.pending_batch is not None else ""))
 
 # %%
-# Dimension ID ranges — read from the Silver dims that setup-02 wrote, so events
-# carry valid foreign keys. Missing/empty dimensions cannot produce a valid stream.
-def _count(table: str) -> int:
-    count = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.{table}").count()
-    if count < 1:
-        raise ValueError(f"Required streaming dimension {table} is empty; run setup first")
-    return count
+# Dimension IDs — read from the Silver dims that setup-02 wrote, so events carry
+# valid foreign keys. Each lookup numbers the IDs that actually exist (gaps from
+# a custom layout or a filtered publish are fine), and inventory events only use
+# products launched by the catalog date. Missing/empty dimensions stop here.
+from pyspark.sql import functions as _F
 
-STORE_COUNT = _count("dim_stores")
-CUSTOMER_COUNT = _count("dim_customers")
-PRODUCT_COUNT = _count("dim_products")
-DC_COUNT = _count("dim_distribution_centers")
-TRUCK_COUNT = _count("dim_trucks")
-print(f"ranges: stores={STORE_COUNT} customers={CUSTOMER_COUNT} products={PRODUCT_COUNT} "
+
+def _ids(table: str, where=None, what: str = "rows"):
+    frame = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.{table}")
+    if where is not None:
+        frame = frame.where(where)
+    lookup, count = dense_id_lookup(frame)
+    if count < 1:
+        raise ValueError(f"Required streaming dimension {table} has no {what}; run setup first")
+    return lookup, count
+
+
+STORE_IDS, STORE_COUNT = _ids("dim_stores")
+CUSTOMER_IDS, CUSTOMER_COUNT = _ids("dim_customers")
+LAUNCHED_PRODUCT_IDS, PRODUCT_COUNT = _ids(
+    "dim_products", _F.to_date("LaunchDate") <= _F.lit(CATALOG_DATE),
+    f"products launched by {CATALOG_DATE}",
+)
+DC_IDS, DC_COUNT = _ids("dim_distribution_centers")
+TRUCK_IDS, TRUCK_COUNT = _ids("dim_trucks")
+print(f"ids: stores={STORE_COUNT} customers={CUSTOMER_COUNT} launched products={PRODUCT_COUNT} "
       f"dcs={DC_COUNT} trucks={TRUCK_COUNT}")
 
-# Dimension ATTRIBUTES (not just counts) as small broadcast frames for
-# stream-static joins, so the live feed's money matches the historical batch:
-# real product prices/taxability and the store's real tax rate. Customer geography affinity is not applied
-# in the stream (the customer base is too large to broadcast and a fixed-rate
-# stream has no per-store demand signal) — a documented live-feed approximation.
-from pyspark.sql import functions as _F
+# Dimension ATTRIBUTES as small broadcast frames for stream-static joins, so the
+# live feed's money matches the historical batch: real product prices/taxability
+# and the store's real tax rate. Customer geography affinity is not applied in
+# the stream (a fixed-rate stream has no per-store demand signal) — a documented
+# live-feed approximation.
 import json
 
 STREAM_PROFILE = StoreTypeProfile.model_validate(json.loads(
@@ -188,7 +200,25 @@ STREAM_PRODUCTS = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_products").sele
 STORE_ATTR = (spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_stores")
               .select(_F.col("ID").alias("as_id"),
                       _F.round(_F.col("tax_rate") * 10000).cast("long").alias("as_bps")))
+_untaxed = STORE_ATTR.where(_F.col("as_bps").isNull()).count()
+if _untaxed:
+    raise ValueError(f"{_untaxed} dim_stores rows have no tax_rate; live purchases need one")
 print("attrs: using real dim_products / dim_stores prices+tax")
+
+# History-to-stream handoff: history should end within a day before now. A new
+# stream refuses a gap or overlap unless allow_history_gap is set; a resumed
+# checkpoint only warns (its own downtime is an expected gap).
+_history_end = (spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.fact_receipts")
+                .agg(_F.max("event_ts").cast("long").alias("end")).first()["end"])
+enforce_history_handoff(
+    check_history_handoff(
+        None if _history_end is None
+        else _datetime.fromtimestamp(_history_end, _timezone.utc),
+        _datetime.now(_timezone.utc),
+    ),
+    resumed=INCARNATION_PLAN.resumed,
+    allow_gap=bool(allow_history_gap),
+)
 
 # %%
 # ruff: noqa: F821, E402  (Fabric-injected globals; imports live in notebook cells)
@@ -248,11 +278,6 @@ def _u(key, salt):
 def _h(key, salt, n):
     """Non-negative int in [0, n)."""
     return F.pmod(F.xxhash64(key, F.lit(f"{salt}|{SEED}")), F.lit(int(n)))
-
-
-def _id(key, salt, n):
-    """Valid dimension id in [1, n]."""
-    return (_h(key, salt, n) + F.lit(1)).cast("long")
 
 
 def _pick(key, salt, values):
@@ -322,11 +347,18 @@ scenario = (F.when(_u(F.col("v"), "scenario") < 0.50, "shopping")
 
 from pyspark.sql.functions import broadcast as _bcast  # noqa: E402
 
-b0 = (rate.select(ts.alias("ts"), v.alias("v"))
-      .withColumn("scenario", scenario)
-      .withColumn("store_id", _id(F.col("v"), "store", STORE_COUNT))
-      .withColumn("customer_id", _id(F.col("v"), "cust", CUSTOMER_COUNT))
-      .withColumn("dc_id", _id(F.col("v"), "dc", DC_COUNT))
+b0 = rate.select(ts.alias("ts"), v.alias("v")).withColumn("scenario", scenario)
+# Foreign keys come only from IDs that exist (inventory products: launched by
+# the catalog date), never from an assumed contiguous 1..count range.
+for _name, _salt, _lookup, _n in (
+    ("store_id", "store", STORE_IDS, STORE_COUNT),
+    ("customer_id", "cust", CUSTOMER_IDS, CUSTOMER_COUNT),
+    ("dc_id", "dc", DC_IDS, DC_COUNT),
+    ("truck_num", "truck", TRUCK_IDS, TRUCK_COUNT),
+    ("inv_product_id", "iprod", LAUNCHED_PRODUCT_IDS, PRODUCT_COUNT),
+):
+    b0 = attach_sampled_id(b0, F.col("v"), _salt, SEED, _lookup, _n, _name)
+b0 = (b0
       .withColumn("receipt_id", F.concat(F.lit("RCP-"), stream_prefix, F.col("v").cast("string")))
       .withColumn("order_id", F.concat(F.lit("ONL-"), stream_prefix, F.col("v").cast("string")))
       .withColumn("shipment_id", F.concat(F.lit("SHP-"), stream_prefix, F.col("v").cast("string")))
@@ -334,10 +366,14 @@ b0 = (rate.select(ts.alias("ts"), v.alias("v"))
       .withColumn("ble_id", F.concat(F.lit("BLE"), F.col("customer_id").cast("string")))
       .withColumn("zone", _pick(F.col("v"), "zone", FOOT_TRAFFIC_ZONES))
       .withColumn("tender", _pick(F.col("v"), "tender", LIVE_TENDERS)))
+# Every sampled store has a tax rate (checked at startup); the guard only
+# applies to rows that price a basket, so other scenarios can never trip it.
+_prices_basket = F.col("scenario").isin(
+    "shopping", "store_attributed", "online", "online_attributed")
 b0 = b0.join(_bcast(STORE_ATTR), F.col("store_id") == F.col("as_id"), "left").withColumn(
-    "store_bps", F.when(F.col("as_bps").isNotNull(), F.col("as_bps")).otherwise(
-        F.raise_error("Live purchase references a missing store tax rate")
-    )
+    "store_bps", F.when(F.col("as_bps").isNotNull(), F.col("as_bps"))
+    .when(~_prices_basket, F.lit(0).cast("long"))
+    .otherwise(F.raise_error(F.lit("Live purchase references a missing store tax rate")))
 )
 b0 = attach_stream_baskets(spark, b0, STREAM_PRODUCTS, STREAM_PROFILE, SEED, CATALOG_DATE)
 b = (b0
@@ -534,7 +570,7 @@ inv_delta = (F.when(disrupted, (-(inv_qty + F.lit(50))).cast("long"))
 inv_reason = F.when(disrupted, F.lit("DISRUPTION")).otherwise(F.lit("SALE"))
 inv_source = F.when(disrupted, F.lit("DC_OUTAGE")).otherwise(F.lit("STORE"))
 op_type = F.when(_u(F.col("v"), "op") < 0.5, "opened").otherwise("closed")
-truck_id = F.concat(F.lit("TRK"), F.lpad(_id(F.col("v"), "truck", TRUCK_COUNT).cast("string"), 4, "0"))
+truck_id = F.concat(F.lit("TRK"), F.lpad(F.col("truck_num").cast("string"), 4, "0"))
 truck_estimated_unload_minutes = (
     _h(
         F.col("v"),
@@ -616,18 +652,18 @@ events_arr = F.array(
     # --- inventory ---
     slot(inv, "inventory_updated", F.struct(
         F.col("store_id"), F.lit(None).cast("long").alias("dc_id"),
-        _id(F.col("v"), "iprod", PRODUCT_COUNT).alias("product_id"),
+        F.col("inv_product_id").alias("product_id"),
         inv_delta.alias("quantity_delta"),
         inv_reason.alias("reason"), inv_source.alias("source"),
     ), F.col("ts"), store_pkey, F.col("v")),
     slot(inv & ((inv_qty < F.lit(STOCKOUT_QUANTITY_THRESHOLD)) | disrupted), "stockout_detected", F.struct(
         F.col("store_id"), F.lit(None).cast("long").alias("dc_id"),
-        _id(F.col("v"), "iprod", PRODUCT_COUNT).alias("product_id"),
+        F.col("inv_product_id").alias("product_id"),
         inv_qty_eff.alias("last_known_quantity"), _iso(F.col("ts")).alias("detection_time"),
     ), F.col("ts"), store_pkey, F.col("v")),
     slot(inv & ((inv_qty < F.lit(REORDER_POINT)) | disrupted), "reorder_triggered", F.struct(
         F.col("store_id"), F.lit(None).cast("long").alias("dc_id"),
-        _id(F.col("v"), "iprod", PRODUCT_COUNT).alias("product_id"),
+        F.col("inv_product_id").alias("product_id"),
         inv_qty_eff.alias("current_quantity"),
         (_h(F.col("v"), "roq", 200) + F.lit(50)).cast("long").alias("reorder_quantity"),
         F.lit(REORDER_POINT).cast("long").alias("reorder_point"),
@@ -662,11 +698,11 @@ events_arr = F.array(
         _pick(F.col("v"), "chan", LIVE_CHANNELS).alias("channel"),
         F.concat(F.lit("CMP-"), (_h(F.col("v"), "camp", 20) + F.lit(1)).cast("string")).alias("campaign_id"),
         F.concat(F.lit("CRV-"), (_h(F.col("v"), "crv", 50) + F.lit(1)).cast("string")).alias("creative_id"),
-        F.concat(F.lit("AD"), _id(F.col("v"), "adcust", CUSTOMER_COUNT).cast("string")).alias("customer_ad_id"),
+        F.concat(F.lit("AD"), F.col("customer_id").cast("string")).alias("customer_ad_id"),
         F.concat(F.lit("IMP-"), stream_prefix, F.col("v").cast("string")).alias("impression_id"),
         F.round(_u(F.col("v"), "cost") * F.lit(2.0) + F.lit(0.1), 4).alias("cost"),
         _pick(F.col("v"), "dev", LIVE_DEVICES).alias("device_type"),
-        _id(F.col("v"), "adcust", CUSTOMER_COUNT).alias("customer_id"),
+        F.col("customer_id"),
     ), F.col("ts"), F.concat(F.lit("camp_"), (_h(F.col("v"), "camp", 20) + F.lit(1)).cast("string")), F.col("v")),
 
     # --- IMP-007 (live mirror): the journey's two linked touches, emitted

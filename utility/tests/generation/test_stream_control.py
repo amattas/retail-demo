@@ -11,7 +11,10 @@ import pytest
 from retail_setup.generation.stream_control import (
     SMOKE_TRIGGER_SECONDS,
     CheckpointStateError,
+    HandoffError,
     call_with_retry,
+    check_history_handoff,
+    enforce_history_handoff,
     ingest_tag,
     is_transient_error,
     parse_ingest_tag,
@@ -412,3 +415,96 @@ def test_ingest_tags_round_trip_and_accept_legacy_tags(tag, expected) -> None:
             parsed["event_type"],
             parsed["batch_id"],
         ) == expected
+
+
+START = datetime(2026, 11, 20, 15, 0, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    ("history_end", "ok", "text"),
+    [
+        (START - timedelta(hours=18), True, ""),
+        (START + timedelta(hours=3), True, "within tolerance"),
+        (START - timedelta(days=3), False, "3.0 days before"),
+        (START + timedelta(days=2), False, "duplicate the historical volume"),
+        (None, False, "no rows"),
+    ],
+)
+def test_history_handoff_detects_gaps_and_overlaps(history_end, ok, text) -> None:
+    check = check_history_handoff(history_end, START)
+
+    assert check.ok is ok
+    assert text in check.message
+
+
+def test_history_handoff_fails_a_new_stream_but_only_warns_on_resume_or_override() -> None:
+    gap = check_history_handoff(START - timedelta(days=5), START)
+    logged: list[str] = []
+
+    with pytest.raises(HandoffError, match="allow_history_gap=True"):
+        enforce_history_handoff(gap, resumed=False, allow_gap=False, log=logged.append)
+    enforce_history_handoff(gap, resumed=True, allow_gap=False, log=logged.append)
+    enforce_history_handoff(gap, resumed=False, allow_gap=True, log=logged.append)
+
+    assert [message.split(":")[0] for message in logged] == [
+        "WARNING history handoff (resumed checkpoint)",
+        "WARNING history handoff (allow_history_gap=True)",
+    ]
+    with pytest.raises(ValueError, match="timezone-aware"):
+        check_history_handoff(datetime(2026, 11, 19), START)
+
+
+@pytest.mark.spark_no_filesystem
+def test_sampled_ids_come_only_from_existing_and_launched_ids(spark) -> None:
+    from pyspark.sql import functions as F
+
+    from retail_setup.generation.stream_frames import attach_sampled_id, dense_id_lookup
+
+    # A custom layout with gaps: IDs 1, 2, 5, 9 and 20 exist; 20 is not launched.
+    products = spark.createDataFrame(
+        [
+            (1, "2025-01-01"),
+            (2, "2025-06-01"),
+            (5, "2025-06-01"),
+            (9, "2026-11-01"),
+            (20, "2027-03-01"),
+        ],
+        "ID long, LaunchDate string",
+    )
+    launched, count = dense_id_lookup(
+        products.where(F.to_date("LaunchDate") <= F.lit(date(2026, 11, 20)))
+    )
+    rows = spark.range(2000).withColumnRenamed("id", "v")
+
+    sampled = attach_sampled_id(rows, F.col("v"), "iprod", 42, launched, count, "product_id")
+    first = sorted((row.v, row.product_id) for row in sampled.collect())
+    second = sorted(
+        (row.v, row.product_id)
+        for row in attach_sampled_id(
+            rows, F.col("v"), "iprod", 42, launched, count, "product_id"
+        ).collect()
+    )
+
+    assert count == 4
+    assert len(first) == 2000
+    assert {product_id for _v, product_id in first} == {1, 2, 5, 9}
+    assert first == second
+    launched.unpersist()
+
+
+@pytest.mark.spark_no_filesystem
+def test_contiguous_ids_keep_the_previous_range_draw(spark) -> None:
+    from pyspark.sql import functions as F
+
+    from retail_setup.generation.stream_frames import attach_sampled_id, dense_id_lookup
+
+    stores, count = dense_id_lookup(spark.range(1, 8).withColumnRenamed("id", "ID"))
+    rows = spark.range(500).withColumnRenamed("id", "v")
+    sampled = attach_sampled_id(rows, F.col("v"), "store", 42, stores, count, "store_id")
+    legacy = (F.pmod(F.xxhash64(F.col("v"), F.lit("store|42")), F.lit(7)) + 1).alias("legacy")
+
+    mismatches = sampled.where(F.col("store_id") != legacy).count()
+
+    assert count == 7
+    assert mismatches == 0
+    stores.unpersist()

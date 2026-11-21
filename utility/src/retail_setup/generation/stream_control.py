@@ -11,7 +11,7 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Protocol
 
 # Live runs trigger a micro-batch every minute. Each batch makes one Kusto
@@ -377,7 +377,7 @@ def persist_incarnation(fs: CheckpointFs, plan: StreamIncarnation) -> StreamInca
 
     if not plan.needs_write:
         return plan
-    payload = {**plan.record(), "written_at": datetime.now(UTC).isoformat()}
+    payload = {**plan.record(), "written_at": datetime.now(timezone.utc).isoformat()}
     fs.mkdirs(plan.record_path.rsplit("/", 1)[0])
     content = json.dumps(payload, sort_keys=True)
     if plan.resumed:
@@ -395,3 +395,89 @@ def persist_incarnation(fs: CheckpointFs, plan: StreamIncarnation) -> StreamInca
             "run only one stream per checkpoint."
         )
     return replace(plan, needs_write=False)
+
+
+# ---------------------------------------------------------------------------
+# History-to-stream handoff
+# ---------------------------------------------------------------------------
+
+# History ends yesterday (store-local), so the newest historical receipt is
+# normally less than a day before the stream starts.
+HANDOFF_MAX_GAP = timedelta(days=1)
+# Local "yesterday" can end up to 14 hours after UTC midnight, so the newest
+# historical receipt may legitimately be slightly after the stream start.
+HANDOFF_OVERLAP_TOLERANCE = timedelta(hours=14)
+
+
+class HandoffError(RuntimeError):
+    """History and the live stream would leave a gap or overlap in the facts."""
+
+
+@dataclass(frozen=True)
+class HandoffCheck:
+    ok: bool
+    message: str
+
+
+def check_history_handoff(
+    history_end: datetime | None,
+    stream_start: datetime,
+    *,
+    max_gap: timedelta = HANDOFF_MAX_GAP,
+    overlap_tolerance: timedelta = HANDOFF_OVERLAP_TOLERANCE,
+) -> HandoffCheck:
+    """Compare the newest historical receipt time with the stream start (both UTC)."""
+
+    if history_end is None:
+        return HandoffCheck(
+            False, "Silver fact_receipts has no rows, so there is no history to continue."
+        )
+    if history_end.tzinfo is None or stream_start.tzinfo is None:
+        raise ValueError("history_end and stream_start must be timezone-aware UTC times")
+    start = stream_start.astimezone(timezone.utc).isoformat(timespec="seconds")
+    end = history_end.astimezone(timezone.utc).isoformat(timespec="seconds")
+    if history_end > stream_start + overlap_tolerance:
+        return HandoffCheck(
+            False,
+            f"History runs until {end}, after the stream start {start}: live events "
+            "would duplicate the historical volume for the overlap.",
+        )
+    if history_end > stream_start:
+        return HandoffCheck(
+            True,
+            f"History ends at {end}, slightly after the stream start {start} "
+            "(store time zones); the overlap is within tolerance.",
+        )
+    gap = stream_start - history_end
+    if gap > max_gap:
+        return HandoffCheck(
+            False,
+            f"History ends at {end}, {gap.total_seconds() / 86400:.1f} days before the "
+            f"stream start {start}: Silver and Gold facts will have a gap. Re-render "
+            "and rerun setup so history ends yesterday.",
+        )
+    return HandoffCheck(True, "")
+
+
+def enforce_history_handoff(
+    check: HandoffCheck,
+    *,
+    resumed: bool,
+    allow_gap: bool,
+    log: Callable[[str], None] = print,
+) -> None:
+    """Fail a new stream on a bad handoff unless overridden; only warn on a resume.
+
+    A resumed checkpoint continues its own events, so a gap after a stop is
+    expected (the backlog cap skips the downtime) and is only reported.
+    """
+
+    if check.ok:
+        if check.message:
+            log(f"history handoff: {check.message}")
+        return
+    if resumed or allow_gap:
+        reason = "resumed checkpoint" if resumed else "allow_history_gap=True"
+        log(f"WARNING history handoff ({reason}): {check.message}")
+        return
+    raise HandoffError(f"{check.message} Set allow_history_gap=True to start anyway.")
