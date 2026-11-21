@@ -117,6 +117,11 @@ _MAX_DERIVED_TRANSACTIONS = 1000
 _OPEN_HOUR_PEAK_SHARE = 0.10
 # Above this average ticket a derived profile runs boutique stores.
 _BOUTIQUE_TICKET = 500.0
+# Derived trip frequency of an active customer around the supercenter reference.
+_REFERENCE_VISITS = 8.0
+_TICKET_VISITS_EXPONENT = 0.4
+_MIN_DERIVED_VISITS = 1.0
+_MAX_DERIVED_VISITS = 52.0
 
 
 def parse_operating_hours(value: str) -> tuple[int, int]:
@@ -160,6 +165,9 @@ class StoreTypeProfile(BaseModel):
     )
     store_formats: list[str] | None = Field(
         default=None, min_length=1, description="Store formats this store type runs"
+    )
+    customer_visits_per_year: float | None = Field(
+        default=None, gt=0, le=156, description="Mean yearly trips of an active loyalty customer"
     )
 
     @field_validator("operating_hours")
@@ -209,6 +217,18 @@ class StoreTypeProfile(BaseModel):
         if self.avg_ticket_target >= _BOUTIQUE_TICKET:
             return ["boutique"]
         return [name for name in STORE_FORMATS if name != "boutique"]
+
+    def resolved_customer_visits_per_year(self) -> float:
+        """Mean yearly trips of an active customer: the profile's, else from the ticket.
+
+        Shoppers return less often to stores with bigger tickets.
+        """
+        if self.customer_visits_per_year is not None:
+            return self.customer_visits_per_year
+        derived = _REFERENCE_VISITS * (_REFERENCE_TICKET / self.avg_ticket_target) ** (
+            _TICKET_VISITS_EXPONENT
+        )
+        return float(min(_MAX_DERIVED_VISITS, max(_MIN_DERIVED_VISITS, round(derived, 1))))
 
     @model_validator(mode="after")
     def _hours_have_traffic(self) -> "StoreTypeProfile":

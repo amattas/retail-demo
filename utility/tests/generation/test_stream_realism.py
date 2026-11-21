@@ -89,6 +89,7 @@ def world(spark):
 def _simulate(spark):
     from pyspark.sql import functions as F
 
+    from retail_setup.generation.customers import lifecycle_for
     from retail_setup.generation.dims import generate_dimensions
     from retail_setup.generation.network import dc_fleets, store_dc_map
     from retail_setup.generation.receipts import generate_receipts_group
@@ -197,6 +198,7 @@ def _simulate(spark):
         baskets=prepare_basket_catalog(spark, products, profile, cfg.seed, START),
         lanes=lanes,
         supply=network,
+        lifecycle=lifecycle_for(cfg, profile.resolved_customer_visits_per_year()),
         inventory_seed=stock,
     )
 

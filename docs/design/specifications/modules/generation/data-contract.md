@@ -381,7 +381,12 @@ Current derived defaults include:
 - `silver_db = ag`
 - `gold_db = au`
 - `dc_count = max(1, store_count // 10)`
-- `customer_count = max(store_count * 1000, 5000)`
+- `customer_count = max(store_count * transactions_per_store_day * 365 * 1.0525 *
+  (1 - anonymous_share) / (0.75 * v), 5000)`, where `v` is the profile's
+  `customer_visits_per_year` (supercenter 8, grocery 9, hardware 6, luxury
+  2.5): about 14,000 customers per supercenter
+- `anonymous_share = 0.45`
+- `annual_churn_rate = 0.20`
 - `transactions_per_store_day` = the store type's profile value (see below)
 - `online_orders_per_day = store_count * transactions_per_store_day * 1.0525 *
   s / (1 - s)`, where `s` is the profile's `online_order_share` and 1.0525 is
@@ -407,11 +412,44 @@ patterns ("24h" or "open-close"). BLE pings and zone changes use the store
 type's `zones` (upper-cased), in history and in the live stream; a live visit
 walks entrance, one to three department zones, checkout (buyers) and exit.
 
-In-store customer assignment reserves a deterministic 10% cohort whose
-purchases stop at seeded, staggered dates inside the generation window.
-Post-cutoff receipts are reassigned to active customers. This preserves
-pre-churn behavior while guaranteeing forward-looking churn labels across
-chronological ML splits.
+## Customers and churn
+
+`generation/customers.py` gives every customer a lifecycle, as pure functions
+of the seed and their ID, shared by history and the live stream:
+
+- **Home store.** `dim_customers.HomeStoreID` is drawn in proportion to store
+  traffic, and the customer lives in that store's geography. 85% of a
+  customer's identified visits are at the home store; the rest are at another
+  store, picked by traffic.
+- **Anonymous shoppers.** About `anonymous_share` (45%) of in-store receipts
+  have no `customer_id` (cash and non-loyalty shoppers). Returns, BLE pings of
+  anonymous visits and most marketing impressions also carry none. Every
+  consumer filters or tolerates NULL `customer_id`.
+- **Visit frequency.** Each customer's yearly trip rate is lognormal around
+  the profile's `customer_visits_per_year`, capped at three trips a week
+  (156 a year), and replicated as selection tickets.
+- **Acquisition.** Customers who already existed when history starts are
+  active from the first day; the rest sign up uniformly across the history, so
+  first purchases keep arriving and the base turns over. The two groups are
+  sized so acquisitions replace churn.
+- **Churn.** A customer's lifetime is exponential with a hazard driven by
+  segment (budget and convenience shoppers churn sooner than brand-loyal and
+  quality shoppers), trip frequency (infrequent visitors churn sooner) and
+  basket budget (small spenders churn sooner). The base hazard is calibrated
+  so `annual_churn_rate` (default 20%) of the customers active at a time churn
+  within a year. 75% of churners taper: their visits fall linearly to 15% of
+  their rate over the 60 days before they stop, the early-warning signal a
+  churn model can learn. The rest stop abruptly.
+- **Online orders and marketing.** An online order's customer is active on the
+  order day (the first of four tries; an order that finds none is not
+  placed), and a CRM-matched impression's customer is signed up and not
+  churned.
+
+A receipt is identified with a calibrated probability, picks a ticket from its
+pool, and keeps that customer with their activity on the receipt's local date
+(1 while active, tapering before churn, 0 before signup or after churn);
+otherwise it is anonymous. Churn dates are not published: models learn them
+from purchase behavior.
 
 ## Removed active-path behavior
 

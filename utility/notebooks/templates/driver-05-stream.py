@@ -15,8 +15,9 @@
 #   profile's hourly, daily and monthly weights in the store's **local** time,
 #   its traffic multiplier and its operating hours (no sales while closed).
 #   Stores open and close at their local operating-hour boundaries.
-# - **Customers.** Shoppers come from each store's local pool, weighted by visit
-#   frequency like history; about 22% of visits buy. Visits follow an ordered
+# - **Customers.** As in history, about 45% of shoppers are anonymous; the rest
+#   are mostly the store's own home customers, weighted by visit frequency and
+#   kept only while signed up and not churned; about 22% of visits buy. Visits follow an ordered
 #   path through the store type's zones (entrance → departments → checkout →
 #   exit) with realistic dwell times, and their BLE IDs resolve to
 #   `dim_customers.BLEId`.
@@ -107,6 +108,12 @@ SEED = int(_param("{{SEED}}", "42"))
 TRANSACTIONS_PER_STORE_DAY = int(_param("{{TRANSACTIONS_PER_STORE_DAY}}", "0"))
 ONLINE_ORDERS_PER_DAY = int(_param("{{ONLINE_ORDERS_PER_DAY}}", "0"))
 HISTORY_START = _param("{{START_DATE}}", "")
+HISTORY_END = _param("{{END_DATE}}", "")
+# Customer lifecycle of the history (who is signed up, churned or anonymous).
+ANNUAL_CHURN_RATE = float(_param(
+    "{{ANNUAL_CHURN_RATE}}", str(GenerationConfig.model_fields["annual_churn_rate"].default)))
+ANONYMOUS_SHARE = float(_param(
+    "{{ANONYMOUS_SHARE}}", str(GenerationConfig.model_fields["anonymous_share"].default)))
 
 spark.conf.set("spark.sql.session.timeZone", "UTC")  # ingest_timestamp depends on it
 
@@ -241,7 +248,8 @@ DIM_CUSTOMERS = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_customers")
 # checkpoint only warns (its own downtime is an expected gap).
 _history = (spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.fact_receipts")
             .agg(_F.max("event_ts").cast("long").alias("end"),
-                 _F.min("event_date").alias("start")).first())
+                 _F.min("event_date").alias("start"),
+                 _F.max("event_date").alias("last")).first())
 _history_end = _history["end"]
 enforce_history_handoff(
     check_history_handoff(
@@ -255,6 +263,16 @@ enforce_history_handoff(
 if not HISTORY_START:
     HISTORY_START = (_history["start"] or CATALOG_DATE).isoformat()
 HISTORY_START_DATE = _date.fromisoformat(HISTORY_START)
+if not HISTORY_END:
+    HISTORY_END = (_history["last"] or CATALOG_DATE).isoformat()
+STREAM_LIFECYCLE = CustomerLifecycle(
+    seed=SEED,
+    history_start=HISTORY_START_DATE,
+    history_end=_date.fromisoformat(HISTORY_END),
+    annual_churn_rate=ANNUAL_CHURN_RATE,
+    anonymous_share=ANONYMOUS_SHARE,
+    visits_per_year=STREAM_PROFILE.resolved_customer_visits_per_year(),
+)
 # Unrendered runs take the store type's volumes, as configuration derives them.
 if TRANSACTIONS_PER_STORE_DAY <= 0:
     TRANSACTIONS_PER_STORE_DAY = STREAM_PROFILE.resolved_transactions_per_store_day()
@@ -346,6 +364,7 @@ STREAM_CONTEXT = build_stream_context(
     baskets=prepare_basket_catalog(spark, STREAM_PRODUCTS, STREAM_PROFILE, SEED, CATALOG_DATE),
     lanes=LANE_PLAN,
     supply=STREAM_SUPPLY,
+    lifecycle=STREAM_LIFECYCLE,
     inventory_seed=INVENTORY_SEED,
 )
 print(f"live volume: {RATE_ROWS_PER_SECOND} source rows/s; lane shares "

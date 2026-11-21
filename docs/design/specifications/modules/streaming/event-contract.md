@@ -84,10 +84,13 @@ history:
   live receipt is outside opening hours. Visits are drawn at
   `transactions_per_store_day / 0.225` per store-day and convert with the same
   store/day/hour conversion as history (about 22%).
-- **Customers.** 70% of shoppers come from the store's own geography and the
-  rest from the whole network, both weighted by the historical visit tickets
-  (`behavior.customer_visit_tickets`). The churned history cohort
-  (`customer_id % 10 == 0`) no longer shops.
+- **Customers.** As in history (`generation/customers.py`), about 45% of
+  visits are anonymous. The rest pick a customer from the store's home-customer
+  pool (85%) or another store's, weighted by visit tickets, and keep them only
+  while they are signed up and not churned on the visit's local day; live
+  churn continues from the history's lifecycle (rendered start, end, churn
+  rate and anonymous share). Online orders take the first of four tries that
+  is active that day.
 - **Visit path.** A visit enters (`customer_entered`, sensor zone by store
   format), walks from the store type's entrance zone through one to three of its
   department zones (`profile.zones`, upper-cased) in random order, passes

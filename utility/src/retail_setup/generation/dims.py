@@ -14,6 +14,7 @@ from pyspark.sql import functions as F
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.loader import DictionarySet
 from retail_setup.dictionaries.models import STORE_FORMATS
+from retail_setup.generation.customers import store_picker, with_home_store
 from retail_setup.generation.network import fleet_sizes, nearest_dc, pool_size
 from retail_setup.generation.runtime import (
     date_grid,
@@ -60,11 +61,6 @@ REFRIGERATED_CATEGORIES = {
     "Seafood",
     "Frozen",
 }
-
-# Share of customers placed in a geography that has a store (the rest are
-# scattered anywhere). Restores datagen's "customers live near stores" locality
-# so receipts can draw a same-geography customer most of the time.
-CUSTOMER_HOME_AFFINITY = 0.70
 
 # Map a product department/category token to a brand-dictionary Category so a
 # product's brand fits its department (datagen product_generator parity: a
@@ -242,30 +238,21 @@ def generate_dimensions(
 
     # --- customers; use Spark range + deterministic hashes so customer scale
     #     does not materialize one Python tuple per customer on the driver.
-    #     ~70% are placed in a store's geography (datagen home-store locality).
+    #     Each customer has a home store, drawn by store traffic, and lives in
+    #     its geography (generation.customers).
     first = [n.Name for n in dicts.first_names]
     last = [n.Name for n in dicts.last_names]
     customer_draws = seeded_draws(cfg.seed)
-    customers = spark.range(1, cfg.customer_count + 1).select(F.col("id").cast("long").alias("ID"))
+    picker = store_picker(spark, [(row[0], row[8]) for row in store_rows])
+    customers = with_home_store(
+        cfg.seed,
+        spark.range(1, cfg.customer_count + 1).select(F.col("id").cast("long").alias("ID")),
+        picker,
+    )
     first_names = F.array(*[F.lit(str(name)) for name in first])
     last_names = F.array(*[F.lit(str(name)) for name in last])
     store_geographies = F.array(*[F.lit(index + 1).cast("long") for index in store_geo_indices])
-    global_geography = (customer_draws.h64(["ID"], "customer-global-geo") % F.lit(n_geo) + 1).cast(
-        "long"
-    )
-    if store_geo_indices:
-        local_geography = F.element_at(
-            store_geographies,
-            (
-                customer_draws.h64(["ID"], "customer-local-geo") % F.lit(len(store_geo_indices)) + 1
-            ).cast("int"),
-        )
-        geography = F.when(
-            customer_draws.u(["ID"], "customer-home-affinity") < F.lit(CUSTOMER_HOME_AFFINITY),
-            local_geography,
-        ).otherwise(global_geography)
-    else:
-        geography = global_geography
+    geography = F.element_at(store_geographies, F.col("HomeStoreID").cast("int"))
 
     street_names = F.array(
         *[F.lit(name) for name in ["Main", "Oak", "Maple", "Market", "Commerce", "Liberty"]]
@@ -308,6 +295,7 @@ def generate_dimensions(
         F.format_string("555-%03d-%04d", phone_exchange, phone_line).alias("Phone"),
         ble_id_column(F.col("ID")).alias("BLEId"),
         ad_id_column(F.col("ID")).alias("AdId"),
+        "HomeStoreID",
     )
     out["dim_customers"] = customers.select(
         *[field.name for field in spark_schema("dim_customers").fields]

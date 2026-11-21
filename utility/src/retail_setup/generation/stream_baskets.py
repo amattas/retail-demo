@@ -14,6 +14,7 @@ from retail_setup.generation.behavior import (
     retail_catalog,
     retail_quantity,
 )
+from retail_setup.generation.customers import shopper_key
 from retail_setup.generation.receipts import _seasonal_factor
 from retail_setup.generation.runtime import seeded_draws
 
@@ -89,18 +90,21 @@ def attach_baskets(
 ) -> DataFrame:
     """Attach ``_offer``, ``basket_n`` and ``basket_lines`` to purchase rows.
 
-    Rows need ``receipt_id``, ``customer_id`` and ``store_bps``.
+    Rows need ``receipt_id``, ``customer_id`` (NULL for anonymous shoppers)
+    and ``store_bps``. Budgets and favorite departments are the customer's,
+    or the purchase's own for anonymous shoppers, as in history.
     """
     draws = seeded_draws(seed)
     purchases = (
         purchases.join(F.broadcast(catalog.lookup))
+        .withColumn("_shopper", shopper_key(F.col("customer_id"), F.col("receipt_id")))
         .withColumn("_offer", draws.u(["receipt_id"], "offer") < profile.promo_rate)
         .withColumn(
             "basket_n",
             retail_basket_size(
                 draws,
                 ["receipt_id"],
-                F.col("customer_id"),
+                F.col("_shopper"),
                 calibrated_basket_mean(
                     F.lit(catalog.line_value),
                     F.lit(catalog.taxable_value),
@@ -121,7 +125,7 @@ def attach_baskets(
             draws.u(keys, "mission-coherence") < 0.60,
             F.when(
                 draws.u(["receipt_id"], "favorite-mission") < 0.50,
-                draws.u(["customer_id"], "favorite-department"),
+                draws.u(["_shopper"], "favorite-department"),
             ).otherwise(draws.u(["receipt_id"], "mission-department")),
         ).otherwise(draws.u(keys, "dept"))
         department = pick_retail_product(F.col("_departments"), department_draw)
@@ -139,7 +143,7 @@ def attach_baskets(
 
     return purchases.withColumn(
         "basket_lines", F.transform(F.sequence(F.lit(1), F.col("basket_n")), line)
-    ).drop("_departments")
+    ).drop("_departments", "_shopper")
 
 
 def attach_stream_baskets(

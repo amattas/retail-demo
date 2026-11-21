@@ -101,6 +101,8 @@ values = {
     "STORE_COUNT": "3",
     "TRANSACTIONS_PER_STORE_DAY": "400",
     "ONLINE_ORDERS_PER_DAY": "24",
+    "ANNUAL_CHURN_RATE": "0.2",
+    "ANONYMOUS_SHARE": "0.45",
     "SEED": "7",
     "DICTIONARY_REF": "deadbeef",
     "CUSTOM_DICTIONARIES": "{}",

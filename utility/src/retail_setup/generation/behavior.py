@@ -7,13 +7,6 @@ from pyspark.sql.window import Window
 from retail_setup.generation.runtime import seeded_draws
 
 
-def customer_visit_tickets(draws: seeded_draws, customer: Column) -> Column:
-    """Persistent dimension-sized weights for heterogeneous shopping frequency."""
-    return F.ceil(4.0 * F.exp(0.9 * draws.gauss([customer], "visit-propensity") - 0.405)).cast(
-        "int"
-    )
-
-
 def repeat_purchase_probability(department: Column) -> Column:
     """Consumables permit multi-unit purchases more often than durable goods."""
     consumable = F.lower(department).rlike(
@@ -35,17 +28,21 @@ def retail_quantity(draws: seeded_draws, keys: list, department: Column) -> Colu
 def retail_basket_size(
     draws: seeded_draws,
     purchase_keys: list,
-    customer: Column,
+    shopper: Column,
     mean: Column,
     offer: Column,
     promo_rate: float,
 ) -> Column:
-    """Mission mixtures with a calibrated mean and persistent customer budgets."""
+    """Mission mixtures with a calibrated mean and persistent customer budgets.
+
+    ``shopper`` keys the budget: the customer (``customers.shopper_key``), so
+    a customer's baskets share one budget, or the purchase when anonymous.
+    """
     trip = draws.u(purchase_keys, "retail-mission")
     mission = (
         F.when(trip < 0.30, 0.30).when(trip < 0.70, 0.90).when(trip < 0.90, 1.60).otherwise(2.50)
     ) / F.lit(1.02)
-    budget = F.exp(0.35 * draws.gauss([customer], "retail-budget") - F.lit(0.35**2 / 2))
+    budget = F.exp(0.35 * draws.gauss([shopper], "retail-budget") - F.lit(0.35**2 / 2))
     # Exposure is decided before demand: coupons increase additional-item demand.
     lift = (F.lit(1.0) + offer.cast("double") * 0.20) / (1.0 + promo_rate * 0.20)
     extra = F.greatest(mean - 1.0, F.lit(0.0)) * mission * budget * lift

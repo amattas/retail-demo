@@ -115,7 +115,11 @@ def _build_online(ctx: GenerationContext) -> StageOutputs:
 
 
 def _build_ads(ctx: GenerationContext) -> StageOutputs:
-    return {"fact_marketing": marketing.generate_marketing(ctx.spark, ctx.dims, ctx.cfg)}
+    return {
+        "fact_marketing": marketing.generate_marketing(
+            ctx.spark, ctx.dims, ctx.cfg, ctx.dicts.profile
+        )
+    }
 
 
 def _build_refunds(ctx: GenerationContext, plan: StageOutputs) -> StageOutputs:

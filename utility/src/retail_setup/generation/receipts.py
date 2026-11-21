@@ -24,11 +24,19 @@ from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.models import StoreTypeProfile
 from retail_setup.generation.behavior import (
     calibrated_basket_mean,
-    customer_visit_tickets,
     pick_retail_product,
     retail_basket_size,
     retail_catalog,
     retail_quantity,
+)
+from retail_setup.generation.customers import (
+    CustomerLifecycle,
+    assign_customers,
+    lifecycle_for,
+    pool_sizes,
+    shopper_key,
+    store_picker,
+    ticket_pool,
 )
 from retail_setup.generation.runtime import (
     case_when,
@@ -45,15 +53,6 @@ from retail_setup.generation.vocabulary import (
     promo_eligible_column,
     tender_column,
 )
-
-# Share of in-store receipts whose customer lives in the store's geography
-# (datagen home-store locality). The rest draw a network-wide customer.
-GEO_AFFINITY = 0.70
-# A deterministic cohort stops receiving purchases at staggered dates. This
-# creates realistic forward churn labels throughout long histories while
-# preserving active customers and pre-churn behavior.
-CHURN_COHORT_MODULUS = 10
-CHURN_CUTOFF_MAX_MARGIN_DAYS = 60
 
 # Per-department seasonal demand multipliers by month (Jan..Dec), keyed by a
 # lowercase token matched as a substring of the department name so the one
@@ -75,28 +74,6 @@ SEASONAL_LIFT: dict[str, list[float]] = {
     "beauty": [1.2, 1.05, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.05, 1.2, 1.5],
     "automotive": [1.0, 1.0, 1.05, 1.1, 1.2, 1.2, 1.2, 1.1, 1.0, 1.0, 1.0, 1.0],
 }
-
-# Per-customer shopping segments (datagen CustomerJourney segment distribution).
-SEGMENT_WEIGHTS: list[tuple[str, float]] = [
-    ("BUDGET", 0.35),
-    ("CONVENIENCE", 0.25),
-    ("QUALITY", 0.20),
-    ("BRAND_LOYAL", 0.20),
-]
-
-
-def _segment_price_skew(u: Column, seg: Column) -> Column:
-    """Skew a uniform draw toward cheaper/pricier products by customer segment.
-
-    BUDGET biases to the low (cheap) end of a department's price-ranked
-    catalog, QUALITY/BRAND_LOYAL to the high end, CONVENIENCE is neutral.
-    """
-    return (
-        F.when(seg == "BUDGET", u * u)
-        .when(seg == "QUALITY", F.lit(1.0) - (F.lit(1.0) - u) * (F.lit(1.0) - u))
-        .when(seg == "BRAND_LOYAL", F.pow(u, F.lit(0.85)))
-        .otherwise(u)
-    )
 
 
 # Weather simulation (datagen EventPatterns): a per-store-day weather state
@@ -200,130 +177,36 @@ def _promo_eligible_expr(
     return promo_eligible_column(idx_col, month_col, ext_before, qty)
 
 
-def _apply_churn_lifecycle(
-    receipts: DataFrame,
-    d: seeded_draws,
-    cfg: GenerationConfig,
-) -> DataFrame:
-    """Stop assigning purchases to a seeded customer cohort after its cutoff."""
+def customer_pools(
+    lifecycle: CustomerLifecycle, dims: dict[str, DataFrame]
+) -> tuple[DataFrame, DataFrame, DataFrame]:
+    """(ticket pool, pool sizes, store picker) of the customer dimension.
 
-    customer_count = int(cfg.customer_count)
-    history_days = (cfg.end_date - cfg.start_date).days + 1
-    cutoff_margin = min(
-        CHURN_CUTOFF_MAX_MARGIN_DAYS,
-        max(1, history_days // 4),
+    Replicated selection tickets give persistent, long-tailed visit frequency;
+    the dimension-sized expansion avoids receipt x customer inequality joins.
+    """
+    pool = ticket_pool(lifecycle, dims["dim_customers"])
+    stores = dims["dim_stores"].select("ID", "daily_traffic_multiplier").collect()
+    picker = store_picker(
+        pool.sparkSession,
+        [(int(row["ID"]), float(row["daily_traffic_multiplier"])) for row in stores],
     )
-    cutoff_span = max(1, history_days - (2 * cutoff_margin))
-    cutoff_offset = (
-        F.lit(cutoff_margin)
-        + F.pmod(
-            d.h64(["customer_id"], "churn_cutoff"),
-            F.lit(cutoff_span),
-        )
-    ).cast("int")
-    cutoff_date = F.date_add(F.lit(cfg.start_date), cutoff_offset)
-
-    replacement_base = (
-        F.pmod(
-            d.h64(["receipt_id_ext"], "active_customer"),
-            F.lit(customer_count),
-        )
-        + F.lit(1)
-    ).cast("long")
-    replacement_customer = F.when(
-        F.pmod(replacement_base, F.lit(CHURN_COHORT_MODULUS)) == 0,
-        F.pmod(replacement_base, F.lit(customer_count)) + F.lit(1),
-    ).otherwise(replacement_base)
-    is_post_churn = (F.pmod(F.col("customer_id"), F.lit(CHURN_COHORT_MODULUS)) == 0) & (
-        F.col("event_date") >= cutoff_date
-    )
-    return receipts.withColumn(
-        "customer_id",
-        F.when(is_post_churn, replacement_customer).otherwise(F.col("customer_id")),
-    )
+    return pool, pool_sizes(pool), picker
 
 
 def _assign_customers(
-    receipts: DataFrame, dims: dict[str, DataFrame], d: seeded_draws, cfg: GenerationConfig
+    receipts: DataFrame, dims: dict[str, DataFrame], lifecycle: CustomerLifecycle
 ) -> DataFrame:
-    """Resolve each receipt's customer_id with store-geography affinity.
+    """Resolve each receipt's customer_id (NULL for anonymous shoppers).
 
-    With probability ``GEO_AFFINITY`` the customer is drawn from those living
-    in the store's geography (resolved by a deterministic within-geography
-    rank), otherwise a network-wide customer is used. Falls back to the
-    network-wide pick when the store's geography has no customers.
+    Most identified visits come from the store's own home customers, the
+    rest from another store's; each customer is kept with their lifecycle
+    activity on the receipt's local date (generation.customers).
     """
-    customers = dims["dim_customers"].select(
-        F.col("ID").alias("customer_id"), F.col("GeographyID").alias("cust_geo_id")
+    pool, sizes, picker = customer_pools(lifecycle, dims)
+    return assign_customers(
+        lifecycle, receipts, pool, sizes, picker, "receipt_id_ext", "store_id", "event_date"
     )
-    # Replicated selection tickets give persistent, long-tailed visit propensity.
-    # This dimension-sized expansion avoids receipt x customer inequality joins.
-    customers = customers.withColumn(
-        "_ticket",
-        F.explode(F.sequence(F.lit(1), customer_visit_tickets(d, F.col("customer_id")))),
-    )
-    geo_sizes = customers.groupBy("cust_geo_id").agg(F.count("*").alias("geo_cust_count"))
-    rank_w = Window.partitionBy("cust_geo_id").orderBy("customer_id", "_ticket")
-    cust_ranked = customers.withColumn("local_rank", F.row_number().over(rank_w))
-    global_customers = customers.withColumn(
-        "_global_rank", F.row_number().over(Window.orderBy("customer_id", "_ticket"))
-    ).select("_global_rank", F.col("customer_id").alias("global_customer"))
-    global_size = customers.agg(F.count("*").alias("_global_size"))
-
-    r = (
-        receipts.join(geo_sizes, receipts["store_geo_id"] == geo_sizes["cust_geo_id"], "left")
-        .drop("cust_geo_id")
-        .withColumn("geo_cust_count", F.coalesce(F.col("geo_cust_count"), F.lit(0)))
-        .crossJoin(global_size)
-        .withColumn(
-            "_global_rank",
-            (d.h64(["receipt_id_ext"], "cust") % F.col("_global_size") + 1).cast("int"),
-        )
-        .join(global_customers, "_global_rank")
-        .withColumn(
-            "want_local",
-            (d.u(["receipt_id_ext"], "affinity") < F.lit(GEO_AFFINITY))
-            & (F.col("geo_cust_count") > 0),
-        )
-        .withColumn(
-            "local_rank_target",
-            F.when(
-                F.col("geo_cust_count") > 0,
-                (d.h64(["receipt_id_ext"], "localcust") % F.col("geo_cust_count") + 1),
-            ).cast("long"),
-        )
-    )
-    local = cust_ranked.select(
-        F.col("cust_geo_id").alias("_lgeo"),
-        F.col("local_rank").alias("_lrank"),
-        F.col("customer_id").alias("local_customer"),
-    )
-    assigned = (
-        r.join(
-            local,
-            (F.col("store_geo_id") == F.col("_lgeo"))
-            & (F.col("local_rank_target") == F.col("_lrank")),
-            "left",
-        )
-        .withColumn(
-            "customer_id",
-            F.when(
-                F.col("want_local") & F.col("local_customer").isNotNull(), F.col("local_customer")
-            ).otherwise(F.col("global_customer")),
-        )
-        .drop(
-            "_lgeo",
-            "_lrank",
-            "local_customer",
-            "global_customer",
-            "want_local",
-            "local_rank_target",
-            "geo_cust_count",
-            "_global_rank",
-            "_global_size",
-        )
-    )
-    return _apply_churn_lifecycle(assigned, d, cfg)
 
 
 def _fmt(cents_col: Column) -> Column:
@@ -450,8 +333,11 @@ def generate_receipts_group(
         .withColumn("trace_id", F.concat(F.lit("TRC"), F.col("receipt_id_ext")))
     )
 
-    # geography affinity: resolve each receipt's customer (local vs network-wide)
-    receipts = _assign_customers(receipts, dims, d, cfg)
+    # home-store customers by lifecycle activity, or anonymous shoppers
+    lifecycle = lifecycle_for(cfg, profile.resolved_customer_visits_per_year())
+    receipts = _assign_customers(receipts, dims, lifecycle).withColumn(
+        "_shopper", shopper_key(F.col("customer_id"), F.col("receipt_id_ext"))
+    )
 
     receipts = receipts.withColumn(
         "_offer", d.u(["receipt_id_ext"], "offer") < F.lit(profile.promo_rate)
@@ -520,7 +406,7 @@ def generate_receipts_group(
             retail_basket_size(
                 d,
                 ["receipt_id_ext"],
-                F.col("customer_id"),
+                F.col("_shopper"),
                 F.col("_basket_mean"),
                 F.col("_offer"),
                 profile.promo_rate,
@@ -536,7 +422,7 @@ def generate_receipts_group(
         "tax_rate",
         "basket_n",
         "_offer",
-        "customer_id",
+        "_shopper",
     ).withColumn("line_num", F.explode(F.sequence(F.lit(1), F.col("basket_n"))))
     exploded = _with_seasonal_department(
         exploded,
@@ -544,7 +430,7 @@ def generate_receipts_group(
             d.u(["receipt_id_ext", "line_num"], "mission-coherence") < 0.60,
             F.when(
                 d.u(["receipt_id_ext"], "favorite-mission") < 0.50,
-                d.u(["customer_id"], "favorite-department"),
+                d.u(["_shopper"], "favorite-department"),
             ).otherwise(d.u(["receipt_id_ext"], "mission-department")),
         ).otherwise(d.u(["receipt_id_ext", "line_num"], "dept")),
         profile.department_weights,

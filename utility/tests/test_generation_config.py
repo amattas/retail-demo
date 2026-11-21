@@ -89,7 +89,8 @@ def test_yaml_round_trip(tmp_path: Path):
 def test_scale_defaults_derive_from_store_count():
     cfg = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31), store_count=40)
     assert cfg.dc_count == 4  # ~1 DC per 10 stores, min 1
-    assert cfg.customer_count == 40_000  # 1000 per store
+    # identified yearly visits / (active share x supercenter trips per customer)
+    assert cfg.customer_count == round(40 * 400 * 365 * 1.0525 * 0.55 / (0.75 * 8))
     assert cfg.transactions_per_store_day == 400
 
 
@@ -137,17 +138,22 @@ def test_mean_traffic_multiplier_matches_the_volume_classes():
 def test_customer_count_floored_at_minimum():
     from retail_setup.config.generation import MIN_CUSTOMER_COUNT
 
-    # Small store counts derive fewer than the minimum -> floored.
-    small = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31), store_count=1)
-    assert small.customer_count == MIN_CUSTOMER_COUNT  # 1 * 1000 -> floored
+    # Small stores derive fewer than the minimum -> floored.
+    small = GenerationConfig(
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 1, 31),
+        store_count=1,
+        transactions_per_store_day=100,
+    )
+    assert small.customer_count == MIN_CUSTOMER_COUNT  # ~3,500 derived -> floored
     # An explicitly tiny override is lifted too, so the churn model can train.
     explicit = GenerationConfig(
         start_date=date(2025, 1, 1), end_date=date(2025, 1, 31), store_count=1, customer_count=10
     )
     assert explicit.customer_count == MIN_CUSTOMER_COUNT
-    # The floor is a no-op once the derived value reaches it (store_count >= 5).
+    # The floor is a no-op once the derived value reaches it.
     big = GenerationConfig(start_date=date(2025, 1, 1), end_date=date(2025, 1, 31), store_count=50)
-    assert big.customer_count == 50_000
+    assert big.customer_count == round(50 * 400 * 365 * 1.0525 * 0.55 / (0.75 * 8))
 
 
 def test_explicit_dictionary_root(tmp_path):

@@ -14,5 +14,6 @@
             "aisles", "checkout", "exit"],
   "transactions_per_store_day": 280,
   "operating_hours": ["6-22", "7-22", "7-23"],
-  "store_formats": ["superstore", "standard", "neighborhood", "express"]
+  "store_formats": ["superstore", "standard", "neighborhood", "express"],
+  "customer_visits_per_year": 9
 }

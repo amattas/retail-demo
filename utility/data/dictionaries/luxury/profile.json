@@ -15,5 +15,6 @@
             "private-suite", "checkout", "exit"],
   "transactions_per_store_day": 40,
   "operating_hours": ["10-19", "10-20", "11-19"],
-  "store_formats": ["boutique"]
+  "store_formats": ["boutique"],
+  "customer_visits_per_year": 2.5
 }

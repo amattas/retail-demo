@@ -41,13 +41,19 @@ from pyspark.sql import functions as F
 
 from retail_setup.dictionaries.models import StoreTypeProfile
 from retail_setup.generation.attribution import SELECTION_RATE, with_journey_plan
-from retail_setup.generation.behavior import customer_visit_tickets, pick_retail_product
+from retail_setup.generation.behavior import pick_retail_product
+from retail_setup.generation.customers import (
+    HOME_STORE_SHARE,
+    ONLINE_CUSTOMER_ATTEMPTS,
+    CustomerLifecycle,
+    activity_column,
+    visit_tickets,
+)
 from retail_setup.generation.marketing import (
     CRM_MATCH_RATE,
     campaign_window_start,
     impression_device_cost,
 )
-from retail_setup.generation.receipts import CHURN_COHORT_MODULUS, GEO_AFFINITY
 from retail_setup.generation.runtime import case_when, seeded_draws
 from retail_setup.generation.store_activity import FORMAT_ZONE_SHARES
 from retail_setup.generation.stream_baskets import BasketCatalog, attach_baskets
@@ -158,7 +164,7 @@ class StreamContext:
     stores: DataFrame
     store_picker: DataFrame
     customer_pools: DataFrame
-    geo_picker: DataFrame
+    lifecycle: CustomerLifecycle
     ids: dict[str, tuple[DataFrame, int]]
     baskets: BasketCatalog
     store_hours: tuple[StoreHours, ...]
@@ -208,15 +214,18 @@ def build_stream_context(
     baskets: BasketCatalog,
     lanes: LanePlan,
     supply: SupplyNetwork,
+    lifecycle: CustomerLifecycle,
     inventory_seed: DataFrame | None = None,
 ) -> StreamContext:
     """Collect the bounded store metadata and build the customer pools.
 
+    Each store's pool holds its home customers (``dim_customers.HomeStoreID``)
+    weighted by their visit tickets; ``lifecycle`` (the history's
+    :class:`CustomerLifecycle`) decides who is active on a live day.
     ``inventory_seed`` (``store_id, product_id, on_hand, rate``, see
     :func:`inventory_seed_frame`) seeds store stock the stream has not
     touched yet; without it, stock starts from history's opening stock.
     """
-    draws = seeded_draws(seed)
     stores = dim_stores.select(
         F.col("ID").cast("long").alias("store_id"),
         F.col("GeographyID").cast("long").alias("store_geo_id"),
@@ -254,39 +263,28 @@ def build_stream_context(
     customers = (
         dim_customers.select(
             F.col("ID").cast("long").alias("customer_id"),
-            F.col("GeographyID").cast("long").alias("geo_id"),
+            F.col("HomeStoreID").cast("long").alias("pool_store"),
         )
-        .where(F.col("customer_id").isNotNull() & F.col("geo_id").isNotNull())
-        # The historical churn cohort has stopped buying by the end of history.
-        .where(F.pmod(F.col("customer_id"), F.lit(CHURN_COHORT_MODULUS)) != 0)
-        .withColumn("_tickets", customer_visit_tickets(draws, F.col("customer_id")).cast("double"))
+        .where(F.col("customer_id").isNotNull() & F.col("pool_store").isNotNull())
+        .withColumn("_tickets", visit_tickets(lifecycle, F.col("customer_id")).cast("double"))
     )
     ordered = (
-        Window.partitionBy("geo_id")
+        Window.partitionBy("pool_store")
         .orderBy("customer_id")
         .rowsBetween(Window.unboundedPreceding, Window.currentRow)
     )
     pools = (
         customers.withColumn(
             "_cdf",
-            F.sum("_tickets").over(ordered) / F.sum("_tickets").over(Window.partitionBy("geo_id")),
+            F.sum("_tickets").over(ordered)
+            / F.sum("_tickets").over(Window.partitionBy("pool_store")),
         )
-        .groupBy("geo_id")
-        .agg(
-            F.sort_array(F.collect_list(F.struct("_cdf", "customer_id"))).alias("_pool"),
-            F.sum("_tickets").alias("_tickets"),
-        )
+        .groupBy("pool_store")
+        .agg(F.sort_array(F.collect_list(F.struct("_cdf", "customer_id"))).alias("_pool"))
         .persist()
     )
-    geos = pools.select("geo_id", "_tickets").orderBy("geo_id").collect()
-    if not geos:
-        raise ValueError("dim_customers has no active customers for live visits")
-    total_tickets = sum(row["_tickets"] for row in geos)
-    cumulative, geo_entries = 0.0, []
-    for row in geos:
-        cumulative += row["_tickets"] / total_tickets
-        geo_entries.append((cumulative, row["geo_id"]))
-    with_pool = {row["geo_id"] for row in geos}
+    if pools.limit(1).count() == 0:
+        raise ValueError("dim_customers has no customers with a home store; re-run setup")
 
     total_multiplier = sum(row["multiplier"] for row in rows)
     cumulative, store_entries = 0.0, []
@@ -294,11 +292,7 @@ def build_stream_context(
         cumulative += row["multiplier"] / total_multiplier
         store_entries.append((cumulative, row["store_id"]))
 
-    stores = (
-        stores.join(F.broadcast(hours), "operating_hours")
-        .withColumn("_has_pool", F.col("store_geo_id").isin(*sorted(with_pool)))
-        .persist()
-    )
+    stores = stores.join(F.broadcast(hours), "operating_hours").persist()
     # Destination tax for DC-shipped online orders, as in history: the mean
     # store rate of the customer's geography, else the network mean.
     mean_bps = int(round(sum(row["_tax_rate"] for row in rows) / len(rows) * 10000))
@@ -333,7 +327,7 @@ def build_stream_context(
             spark, "_stores", store_entries, "_cdf:double,store_id:bigint"
         ),
         customer_pools=pools,
-        geo_picker=_single_row_array(spark, "_geos", geo_entries, "_cdf:double,geo_id:bigint"),
+        lifecycle=lifecycle,
         ids=ids,
         baskets=baskets,
         store_hours=tuple(
@@ -485,21 +479,29 @@ def new_visits(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
         * F.element_at(F.col("_hour_share"), F.hour(_local(F.col("ts"))) + 1)
     )
     visits = visits.where(_keep(ctx, "visits", time_factor))
-    local = (d.u([v], "affinity") < F.lit(GEO_AFFINITY)) & F.col("_has_pool")
-    network_geo = pick_retail_product(F.col("_geos"), d.u([v], "customer-geo"))["geo_id"]
-    pools = ctx.customer_pools.select("geo_id", "_pool")
+    # As in history: most identified shoppers are the store's home customers,
+    # the rest another store's; a shopper is kept with their lifecycle
+    # activity that local day, else the visit is anonymous.
+    home = d.u([v], "customer-home-visit") < F.lit(HOME_STORE_SHARE)
+    away = pick_retail_product(F.col("_stores"), d.u([v], "customer-away-store"))["store_id"]
     visits = (
-        visits.crossJoin(F.broadcast(ctx.geo_picker))
-        .withColumn("geo_id", F.when(local, F.col("store_geo_id")).otherwise(network_geo))
-        .join(F.broadcast(pools), "geo_id")
+        visits.crossJoin(F.broadcast(ctx.store_picker))
+        .withColumn("pool_store", F.when(home, F.col("store_id")).otherwise(away).cast("long"))
+        .drop("_stores")
+        .join(F.broadcast(ctx.customer_pools), "pool_store", "left")
+    )
+    picked = F.when(
+        F.col("_pool").isNotNull(),
+        pick_retail_product(F.col("_pool"), d.u([v], "customer"))["customer_id"].cast("long"),
+    )
+    kept = (d.u([v], "customer-identified") < F.lit(ctx.lifecycle.identify_probability)) & (
+        d.u([v], "customer-active") < activity_column(ctx.lifecycle, picked, local_day)
     )
     return visits.select(
         v,
         F.unix_millis(F.col("ts")).alias("start_ms"),
         "store_id",
-        pick_retail_product(F.col("_pool"), d.u([v], "customer"))["customer_id"]
-        .cast("long")
-        .alias("customer_id"),
+        F.when(kept, picked).cast("long").alias("customer_id"),
     )
 
 
@@ -1182,6 +1184,43 @@ def _online_line(ctx: StreamContext, line: Column) -> Column:
     )
 
 
+def _online_customers(ctx: StreamContext, orders: DataFrame) -> DataFrame:
+    """Add each order's customer: the first of a few tries active that (UTC) day.
+
+    As in history, a try picks a store by traffic and a ticket in its pool;
+    an order whose tries all find inactive customers is never placed.
+    """
+    d = ctx.draws
+    tries = orders.select(
+        "v",
+        F.to_date(_ms_ts(F.col("start_ms"))).alias("_day"),
+        F.explode(F.sequence(F.lit(1), F.lit(ONLINE_CUSTOMER_ATTEMPTS))).alias("_try"),
+    )
+    k = [F.col("v"), F.col("_try")]
+    store = pick_retail_product(F.col("_stores"), d.u(k, "online-customer-store"))["store_id"]
+    tries = (
+        tries.crossJoin(F.broadcast(ctx.store_picker))
+        .withColumn("pool_store", store.cast("long"))
+        .drop("_stores")
+        .join(F.broadcast(ctx.customer_pools), "pool_store")
+        .withColumn(
+            "_picked",
+            pick_retail_product(F.col("_pool"), d.u(k, "online-customer"))["customer_id"].cast(
+                "long"
+            ),
+        )
+    )
+    active = d.u(k, "online-customer-active") < activity_column(
+        ctx.lifecycle, F.col("_picked"), F.col("_day")
+    )
+    chosen = (
+        tries.where(active)
+        .groupBy("v")
+        .agg(F.min_by("_picked", "_try").cast("long").alias("customer_id"))
+    )
+    return orders.join(chosen, "v")
+
+
 def plan_orders(ctx: StreamContext, orders: DataFrame) -> DataFrame:
     """Lay out each order's lifecycle (``v, start_ms, rejected, _is_new`` rows).
 
@@ -1196,10 +1235,10 @@ def plan_orders(ctx: StreamContext, orders: DataFrame) -> DataFrame:
     v = F.col("v")
     for salt, name, output in (
         ("store", "stores", "store_id"),
-        ("cust", "customers", "customer_id"),
         ("dc", "dcs", "dc_id"),
     ):
         orders = _sample(ctx, orders, salt, name, output)
+    orders = _online_customers(ctx, orders)
     key = [F.col("order_id")]
     mode = F.col("fulfillment_mode")
     bopis = mode == "BOPIS"
@@ -1535,7 +1574,12 @@ def marketing_events(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
         F.col("impression_id"),
         F.round(cost, 2).alias("cost"),
         device.alias("device_type"),
-        F.when(d.u(key, "mk_crm") < F.lit(CRM_MATCH_RATE), F.col("customer_pick"))
+        # A CRM match needs a customer who is signed up and not churned, as in history.
+        F.when(
+            (d.u(key, "mk_crm") < F.lit(CRM_MATCH_RATE))
+            & (activity_column(ctx.lifecycle, F.col("customer_pick"), F.col("day")) > 0),
+            F.col("customer_pick"),
+        )
         .cast("long")
         .alias("customer_id"),
         iso(F.col("ts")).alias("impression_time"),

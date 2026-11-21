@@ -27,9 +27,11 @@ from retail_setup.generation.behavior import (
     retail_quantity,
 )
 from retail_setup.dictionaries.models import StoreTypeProfile
+from retail_setup.generation.customers import assign_online_customers, lifecycle_for
 from retail_setup.generation.receipts import (
     _fmt,
     _with_seasonal_department,
+    customer_pools,
 )
 from retail_setup.generation.runtime import (
     date_grid,
@@ -163,10 +165,6 @@ def generate_online_orders(
             ),
         )
         .withColumn(
-            "customer_id",
-            (d.h64(["order_id_ext"], "onl_cust") % F.lit(cfg.customer_count) + 1).cast("long"),
-        )
-        .withColumn(
             "tender_type",
             d.pick_by_weights(
                 ["order_id_ext"], "onl_tender", [(n, w) for n, w, _, _, _ in ONLINE_TENDERS]
@@ -181,6 +179,15 @@ def generate_online_orders(
             + F.lit(ONLINE_PROMO_LINE_SHARE[0]),
         )
         .withColumn("basket_n", basket_n)
+    )
+    # Each order's customer is active that day (signed up, not churned); the
+    # rare order whose tries all find inactive customers is not placed.
+    lifecycle = lifecycle_for(cfg, profile.resolved_customer_visits_per_year())
+    pool, sizes, picker = customer_pools(lifecycle, dims)
+    orders = (
+        assign_online_customers(
+            lifecycle, orders, pool, sizes, picker, "order_id_ext", "event_date"
+        )
         # destination-based tax rate for this order's customer
         .join(cust_rate, "customer_id", "left")
         .withColumn("rate_bps", F.coalesce(F.col("rate_bps"), F.lit(mean_bps)))
