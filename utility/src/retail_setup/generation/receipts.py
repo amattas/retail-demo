@@ -38,12 +38,12 @@ from retail_setup.generation.runtime import (
 from retail_setup.generation.schemas import column_names
 from retail_setup.generation.traffic import generate_hourly_visits
 from retail_setup.generation.vocabulary import (
-    BASE_DECLINE,
-    DECLINE_REASONS,
-    EVERGREEN_PROMOS,
-    PROMO_CATALOG,
-    TENDERS,
+    decline_reason_column,
+    line_promotion,
+    payment_status_column,
+    processing_ms_column,
     promo_eligible_column,
+    tender_column,
 )
 
 # Share of in-store receipts whose customer lives in the store's geography
@@ -457,7 +457,7 @@ def generate_receipts_group(
         "_offer", d.u(["receipt_id_ext"], "offer") < F.lit(profile.promo_rate)
     ).withColumn(
         "tender_type",
-        d.pick_by_weights(["receipt_id_ext"], "tender", [(n, w) for n, w, _, _, _ in TENDERS]),
+        tender_column(d, ["receipt_id_ext"]),
     )
 
     # --- lines: explode baskets, weighted department -> price-tiered product
@@ -563,77 +563,21 @@ def generate_receipts_group(
         )
         .withColumn("unit_cents", F.round(F.col("SalePrice") * 100).cast("long"))
         .withColumn("ext_before", F.col("unit_cents") * F.col("quantity"))
-        .withColumn("has_promo", F.col("_offer"))
         # named promo code + matching discount (datagen promotion_utils parity):
         # a seasonal/min-purchase/BOGO code if eligible, else an evergreen code.
         .withColumn(
-            "_pidx",
-            (d.h64(["receipt_id_ext", "line_num"], "pcode") % F.lit(len(PROMO_CATALOG))).cast(
-                "int"
+            "_promo",
+            line_promotion(
+                d,
+                ["receipt_id_ext", "line_num"],
+                F.month(F.col("event_date")),
+                F.col("unit_cents"),
+                F.col("quantity"),
+                F.col("_offer"),
             ),
         )
-        .withColumn(
-            "_pcode",
-            F.element_at(F.array(*[F.lit(t[0]) for t in PROMO_CATALOG]), F.col("_pidx") + 1),
-        )
-        .withColumn(
-            "_ppct",
-            F.element_at(F.array(*[F.lit(t[1]) for t in PROMO_CATALOG]), F.col("_pidx") + 1),
-        )
-        .withColumn(
-            "_pkind",
-            F.element_at(F.array(*[F.lit(t[4]) for t in PROMO_CATALOG]), F.col("_pidx") + 1),
-        )
-        .withColumn(
-            "_pelig",
-            _promo_eligible_expr(
-                F.col("_pidx"), F.month(F.col("event_date")), F.col("ext_before"), F.col("quantity")
-            ),
-        )
-        .withColumn(
-            "_evidx",
-            (d.h64(["receipt_id_ext", "line_num"], "pcodeev") % F.lit(len(EVERGREEN_PROMOS))).cast(
-                "int"
-            ),
-        )
-        .withColumn(
-            "_evcode",
-            F.element_at(F.array(*[F.lit(c) for c, _ in EVERGREEN_PROMOS]), F.col("_evidx") + 1),
-        )
-        .withColumn(
-            "_evpct",
-            F.element_at(F.array(*[F.lit(p) for _, p in EVERGREEN_PROMOS]), F.col("_evidx") + 1),
-        )
-        .withColumn(
-            "promo_code",
-            F.when(
-                F.col("has_promo"),
-                F.when(F.col("_pelig"), F.col("_pcode")).otherwise(F.col("_evcode")),
-            ),
-        )
-        .withColumn("_disc_pct", F.when(F.col("_pelig"), F.col("_ppct")).otherwise(F.col("_evpct")))
-        .withColumn("_disc_kind", F.when(F.col("_pelig"), F.col("_pkind")).otherwise(F.lit("PCT")))
-        .withColumn(
-            "discount_cents",
-            F.when(
-                F.col("has_promo"),
-                F.when(
-                    F.col("_disc_kind") == "BOGO",
-                    # buy-one-get-one: every 2nd item discounted at _disc_pct
-                    F.floor(
-                        F.floor(F.col("quantity") / F.lit(2))
-                        * F.col("unit_cents")
-                        * F.col("_disc_pct")
-                        / F.lit(100.0)
-                        + F.lit(0.5)
-                    ).cast("long"),
-                ).otherwise(
-                    F.floor(
-                        F.col("ext_before") * F.col("_disc_pct") / F.lit(100.0) + F.lit(0.5)
-                    ).cast("long")
-                ),
-            ).otherwise(F.lit(0).cast("long")),
-        )
+        .withColumn("promo_code", F.col("_promo.promo_code"))
+        .withColumn("discount_cents", F.col("_promo.discount_cents"))
         .withColumn(
             "ext_cents",
             F.greatest(F.lit(0).cast("long"), F.col("ext_before") - F.col("discount_cents")),
@@ -720,18 +664,6 @@ def generate_receipts_group(
     )
 
     # --- payments (one per receipt; in-store, so order_id_ext is NULL)
-    u_dec = d.u(["receipt_id_ext"], "decline")
-    decline_p: Column = F.lit(0.0)
-    for name, _, mult, _, _ in TENDERS:
-        decline_p = F.when(F.col("payment_method") == name, F.lit(BASE_DECLINE * mult)).otherwise(
-            decline_p
-        )
-    proc_lo: Column = F.lit(TENDERS[-1][3])
-    proc_hi: Column = F.lit(TENDERS[-1][4])
-    for name, _, _, lo, hi in TENDERS[:-1]:
-        proc_lo = F.when(F.col("payment_method") == name, F.lit(lo)).otherwise(proc_lo)
-        proc_hi = F.when(F.col("payment_method") == name, F.lit(hi)).otherwise(proc_hi)
-    reason_idx = (d.h64(["receipt_id_ext"], "reason") % len(DECLINE_REASONS)).cast("int")
     fact_payments = (
         fact_receipts.withColumn("order_id_ext", F.lit(None).cast("string"))
         .withColumn("amount_cents", F.col("total_cents"))
@@ -748,17 +680,11 @@ def generate_receipts_group(
                 ),
             ),
         )
-        .withColumn("status", F.when(u_dec < decline_p, "DECLINED").otherwise("APPROVED"))
-        .withColumn(
-            "decline_reason",
-            F.when(
-                F.col("status") == "DECLINED",
-                F.element_at(F.array(*[F.lit(r) for r in DECLINE_REASONS]), reason_idx + 1),
-            ),
-        )
+        .withColumn("status", payment_status_column(d, ["receipt_id_ext"], F.col("payment_method")))
+        .withColumn("decline_reason", decline_reason_column(d, ["receipt_id_ext"], F.col("status")))
         .withColumn(
             "processing_time_ms",
-            (proc_lo + d.u(["receipt_id_ext"], "proc") * (proc_hi - proc_lo)).cast("long"),
+            processing_ms_column(d, ["receipt_id_ext"], F.col("payment_method")),
         )
         .withColumn("amount", _fmt(F.col("amount_cents")))
         .select(*column_names("fact_payments"))
