@@ -27,6 +27,35 @@ PENDING_EVENT_TYPES = frozenset(
     }
 )
 
+# Live tables that are quiet by design. Live volume follows the store hours and
+# the historical configuration, so a healthy stream can leave these tables
+# without new rows for a while: store operations happen only at opening and
+# closing, store visits stop overnight while every store is closed, and a small
+# fleet has few online orders, impressions or promotions per hour. Readiness
+# adds this quiet time to its freshness window for the table.
+EVENT_TABLE_QUIET = {
+    "store_opened": timedelta(hours=26),
+    "store_closed": timedelta(hours=26),
+    "customer_entered": timedelta(hours=12),
+    "ble_ping_detected": timedelta(hours=12),
+    "customer_zone_changed": timedelta(hours=12),
+    "receipt_created": timedelta(hours=12),
+    "receipt_line_added": timedelta(hours=12),
+    "promotion_applied": timedelta(hours=12),
+    "payment_processed": timedelta(hours=12),
+    "online_order_created": timedelta(hours=12),
+    "online_order_picked": timedelta(hours=12),
+    "online_order_shipped": timedelta(hours=12),
+    "ad_impression": timedelta(hours=6),
+}
+
+
+def event_table_max_age(event_type: str, base: timedelta) -> timedelta:
+    """Freshness window of a live event table: ``base`` plus its quiet time."""
+
+    return base + EVENT_TABLE_QUIET.get(event_type, timedelta(0))
+
+
 # Live runs trigger a micro-batch every minute. Each batch makes one Kusto
 # transaction per event table, so a longer trigger means fewer, larger extents.
 DEFAULT_TRIGGER_SECONDS = 60

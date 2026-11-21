@@ -17,6 +17,9 @@ The module holds:
 The live stream does not use every definition yet. The remaining differences
 are listed, with their review IDs, in the known-gap allowlist of
 ``tests/generation/test_vocabulary.py``.
+
+Column helpers here (tender, decline, promotion and BLE draws) are the single
+implementation both producers call, keyed on each producer's own IDs.
 """
 
 from datetime import date
@@ -26,9 +29,11 @@ from pyspark.sql import functions as F
 
 from retail_setup.dictionaries.models import StoreTypeProfile
 from retail_setup.generation.runtime import (
+    case_when,
     fixed_width_decimal,
     minimum_width_decimal,
     minimum_width_text,
+    seeded_draws,
 )
 
 # ---------------------------------------------------------------------------
@@ -78,6 +83,64 @@ def decline_probability(
         if name == method:
             return BASE_DECLINE * multiplier
     raise ValueError(f"unknown tender {method!r}")
+
+
+def tender_column(
+    draws: seeded_draws,
+    keys: list,
+    tenders: list[tuple[str, float, float, int, int]] = TENDERS,
+    salt: str = "tender",
+) -> Column:
+    """Tender drawn by the mix weights of ``tenders``."""
+    return draws.pick_by_weights(keys, salt, [(name, weight) for name, weight, *_ in tenders])
+
+
+def decline_probability_column(
+    method: Column, tenders: list[tuple[str, float, float, int, int]] = TENDERS
+) -> Column:
+    """Column form of :func:`decline_probability` (0 for an unknown method)."""
+    return case_when(
+        (method == name, F.lit(BASE_DECLINE * multiplier)) for name, _, multiplier, _, _ in tenders
+    ).otherwise(F.lit(0.0))
+
+
+def payment_status_column(
+    draws: seeded_draws,
+    keys: list,
+    method: Column,
+    tenders: list[tuple[str, float, float, int, int]] = TENDERS,
+    salt: str = "decline",
+) -> Column:
+    """``DECLINED`` with the tender's decline probability, else ``APPROVED``."""
+    declined = draws.u(keys, salt) < decline_probability_column(method, tenders)
+    return F.when(declined, F.lit("DECLINED")).otherwise(F.lit("APPROVED"))
+
+
+def decline_reason_column(
+    draws: seeded_draws, keys: list, status: Column, salt: str = "reason"
+) -> Column:
+    """A decline reason for declined payments, NULL otherwise."""
+    index = (draws.h64(keys, salt) % len(DECLINE_REASONS)).cast("int")
+    return F.when(
+        status == "DECLINED",
+        F.element_at(F.array(*[F.lit(reason) for reason in DECLINE_REASONS]), index + 1),
+    )
+
+
+def processing_ms_column(
+    draws: seeded_draws,
+    keys: list,
+    method: Column,
+    tenders: list[tuple[str, float, float, int, int]] = TENDERS,
+    salt: str = "proc",
+) -> Column:
+    """Payment processing time in ms, uniform in the tender's range."""
+    low: Column = F.lit(tenders[-1][3])
+    high: Column = F.lit(tenders[-1][4])
+    for name, _, _, lo, hi in tenders[:-1]:
+        low = F.when(method == name, F.lit(lo)).otherwise(low)
+        high = F.when(method == name, F.lit(hi)).otherwise(high)
+    return (low + draws.u(keys, salt) * (high - low)).cast("long")
 
 
 # ---------------------------------------------------------------------------
@@ -143,6 +206,48 @@ def promo_eligible_column(
     return expr.otherwise(F.lit(False))
 
 
+def line_promotion(
+    draws: seeded_draws,
+    keys: list,
+    month: Column,
+    unit_cents: Column,
+    quantity: Column,
+    offer: Column,
+) -> Column:
+    """Per-line promotion: ``struct<promo_code string, discount_cents long>``.
+
+    Lines of an offered receipt each draw a catalog code; when it is not
+    eligible for the line, an evergreen code applies. Lines of other receipts
+    get no code and no discount.
+    """
+    line_cents = unit_cents * quantity
+    index = (draws.h64(keys, "pcode") % F.lit(len(PROMO_CATALOG))).cast("int")
+    position = index + 1
+    code = F.element_at(F.array(*[F.lit(entry[0]) for entry in PROMO_CATALOG]), position)
+    pct = F.element_at(F.array(*[F.lit(entry[1]) for entry in PROMO_CATALOG]), position)
+    kind = F.element_at(F.array(*[F.lit(entry[4]) for entry in PROMO_CATALOG]), position)
+    eligible = promo_eligible_column(index, month, line_cents, quantity)
+    fallback = (draws.h64(keys, "pcodeev") % F.lit(len(EVERGREEN_PROMOS))).cast("int") + 1
+    fallback_code = F.element_at(F.array(*[F.lit(c) for c, _ in EVERGREEN_PROMOS]), fallback)
+    fallback_pct = F.element_at(F.array(*[F.lit(p) for _, p in EVERGREEN_PROMOS]), fallback)
+    discount_pct = F.when(eligible, pct).otherwise(fallback_pct)
+    discount_kind = F.when(eligible, kind).otherwise(F.lit("PCT"))
+    discount = F.when(
+        offer,
+        F.when(
+            discount_kind == "BOGO",
+            # Buy one, get one: every second unit is discounted.
+            F.floor(
+                F.floor(quantity / F.lit(2)) * unit_cents * discount_pct / F.lit(100.0) + F.lit(0.5)
+            ).cast("long"),
+        ).otherwise(F.floor(line_cents * discount_pct / F.lit(100.0) + F.lit(0.5)).cast("long")),
+    ).otherwise(F.lit(0).cast("long"))
+    return F.struct(
+        F.when(offer, F.when(eligible, code).otherwise(fallback_code)).alias("promo_code"),
+        discount.alias("discount_cents"),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Identifier formats
 # ---------------------------------------------------------------------------
@@ -206,6 +311,22 @@ def sensor_id_column(store_id: Column, zone: Column) -> Column:
     return F.format_string(SENSOR_ID_FORMAT, store_id, zone)
 
 
+# Share of in-store visits whose phone is identified (its BLE ID is in
+# dim_customers); the rest are anonymous.
+BLE_KNOWN_SHARE = 0.3
+ANONYMOUS_BLE_PREFIX = "ANON-"
+
+
+def anonymous_ble_id_column(store_id: Column, draw: Column) -> Column:
+    """Anonymous BLE device ID: ``ANON-<store>-<6 digits>`` from a non-negative hash."""
+    return F.concat(
+        F.lit(ANONYMOUS_BLE_PREFIX),
+        store_id.cast("string"),
+        F.lit("-"),
+        (draw % F.lit(900000) + F.lit(100000)).cast("string"),
+    )
+
+
 def campaign_id(campaign_start: date, archetype_index: int) -> str:
     """Campaign ID: ``CAMP`` + window start (yyyyMMdd) + 2-digit archetype index."""
     if not 0 <= archetype_index < 10**CAMPAIGN_INDEX_WIDTH:
@@ -238,6 +359,19 @@ FOOT_TRAFFIC_ZONE_DWELL: dict[str, tuple[int, int]] = {
     "CHECKOUT": (90, 240),
 }
 FOOT_TRAFFIC_ZONES = list(FOOT_TRAFFIC_ZONE_DWELL)
+
+# A shopper's BLE path starts at the entrance, visits some department zones in
+# a random order, and ends at checkout when the visit buys. Each BLE zone
+# borrows the dwell range of the foot-traffic zone it overlaps.
+BLE_ENTRY_ZONE = "ENTRANCE"
+BLE_CHECKOUT_ZONE = "CHECKOUT"
+BLE_ZONE_DWELL: dict[str, tuple[int, int]] = {
+    "ENTRANCE": FOOT_TRAFFIC_ZONE_DWELL["ENTRANCE_MAIN"],
+    "ELECTRONICS": FOOT_TRAFFIC_ZONE_DWELL["AISLES_B"],
+    "GROCERY": FOOT_TRAFFIC_ZONE_DWELL["AISLES_A"],
+    "CLOTHING": FOOT_TRAFFIC_ZONE_DWELL["AISLES_B"],
+    "CHECKOUT": FOOT_TRAFFIC_ZONE_DWELL["CHECKOUT"],
+}
 
 
 def ble_zones_for_profile(profile: StoreTypeProfile | None) -> list[str]:

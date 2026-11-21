@@ -251,6 +251,20 @@ part of every generated ID and Kusto ingest tag.
 - **Upgrade from an earlier version:** the old `eventhouse/` folder is no
   longer read and can be deleted.
 
+The stream's own state (store open/closed, visits in progress, the last batch
+clock) is in the Lakehouse tables `ag._stream_state_stores`,
+`ag._stream_state_visits` and `ag._stream_state_meta`, keyed by incarnation. A
+new incarnation starts from a fresh state seeded from Silver `fact_store_ops`;
+rows of earlier incarnations are ignored and can be deleted with
+`DELETE FROM ag._stream_state_<name> WHERE incarnation <> '<current>'`.
+Notebook 05 maintains the three tables.
+
+Live volume follows history by default: `source_rows_per_second = 0` derives
+the rate from the store count and `transactions_per_store_day`, and visits
+follow each store's local hours, so expect few events at night and none from
+a store while it is closed. Set `volume_scale` (for example `5.0`) for a busier
+demo; it multiplies every live volume.
+
 A new incarnation checks the history handoff again. If history ends more than
 a day before the start, rerun setup or set `allow_history_gap = True`.
 

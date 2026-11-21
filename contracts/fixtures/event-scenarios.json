@@ -12,18 +12,19 @@
           "schema_version": "1.0",
           "source": "contract-fixture",
           "correlation_id": "JRN-FIX-STORE-001",
-          "partition_key": "camp_CMP-7",
+          "partition_key": "camp_CAMP2026071402",
           "session_id": "SES-FIX-STORE-001",
           "parent_event_id": null,
           "payload": {
             "channel": "SOCIAL",
-            "campaign_id": "CMP-7",
-            "creative_id": "CRV-21",
-            "customer_ad_id": "AD42",
+            "campaign_id": "CAMP2026071402",
+            "creative_id": "CREATJRN0A1B2C3D4E5F-NEWER",
+            "customer_ad_id": "AD00000042",
             "impression_id": "IMP-FIX-001",
-            "cost": 0.35,
-            "device_type": "mobile",
-            "customer_id": 42
+            "cost": 0.12,
+            "device_type": "MOBILE",
+            "customer_id": 42,
+            "impression_time": "2026-07-20T12:00:00.000Z"
           }
         },
         {

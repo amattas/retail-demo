@@ -298,10 +298,20 @@ an empty/missing eligible catalog is an error, not a synthetic `$9.99` price.
 
 Live catalog launch eligibility is snapshotted when the stream starts; restart
 the stream to pick up newly launched products or changed catalog/profile data.
-The rate source remains an operator-controlled demonstration pace, not the
-historical visitor-arrival process. Live event scenarios and historical online
-fulfillment retain their explicitly synthetic scheduling assumptions; shared
-basket behavior does not imply a persistent live supply-chain simulator.
+Live store visits continue the historical visitor-arrival process: the same
+hourly, daily and monthly weights in store-local time, the same traffic
+multipliers and operating hours, the same conversion model, and customers from
+the same ticket-weighted local pools (see the
+[live event contract](../streaming/event-contract.md#volume-hours-and-customers)).
+Live inventory, logistics and online fulfillment keep their synthetic
+scheduling until their state machines land; shared basket behavior does not
+imply a persistent live supply-chain simulator.
+
+Live `fact_store_ops` rows use the historical lower-case `opened`/`closed`;
+notebook 03 lower-cases rows written by earlier stream versions. Live
+`fact_marketing` journey touches are dated by when they were shown
+(`impression_time`), not when they arrived, and live `fact_promotions.product_ids`
+is the same comma-separated, numerically sorted list as history.
 
 ### Statistical acceptance
 

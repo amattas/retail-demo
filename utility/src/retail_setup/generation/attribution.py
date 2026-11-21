@@ -43,22 +43,21 @@ Pipeline:
    base generators already emit.
 """
 
+from datetime import date
+
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
 from retail_setup.config.generation import GenerationConfig
+from retail_setup.generation.marketing import campaign_window_start, impression_device_cost
 from retail_setup.generation.runtime import (
-    case_when,
     legacy_index,
     seeded_draws,
 )
 from retail_setup.generation.schemas import column_names
 from retail_setup.generation.vocabulary import (
     CAMPAIGN_ARCHETYPES,
-    CHANNEL_COSTS,
-    DEVICE_MULTIPLIERS,
-    DEVICE_WEIGHTS,
     campaign_id_column,
 )
 
@@ -162,15 +161,11 @@ def _journey_touch_rows(
         F.concat(F.lit("IMPJRN"), F.col("_jhash"), F.lit(suffix[0].upper())),
     )
     key = [F.col("impression_id_ext")]
-    rows = rows.withColumn(
-        "device", d.pick_by_weights(key, f"attr_device_{suffix}", DEVICE_WEIGHTS)
+    device, cost = impression_device_cost(
+        d, key, F.col("channel"), f"attr_device_{suffix}", f"attr_cost_{suffix}"
     )
-    mult = case_when((F.col("device") == device, m) for device, m in DEVICE_MULTIPLIERS.items())
-    rows = rows.withColumn("device_mult", mult)
-    channel = F.col("channel")
-    lo = case_when((channel == name, c_lo) for name, (c_lo, _) in CHANNEL_COSTS.items())
-    hi = case_when((channel == name, c_hi) for name, (_, c_hi) in CHANNEL_COSTS.items())
-    cost_dollars = (lo + d.u(key, f"attr_cost_{suffix}") * (hi - lo)) * F.col("device_mult")
+    rows = rows.withColumn("device", device).withColumn("_cost_dollars", cost)
+    cost_dollars = F.col("_cost_dollars")
     rows = (
         rows.withColumn("cost_cents", F.round(cost_dollars * 100).cast("long"))
         .withColumn("cost", F.format_string("%.2f", cost_dollars))
@@ -196,6 +191,88 @@ def _journey_touch_rows(
         "attribution_journey_id",
     ).withColumn("__index_level_0__", legacy_index("impression_id_ext"))
     return out.select(*column_names("fact_marketing"))
+
+
+def with_journey_plan(purchases: DataFrame, d: seeded_draws, history_start: date) -> DataFrame:
+    """Add a selected purchase's journey: ID, campaign, channel and two touch times.
+
+    ``purchases`` needs ``match_key`` (the purchase's own ID) and
+    ``purchase_ts``. Every draw is keyed on ``match_key``, so the batch and the
+    live stream plan journeys the same way for their own purchases.
+    """
+    return (
+        purchases.withColumn(
+            "_jhash", F.hex(F.xxhash64(F.col("match_key"), F.lit(f"attr_journey|{d.seed}")))
+        )
+        .withColumn("attribution_journey_id", F.concat(F.lit("JRN"), F.col("_jhash")))
+        .withColumn("creative_id", F.concat(F.lit("CREATJRN"), F.substring(F.col("_jhash"), 1, 12)))
+        .withColumn(
+            "_campaign_choice",
+            (d.h64(["match_key"], "attr_campaign") % len(JOURNEY_CAMPAIGNS)).cast("int"),
+        )
+        .withColumn(
+            "_campaign_index",
+            F.when(F.col("_campaign_choice") == 0, F.lit(JOURNEY_CAMPAIGNS[0][0])).otherwise(
+                F.lit(JOURNEY_CAMPAIGNS[1][0])
+            ),
+        )
+        .withColumn(
+            "_campaign_duration",
+            F.when(F.col("_campaign_choice") == 0, F.lit(JOURNEY_CAMPAIGNS[0][2])).otherwise(
+                F.lit(JOURNEY_CAMPAIGNS[1][2])
+            ),
+        )
+        .withColumn(
+            "channel",
+            F.when(
+                F.col("_campaign_choice") == 0,
+                d.pick_by_weights(
+                    ["match_key"],
+                    "attr_channel_product",
+                    [(channel, 1.0) for channel in JOURNEY_CAMPAIGNS[0][1]],
+                ),
+            ).otherwise(
+                d.pick_by_weights(
+                    ["match_key"],
+                    "attr_channel_loyalty",
+                    [(channel, 1.0) for channel in JOURNEY_CAMPAIGNS[1][1]],
+                )
+            ),
+        )
+        .withColumn(
+            "older_offset",
+            (
+                F.lit(OLDER_OFFSET_MIN_S)
+                + d.u(["match_key"], "attr_older") * F.lit(OLDER_OFFSET_MAX_S - OLDER_OFFSET_MIN_S)
+            ).cast("long"),
+        )
+        .withColumn(
+            "newer_offset",
+            (
+                F.lit(NEWER_OFFSET_MIN_S)
+                + d.u(["match_key"], "attr_newer") * F.lit(NEWER_OFFSET_MAX_S - NEWER_OFFSET_MIN_S)
+            ).cast("long"),
+        )
+        .withColumn(
+            "touch_ts_older",
+            F.timestamp_seconds(F.col("purchase_ts").cast("long") - F.col("older_offset")),
+        )
+        .withColumn(
+            "touch_ts_newer",
+            F.timestamp_seconds(F.col("purchase_ts").cast("long") - F.col("newer_offset")),
+        )
+        .withColumn("_campaign_touch_day", F.to_date("touch_ts_newer"))
+        .withColumn(
+            "_campaign_start",
+            campaign_window_start(
+                F.col("_campaign_touch_day"), history_start, F.col("_campaign_duration")
+            ),
+        )
+        .withColumn(
+            "campaign_id",
+            campaign_id_column(F.col("_campaign_start"), F.col("_campaign_index")),
+        )
+    )
 
 
 def generate_attribution(
@@ -299,84 +376,7 @@ def generate_attribution(
         .drop("_sel_u")
     )
 
-    selected = (
-        selected.withColumn(
-            "_jhash", F.hex(F.xxhash64(F.col("match_key"), F.lit(f"attr_journey|{cfg.seed}")))
-        )
-        .withColumn("attribution_journey_id", F.concat(F.lit("JRN"), F.col("_jhash")))
-        .withColumn("creative_id", F.concat(F.lit("CREATJRN"), F.substring(F.col("_jhash"), 1, 12)))
-        .withColumn(
-            "_campaign_choice",
-            (d.h64(["match_key"], "attr_campaign") % len(JOURNEY_CAMPAIGNS)).cast("int"),
-        )
-        .withColumn(
-            "_campaign_index",
-            F.when(F.col("_campaign_choice") == 0, F.lit(JOURNEY_CAMPAIGNS[0][0])).otherwise(
-                F.lit(JOURNEY_CAMPAIGNS[1][0])
-            ),
-        )
-        .withColumn(
-            "_campaign_duration",
-            F.when(F.col("_campaign_choice") == 0, F.lit(JOURNEY_CAMPAIGNS[0][2])).otherwise(
-                F.lit(JOURNEY_CAMPAIGNS[1][2])
-            ),
-        )
-        .withColumn(
-            "channel",
-            F.when(
-                F.col("_campaign_choice") == 0,
-                d.pick_by_weights(
-                    ["match_key"],
-                    "attr_channel_product",
-                    [(channel, 1.0) for channel in JOURNEY_CAMPAIGNS[0][1]],
-                ),
-            ).otherwise(
-                d.pick_by_weights(
-                    ["match_key"],
-                    "attr_channel_loyalty",
-                    [(channel, 1.0) for channel in JOURNEY_CAMPAIGNS[1][1]],
-                )
-            ),
-        )
-        .withColumn(
-            "older_offset",
-            (
-                F.lit(OLDER_OFFSET_MIN_S)
-                + d.u(["match_key"], "attr_older") * F.lit(OLDER_OFFSET_MAX_S - OLDER_OFFSET_MIN_S)
-            ).cast("long"),
-        )
-        .withColumn(
-            "newer_offset",
-            (
-                F.lit(NEWER_OFFSET_MIN_S)
-                + d.u(["match_key"], "attr_newer") * F.lit(NEWER_OFFSET_MAX_S - NEWER_OFFSET_MIN_S)
-            ).cast("long"),
-        )
-        .withColumn(
-            "touch_ts_older",
-            F.timestamp_seconds(F.col("purchase_ts").cast("long") - F.col("older_offset")),
-        )
-        .withColumn(
-            "touch_ts_newer",
-            F.timestamp_seconds(F.col("purchase_ts").cast("long") - F.col("newer_offset")),
-        )
-        .withColumn("_campaign_touch_day", F.to_date("touch_ts_newer"))
-        .withColumn(
-            "_campaign_start",
-            F.date_add(
-                F.lit(cfg.start_date),
-                (
-                    F.datediff(F.col("_campaign_touch_day"), F.lit(cfg.start_date))
-                    / F.col("_campaign_duration")
-                ).cast("int")
-                * F.col("_campaign_duration"),
-            ),
-        )
-        .withColumn(
-            "campaign_id",
-            campaign_id_column(F.col("_campaign_start"), F.col("_campaign_index")),
-        )
-    )
+    selected = with_journey_plan(selected, d, cfg.start_date)
 
     cust_ad = t["dim_customers"].select(
         F.col("ID").alias("customer_id"), F.col("AdId").alias("customer_ad_id")

@@ -79,10 +79,12 @@ def test_stream_notebook_code_compiles():
 
 def test_stream_template_emits_declared_eventhouse_event_types():
     template = (UTILITY / "notebooks" / "templates" / "driver-05-stream.py").read_text()
-    stream_tree = ast.parse(template)
+    events_source = (
+        UTILITY / "src" / "retail_setup" / "generation" / "stream_events.py"
+    ).read_text()
     payload_assignment = next(
         node
-        for node in stream_tree.body
+        for node in ast.parse(template).body
         if isinstance(node, ast.Assign)
         and any(
             isinstance(target, ast.Name) and target.id == "EVENT_PAYLOADS"
@@ -90,18 +92,21 @@ def test_stream_template_emits_declared_eventhouse_event_types():
         )
     )
     declared_events = set(ast.literal_eval(payload_assignment.value))
+    # Event types are the string argument of slot(ctx, cond, type, ...),
+    # envelope(ctx, type, ...) and the online stage(type, ...) helper.
+    position = {"slot": 2, "envelope": 1, "stage": 0}
     stream_events = {
-        node.args[1].value
-        for node in ast.walk(stream_tree)
+        node.args[position[node.func.id]].value
+        for node in ast.walk(ast.parse(events_source))
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
-        and node.func.id == "slot"
-        and len(node.args) > 1
-        and isinstance(node.args[1], ast.Constant)
-        and isinstance(node.args[1].value, str)
+        and node.func.id in position
+        and len(node.args) > position[node.func.id]
+        and isinstance(node.args[position[node.func.id]], ast.Constant)
+        and isinstance(node.args[position[node.func.id]].value, str)
     }
     # Store operations use a Catalyst concat expression: "store_" + opened/closed.
-    assert 'F.concat(F.lit("store_"), op_type)' in template
+    assert 'F.concat(F.lit("store_"), F.col("operation_type"))' in events_source
     stream_events.update({"store_opened", "store_closed"})
 
     kql = (UTILITY.parent / "fabric" / "kql_database" / "01-create-tables.kql").read_text()

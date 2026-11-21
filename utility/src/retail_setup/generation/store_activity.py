@@ -16,6 +16,7 @@ from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.loader import load_dictionaries
 from retail_setup.generation.runtime import case_when, seeded_draws, store_day_grid
 from retail_setup.generation.schemas import column_names
+from retail_setup.generation.stream_calendar import OPERATING_HOURS_MAP
 from retail_setup.generation.traffic import generate_hourly_visits
 from retail_setup.generation.vocabulary import (
     FOOT_TRAFFIC_ZONE_DWELL,
@@ -23,8 +24,6 @@ from retail_setup.generation.vocabulary import (
     sensor_id_column,
 )
 
-# operating_hours literal -> (open_hour, close_hour); "24h" maps to 0/24
-OPERATING_HOURS_MAP = {"6-22": (6, 22), "7-22": (7, 22), "7-23": (7, 23), "24h": (0, 24)}
 
 BASE_CONVERSION = 0.20
 PEAK_HOURS = (12, 13, 17, 18, 19)

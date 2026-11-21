@@ -99,6 +99,8 @@ values = {
     "END_DATE": "2025-02-28",
     "ANCHOR_DATE": "2024-12-01",
     "STORE_COUNT": "3",
+    "TRANSACTIONS_PER_STORE_DAY": "400",
+    "ONLINE_ORDERS_PER_DAY": "24",
     "SEED": "7",
     "DICTIONARY_REF": "deadbeef",
     "CUSTOM_DICTIONARIES": "{}",

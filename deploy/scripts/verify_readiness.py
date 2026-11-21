@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol
 from retail_setup.generation.stream_control import (
     INGEST_TAG_PREFIX,
     PENDING_EVENT_TYPES,
+    event_table_max_age,
     parse_ingest_tag,
 )
 
@@ -2121,14 +2122,16 @@ class ReadinessRunner:
         }
         if not processed:
             raise EvidenceNotObserved(_UNOBSERVED_STREAM_MESSAGES["freshness.watermarks"])
-        stalest_table, stalest = min(
-            processed.items(), key=lambda item: _parse_time(item[1])
-        )
+        # Tables that are quiet by design (store hours) get their quiet time on top.
+        allowed = {
+            table: event_table_max_age(table, self._silver_max_age()) for table in processed
+        }
+        stalest_table = self._closest_to_limit(processed, allowed)
         try:
             freshness = evaluate_freshness(
-                stalest,
+                processed[stalest_table],
                 observed_at=self.context.observed_at,
-                max_age=self._silver_max_age(),
+                max_age=allowed[stalest_table],
                 lineage=f"ag._watermarks last_processed_ts (stalest: {stalest_table})",
             )
         except CheckFailed as exc:
@@ -2174,6 +2177,15 @@ class ReadinessRunner:
             freshness,
         )
 
+    def _closest_to_limit(self, timestamps: dict[str, Any], allowed: dict[str, timedelta]) -> str:
+        """The table whose latest timestamp is nearest its freshness limit."""
+
+        observed_at = self.context.observed_at.astimezone(UTC)
+        return min(
+            sorted(timestamps),
+            key=lambda table: allowed[table] - (observed_at - _parse_time(timestamps[table])),
+        )
+
     def _silver_lag(self, watermarks: dict[str, Any]) -> dict[str, Any] | None:
         """Return the worst unprocessed Eventhouse backlog relative to retention."""
 
@@ -2214,16 +2226,18 @@ class ReadinessRunner:
                 "Eventhouse ingestion is missing selected event tables.", evidence=comparison
             )
         # Each live table must be fresh on its own; one busy table must not make
-        # the whole Eventhouse look fresh.
+        # the whole Eventhouse look fresh. Tables that are quiet by design (store
+        # operations, store visits overnight) get their quiet time on top.
         per_table = signal.get("table_ingestion") or {}
         ingested = {table: (per_table.get(table) or {}).get("ingested") for table in live_tables}
+        allowed = {table: event_table_max_age(table, _STREAM_MAX_AGE) for table in live_tables}
         stale: list[str] = []
         for table in sorted(live_tables):
             try:
                 evaluate_freshness(
                     ingested[table],
                     observed_at=self.context.observed_at,
-                    max_age=_STREAM_MAX_AGE,
+                    max_age=allowed[table],
                     lineage=table,
                 )
             except (CheckFailed, EvidenceUnknown):
@@ -2234,11 +2248,11 @@ class ReadinessRunner:
                 f"{len(live_tables)} live event tables: {', '.join(stale)}.",
                 evidence={**comparison, "stale": stale},
             )
-        stalest_table = min(live_tables, key=lambda table: _parse_time(ingested[table]))
+        stalest_table = self._closest_to_limit(ingested, allowed)
         freshness = evaluate_freshness(
             ingested[stalest_table],
             observed_at=self.context.observed_at,
-            max_age=_STREAM_MAX_AGE,
+            max_age=allowed[stalest_table],
             lineage=f"Eventhouse per-table max ingestion_time() (stalest: {stalest_table})",
         )
         return Observation(

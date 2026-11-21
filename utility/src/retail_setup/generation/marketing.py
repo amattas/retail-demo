@@ -20,7 +20,9 @@ snake_case plan columns `customer_id`/`cost_cents`, and `__index_level_0__`
 is the legacy pandas index (hash-derived via legacy_index).
 """
 
-from pyspark.sql import DataFrame, SparkSession
+from datetime import date
+
+from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
@@ -43,6 +45,35 @@ from retail_setup.generation.vocabulary import (
 ARCHETYPES = CAMPAIGN_ARCHETYPES
 
 LEGACY_FLEET_SIZE = 86  # datagen's store count; volumes scale store_count/86
+# Background (non-journey) impressions carry a customer_id for this CRM-matched share.
+CRM_MATCH_RATE = 0.05
+
+
+def campaign_window_start(day: Column, history_start: date, duration: Column) -> Column:
+    """Start of the campaign window a day falls in.
+
+    Campaigns of an archetype run back to back for its duration, anchored on
+    the first history day, so the live stream continues the same campaigns.
+    """
+    return F.date_add(
+        F.lit(history_start),
+        (F.datediff(day, F.lit(history_start)) / duration).cast("int") * duration,
+    )
+
+
+def impression_device_cost(
+    draws: seeded_draws, key: list, channel: Column, device_salt: str, cost_salt: str
+) -> tuple[Column, Column]:
+    """(device, cost in dollars) of an impression.
+
+    The device is MOBILE/DESKTOP/TABLET at 60/30/10; the cost is uniform in
+    the channel's band times the device's multiplier.
+    """
+    device = draws.pick_by_weights(key, device_salt, DEVICE_WEIGHTS)
+    multiplier = case_when((device == name, m) for name, m in DEVICE_MULTIPLIERS.items())
+    low = case_when((channel == name, c_lo) for name, (c_lo, _) in CHANNEL_COSTS.items())
+    high = case_when((channel == name, c_hi) for name, (_, c_hi) in CHANNEL_COSTS.items())
+    return device, (low + draws.u(key, cost_salt) * (high - low)) * multiplier
 
 
 def generate_marketing(
@@ -76,10 +107,7 @@ def generate_marketing(
             # Campaigns span their archetype duration: the day's impressions
             # belong to the window [start + k*duration, ...) it falls in.
             "campaign_start",
-            F.date_add(
-                F.lit(cfg.start_date),
-                (F.col("day_offset") / F.col("duration")).cast("int") * F.col("duration"),
-            ),
+            campaign_window_start(F.col("day"), cfg.start_date, F.col("duration")),
         )
     )
 
@@ -128,16 +156,11 @@ def generate_marketing(
     ch_idx = F.floor(d.u(key, "mk_channel") * F.size("channels")).cast("int")
     imps = imps.withColumn("channel", F.element_at("channels", ch_idx + 1))
 
-    # --- device pick (60/30/10) and cost multiplier
-    imps = imps.withColumn("device", d.pick_by_weights(key, "mk_device", DEVICE_WEIGHTS))
-    mult = case_when((F.col("device") == device, m) for device, m in DEVICE_MULTIPLIERS.items())
-    imps = imps.withColumn("device_mult", mult)
-
-    # --- cost: uniform within the channel band, times the device multiplier
-    channel = F.col("channel")
-    lo = case_when((channel == name, c_lo) for name, (c_lo, _) in CHANNEL_COSTS.items())
-    hi = case_when((channel == name, c_hi) for name, (_, c_hi) in CHANNEL_COSTS.items())
-    cost_dollars = (lo + d.u(key, "mk_cost") * (hi - lo)) * F.col("device_mult")
+    # --- device pick (60/30/10); cost uniform in the channel band times the
+    # device multiplier
+    device, cost = impression_device_cost(d, key, F.col("channel"), "mk_device", "mk_cost")
+    imps = imps.withColumn("device", device).withColumn("_cost_dollars", cost)
+    cost_dollars = F.col("_cost_dollars")
     imps = imps.withColumn("cost_cents", F.round(cost_dollars * 100).cast("long")).withColumn(
         "cost", F.format_string("%.2f", cost_dollars)
     )
@@ -154,7 +177,7 @@ def generate_marketing(
     imps = imps.withColumn(
         "customer_id",
         F.when(
-            d.u(key, "mk_crm") < F.lit(0.05),
+            d.u(key, "mk_crm") < F.lit(CRM_MATCH_RATE),
             F.col("customer_pick").cast("double"),
         ),
     )

@@ -13,7 +13,10 @@ from types import SimpleNamespace
 
 import pytest
 from retail_setup.contracts import load_repository_manifest, resolve_profile
-from retail_setup.generation.stream_control import PENDING_EVENT_TYPES
+from retail_setup.generation.stream_control import (
+    EVENT_TABLE_QUIET,
+    PENDING_EVENT_TYPES,
+)
 
 from deploy.scripts.build_artifacts import SETUP_NOTEBOOKS
 from deploy.scripts.deploy_config import OperationsPlanningConfig, TwinsConfig
@@ -2089,7 +2092,11 @@ def test_watermark_check_warns_before_retention_purges_unprocessed_events(
     assert result.status == status
     assert text in result.summary
     if status == "PASS":
-        assert result.freshness["max_age_seconds"] == 2 * 30 * 60
+        # Two schedule intervals plus the table's quiet time (store visits stop
+        # overnight while every store is closed).
+        assert result.freshness["max_age_seconds"] == (
+            2 * 30 * 60 + EVENT_TABLE_QUIET["customer_entered"].total_seconds()
+        )
         assert "last_processed_ts" in result.freshness["lineage"]
 
 
@@ -2102,13 +2109,22 @@ def _live_tables() -> frozenset[str]:
     ) - PENDING_EVENT_TYPES
 
 
-@pytest.mark.parametrize("stale_table", [None, "store_closed"])
-def test_eventhouse_freshness_is_checked_per_live_table(stale_table):
+@pytest.mark.parametrize(
+    ("stale_table", "age", "status"),
+    [
+        (None, None, "PASS"),
+        ("inventory_updated", timedelta(hours=2), "FAIL"),
+        # Store operations happen only at opening and closing time, and store
+        # visits stop overnight: those tables are quiet by design.
+        ("store_closed", timedelta(hours=20), "PASS"),
+        ("receipt_created", timedelta(hours=9), "PASS"),
+        ("store_closed", timedelta(hours=27), "FAIL"),
+    ],
+)
+def test_eventhouse_freshness_is_checked_per_live_table(stale_table, age, status):
     ingestion = {
         table: {
-            "ingested": (
-                NOW - (timedelta(hours=2) if table == stale_table else timedelta(minutes=2))
-            ).isoformat()
+            "ingested": (NOW - (age if table == stale_table else timedelta(minutes=2))).isoformat()
         }
         for table in _live_tables()
     }
@@ -2125,11 +2141,10 @@ def test_eventhouse_freshness_is_checked_per_live_table(stale_table):
     result = _status(runner, runner._eventhouse_freshness)
 
     assert PENDING_EVENT_TYPES.isdisjoint(ingestion)
+    assert result.status == status
     if stale_table is None:
-        assert result.status == "PASS"
         assert result.freshness["age_seconds"] == 120
-    else:
-        assert result.status == "FAIL"
+    elif status == "FAIL":
         assert stale_table in result.summary
 
 

@@ -437,6 +437,8 @@ because both read only Silver.
 | `START_DATE` | Derived or explicit historical start |
 | `END_DATE` | Derived or explicit historical end |
 | `STORE_COUNT` | Number of stores |
+| `TRANSACTIONS_PER_STORE_DAY` | Historical in-store transactions per store-day; sizes the live stream |
+| `ONLINE_ORDERS_PER_DAY` | Historical online orders per day; sizes the live stream |
 | `SEED` | Deterministic seed |
 | `DICTIONARY_REF` | Git ref used for dictionary content |
 | `CUSTOM_DICTIONARIES` | JSON map of custom layout file → SHA-256; `{}` for presets |

@@ -131,7 +131,11 @@ lineage and cannot make an old model generation appear fresh. Setup and model
 evidence use a seven-day maximum age. Eventhouse ingestion and checkpoint
 evidence use a 30-minute maximum age, checked per live event table: each
 table's own `max(ingestion_time())` must be recent, so one busy table cannot
-make the rest look fresh. Event types declared but not yet emitted
+make the rest look fresh. Live volume follows store hours, so tables that are
+quiet by design get extra time (`stream_control.EVENT_TABLE_QUIET`): 26 hours
+for store opened/closed, 12 hours for store-visit, purchase and online-order
+tables (stores close overnight; small fleets have few orders per hour), and 6
+hours for ad impressions. The Silver watermark check adds the same quiet time. Event types declared but not yet emitted
 (`stream_control.PENDING_EVENT_TYPES`) are not expected. Silver watermark
 evidence uses the stalest live table's `last_processed_ts` (the event time
 Silver has processed), not `updated_at`, which the daily deep reconciliation

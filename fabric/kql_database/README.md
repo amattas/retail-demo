@@ -55,8 +55,11 @@ never used. Only `unknown_event` keeps them, for queued ingestion.
 
 The Spark Kusto writes are positional, so a new column in an existing event
 table must keep the payload-then-envelope order. `01-create-tables.kql`
-restates `truck_arrived` with `.alter table` after its `.create-merge` for
-that reason.
+restates `truck_arrived` and `ad_impression` with `.alter table` after their
+`.create-merge` for that reason. `ad_impression.impression_time` is when an
+impression was shown; journey touches arrive (`ingest_timestamp`) with their
+purchase, so the marketing functions use
+`coalesce(impression_time, ingest_timestamp)` as the touch time.
 
 Thresholds in `06-ml-anomaly-detection.kql` (detector threshold, seasonality,
 trend, severity bands, lookback) must equal

@@ -53,11 +53,85 @@ time. Historical Silver uses the same convention (see the
 
 Tenders, zones, ID formats, marketing channels and devices, promotions, and the
 decline model come from `retail_setup.generation.vocabulary`, which the build
-inlines into the notebook. Where the live values still differ from history
-(for example the `MOBILE` tender, decimal BLE IDs, lower-case devices, and
-`CMP-` campaign IDs), the stream keeps a `LIVE_*` constant and
-`utility/tests/generation/test_vocabulary.py` lists the difference as a known
-gap. That test fails when a gap closes, so the list only shrinks.
+inlines into the notebook, so live values match history: `MOBILE_PAY`, base-36
+BLE IDs padded to six characters, `BEACON_%03d_<zone>` and `SENSOR_%03d_<zone>`
+IDs, upper-case devices, `CAMP<yyyyMMdd><NN>` campaign IDs, and padded `AdId`s.
+The two remaining differences (S-12: online fulfillment modes are picked
+uniformly, and online payments are never declined) are listed as known gaps in
+`utility/tests/generation/test_vocabulary.py`. That test fails when a gap
+closes, so the list only shrinks.
+
+## Volume, hours and customers
+
+The live stream reuses the historical models (`stream_calendar`,
+`stream_events`), so its volume, time of day and customer mix continue the
+history:
+
+- **Rate.** `source_rows_per_second = 0` (the default) derives the rate-source
+  rate from the store count, the historical `transactions_per_store_day`
+  (rendered into the notebook), `online_orders_per_day`, and the marketing
+  volume: the smallest whole rate that covers every lane at its peak. Each row
+  goes to one lane (store visits, online orders, marketing, inventory,
+  logistics) and is kept with that lane's calendar weight, so a larger explicit
+  rate adds resolution, not volume. `volume_scale` multiplies every calibrated
+  volume. Inventory and logistics keep their previous per-store rates until
+  their state machines replace them.
+- **Store visits.** A visit picks a store weighted by `daily_traffic_multiplier`
+  and is kept with the profile's hourly, daily and monthly weights evaluated in
+  the store's local time (`dim_stores.TimeZone`, daylight saving included). The
+  hourly weight is zero while the store is closed and on Christmas Day, so no
+  live receipt is outside opening hours. Visits are drawn at
+  `transactions_per_store_day / 0.225` per store-day and convert with the same
+  store/day/hour conversion as history (about 22%).
+- **Customers.** 70% of shoppers come from the store's own geography and the
+  rest from the whole network, both weighted by the historical visit tickets
+  (`behavior.customer_visit_tickets`). The churned history cohort
+  (`customer_id % 10 == 0`) no longer shops.
+- **Visit path.** A visit enters (`customer_entered`, sensor zone by store
+  format), walks from `ENTRANCE` through one to three department zones in
+  random order, and ends at `CHECKOUT` when it buys. Each zone has a dwell time
+  in its foot-traffic range, two to five BLE pings, and a zone change on
+  arrival. 30% of visits carry the customer's `dim_customers.BLEId`; the rest
+  are `ANON-<store>-<n>`, as in history. The receipt, lines and promotions are
+  emitted halfway through checkout and the payment after the tender's
+  processing time. A visit that would run past closing time is compressed to
+  end before it.
+- **Purchases.** Baskets, per-line promotions (`PROMO_CATALOG` with the
+  evergreen fallback), the 40/30/20/10 tender mix and the 2.5% base decline
+  model are the batch helpers. A declined payment keeps its `SALE` receipt,
+  as in history, and is never attributed. One `promotion_applied` is emitted per
+  receipt and promo code.
+- **Store operations.** `store_opened` and `store_closed` (lower-case
+  `opened`/`closed`, like history) are emitted exactly at each store's local
+  opening and closing time, one pair per open day. A 24-hour store closes at
+  23:59 and reopens at midnight.
+- **Marketing.** Background impressions follow the historical campaigns
+  (archetype channels, `CAMP` IDs on the same campaign windows, flash sales on
+  about one day in seven), cost bands by channel and device, padded `AdId`s,
+  and a 5% CRM match, at `store_count / 86` of the archetype volumes.
+
+## Stream state
+
+Events that span micro-batches need state. A visit's later events (pings,
+receipt, payment) are emitted in the batch whose time they fall in, and the
+store hours need each store's open/closed state. The state lives in Lakehouse
+Delta tables in the Silver schema:
+
+| Table | Key | Contents |
+| --- | --- | --- |
+| `_stream_state_stores` | store ID | Open or closed, and when it last changed. |
+| `_stream_state_visits` | visit (rate row) | Visits whose last event is still in the future. |
+| `_stream_state_meta` | `clock` | The time of the last micro-batch. |
+
+Each row also carries the checkpoint `incarnation` (stream ID and nonce),
+`batch_id`, the JSON `payload` and a `deleted` flag. Micro-batch N reads, per
+entity, the latest version written before N, and writes its changes with
+`batch_id = N` using a Delta `replaceWhere` on `batch_id >= N`. A replay of N
+therefore reads the same state, regenerates the same events, and replaces its
+own versions: nothing is applied twice. Superseded versions are deleted every
+60 batches. A new incarnation has no rows; at startup it seeds each store from
+its last Silver `fact_store_ops` row (or its hours) as `batch_id = -1`. Rows of
+an earlier incarnation are ignored and can be deleted.
 
 ## Envelope
 
@@ -128,7 +202,9 @@ be processed.
 
 ## Eventhouse writes
 
-For each micro-batch, the notebook:
+Each micro-batch is generated inside `foreachBatch`: the notebook reads the
+state as of the previous batch, builds the batch's events, writes them, and
+only then commits the new state. For the Eventhouse sink, the notebook:
 
 1. Persists the batch.
 2. Finds present mapped event types.
@@ -159,7 +235,8 @@ they are inert. The `unknown_event` catch-all keeps both for queued ingestion.
 
 | Parameter | Default | Meaning |
 | --- | --- | --- |
-| `source_rows_per_second` | `5` | Rate-source rows per second; each row emits one scenario bundle. |
+| `source_rows_per_second` | `0` | `0` derives the rate from the store count and historical volume; a larger value adds resolution, not volume. |
+| `volume_scale` | `1.0` | Multiplies every calibrated live volume. |
 | `run_seconds` | `0` | `0` runs until cancelled; a positive value is a bounded (smoke) run. |
 | `trigger_seconds` | `60` | Live micro-batch interval. Bounded runs use at most 10 seconds. |
 | `max_lag_seconds` | `600` | After a stop, rate rows older than this behind the batch time are dropped. |
@@ -223,8 +300,9 @@ delete the whole checkpoint root.
   each stream, incarnation, event type, and Spark micro-batch.
 - Unmapped event types and any required table-write failure (after retries)
   raise from `foreachBatch`, so Spark does not commit that batch's checkpoint.
-- A replayed batch rebuilds the same rows, catalog, and tags, so tables that
-  already succeeded are skipped and the rest are written once.
+- A replayed batch rebuilds the same rows, catalog, state, and tags, so tables
+  that already succeeded are skipped and the rest are written once. The state
+  write replaces the batch's own versions.
 - Silver transforms remove exact duplicate candidates, reject conflicting rows
   with the same identity, and use Delta `MERGE` before advancing watermarks.
 - Gold tables are rebuilt with overwrite semantics from duplicate-safe Silver
@@ -288,10 +366,24 @@ deployment verification gate.
 
 ## Marketing attribution
 
-Attributed store and online scenarios emit two `ad_impression` touches and one
-purchase journey without introducing another event type. The existing envelope
+About 5% of approved store and online purchases with a customer are selected
+for a journey with the batch helper (`attribution.with_journey_plan`): one
+journey ID, a product-launch or loyalty campaign, and two `ad_impression`
+touches 3-7 days and 1 minute-2 days before the purchase. The existing envelope
 `correlation_id` carries `attribution_journey_id` through impressions,
 receipt/order creation, promotion, payment, and online status events.
+
+Touches arrive with the purchase: their `ingest_timestamp` is the purchase
+time, and the payload's `impression_time` says when they were shown
+(background impressions have both equal). Notebook 03 dates `fact_marketing`
+rows by `impression_time` but tracks its watermark and replay window on
+`ingest_timestamp`, the arrival time, so touches are never older than the
+replay window and are not left to the daily deep reconciliation. Kusto's
+`ingestion_time()` is not visible through the OneLake shortcut notebook 03
+reads; `ingest_timestamp` stays deterministic from the rate-source time, so
+replays are identical, and is within one trigger interval of it. KQL
+`fn_marketing_attribution()` and `fn_campaign_performance()` use
+`coalesce(impression_time, ingest_timestamp)` as the touch time.
 
 The contract is deterministic last-touch within an inclusive seven-day window,
 ordered by touch timestamp and impression ID. Silver writes one

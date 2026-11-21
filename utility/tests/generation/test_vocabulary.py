@@ -14,8 +14,12 @@ from retail_setup.generation import vocabulary as vocab
 
 UTILITY = Path(__file__).resolve().parents[2]
 STREAM_TEMPLATE = UTILITY / "notebooks" / "templates" / "driver-05-stream.py"
-STREAM_SOURCE = STREAM_TEMPLATE.read_text(encoding="utf-8")
-STREAM_TREE = ast.parse(STREAM_SOURCE)
+STREAM_EVENTS = UTILITY / "src" / "retail_setup" / "generation" / "stream_events.py"
+TEMPLATE_SOURCE = STREAM_TEMPLATE.read_text(encoding="utf-8")
+EVENTS_SOURCE = STREAM_EVENTS.read_text(encoding="utf-8")
+# The stream's code: the notebook template plus the event module it inlines.
+STREAM_SOURCE = TEMPLATE_SOURCE + "\n" + EVENTS_SOURCE
+STREAM_TREES = [ast.parse(TEMPLATE_SOURCE), ast.parse(EVENTS_SOURCE)]
 
 
 def _module_literals(tree: ast.Module) -> dict[str, object]:
@@ -34,7 +38,9 @@ def _module_literals(tree: ast.Module) -> dict[str, object]:
     return found
 
 
-STREAM_LITERALS = _module_literals(STREAM_TREE)
+STREAM_LITERALS = {
+    name: value for tree in STREAM_TREES for name, value in _module_literals(tree).items()
+}
 
 
 def _shared_values() -> dict[str, object]:
@@ -54,83 +60,17 @@ def _present(pattern: str) -> Callable[[], bool]:
 # makes the stream use the shared definition, its detector turns False and this
 # test fails until the entry is removed, so the allowlist only shrinks.
 KNOWN_STREAM_GAPS: dict[str, tuple[str, Callable[[], bool]]] = {
-    "tender-names": (
-        "S-15: live tenders use MOBILE, the vocabulary uses MOBILE_PAY",
-        lambda: (
-            "MOBILE" in STREAM_LITERALS["LIVE_TENDERS"] and "MOBILE" not in vocab.tender_names()
-        ),
-    ),
-    "tender-mix": (
-        "S-15: live tenders are picked uniformly instead of by TENDERS weights",
-        _present(r'_pick\(F\.col\("v"\), "tender", LIVE_TENDERS\)'),
-    ),
-    "payment-declines": (
-        "S-15/C-12: live payments are always APPROVED (no decline model)",
-        lambda: STREAM_SOURCE.count('F.lit("APPROVED").alias("status")') == 2,
-    ),
-    "marketing-channels": (
-        "S-14: live impressions use a 4-channel subset",
-        lambda: set(STREAM_LITERALS["LIVE_CHANNELS"]) < set(vocab.MARKETING_CHANNELS),
-    ),
-    "device-casing": (
-        "S-14: live device types are lower case",
-        lambda: (
-            [d.upper() for d in STREAM_LITERALS["LIVE_DEVICES"]] == vocab.DEVICE_TYPES
-            and STREAM_LITERALS["LIVE_DEVICES"] != vocab.DEVICE_TYPES
-        ),
-    ),
-    "campaign-id-format": (
-        "S-14: live campaign IDs are CMP-<n>, not CAMP<yyyyMMdd><NN>",
-        _present(r'F\.lit\("CMP-"\)'),
-    ),
-    "impression-cost": (
-        "S-14/B-6: live cost per impression is uniform $0.10-$2.10, not by channel",
-        _present(r"F\.lit\(2\.0\) \+ F\.lit\(0\.1\)"),
-    ),
-    "organic-ad-id-padding": (
-        "S-14/L-25: organic live customer_ad_id is AD + unpadded customer ID",
-        _present(r'F\.concat\(F\.lit\("AD"\), F\.col\("customer_id"\)\.cast\("string"\)\)'),
-    ),
-    "ble-id-format": (
-        "S-6: live BLE IDs are BLE + decimal customer ID, not base-36 padded to 6",
-        _present(r'F\.concat\(F\.lit\("BLE"\), F\.col\("customer_id"\)'),
-    ),
-    "ble-zones": (
-        "S-6/B-18: live BLE pings use the foot-traffic zones instead of BLE_ZONES",
-        lambda: "BLE_ZONES" not in STREAM_SOURCE,
-    ),
-    "beacon-id-format": (
-        "S-6: live beacon IDs are BEACON_<store>_<zone>, not BEACON_%03d_%s",
-        _present(r'F\.lit\("BEACON_"\)'),
-    ),
-    "sensor-id-format": (
-        "S-6: live sensor IDs are SENSOR_<store>_<zone>, not SENSOR_%03d_%s",
-        _present(r'F\.lit\("SENSOR_"\)'),
-    ),
-    "promo-catalog": (
-        "S-22: the live catalog lacks SAVE15, SAVE25 and BFRIDAY40, and minimums are dollars",
-        lambda: (
-            {code for code, *_ in STREAM_LITERALS["LIVE_NAMED_PROMOS"]}
-            < {code for code, *_ in vocab.PROMO_CATALOG}
-        ),
-    ),
-    "evergreen-promos": (
-        "S-22: the live evergreen fallback lacks DEAL15",
-        lambda: set(STREAM_LITERALS["LIVE_EVERGREEN_PROMOS"]) < set(vocab.EVERGREEN_PROMOS),
-    ),
-    "promo-selection": (
-        "S-22/B-9: live promos pick one code per receipt on the gross subtotal, not per line",
-        _present(
-            r'_promo_elig\(\s*F\.col\("_pidx"\), F\.month\(F\.col\("ts"\)\), F\.col\("subtotal"\)'
-        ),
-    ),
     "fulfillment-mix": (
         "S-12: live fulfillment modes are picked uniformly, not by ONLINE_FULFILLMENT_MIX",
-        _present(r'_pick\(F\.col\("v"\), "omode", FULFILLMENT_MODES\)'),
+        lambda: (
+            re.search(r'h64\(\[v\], "omode"\) % len\(FULFILLMENT_MODES\)', STREAM_SOURCE)
+            is not None
+            and "ONLINE_FULFILLMENT_MIX" not in STREAM_SOURCE
+        ),
     ),
-    "online-tenders": (
-        "S-12: live online orders reuse in-store tenders (including CASH)",
-        lambda: "ONLINE_TENDERS" not in STREAM_SOURCE,
+    "online-payment-declines": (
+        "S-12: live online payments are always APPROVED (no decline model)",
+        _present(r'\.withColumn\("status", F\.lit\("APPROVED"\)\)'),
     ),
 }
 
@@ -182,17 +122,8 @@ def test_stream_does_not_redefine_shared_vocabulary() -> None:
     assert not duplicates, f"stream redefines shared vocabulary: {duplicates}"
 
 
-def test_live_only_constants_are_listed_as_known_gaps() -> None:
-    live = sorted(name for name in STREAM_LITERALS if name.startswith("LIVE_"))
-    assert live == [
-        "LIVE_CHANNELS",
-        "LIVE_DEVICES",
-        "LIVE_EVERGREEN_PROMOS",
-        "LIVE_NAMED_PROMOS",
-        "LIVE_TENDERS",
-    ]
-    for name in live:
-        assert STREAM_LITERALS[name] not in _shared_values().values(), name
+def test_stream_defines_no_live_only_vocabulary() -> None:
+    assert sorted(name for name in STREAM_LITERALS if name.startswith("LIVE_")) == []
 
 
 @pytest.mark.parametrize("gap", sorted(KNOWN_STREAM_GAPS))
@@ -201,9 +132,23 @@ def test_known_stream_vocabulary_gaps_still_exist(gap: str) -> None:
     assert detector(), f"gap {gap!r} is closed ({finding}); remove it from KNOWN_STREAM_GAPS"
 
 
-def test_stream_uses_shared_definitions_where_values_already_agree() -> None:
-    assert '_pick(F.col("v"), "zone", FOOT_TRAFFIC_ZONES)' in STREAM_SOURCE
-    assert 'attr_customer_ad_id = ad_id_column(F.col("customer_id"))' in STREAM_SOURCE
+def test_stream_uses_the_shared_definitions() -> None:
+    for usage in (
+        'tender_column(d, [F.col("receipt_id")])',
+        'payment_status_column(d, [F.col("receipt_id")], F.col("tender"))',
+        "line_promotion(",
+        'ble_id_column(F.col("customer_id"))',
+        "anonymous_ble_id_column(",
+        "beacon_id_column(",
+        "sensor_id_column(",
+        "campaign_id_column(",
+        "impression_device_cost(",
+        'ad_id_column(F.col("customer_pick"))',
+        "ONLINE_TENDERS",
+        "BLE_ZONE_DWELL",
+    ):
+        assert usage in EVENTS_SOURCE, usage
+    assert set(vocab.BLE_ZONE_DWELL) == set(vocab.BLE_ZONES)
     assert vocab.FULFILLMENT_MODES == ["SHIP_FROM_DC", "SHIP_FROM_STORE", "BOPIS"]
 
 

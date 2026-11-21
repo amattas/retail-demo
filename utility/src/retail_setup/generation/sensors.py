@@ -32,7 +32,12 @@ from pyspark.sql import functions as F
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.generation.runtime import legacy_index, seeded_draws
 from retail_setup.generation.schemas import column_names
-from retail_setup.generation.vocabulary import BLE_ZONES, beacon_id_column
+from retail_setup.generation.vocabulary import (
+    BLE_KNOWN_SHARE,
+    BLE_ZONES,
+    anonymous_ble_id_column,
+    beacon_id_column,
+)
 
 # zone selection is without replacement
 _N_ZONES = len(BLE_ZONES)  # 5
@@ -90,7 +95,7 @@ def generate_ble(
     )
 
     # known flag: u(receipt_id_ext, "known") < 0.3
-    visits = visits.withColumn("_known", d.u(["receipt_id_ext"], "known") < F.lit(0.3))
+    visits = visits.withColumn("_known", d.u(["receipt_id_ext"], "known") < F.lit(BLE_KNOWN_SHARE))
 
     # customer_ble_id and customer_id (double)
     visits = visits.withColumn(
@@ -99,14 +104,7 @@ def generate_ble(
             F.col("_known") & F.col("ble_id_from_dim").isNotNull(),
             F.col("ble_id_from_dim"),
         ).otherwise(
-            F.concat(
-                F.lit("ANON-"),
-                F.col("store_id").cast("string"),
-                F.lit("-"),
-                (d.h64(["receipt_id_ext"], "anon_id") % F.lit(900000) + F.lit(100000)).cast(
-                    "string"
-                ),
-            )
+            anonymous_ble_id_column(F.col("store_id"), d.h64(["receipt_id_ext"], "anon_id"))
         ),
     ).withColumn(
         "visit_customer_id",

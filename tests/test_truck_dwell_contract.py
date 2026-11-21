@@ -10,6 +10,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 STREAM_TEMPLATE = ROOT / "utility" / "notebooks" / "templates" / "driver-05-stream.py"
 STREAM_NOTEBOOK = ROOT / "utility" / "notebooks" / "stream-events.ipynb"
+STREAM_EVENTS = ROOT / "utility" / "src" / "retail_setup" / "generation" / "stream_events.py"
 SILVER_NOTEBOOK = ROOT / "fabric" / "lakehouse" / "03-streaming-to-silver.ipynb"
 GOLD_NOTEBOOK = ROOT / "fabric" / "lakehouse" / "04-streaming-to-gold.ipynb"
 KQL_TABLES = ROOT / "fabric" / "kql_database" / "01-create-tables.kql"
@@ -81,22 +82,21 @@ def test_generator_emits_shared_keys_and_positive_late_dwell() -> None:
     assert departure > arrival
     assert (departure - arrival).total_seconds() > 0
 
-    assert '_iso(truck_arrival_ts).alias("arrival_time")' in source
-    assert '_iso(truck_departure_ts).alias("departure_time")' in source
-    assert (
-        "F.unix_timestamp(truck_arrival_ts) + truck_dwell_minutes * F.lit(60)" in source
-    )
-    assert 'truck_dwell_minutes.alias("actual_unload_duration")' in source
-    assert source.count('session=F.col("shipment_id")') == 2
-    assert 'F.pmod(F.col("v"), F.lit(TRUCK_LATE_BUCKET_MODULUS))' in source
+    events = STREAM_EVENTS.read_text(encoding="utf-8")
+    assert 'iso(arrival).alias("arrival_time")' in events
+    assert 'iso(departure).alias("departure_time")' in events
+    assert "F.unix_timestamp(arrival) + dwell * F.lit(60)" in events
+    assert 'dwell.alias("actual_unload_duration")' in events
+    assert events.count("session=shipment_id") == 2
+    assert "F.pmod(v, F.lit(TRUCK_LATE_BUCKET_MODULUS))" in events
 
 
 def test_generated_stream_notebook_contains_lifecycle_timing_contract() -> None:
     source = _notebook_source(STREAM_NOTEBOOK)
     assert "TRUCK_LATE_DWELL_MINUTES = 120" in source
     assert "TRUCK_DWELL_SLA_MINUTES = 90" in source
-    assert '_iso(truck_departure_ts).alias("departure_time")' in source
-    assert re.search(r"\),\s*truck_departure_ts,", source)
+    assert 'iso(departure).alias("departure_time")' in source
+    assert re.search(r"\),\s*departure,", source)
 
 
 def test_silver_joins_one_completed_lifecycle_on_authoritative_keys() -> None:

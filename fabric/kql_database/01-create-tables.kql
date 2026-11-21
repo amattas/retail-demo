@@ -320,6 +320,9 @@
 
 // MARKETING EVENTS
 
+// impression_time is when the impression was shown. Marketing journey touches
+// arrive with their purchase (ingest_timestamp) but were shown up to 7 days
+// earlier; background impressions have impression_time == ingest_timestamp.
 .create-merge table ad_impression (
     channel:string,
     campaign_id:string,
@@ -329,6 +332,31 @@
     cost:real,
     device_type:string,
     customer_id:long,
+    impression_time:datetime,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+// .create-merge appends impression_time after the envelope on an existing
+// table; restate the schema so it sits before the envelope, as the stream
+// writes it by position. No existing column changes type.
+.alter table ad_impression (
+    channel:string,
+    campaign_id:string,
+    creative_id:string,
+    customer_ad_id:string,
+    impression_id:string,
+    cost:real,
+    device_type:string,
+    customer_id:long,
+    impression_time:datetime,
     event_type:string,
     trace_id:string,
     ingest_timestamp:datetime,

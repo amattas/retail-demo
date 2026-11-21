@@ -46,7 +46,8 @@ Notable groups in this directory:
   Lakehouse projection
 - `05-maintain-delta-tables`: maintenance of every Silver, Gold and ML table
   in the contracts, including the owned streaming-only
-  `fact_online_order_status`, `ag._watermarks` and `setup_run_log`
+  `fact_online_order_status`, `ag._watermarks`, `setup_run_log` and the live
+  stream's `ag._stream_state_*` tables
 - `06` through `14`: ML and advanced analytics. `14` also appends `PENDING`
   pricing recommendations to the Eventhouse approval workflow.
 - `16-persist-anomaly-alerts`: runs in `streaming-data-load` and appends new

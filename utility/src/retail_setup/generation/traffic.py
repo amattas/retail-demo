@@ -7,6 +7,12 @@ from pyspark.sql.window import Window
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.models import StoreTypeProfile
 from retail_setup.generation.runtime import date_grid, seeded_draws
+from retail_setup.generation.stream_calendar import (
+    VISIT_CONVERSION_CALIBRATION,
+    daily_factor_column,
+    monthly_factor_column,
+    visit_conversion,
+)
 
 
 def generate_hourly_visits(
@@ -44,27 +50,14 @@ def generate_hourly_visits(
         ~((F.month("day") == 12) & (F.dayofmonth("day") == 25))
     )
     grid = hours.crossJoin(days)
-    daily = F.element_at(
-        F.array(*[F.lit(w * 7 / sum(profile.daily_weights)) for w in profile.daily_weights]),
-        F.pmod(F.dayofweek("day") + 5, F.lit(7)) + 1,
-    )
-    monthly = F.element_at(
-        F.array(*[F.lit(w * 12 / sum(profile.monthly_weights)) for w in profile.monthly_weights]),
-        F.month("day"),
-    )
+    daily = daily_factor_column(profile, F.col("day"))
+    monthly = monthly_factor_column(profile, F.col("day"))
     # Nearby stores share weather; store/hour conversion remains heterogeneous.
     weather = F.exp(0.15 * draws.gauss(["GeographyID", "day"], "weather") - 0.15**2 / 2)
-    conversion = 1.0 / (
-        1.0
-        + F.exp(
-            F.lit(1.2657)
-            - 0.25 * draws.gauss(["store_id"], "conversion-store")
-            - 0.20 * draws.gauss(["store_id", "day", "hour"], "conversion-hour")
-        )
-    )
+    conversion = visit_conversion(draws, F.col("store_id"), F.col("day"), F.col("hour"))
     grid = grid.withColumn(
         "_visits_mean",
-        F.lit(cfg.transactions_per_store_day / 0.225)
+        F.lit(cfg.transactions_per_store_day / VISIT_CONVERSION_CALIBRATION)
         * daily
         * monthly
         * weather

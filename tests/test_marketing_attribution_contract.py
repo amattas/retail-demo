@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 STREAM_TEMPLATE = ROOT / "utility" / "notebooks" / "templates" / "driver-05-stream.py"
+STREAM_EVENTS = ROOT / "utility" / "src" / "retail_setup" / "generation" / "stream_events.py"
 KQL_TABLES = ROOT / "fabric" / "kql_database" / "01-create-tables.kql"
 KQL_MAPPINGS = ROOT / "fabric" / "kql_database" / "02-create-ingestion-mappings.kql"
 KQL_FUNCTIONS = ROOT / "fabric" / "kql_database" / "03-create-functions.kql"
@@ -115,7 +116,7 @@ def test_typed_spark_projection_matches_every_kql_table_order() -> None:
 
 def test_attribution_uses_existing_envelope_without_new_event_type() -> None:
     payloads = _event_payloads()
-    source = STREAM_TEMPLATE.read_text(encoding="utf-8")
+    source = STREAM_EVENTS.read_text(encoding="utf-8")
 
     assert len(payloads) == 22
     assert "marketing_attribution" not in payloads
@@ -135,7 +136,10 @@ def test_kql_functions_enforce_last_touch_and_reconciliation() -> None:
 
     for expected in (
         "touch_rank = strcat(",
-        'format_datetime(ingest_timestamp, "yyyy-MM-dd HH:mm:ss.fffffff")',
+        # touches are dated by when they were shown, not when they arrived
+        "touch_ts = coalesce(impression_time, ingest_timestamp)",
+        'format_datetime(touch_ts, "yyyy-MM-dd HH:mm:ss.fffffff")',
+        "day = startofday(coalesce(impression_time, ingest_timestamp))",
         "arg_max(touch_rank, *)",
         "lag_seconds between (0 .. 604800)",
         'payment_status == "APPROVED"',

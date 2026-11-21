@@ -23,4 +23,14 @@ applicable, Silver, Gold, ontology, and Power BI consumers.
 Required writes and transforms shall fail closed or retain replay evidence.
 Checkpoints and watermarks shall advance only after successful publication.
 
+### REQ-STREAM-005 - Continuity with history
+
+The live driver shall continue the generated history with the same models:
+volume per store-day from the historical configuration, the store-local
+hourly, daily and monthly curve, operating hours, customer pools and visit
+frequency, visit conversion, identifier formats, vocabularies, the tender and
+decline mix, promotions, and marketing campaigns. State that spans
+micro-batches shall be versioned by batch so a replayed batch emits the same
+events.
+
 See [the event-contract specification](../../../specifications/modules/streaming/event-contract.md).
