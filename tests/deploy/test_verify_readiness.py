@@ -2064,6 +2064,7 @@ def _watermark_adapter(watermark):
         },
         data_consistency_signal=lambda: {
             "missing_receipts": 0, "missing_inventory": 0, "null_balances": 0,
+            "negative_balances": 0, "lifecycle_out_of_order": 0,
             "orphan_receipts": 0, "gold_sales_mismatches": 0,
             "settled_receipts": 3, "settled_inventory": 2, "settled_sales": 3,
         },
@@ -2113,7 +2114,10 @@ def _live_tables() -> frozenset[str]:
     ("stale_table", "age", "status"),
     [
         (None, None, "PASS"),
-        ("inventory_updated", timedelta(hours=2), "FAIL"),
+        ("ad_impression", timedelta(hours=7), "FAIL"),
+        # Stock moves follow the purchases, so they stop overnight too.
+        ("inventory_updated", timedelta(hours=9), "PASS"),
+        ("inventory_updated", timedelta(hours=13), "FAIL"),
         # Store operations happen only at opening and closing time, and store
         # visits stop overnight: those tables are quiet by design.
         ("store_closed", timedelta(hours=20), "PASS"),

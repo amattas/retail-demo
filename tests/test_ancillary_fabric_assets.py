@@ -99,8 +99,11 @@ def test_fulfillment_counts_do_not_use_an_unsupported_constant_join() -> None:
 
     for query in (queryset, dashboard_query):
         assert not re.search(r"\bjoin\b.*\bon\s+1\s*==\s*1", query)
-        assert query.count("toscalar(") == 3
+        # One cohort (orders created in the window) followed through each stage.
+        assert query.count("toscalar(") == 4
+        assert query.count("where order_id in (created)") == 3
         assert "print created" in query
+        assert "delivered" in query
 
 
 def test_truck_dwell_alerts_are_driven_by_completed_nonfuture_departures() -> None:

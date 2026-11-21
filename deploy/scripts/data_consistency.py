@@ -63,6 +63,14 @@ SELECT
        )) AS missing_inventory,
     (SELECT COUNT_BIG(*) FROM [ag].[fact_store_inventory_txn] CROSS JOIN inventory_bounds
      WHERE event_ts >= inventory_bounds.window_start AND balance IS NULL) AS null_balances,
+    (SELECT COUNT_BIG(*) FROM [ag].[fact_store_inventory_txn] CROSS JOIN inventory_bounds
+     WHERE event_ts >= inventory_bounds.window_start AND balance < 0) AS negative_balances,
+    (SELECT COUNT_BIG(*) FROM [ag].[fact_online_order_lines] AS line CROSS JOIN bounds
+     WHERE line.event_ts >= bounds.window_start
+       AND (line.picked_ts < line.event_ts
+            OR line.shipped_ts < line.picked_ts
+            OR line.delivered_ts < COALESCE(line.shipped_ts, line.picked_ts))
+    ) AS lifecycle_out_of_order,
     (SELECT COUNT_BIG(*) FROM [ag].[fact_receipts] AS receipt CROSS JOIN bounds
      WHERE receipt.event_ts >= bounds.window_start
        AND (NOT EXISTS (
@@ -82,6 +90,8 @@ CONSISTENCY_FIELDS = (
     "missing_receipts",
     "missing_inventory",
     "null_balances",
+    "negative_balances",
+    "lifecycle_out_of_order",
     "orphan_receipts",
     "gold_sales_mismatches",
 )
