@@ -47,7 +47,7 @@ def candidate_case(spark):
     dims = {
         "dim_stores": _native_frame(
             spark,
-            [{"ID": 1, "GeographyID": 1, "tax_rate": 0.0825}],
+            [{"ID": 1, "GeographyID": 1, "tax_rate": 0.0825, "TimeZone": "UTC"}],
             "dim_stores",
         ),
         "dim_products": _native_frame(
