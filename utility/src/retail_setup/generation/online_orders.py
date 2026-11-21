@@ -41,21 +41,26 @@ from retail_setup.generation.schemas import column_names
 from retail_setup.generation.vocabulary import (
     BASE_DECLINE,
     DECLINE_REASONS,
+    ONLINE_BACKORDER_RATE,
+    ONLINE_CANCEL_RATE,
+    ONLINE_DELIVER_SECONDS,
     ONLINE_FULFILLMENT_MIX,
+    ONLINE_HOURLY_WEIGHTS,
+    ONLINE_PICK_SECONDS,
+    ONLINE_PICKUP_SECONDS,
+    ONLINE_PROMO_LINE_SHARE,
+    ONLINE_PROMOS,
+    ONLINE_SHIP_SECONDS,
     ONLINE_TENDERS,
 )
 
-CANCEL_RATE = 0.02
-# Fraction of shippable (non-BOPIS) lines that backorder: ship but not yet
-# delivered. Approximates datagen's inventory-driven backorder check, which
-# utility cannot evaluate here (the inventory chain is generated afterwards).
-BACKORDER_RATE = 0.08
+# Cancellation, backorder, promo and stage-delay parameters are shared with the
+# live stream (vocabulary.ONLINE_*). Backorders approximate datagen's
+# inventory-driven check, which utility cannot evaluate here (the inventory
+# chain is generated afterwards).
 
 # basket-size buckets: 60% -> 1-3 lines, 30% -> 2-5, 10% -> 5-8
 BASKET_BUCKETS = [("S", 0.60, 1, 3), ("M", 0.30, 2, 5), ("L", 0.10, 5, 8)]
-
-# promo codes with matching percentage discounts (5/10/20%)
-PROMOS = [("PROMO05", 5), ("PROMO10", 10), ("PROMO20", 20)]
 
 
 def generate_online_orders(
@@ -120,7 +125,14 @@ def generate_online_orders(
         days.withColumn("n_orders", n_orders)
         .filter(F.col("n_orders") > 0)
         .withColumn("seq", F.explode(F.sequence(F.lit(1), F.col("n_orders"))))
-        .withColumn("hour", (d.h64(["day", "seq"], "onl_hour") % 24).cast("int"))
+        .withColumn(
+            "hour",
+            d.pick_by_weights(
+                ["day", "seq"],
+                "onl_hour",
+                [(str(hour), weight) for hour, weight in enumerate(ONLINE_HOURLY_WEIGHTS)],
+            ).cast("int"),
+        )
         .withColumn("minute", (d.h64(["day", "seq"], "onl_min") % 60).cast("int"))
         .withColumn("second", (d.h64(["day", "seq"], "onl_sec") % 60).cast("int"))
         .withColumn(
@@ -160,9 +172,14 @@ def generate_online_orders(
                 ["order_id_ext"], "onl_tender", [(n, w) for n, w, _, _, _ in ONLINE_TENDERS]
             ),
         )
-        .withColumn("is_cancelled", d.u(["order_id_ext"], "onl_cancel") < F.lit(CANCEL_RATE))
-        # per-order promo intensity: 10-30% of its lines carry a promo
-        .withColumn("promo_rate", d.u(["order_id_ext"], "onl_prate") * F.lit(0.20) + F.lit(0.10))
+        .withColumn("is_cancelled", d.u(["order_id_ext"], "onl_cancel") < F.lit(ONLINE_CANCEL_RATE))
+        # per-order promo intensity: the share of its lines that carry a promo
+        .withColumn(
+            "promo_rate",
+            d.u(["order_id_ext"], "onl_prate")
+            * F.lit(ONLINE_PROMO_LINE_SHARE[1] - ONLINE_PROMO_LINE_SHARE[0])
+            + F.lit(ONLINE_PROMO_LINE_SHARE[0]),
+        )
         .withColumn("basket_n", basket_n)
         # destination-based tax rate for this order's customer
         .join(cust_rate, "customer_id", "left")
@@ -182,9 +199,9 @@ def generate_online_orders(
 
     qty = retail_quantity(d, ["order_id_ext", "line_num"], F.col("department"))
 
-    promo_idx = (d.h64(["order_id_ext", "line_num"], "onl_pidx") % len(PROMOS)).cast("int")
-    promo_code_arr = F.array(*[F.lit(c) for c, _ in PROMOS])
-    promo_pct_arr = F.array(*[F.lit(p).cast("long") for _, p in PROMOS])
+    promo_idx = (d.h64(["order_id_ext", "line_num"], "onl_pidx") % len(ONLINE_PROMOS)).cast("int")
+    promo_code_arr = F.array(*[F.lit(c) for c, _ in ONLINE_PROMOS])
+    promo_pct_arr = F.array(*[F.lit(p).cast("long") for _, p in ONLINE_PROMOS])
 
     # per-line fulfillment: 60% SHIP_FROM_DC / 30% SHIP_FROM_STORE / 10% BOPIS
     mode = d.pick_by_weights(
@@ -296,7 +313,7 @@ def generate_online_orders(
             "is_backordered",
             (F.col("fulfillment_mode") != "BOPIS")
             & ~F.col("is_cancelled")
-            & (d.u(["order_id_ext", "line_num"], "onl_backorder") < F.lit(BACKORDER_RATE)),
+            & (d.u(["order_id_ext", "line_num"], "onl_backorder") < F.lit(ONLINE_BACKORDER_RATE)),
         )
         .withColumn(
             "fulfillment_status",
@@ -309,17 +326,17 @@ def generate_online_orders(
 
     # --- lifecycle (non-cancelled lines only; cancelled lines keep NULL ts)
     is_bopis = F.col("fulfillment_mode") == "BOPIS"
-    u_pick = d.u(["order_id_ext", "line_num"], "onl_pick")
-    # BOPIS: picked 4-24h after order; ship modes: 30-240 min
-    pick_secs = F.when(
-        is_bopis, (F.lit(4 * 3600) + u_pick * F.lit(20 * 3600.0)).cast("long")
-    ).otherwise((F.lit(30 * 60) + u_pick * F.lit(210 * 60.0)).cast("long"))
-    ship_secs = (
-        F.lit(2 * 3600) + d.u(["order_id_ext", "line_num"], "onl_ship") * F.lit(2 * 3600.0)
-    ).cast("long")
-    deliver_secs = (
-        F.lit(1 * 86400) + d.u(["order_id_ext", "line_num"], "onl_dlv") * F.lit(2 * 86400.0)
-    ).cast("long")
+
+    def seconds(bounds: tuple[int, int], salt: str) -> Column:
+        draw = d.u(["order_id_ext", "line_num"], salt)
+        return (F.lit(bounds[0]) + draw * F.lit(float(bounds[1] - bounds[0]))).cast("long")
+
+    pick_secs = F.when(is_bopis, seconds(ONLINE_PICK_SECONDS["BOPIS"], "onl_pick")).otherwise(
+        seconds(ONLINE_PICK_SECONDS["SHIP"], "onl_pick")
+    )
+    ship_secs = seconds(ONLINE_SHIP_SECONDS, "onl_ship")
+    deliver_secs = seconds(ONLINE_DELIVER_SECONDS, "onl_dlv")
+    pickup_secs = seconds(ONLINE_PICKUP_SECONDS, "onl_pickup")
     live = ~F.col("is_cancelled")
     lines = (
         lines.withColumn(
@@ -335,7 +352,11 @@ def generate_online_orders(
         .withColumn(
             "delivered_ts",
             F.when(F.col("is_backordered"), F.lit(None).cast("timestamp"))
-            .when(live & is_bopis, F.col("picked_ts"))
+            # BOPIS: the customer collects the order after it is ready
+            .when(
+                live & is_bopis,
+                F.timestamp_seconds(F.unix_timestamp("picked_ts") + pickup_secs),
+            )
             .when(live, F.timestamp_seconds(F.unix_timestamp("shipped_ts") + deliver_secs)),
         )
     )

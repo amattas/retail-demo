@@ -15,24 +15,20 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Protocol
 
 # Event types declared end to end (KQL, mappings, EVENT_PAYLOADS, Silver) for
-# the incident and online-order lifecycle models, which the live stream does
-# not emit yet. Readiness doesn't expect fresh rows for them. Shrink this set
-# as the models land; tests/test_notebook_build.py checks it against the slots.
-PENDING_EVENT_TYPES = frozenset(
-    {
-        "logistics_incident_started",
-        "logistics_incident_resolved",
-        "online_order_line_added",
-        "online_order_delivered",
-    }
-)
+# the logistics incident model, which the live stream does not emit yet.
+# Readiness doesn't expect fresh rows for them. Shrink this set as the model
+# lands; tests/test_notebook_build.py checks it against the slots.
+PENDING_EVENT_TYPES = frozenset({"logistics_incident_started", "logistics_incident_resolved"})
 
 # Live tables that are quiet by design. Live volume follows the store hours and
 # the historical configuration, so a healthy stream can leave these tables
 # without new rows for a while: store operations happen only at opening and
-# closing, store visits stop overnight while every store is closed, and a small
-# fleet has few online orders, impressions or promotions per hour. Readiness
-# adds this quiet time to its freshness window for the table.
+# closing, store visits (and the stock moves, reorders and stockouts they
+# cause) stop overnight while every store is closed, trucks run only when
+# consolidated loads are due, online orders reach delivery a day or more after
+# they are placed, and a small fleet has few online orders, impressions or
+# promotions per hour. Readiness adds this quiet time to its freshness window
+# for the table.
 EVENT_TABLE_QUIET = {
     "store_opened": timedelta(hours=26),
     "store_closed": timedelta(hours=26),
@@ -46,6 +42,13 @@ EVENT_TABLE_QUIET = {
     "online_order_created": timedelta(hours=12),
     "online_order_picked": timedelta(hours=12),
     "online_order_shipped": timedelta(hours=12),
+    "online_order_line_added": timedelta(hours=12),
+    "online_order_delivered": timedelta(hours=36),
+    "inventory_updated": timedelta(hours=12),
+    "reorder_triggered": timedelta(hours=12),
+    "stockout_detected": timedelta(hours=24),
+    "truck_arrived": timedelta(hours=12),
+    "truck_departed": timedelta(hours=12),
     "ad_impression": timedelta(hours=6),
 }
 

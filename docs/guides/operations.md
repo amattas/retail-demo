@@ -54,7 +54,8 @@ normally reports three optional unknowns:
 
 A recent watermark alone is not enough for a passing streaming check.
 The verifier also samples settled receipt/inventory keys and Gold sales
-against Silver, checking orphan keys and null balances. Missing or empty
+against Silver, checking orphan keys, null or negative balances, and online
+order lines whose picked, shipped and delivered times are out of order. Missing or empty
 samples remain `UNKNOWN`; observed mismatches are `FAIL`. Both are optional
 streaming degradation. This bounded sample is not proof of every table or
 all historical data. See the
@@ -251,13 +252,28 @@ part of every generated ID and Kusto ingest tag.
 - **Upgrade from an earlier version:** the old `eventhouse/` folder is no
   longer read and can be deleted.
 
-The stream's own state (store open/closed, visits in progress, the last batch
-clock) is in the Lakehouse tables `ag._stream_state_stores`,
-`ag._stream_state_visits` and `ag._stream_state_meta`, keyed by incarnation. A
-new incarnation starts from a fresh state seeded from Silver `fact_store_ops`;
-rows of earlier incarnations are ignored and can be deleted with
+The stream's own state is in the Lakehouse tables `ag._stream_state_stores`
+(store open/closed), `ag._stream_state_visits` and `ag._stream_state_orders`
+(visits and online orders in progress), `ag._stream_state_inventory` (store
+stock the stream has touched), `ag._stream_state_logistics` (loads waiting at
+the DCs, shipments on the road, trucks) and `ag._stream_state_meta` (the last
+batch clock and the inventory seed time), keyed by incarnation. A new
+incarnation starts from a fresh state: store open/closed from Silver
+`fact_store_ops`, and store stock from the latest Silver
+`fact_store_inventory_txn` balances at its start, read only when the stream
+first touches a store and product. Trucks start idle at their DC; shipments
+history had on the road are not carried over. Rows of earlier incarnations are
+ignored and can be deleted with
 `DELETE FROM ag._stream_state_<name> WHERE incarnation <> '<current>'`.
-Notebook 05 maintains the three tables.
+Notebook 05 maintains the six tables.
+
+What to expect from a fresh stream: inventory, reorder and stockout events
+follow the purchases, so they stop overnight with the stores. Reorders wait
+four hours at the DC to consolidate, so the first truck arrivals come several
+hours after the start, and online orders are delivered a day or more after they
+are placed (BOPIS pickups within hours). The Fulfillment Pipeline tile follows
+the orders created in the last 24 hours through picking, shipping and delivery,
+so its later stages trail the created count.
 
 Live volume follows history by default: `source_rows_per_second = 0` derives
 the rate from the store count and `transactions_per_store_day`, and visits

@@ -18,6 +18,7 @@ from retail_setup.generation.inventory_balances import (
     stockouts,
     with_balances,
 )
+from retail_setup.generation.network import dc_fleets, store_dc_map
 from retail_setup.generation.runtime import (
     legacy_index,
     seeded_draws,
@@ -37,33 +38,9 @@ def _with_index(df: DataFrame, table: str) -> DataFrame:
 
 
 def _store_dc_map(dims: dict[str, DataFrame]) -> DataFrame:
-    """Route each store to its nearest DC by geography (same state > same region
-    > lowest dc_id), restoring datagen's geography-aware assignment in place of a
-    ``store_id % dc_count`` modulo. Returns one (store_id, dc_id) row per store."""
-    geo = dims["dim_geographies"].select(F.col("ID").alias("geo_id"), "State", "Region")
-    stores = (
-        dims["dim_stores"]
-        .select(F.col("ID").alias("store_id"), "GeographyID")
-        .join(geo, F.col("GeographyID") == F.col("geo_id"))
-        .select("store_id", F.col("State").alias("s_state"), F.col("Region").alias("s_region"))
-    )
-    dcs = (
-        dims["dim_distribution_centers"]
-        .select(F.col("ID").alias("dc_id"), "GeographyID")
-        .join(geo, F.col("GeographyID") == F.col("geo_id"))
-        .select("dc_id", F.col("State").alias("d_state"), F.col("Region").alias("d_region"))
-    )
-    scored = stores.crossJoin(dcs).withColumn(
-        "_score",
-        F.when(F.col("s_state") == F.col("d_state"), 0)
-        .when(F.col("s_region") == F.col("d_region"), 1)
-        .otherwise(2),
-    )
-    nearest = Window.partitionBy("store_id").orderBy("_score", "dc_id")
-    return (
-        scored.withColumn("_r", F.row_number().over(nearest))
-        .filter(F.col("_r") == 1)
-        .select("store_id", F.col("dc_id").cast("long").alias("dc_id"))
+    """Route each store to its nearest DC by geography (see ``network.store_dc_map``)."""
+    return store_dc_map(
+        dims["dim_stores"], dims["dim_geographies"], dims["dim_distribution_centers"]
     )
 
 
@@ -134,19 +111,10 @@ def _truck_lookup(
 ) -> DataFrame:
     """(dc_id, slot, truck_id, n_trucks) rows for round-robin-by-day joins."""
     trucks = dims["dim_trucks"].select("ID", "DCID").collect()
-    assigned: dict[int, list[int]] = {}
-    pool: list[int] = []
-    for r in trucks:
-        if r.DCID is None:
-            pool.append(int(r.ID))
-        else:
-            assigned.setdefault(int(r.DCID), []).append(int(r.ID))
+    # A DC with no assigned trucks falls back to the pool trucks (documented).
+    fleets = dc_fleets(((r.ID, r.DCID) for r in trucks), range(1, cfg.dc_count + 1))
     rows: list[tuple[int, int, int, int]] = []
-    for dc in range(1, cfg.dc_count + 1):
-        # Fall back to pool trucks for DCs with no assigned trucks (documented).
-        fleet = sorted(assigned.get(dc) or pool)
-        if not fleet:
-            raise ValueError(f"DC {dc} has neither assigned nor shared trucks")
+    for dc, fleet in fleets.items():
         rows.extend((dc, slot, tid, len(fleet)) for slot, tid in enumerate(fleet))
     return spark.createDataFrame(rows, "dc_id long, slot long, truck_id long, n_trucks long")
 

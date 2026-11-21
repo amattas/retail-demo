@@ -23,10 +23,23 @@
 #   declines and campaigns use the historical catalogs. Marketing journey
 #   touches carry their touch time in `impression_time` and arrive with the
 #   purchase, so notebook 03 never skips them.
+# - **Store inventory.** Each store keeps a running balance per product,
+#   seeded from the Silver ledger. Receipt lines and store-fulfilled online
+#   lines take stock; a line the store cannot fill is a lost sale and is left
+#   off the receipt. Stockouts and reorders come from the balance and history's
+#   replenishment policy, with the store's DC on every event.
+# - **Trucks.** Reorders wait at the store's DC for a consolidated load, then
+#   ride the next free truck of the DC's fleet: planned and actual arrival,
+#   a load-size driven unload, and a departure once the unload is done. The
+#   unload restocks the store.
+# - **Online orders.** Created with one event per line, then paid, picked,
+#   shipped and delivered with realistic delays (BOPIS: ready, then collected),
+#   with history's fulfillment mix, cancellations, backorders and declines.
 #
-# State that spans micro-batches (store open/closed, visits in progress) lives
-# in Lakehouse Delta tables `<silver>._stream_state_*`, versioned by micro-batch,
-# so a replayed batch regenerates exactly the same events.
+# State that spans micro-batches (store open/closed, visits and online orders
+# in progress, store inventory, shipments and trucks) lives in Lakehouse Delta
+# tables `<silver>._stream_state_*`, versioned by micro-batch, so a replayed
+# batch regenerates exactly the same events.
 #
 # The connector write pattern follows the Real-Time Intelligence tutorial
 # "Use a notebook with Apache Spark to query a KQL database"
@@ -263,6 +276,51 @@ if LANE_PLAN.clipped:
     print(f"WARNING source_rows_per_second={source_rows_per_second} is below the peak "
           f"{sum(LANE_PLAN.peaks.values()):.2f} rows/s; peak hours will be under-produced")
 
+# Stateful features keep their state in Delta tables, one incarnation each.
+STREAM_STATE = DeltaStateStore(spark, f"{LAKEHOUSE_NAME}.{SILVER_DB}", STREAM_NAMESPACE)
+
+# Store inventory is seeded from the Silver ledger as of the incarnation start,
+# which is pinned in the meta state so restarts and replays seed the same way.
+_seed_meta = STREAM_STATE.read("meta", 2**62).get("seed")
+if _seed_meta is not None:
+    INVENTORY_SEED_AS_OF = _datetime.fromtimestamp(_seed_meta["as_of_ms"] / 1000, _timezone.utc)
+else:
+    INVENTORY_SEED_AS_OF = _datetime.now(_timezone.utc)
+    if STREAM_STATE.has_rows("meta"):
+        print("WARNING this incarnation predates the inventory seed; seeding stock as of now")
+    else:
+        STREAM_STATE.write("meta", SEED_BATCH_ID, {
+            "seed": {"as_of_ms": int(INVENTORY_SEED_AS_OF.timestamp() * 1000)}})
+try:
+    _ledger = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.fact_store_inventory_txn")
+except Exception:  # noqa: BLE001 - no ledger yet; stock starts from opening stock
+    _ledger = None
+INVENTORY_SEED = (None if _ledger is None
+                  else inventory_seed_frame(_ledger, INVENTORY_SEED_AS_OF).persist())
+
+# Stores route to their nearest DC and trucks serve their DC's fleet, exactly as
+# in the historical inventory chain; the demand prior is history's.
+_DIM_DCS = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_distribution_centers")
+_store_dc = {int(r["store_id"]): int(r["dc_id"]) for r in store_dc_map(
+    DIM_STORES, spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_geographies"), _DIM_DCS,
+).collect()}
+_fleets = dc_fleets(
+    ((r["ID"], r["DCID"]) for r in spark.table(
+        f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_trucks").select("ID", "DCID").collect()),
+    [int(r["ID"]) for r in _DIM_DCS.select("ID").collect()],
+)
+STREAM_SUPPLY = SupplyNetwork(
+    seed=SEED,
+    namespace=STREAM_NAMESPACE,
+    store_dc=_store_dc,
+    fleets=_fleets,
+    daily_prior=TRANSACTIONS_PER_STORE_DAY * 10.0
+    / max(1, spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_products").count()),
+)
+print(f"supply: {len(_store_dc)} stores on {len(_fleets)} DC fleets "
+      f"({sum(len(f) for f in _fleets.values())} trucks); stock seeded as of "
+      f"{INVENTORY_SEED_AS_OF.isoformat()}")
+
 STREAM_CONTEXT = build_stream_context(
     spark,
     seed=SEED,
@@ -281,13 +339,13 @@ STREAM_CONTEXT = build_stream_context(
     },
     baskets=prepare_basket_catalog(spark, STREAM_PRODUCTS, STREAM_PROFILE, SEED, CATALOG_DATE),
     lanes=LANE_PLAN,
+    supply=STREAM_SUPPLY,
+    inventory_seed=INVENTORY_SEED,
 )
 print(f"live volume: {RATE_ROWS_PER_SECOND} source rows/s; lane shares "
       + ", ".join(f"{lane}={share:.3f}" for lane, share in LANE_PLAN.shares.items()))
 
-# Stateful features keep their state in Delta tables, one incarnation each. A
-# new incarnation seeds store open/closed from the last historical operation.
-STREAM_STATE = DeltaStateStore(spark, f"{LAKEHOUSE_NAME}.{SILVER_DB}", STREAM_NAMESPACE)
+# A new incarnation seeds store open/closed from the last historical operation.
 
 
 def _last_store_operations():
@@ -315,8 +373,8 @@ if not STREAM_STATE.has_rows("stores"):
 # ruff: noqa: F821, E402  (Fabric-injected globals; imports live in notebook cells)
 # Every micro-batch is generated by `generate_stream_batch` (stream_events in the
 # behavior cell above): calibrated lanes of the rate source, store visits with
-# their state, purchases, store operations, online orders, marketing, inventory
-# and logistics.
+# their state, purchases, store operations, staged online orders and marketing;
+# store inventory, reorders and trucks follow from the purchases (stream_supply).
 from pyspark.sql import functions as F
 
 # %%
@@ -353,7 +411,7 @@ EVENT_PAYLOADS = {
     "receipt_created": [("store_id", "store_id", "long"), ("customer_id", "customer_id", "long"), ("receipt_id", "receipt_id", "string"), ("subtotal", "subtotal", "real"), ("tax", "tax", "real"), ("total", "total", "real"), ("tender_type", "tender_type", "string"), ("item_count", "item_count", "long"), ("campaign_id", "campaign_id", "string"), ("impression_id", "impression_id", "string"), ("gross_subtotal_cents", "gross_subtotal_cents", "long"), ("discount_cents", "discount_cents", "long"), ("subtotal_cents", "subtotal_cents", "long"), ("tax_cents", "tax_cents", "long"), ("total_cents", "total_cents", "long")],
     "receipt_line_added": [("receipt_id", "receipt_id", "string"), ("line_number", "line_number", "long"), ("product_id", "product_id", "long"), ("quantity", "quantity", "long"), ("unit_price", "unit_price", "real"), ("extended_price", "extended_price", "real"), ("promo_code", "promo_code", "string")],
     "payment_processed": [("receipt_id", "receipt_id", "string"), ("order_id", "order_id", "string"), ("payment_method", "payment_method", "string"), ("amount", "amount", "real"), ("amount_cents", "amount_cents", "long"), ("transaction_id", "transaction_id", "string"), ("processing_time", "processing_time", "datetime"), ("processing_time_ms", "processing_time_ms", "int"), ("status", "status", "string"), ("decline_reason", "decline_reason", "string"), ("store_id", "store_id", "long"), ("customer_id", "customer_id", "long")],
-    "inventory_updated": [("store_id", "store_id", "long"), ("dc_id", "dc_id", "long"), ("product_id", "product_id", "long"), ("quantity_delta", "quantity_delta", "long"), ("reason", "reason", "string"), ("payload_source", "source", "string")],
+    "inventory_updated": [("store_id", "store_id", "long"), ("dc_id", "dc_id", "long"), ("product_id", "product_id", "long"), ("quantity_delta", "quantity_delta", "long"), ("reason", "reason", "string"), ("payload_source", "source", "string"), ("requested_quantity", "requested_quantity", "long")],
     "stockout_detected": [("store_id", "store_id", "long"), ("dc_id", "dc_id", "long"), ("product_id", "product_id", "long"), ("last_known_quantity", "last_known_quantity", "long"), ("detection_time", "detection_time", "datetime")],
     "reorder_triggered": [("store_id", "store_id", "long"), ("dc_id", "dc_id", "long"), ("product_id", "product_id", "long"), ("current_quantity", "current_quantity", "long"), ("reorder_quantity", "reorder_quantity", "long"), ("reorder_point", "reorder_point", "long"), ("priority", "priority", "string")],
     "customer_entered": [("store_id", "store_id", "long"), ("sensor_id", "sensor_id", "string"), ("zone", "zone", "string"), ("customer_count", "customer_count", "long"), ("dwell_time", "dwell_time", "long")],
@@ -368,8 +426,8 @@ EVENT_PAYLOADS = {
     "online_order_created": [("order_id", "order_id", "string"), ("customer_id", "customer_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("item_count", "item_count", "long"), ("subtotal", "subtotal", "real"), ("tax", "tax", "real"), ("total", "total", "real"), ("tender_type", "tender_type", "string"), ("campaign_id", "campaign_id", "string"), ("impression_id", "impression_id", "string"), ("gross_subtotal_cents", "gross_subtotal_cents", "long"), ("discount_cents", "discount_cents", "long"), ("subtotal_cents", "subtotal_cents", "long"), ("tax_cents", "tax_cents", "long"), ("total_cents", "total_cents", "long")],
     "online_order_picked": [("order_id", "order_id", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("picked_time", "picked_time", "datetime")],
     "online_order_shipped": [("order_id", "order_id", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("shipped_time", "shipped_time", "datetime")],
-    # Declared for the incident and online-order lifecycle models; the stream
-    # does not emit these yet.
+    # Declared for the logistics incident model; the stream does not emit
+    # these yet.
     "logistics_incident_started": [("incident_id", "incident_id", "string"), ("incident_type", "incident_type", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("started_at", "started_at", "datetime"), ("severity", "severity", "string"), ("affected_store_count", "affected_store_count", "long"), ("description", "description", "string")],
     "logistics_incident_resolved": [("incident_id", "incident_id", "string"), ("incident_type", "incident_type", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("resolved_at", "resolved_at", "datetime")],
     "online_order_line_added": [("order_id", "order_id", "string"), ("line_number", "line_number", "long"), ("product_id", "product_id", "long"), ("quantity", "quantity", "long"), ("unit_price", "unit_price", "real"), ("extended_price", "extended_price", "real"), ("promo_code", "promo_code", "string"), ("fulfillment_mode", "fulfillment_mode", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long")],

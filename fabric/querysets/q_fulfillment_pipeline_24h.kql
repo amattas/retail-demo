@@ -1,18 +1,26 @@
-// Pipeline counts across created → picked → shipped in last 24h
+// Staged fulfillment of the online orders created in the last 24h: how many of
+// them have been picked, shipped (BOPIS orders never ship) and delivered or
+// collected so far. Each stage follows the previous one by hours or days, and
+// cancelled orders never move past created.
 let window = 24h;
-let created_count = toscalar(
-    online_order_created
+let created = online_order_created
     | where ingest_timestamp > ago(window)
-    | summarize count()
-);
+    | distinct order_id;
+let created_count = toscalar(created | count);
 let picked_count = toscalar(
     online_order_picked
-    | where ingest_timestamp > ago(window)
-    | summarize count()
+    | where order_id in (created)
+    | summarize dcount(order_id)
 );
 let shipped_count = toscalar(
     online_order_shipped
-    | where ingest_timestamp > ago(window)
-    | summarize count()
+    | where order_id in (created)
+    | summarize dcount(order_id)
 );
-print created = created_count, picked = picked_count, shipped = shipped_count
+let delivered_count = toscalar(
+    online_order_delivered
+    | where order_id in (created)
+    | summarize dcount(order_id)
+);
+print created = created_count, picked = picked_count, shipped = shipped_count,
+      delivered = delivered_count

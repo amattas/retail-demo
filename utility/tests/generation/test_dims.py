@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import date
 
 import pytest
@@ -5,6 +6,7 @@ import pytest
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.loader import default_dictionary_root, load_dictionaries
 from retail_setup.generation.dims import generate_dim_date, generate_dimensions
+from retail_setup.generation.network import fleet_sizes, nearest_dc, pool_size, store_dc_map
 from retail_setup.generation.schemas import column_names
 
 
@@ -81,6 +83,22 @@ def test_trucks_dc_assignment(dims):
     pool = [r for r in rows if r.DCID is None]
     assert assigned and pool  # both populations exist
     assert {r.DCID for r in assigned} <= dc_ids
+
+
+def test_dc_fleets_are_sized_to_the_stores_each_dc_serves(dims):
+    served = Counter(
+        row.dc_id
+        for row in store_dc_map(
+            dims["dim_stores"], dims["dim_geographies"], dims["dim_distribution_centers"]
+        ).collect()
+    )
+    rows = dims["dim_trucks"].collect()
+    assigned = Counter(int(r.DCID) for r in rows if r.DCID is not None)
+    dc_ids = [r.ID for r in dims["dim_distribution_centers"].collect()]
+    # dims routes stores in Python exactly as the Spark store_dc_map does.
+    assert dict(assigned) == fleet_sizes(dict(served), dc_ids)
+    assert sum(r.DCID is None for r in rows) == pool_size(sum(assigned.values()))
+    assert [r.ID for r in rows] == list(range(1, len(rows) + 1))
 
 
 def test_determinism(spark, small_cfg, dicts):
@@ -160,3 +178,12 @@ def test_explicit_product_attributes_override_name_rules(spark, small_cfg, dicts
 
     assert row is not None
     assert (row.taxability, row.RequiresRefrigeration) == ("TAXABLE", False)
+
+
+def test_nearest_dc_prefers_state_then_region_then_lowest_id():
+    dcs = [(3, "TX", "South"), (1, "CA", "West"), (2, "OR", "West")]
+    assert nearest_dc("TX", "South", dcs) == 3
+    assert nearest_dc("WA", "West", dcs) == 1
+    assert nearest_dc("NY", "Northeast", dcs) == 1
+    assert fleet_sizes({1: 25, 2: 4}, [1, 2, 3]) == {1: 10, 2: 2, 3: 2}
+    assert pool_size(14) == 2 and pool_size(1) == 1

@@ -31,6 +31,9 @@ STREAM_TEMPLATE = (REPO / "utility" / "notebooks" / "templates" / "driver-05-str
 STREAM_EVENTS = (
     REPO / "utility" / "src" / "retail_setup" / "generation" / "stream_events.py"
 ).read_text(encoding="utf-8")
+STREAM_SUPPLY = (
+    REPO / "utility" / "src" / "retail_setup" / "generation" / "stream_supply.py"
+).read_text(encoding="utf-8")
 
 
 def _rule(title_prefix: str) -> str:
@@ -62,14 +65,18 @@ def test_truck_dwell_sla_is_one_value_everywhere() -> None:
     assert measure is not None
     assert float(measure.group(1)) == cal.TRUCK_DWELL_SLA_MINUTES
 
-    # Normal live dwell stays under the SLA; late trucks breach it.
+    # The live unload model keeps normal loads under the SLA: an empty truck
+    # dwells the base time, and a load up to the normal maximum stays inside
+    # the normal range at the slowest dock with the most noise.
     assert (
         0
         < cal.TRUCK_NORMAL_DWELL_MINUTES_MIN
-        <= cal.TRUCK_NORMAL_DWELL_MINUTES_MAX
+        <= cal.TRUCK_UNLOAD_BASE_MINUTES + cal.TRUCK_UNLOAD_NOISE_MINUTES
+        < cal.TRUCK_NORMAL_DWELL_MINUTES_MAX
         < cal.TRUCK_DWELL_SLA_MINUTES
-        < cal.TRUCK_LATE_DWELL_MINUTES
     )
+    low, high = cal.TRUCK_DOCK_FACTOR_RANGE
+    assert 0 < low <= 1 <= high
 
 
 def test_inventory_rules_use_calibrated_windows() -> None:
@@ -77,12 +84,8 @@ def test_inventory_rules_use_calibrated_windows() -> None:
     urgent = _rule("Reorder URGENT")
     assert "priority == 'URGENT'" in urgent
     assert _window_minutes(urgent) == cal.URGENT_REORDER_RULE_WINDOW_MINUTES
-    assert (
-        0
-        < cal.URGENT_REORDER_QUANTITY_THRESHOLD
-        < cal.STOCKOUT_QUANTITY_THRESHOLD
-        < cal.REORDER_POINT
-    )
+    # A stockout is a store's balance reaching zero, as in history's fact_stockouts.
+    assert cal.STOCKOUT_QUANTITY_THRESHOLD == 1
 
 
 def test_zone_surge_rule_uses_calibrated_thresholds() -> None:
@@ -148,14 +151,28 @@ def test_stream_reads_thresholds_from_calibration() -> None:
     }
     constants = {name for name in vars(cal) if name.isupper()}
     assert not assigned & constants, "stream redefines calibration constants"
+    supply_assigned = {
+        target.id
+        for node in ast.parse(STREAM_SUPPLY).body
+        if isinstance(node, ast.Assign)
+        for target in node.targets
+        if isinstance(target, ast.Name)
+    }
+    assert not supply_assigned & constants, "stream_supply redefines calibration constants"
     for name in (
         "TRUCK_NORMAL_DWELL_MINUTES_MIN",
-        "TRUCK_NORMAL_DWELL_MINUTES_MAX",
-        "TRUCK_LATE_DWELL_MINUTES",
-        "TRUCK_LATE_BUCKET_MODULUS",
+        "TRUCK_UNLOAD_BASE_MINUTES",
+        "TRUCK_UNLOAD_UNITS_PER_MINUTE",
+        "TRUCK_UNLOAD_NOISE_MINUTES",
+        "TRUCK_DOCK_FACTOR_RANGE",
+        "TRUCK_LOAD_MINUTES",
+        "TRUCK_TRANSIT_MINUTES_MIN",
+        "TRUCK_TRANSIT_MINUTES_MAX",
         "STOCKOUT_QUANTITY_THRESHOLD",
-        "REORDER_POINT",
-        "URGENT_REORDER_QUANTITY_THRESHOLD",
     ):
-        assert re.search(rf"\b{name}\b", STREAM_EVENTS), name
-    assert not re.search(r"quantity < F\.lit\(\d+\)", STREAM_EVENTS)
+        assert re.search(rf"\b{name}\b", STREAM_SUPPLY), name
+    # Reorder points and priorities come from the shared replenishment policy.
+    for helper in ("reorder_levels(", "reorder_priority(", "reorder_quantity("):
+        assert helper in STREAM_SUPPLY, helper
+    # No lane-and-coin-flip inventory or truck model is left in the stream.
+    assert "TRUCK_LATE" not in STREAM_EVENTS and "pmod(v" not in STREAM_EVENTS

@@ -21,6 +21,7 @@ FUNCTIONS = {
     "transform_store_operation",
     "transform_promotion_applied",
     "transform_ad_impression",
+    "transform_stockout_detected",
 }
 CONSTANTS = {"EVENT_TIME_FIELDS", "STORE_OPERATION_TYPES"}
 
@@ -92,3 +93,18 @@ def test_journey_touches_are_dated_by_impression_time(spark, nb03):
     assert out["TRC-3"].event_time == "2026-03-05 08:30:00"
     assert str(out["TRC-3"].event_date) == "2026-03-05"
     assert out["TRC-4"].event_time == "2026-03-09 15:01:00"
+
+
+def test_store_stockouts_keep_dcid_null_like_history(spark, nb03):
+    rows = spark.sql("""
+        SELECT timestamp'2026-03-02 11:00:00' AS detection_time,
+               timestamp'2026-03-02 11:00:00' AS ingest_timestamp,
+               4L AS store_id, 2L AS dc_id, 501L AS product_id, 3L AS last_known_quantity,
+               'TRC-5' AS trace_id
+        UNION ALL
+        SELECT timestamp'2026-03-02 12:00:00', timestamp'2026-03-02 12:00:00',
+               CAST(NULL AS BIGINT), 2L, 502L, 9L, 'TRC-6'
+    """)
+    out = {row.trace_id: row for row in nb03["transform_stockout_detected"](rows).collect()}
+    assert (out["TRC-5"].StoreID, out["TRC-5"].DCID) == (4.0, None)
+    assert (out["TRC-6"].StoreID, out["TRC-6"].DCID) == (None, 2.0)

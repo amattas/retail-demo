@@ -15,8 +15,16 @@ One micro-batch of ``rate`` rows becomes the events of that minute:
   touch time in ``impression_time`` and arrive with the purchase.
 - **Store operations.** Opened/closed events at each store's local operating
   hour boundaries, from the store state.
-- **Online orders, marketing, inventory, logistics.** Calibrated lanes of the
-  rate source; online and marketing volume follow the historical config.
+- **Online orders.** Orders at the configured daily volume, following the
+  monthly weights and the online hourly curve. Each order runs a staged
+  lifecycle (created with one line event per line, paid, picked, shipped and
+  delivered, or ready and collected for BOPIS) whose events are emitted as
+  their time passes; open orders live in the order state. Cancellations,
+  backorders, promotions, declines and destination tax follow history.
+- **Inventory and logistics.** Receipt lines and store-fulfilled online lines
+  take stock from a running per-store balance; stockouts, reorders, truck
+  shipments and unloads follow from it (``stream_supply``).
+- **Marketing.** Background impressions at the historical volume.
 
 ``build_notebooks.py`` inlines this module into the stream notebook; the
 statistical tests run the same functions offline.
@@ -24,6 +32,7 @@ statistical tests run the same functions offline.
 
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
+from math import floor
 from typing import Any
 
 from pyspark.sql import Column, DataFrame, SparkSession, Window
@@ -32,15 +41,6 @@ from pyspark.sql import functions as F
 from retail_setup.dictionaries.models import StoreTypeProfile
 from retail_setup.generation.attribution import SELECTION_RATE, with_journey_plan
 from retail_setup.generation.behavior import customer_visit_tickets, pick_retail_product
-from retail_setup.generation.calibration import (
-    REORDER_POINT,
-    STOCKOUT_QUANTITY_THRESHOLD,
-    TRUCK_LATE_BUCKET_MODULUS,
-    TRUCK_LATE_DWELL_MINUTES,
-    TRUCK_NORMAL_DWELL_MINUTES_MAX,
-    TRUCK_NORMAL_DWELL_MINUTES_MIN,
-    URGENT_REORDER_QUANTITY_THRESHOLD,
-)
 from retail_setup.generation.marketing import (
     CRM_MATCH_RATE,
     campaign_window_start,
@@ -58,6 +58,7 @@ from retail_setup.generation.stream_calendar import (
     daily_factor_column,
     hour_shares,
     monthly_factor_column,
+    online_hour_factor_column,
     operating_window,
     visit_conversion,
 )
@@ -72,6 +73,23 @@ from retail_setup.generation.stream_state import (
     apply_visit_batch,
     state_changes,
 )
+from retail_setup.generation.stream_supply import (
+    INVENTORY_STATE,
+    LOGISTICS_STATE,
+    ONLINE_SALE_SOURCE,
+    STORE_SALE_SOURCE,
+    StockDemand,
+    SupplyBatch,
+    SupplyNetwork,
+    SupplyOutput,
+    SupplyState,
+    default_inventory_entry,
+    inventory_entry,
+    inventory_key,
+    lost_lines,
+    parse_inventory_key,
+    run_supply_batch,
+)
 from retail_setup.generation.vocabulary import (
     BLE_CHECKOUT_ZONE,
     BLE_ENTRY_ZONE,
@@ -81,7 +99,15 @@ from retail_setup.generation.vocabulary import (
     CAMPAIGN_ARCHETYPES,
     FOOT_TRAFFIC_ZONE_DWELL,
     FOOT_TRAFFIC_ZONES,
-    FULFILLMENT_MODES,
+    ONLINE_BACKORDER_RATE,
+    ONLINE_CANCEL_RATE,
+    ONLINE_DELIVER_SECONDS,
+    ONLINE_FULFILLMENT_MIX,
+    ONLINE_PICK_SECONDS,
+    ONLINE_PICKUP_SECONDS,
+    ONLINE_PROMO_LINE_SHARE,
+    ONLINE_PROMOS,
+    ONLINE_SHIP_SECONDS,
     ONLINE_TENDERS,
     ad_id_column,
     anonymous_ble_id_column,
@@ -98,16 +124,26 @@ from retail_setup.generation.vocabulary import (
 
 ISO_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
 EVENT_COLUMNS = ["key", "value", "event_type"]
-VISIT_SCHEMA = "v long, start_ms long, store_id long, customer_id long"
+VISIT_SCHEMA = "v long, start_ms long, store_id long, customer_id long, rejected array<int>"
+ORDER_SCHEMA = "v long, start_ms long, rejected array<int>"
 STORE_OP_SCHEMA = "store_id long, event_ms long, operation_type string"
+LOST_SCHEMA = "_owner string, _lost array<int>"
 # BLE department zones a shopper may visit between the entrance and checkout.
 BLE_MIDDLE_ZONES = [zone for zone in BLE_ZONES if zone not in (BLE_ENTRY_ZONE, BLE_CHECKOUT_ZONE)]
 BLE_PINGS_PER_ZONE = (2, 5)
 # Pings carry an RSSI uniform in [-80, -29] dBm, as in history.
 RSSI_FLOOR = -80
 RSSI_SPAN = 52
-# Visits are kept on the open-visit state until their last event.
-ONLINE_PROCESSING_MS = (200, 3200)
+# Days of Silver ledger demand that seed a store-product's smoothed daily rate.
+INVENTORY_SEED_LOOKBACK_DAYS = 7
+# One row per supply record: inventory moves, stockouts, reorders and trucks.
+SUPPLY_SCHEMA = (
+    "event_type string, at_ms long, seed string, store_id long, dc_id long, product_id long, "
+    "quantity_delta long, reason string, source string, requested_quantity long, "
+    "last_known_quantity long, current_quantity long, reorder_quantity long, "
+    "reorder_point long, priority string, truck_id long, shipment_id string, planned_ms long, "
+    "delay_minutes long, delay_reason string, estimated_unload long, unload_minutes long"
+)
 
 
 @dataclass(frozen=True)
@@ -127,6 +163,9 @@ class StreamContext:
     ids: dict[str, tuple[DataFrame, int]]
     baskets: BasketCatalog
     store_hours: tuple[StoreHours, ...]
+    supply: SupplyNetwork
+    customer_tax: DataFrame
+    inventory_seed: DataFrame | None = None
 
     @property
     def draws(self) -> seeded_draws:
@@ -169,8 +208,15 @@ def build_stream_context(
     ids: dict[str, tuple[DataFrame, int]],
     baskets: BasketCatalog,
     lanes: LanePlan,
+    supply: SupplyNetwork,
+    inventory_seed: DataFrame | None = None,
 ) -> StreamContext:
-    """Collect the bounded store metadata and build the customer pools."""
+    """Collect the bounded store metadata and build the customer pools.
+
+    ``inventory_seed`` (``store_id, product_id, on_hand, rate``, see
+    :func:`inventory_seed_frame`) seeds store stock the stream has not
+    touched yet; without it, stock starts from history's opening stock.
+    """
     draws = seeded_draws(seed)
     stores = dim_stores.select(
         F.col("ID").cast("long").alias("store_id"),
@@ -180,6 +226,7 @@ def build_stream_context(
         "store_format",
         F.col("daily_traffic_multiplier").cast("double").alias("multiplier"),
         F.round(F.col("tax_rate") * 10000).cast("long").alias("store_bps"),
+        F.col("tax_rate").cast("double").alias("_tax_rate"),
     ).where(F.col("store_id").isNotNull())
     rows = stores.orderBy("store_id").collect()
     if not rows:
@@ -253,6 +300,28 @@ def build_stream_context(
         .withColumn("_has_pool", F.col("store_geo_id").isin(*sorted(with_pool)))
         .persist()
     )
+    # Destination tax for DC-shipped online orders, as in history: the mean
+    # store rate of the customer's geography, else the network mean.
+    mean_bps = int(round(sum(row["_tax_rate"] for row in rows) / len(rows) * 10000))
+    geo_rates: dict[int, list[float]] = {}
+    for row in rows:
+        geo_rates.setdefault(int(row["store_geo_id"]), []).append(float(row["_tax_rate"]))
+    geo_bps = spark.createDataFrame(
+        [
+            (geo, floor(sum(rates) / len(rates) * 10000 + 0.5))
+            for geo, rates in sorted(geo_rates.items())
+        ],
+        "geo_id long, _geo_bps long",
+    )
+    customer_tax = (
+        dim_customers.select(
+            F.col("ID").cast("long").alias("customer_id"),
+            F.col("GeographyID").cast("long").alias("geo_id"),
+        )
+        .join(F.broadcast(geo_bps), "geo_id", "left")
+        .select("customer_id", F.coalesce("_geo_bps", F.lit(mean_bps)).alias("customer_bps"))
+        .persist()
+    )
     return StreamContext(
         seed=seed,
         namespace=namespace,
@@ -272,6 +341,9 @@ def build_stream_context(
             StoreHours(int(row["store_id"]), str(row["operating_hours"]), str(row["tz"]))
             for row in rows
         ),
+        supply=supply,
+        customer_tax=customer_tax,
+        inventory_seed=inventory_seed,
     )
 
 
@@ -809,16 +881,21 @@ def journey_touch_events(ctx: StreamContext, frame: DataFrame, due: Column) -> D
     return collect_events(frame, F.array(*touches))
 
 
-def purchase_events(
+def purchase_baskets(
     ctx: StreamContext, plan: DataFrame, previous_ms: int | None, clock_ms: int
 ) -> DataFrame:
-    """Receipt, lines, promotions, payment and journey touches of buying visits."""
+    """Buying visits with a purchase or payment due in this batch, with priced basket lines.
+
+    ``_purchase_due`` marks purchases that happen in this batch (their lines
+    are this batch's store demand); ``rejected`` holds the line numbers an
+    earlier batch turned into lost sales.
+    """
     d = ctx.draws
     purchase_due = _due(F.col("purchase_ms"), previous_ms, clock_ms)
     payment_due = _due(F.col("payment_ms"), previous_ms, clock_ms)
+    local_purchase = _local(_ms_ts(F.col("purchase_ms")))
     buyers = plan.where(F.col("converts") & (purchase_due | payment_due)).select(
         "v",
-        "_is_new",
         "store_id",
         "customer_id",
         "store_bps",
@@ -828,11 +905,15 @@ def purchase_events(
         "processing_ms",
         "purchase_ms",
         "payment_ms",
-        F.month(F.to_date(_local(_ms_ts(F.col("purchase_ms"))))).alias("_month"),
+        "rejected",
+        purchase_due.alias("_purchase_due"),
+        payment_due.alias("_payment_due"),
+        F.month(F.to_date(local_purchase)).alias("_month"),
+        F.date_format(local_purchase, "yyyy-MM-dd").alias("_local_day"),
         "tz",
     )
     buyers = attach_baskets(buyers, ctx.baskets, ctx.profile, ctx.seed)
-    buyers = buyers.withColumn(
+    return buyers.withColumn(
         "priced_lines",
         F.transform(
             "basket_lines",
@@ -840,6 +921,71 @@ def purchase_events(
                 d, line, F.col("receipt_id"), F.col("_month"), F.col("_offer"), F.col("store_bps")
             ),
         ),
+    )
+
+
+def _demand_rows(frame: DataFrame, owner: str, at_ms: str, store: str) -> list[Any]:
+    return (
+        frame.select(
+            F.col(owner).alias("owner"),
+            F.col(at_ms).alias("at_ms"),
+            F.col(store).alias("store_id"),
+            "_local_day",
+            F.explode("priced_lines").alias("line"),
+        )
+        .select(
+            "owner",
+            "at_ms",
+            "store_id",
+            "_local_day",
+            F.col("line.line_num").alias("line_num"),
+            F.col("line.product_id").alias("product_id"),
+            F.col("line.quantity").alias("quantity"),
+        )
+        .collect()
+    )
+
+
+def _stock_demand(rows: list[Any], source: str) -> list[StockDemand]:
+    return [
+        StockDemand(
+            int(row["at_ms"]),
+            int(row["store_id"]),
+            int(row["product_id"]),
+            int(row["quantity"]),
+            date.fromisoformat(row["_local_day"]),
+            f"{row['owner']}#{int(row['line_num'])}",
+            source,
+        )
+        for row in rows
+    ]
+
+
+def purchase_demand(buyers: DataFrame) -> list[StockDemand]:
+    """Store demand of this batch's purchases: one line per basket line."""
+    due = buyers.where(F.col("_purchase_due"))
+    return _stock_demand(
+        _demand_rows(due, "receipt_id", "purchase_ms", "store_id"), STORE_SALE_SOURCE
+    )
+
+
+def _kept_lines(lines: str) -> Column:
+    """Basket lines that were not lost sales."""
+    return F.filter(lines, lambda line: ~F.array_contains(F.col("rejected"), line["line_num"]))
+
+
+def purchase_events(ctx: StreamContext, buyers: DataFrame) -> DataFrame:
+    """Receipt, lines, promotions, payment and journey touches of buying visits.
+
+    Lines in ``rejected`` were lost sales (the store had no stock): they are
+    dropped, as history drops them, and a purchase with no line left emits
+    nothing.
+    """
+    d = ctx.draws
+    purchase_due = F.col("_purchase_due")
+    payment_due = F.col("_payment_due")
+    buyers = buyers.withColumn("priced_lines", _kept_lines("priced_lines")).where(
+        F.size("priced_lines") > 0
     )
     gross = _sum_lines("priced_lines", "gross_cents")
     discount = _sum_lines("priced_lines", "discount_cents")
@@ -873,7 +1019,7 @@ def purchase_events(
             _cents_to_dollars(F.col("tax_cents")).alias("tax"),
             total.alias("total"),
             F.col("tender").alias("tender_type"),
-            F.col("basket_n").cast("long").alias("item_count"),
+            F.size("priced_lines").cast("long").alias("item_count"),
             F.when(F.col("_attributed"), F.col("campaign_id")).alias("campaign_id"),
             F.when(F.col("_attributed"), newer_impression).alias("impression_id"),
             F.col("gross_cents").alias("gross_subtotal_cents"),
@@ -986,80 +1132,230 @@ def purchase_events(
 # ---------------------------------------------------------------------------
 
 
-def online_events(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
-    """Online orders at the configured daily volume and monthly seasonality."""
+def new_orders(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
+    """Orders placed in this batch, at the configured daily volume.
+
+    Volume follows the profile's monthly weights and the online hourly curve
+    (UTC); ``rejected`` starts empty.
+    """
+    rows = lanes.where(F.col("lane") == "online")
+    factor = monthly_factor_column(ctx.profile, F.to_date(F.col("ts"))) * (
+        online_hour_factor_column(F.col("ts"))
+    )
+    return rows.where(_keep(ctx, "online", factor)).select(
+        F.col("v"),
+        F.unix_millis(F.col("ts")).alias("start_ms"),
+        F.array().cast("array<int>").alias("rejected"),
+    )
+
+
+def _seconds(ctx: StreamContext, bounds: tuple[int, int], salt: str) -> Column:
+    draw = ctx.draws.u([F.col("order_id")], salt)
+    return (F.lit(bounds[0]) + draw * F.lit(float(bounds[1] - bounds[0]))).cast("long")
+
+
+def _online_line(ctx: StreamContext, line: Column) -> Column:
+    """Online promo (history's per-order promo share and codes), then destination tax."""
+    d = ctx.draws
+    keys = [F.col("order_id"), line["line_num"]]
+    has_promo = d.u(keys, "online-promo") < F.col("_promo_share")
+    index = (d.h64(keys, "online-promo-code") % len(ONLINE_PROMOS)).cast("int") + 1
+    code = F.when(has_promo, F.element_at(F.array(*[F.lit(c) for c, _ in ONLINE_PROMOS]), index))
+    percent = F.when(
+        has_promo, F.element_at(F.array(*[F.lit(p).cast("long") for _, p in ONLINE_PROMOS]), index)
+    ).otherwise(F.lit(0).cast("long"))
+    discount = F.floor((line["gross_cents"] * percent + F.lit(50)) / F.lit(100)).cast("long")
+    net = line["gross_cents"] - discount
+    multiplier = (
+        F.when(line["taxability"] == "TAXABLE", F.lit(100))
+        .when(line["taxability"] == "REDUCED_RATE", F.lit(50))
+        .otherwise(F.lit(0))
+        .cast("long")
+    )
+    tax = F.floor((net * F.col("tax_bps") * multiplier + F.lit(500_000)) / F.lit(1_000_000)).cast(
+        "long"
+    )
+    return (
+        line.withField("promo_code", code)
+        .withField("discount_cents", discount)
+        .withField("net_cents", net)
+        .withField("tax_cents", tax)
+    )
+
+
+def plan_orders(ctx: StreamContext, orders: DataFrame) -> DataFrame:
+    """Lay out each order's lifecycle (``v, start_ms, rejected, _is_new`` rows).
+
+    The customer, store, DC, tender, fulfillment mode, basket, promotions,
+    cancellation, backorder and every stage time are drawn from the order's
+    rate row, so the plan is identical in every batch that sees the order.
+    One fulfillment mode and node serve the whole order, picked by the
+    historical mix. Store-fulfilled orders (ship-from-store, BOPIS) are taxed
+    at the store's rate, DC-shipped orders at the customer's destination rate.
+    """
     d = ctx.draws
     v = F.col("v")
-    orders = lanes.where(F.col("lane") == "online")
-    orders = orders.where(
-        _keep(ctx, "online", monthly_factor_column(ctx.profile, F.to_date(F.col("ts"))))
-    )
     for salt, name, output in (
         ("store", "stores", "store_id"),
         ("cust", "customers", "customer_id"),
         ("dc", "dcs", "dc_id"),
     ):
         orders = _sample(ctx, orders, salt, name, output)
+    key = [F.col("order_id")]
+    mode = F.col("fulfillment_mode")
+    bopis = mode == "BOPIS"
     orders = (
         orders.join(F.broadcast(ctx.stores.select("store_id", "store_bps", "tz")), "store_id")
+        .join(ctx.customer_tax, "customer_id", "left")
         .withColumn("order_id", _prefixed(ctx, "ONL", v))
         .withColumn("receipt_id", F.col("order_id"))
-        .withColumn("start_ms", F.unix_millis(F.col("ts")))
+        .withColumn("tender", tender_column(d, key, ONLINE_TENDERS, "online-tender"))
         .withColumn(
-            "tender", tender_column(d, [F.col("order_id")], ONLINE_TENDERS, "online-tender")
+            "status",
+            payment_status_column(d, key, F.col("tender"), ONLINE_TENDERS, "online-decline"),
         )
-        .withColumn("status", F.lit("APPROVED"))
         .withColumn(
-            "fulfillment_mode",
-            F.element_at(
-                F.array(*[F.lit(mode) for mode in FULFILLMENT_MODES]),
-                (d.h64([v], "omode") % len(FULFILLMENT_MODES)).cast("int") + 1,
+            "processing_ms",
+            processing_ms_column(d, key, F.col("tender"), ONLINE_TENDERS, "online-proc"),
+        )
+        .withColumn(
+            "fulfillment_mode", d.pick_by_weights(key, "online-mode", ONLINE_FULFILLMENT_MIX)
+        )
+        .withColumn(
+            "node_type", F.when(mode == "SHIP_FROM_DC", F.lit("DC")).otherwise(F.lit("STORE"))
+        )
+        .withColumn(
+            "node_id",
+            F.when(F.col("node_type") == "DC", F.col("dc_id")).otherwise(F.col("store_id")),
+        )
+        .withColumn(
+            "tax_bps",
+            F.when(F.col("node_type") == "STORE", F.col("store_bps")).otherwise(
+                F.coalesce(F.col("customer_bps"), F.col("store_bps"))
             ),
+        )
+        .withColumn("cancelled", d.u(key, "online-cancel") < F.lit(ONLINE_CANCEL_RATE))
+        .withColumn(
+            "backordered",
+            ~bopis
+            & ~F.col("cancelled")
+            & (d.u(key, "online-backorder") < F.lit(ONLINE_BACKORDER_RATE)),
+        )
+        .withColumn(
+            "_promo_share",
+            F.lit(ONLINE_PROMO_LINE_SHARE[0])
+            + d.u(key, "online-promo-share")
+            * F.lit(ONLINE_PROMO_LINE_SHARE[1] - ONLINE_PROMO_LINE_SHARE[0]),
+        )
+        .withColumn(
+            "_local_day",
+            F.date_format(_local(_ms_ts(F.col("start_ms"))), "yyyy-MM-dd"),
         )
     )
     orders = attach_baskets(orders, ctx.baskets, ctx.profile, ctx.seed)
-    tax = F.aggregate(
-        "basket_lines",
-        F.lit(0).cast("long"),
-        lambda acc, line: (
-            acc
-            + F.floor(
-                line["gross_cents"] * _tax_share(line["taxability"]) * F.col("store_bps") / 10000.0
-                + 0.5
-            ).cast("long")
-        ),
+    orders = orders.withColumn(
+        "priced_lines", F.transform("basket_lines", lambda line: _online_line(ctx, line))
+    )
+    live = ~F.col("cancelled")
+    pick_s = F.when(bopis, _seconds(ctx, ONLINE_PICK_SECONDS["BOPIS"], "online-pick")).otherwise(
+        _seconds(ctx, ONLINE_PICK_SECONDS["SHIP"], "online-pick")
     )
     orders = (
-        orders.withColumn("gross_cents", _sum_lines("basket_lines", "gross_cents"))
-        .withColumn("tax_cents", tax)
-        .withColumn("total_cents", F.col("gross_cents") + F.col("tax_cents"))
+        orders.withColumn("payment_ms", F.when(live, F.col("start_ms") + F.col("processing_ms")))
+        .withColumn("picked_ms", F.when(live, F.col("start_ms") + pick_s * 1000))
+        .withColumn(
+            "shipped_ms",
+            F.when(
+                live & ~bopis,
+                F.col("picked_ms") + _seconds(ctx, ONLINE_SHIP_SECONDS, "online-ship") * 1000,
+            ),
+        )
+        .withColumn(
+            "delivered_ms",
+            F.when(
+                live & bopis,
+                F.col("picked_ms") + _seconds(ctx, ONLINE_PICKUP_SECONDS, "online-pickup") * 1000,
+            ).when(
+                live & ~F.col("backordered"),
+                F.col("shipped_ms")
+                + _seconds(ctx, ONLINE_DELIVER_SECONDS, "online-deliver") * 1000,
+            ),
+        )
+        .withColumn(
+            "end_ms",
+            F.greatest(
+                F.col("start_ms"),
+                F.col("payment_ms"),
+                F.col("picked_ms"),
+                F.col("shipped_ms"),
+                F.col("delivered_ms"),
+            ),
+        )
+    )
+    return orders
+
+
+def order_demand(orders: DataFrame) -> list[StockDemand]:
+    """Store demand of orders placed in this batch that a store fulfills."""
+    placed = orders.where(F.col("_is_new") & (F.col("node_type") == "STORE") & ~F.col("cancelled"))
+    return _stock_demand(
+        _demand_rows(placed, "order_id", "start_ms", "node_id"), ONLINE_SALE_SOURCE
+    )
+
+
+def online_events(
+    ctx: StreamContext, orders: DataFrame, previous_ms: int | None, clock_ms: int
+) -> DataFrame:
+    """Lifecycle events of planned orders that fall due in this batch.
+
+    An order is created with one ``online_order_line_added`` per line (lines
+    a fulfilling store could not supply were dropped as lost sales), paid
+    after the tender's processing time, picked, shipped and delivered; a BOPIS
+    order is picked (ready for pickup) and delivered when the customer
+    collects it, and is never shipped. Cancelled orders have zero totals, no
+    payment and no fulfillment; backordered orders ship but are not delivered.
+    """
+    v = F.col("v")
+    orders = orders.withColumn("priced_lines", _kept_lines("priced_lines")).where(
+        F.size("priced_lines") > 0
+    )
+    live = ~F.col("cancelled")
+    subtotal = F.when(live, _sum_lines("priced_lines", "net_cents")).otherwise(F.lit(0))
+    discount = F.when(live, _sum_lines("priced_lines", "discount_cents")).otherwise(F.lit(0))
+    tax = F.when(live, _sum_lines("priced_lines", "tax_cents")).otherwise(F.lit(0))
+    orders = (
+        orders.withColumn("subtotal_cents", subtotal.cast("long"))
+        .withColumn("discount_cents", discount.cast("long"))
+        .withColumn("gross_cents", (subtotal + discount).cast("long"))
+        .withColumn("tax_cents", tax.cast("long"))
+        .withColumn("total_cents", (subtotal + tax).cast("long"))
         .withColumn("_journey_session", F.col("order_id"))
     )
-    orders = _journey(ctx, orders, "order_id", "start_ms")
-    node_type = F.when(F.col("fulfillment_mode") == "SHIP_FROM_DC", F.lit("DC")).otherwise(
-        F.lit("STORE")
+    # Cancelled orders are never paid, so they are never attributed.
+    orders = _journey(
+        ctx, orders.withColumn("status", F.when(live, F.col("status"))), "order_id", "start_ms"
     )
-    node_id = F.when(node_type == "DC", F.col("dc_id")).otherwise(F.col("store_id"))
-    ts = F.col("ts")
+    created_ts = _ms_ts(F.col("start_ms"))
+    created_due = _due(F.col("start_ms"), previous_ms, clock_ms)
     pkey = F.concat(F.lit("order_"), F.col("order_id"))
     session = F.col("order_id")
     journey = F.col("journey_id")
     total = _cents_to_dollars(F.col("total_cents"))
-    always = F.lit(True)
 
-    def stage(event_type: str, time_field: str) -> Column:
+    def stage(event_type: str, ms_col: str, time_field: str) -> Column:
+        ms = F.col(ms_col)
         return slot(
             ctx,
-            always,
+            ms.isNotNull() & _due(ms, previous_ms, clock_ms),
             event_type,
             F.struct(
                 F.col("order_id"),
-                node_type.alias("node_type"),
-                node_id.alias("node_id"),
+                F.col("node_type"),
+                F.col("node_id"),
                 F.col("fulfillment_mode"),
-                iso(ts).alias(time_field),
+                iso(_ms_ts(ms)).alias(time_field),
             ),
-            ts,
+            _ms_ts(ms),
             pkey,
             v,
             session=session,
@@ -1067,79 +1363,103 @@ def online_events(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
             correlation=journey,
         )
 
-    events = F.array(
-        slot(
+    def line_event(line: Column) -> Column:
+        return slot(
             ctx,
-            always,
-            "online_order_created",
+            created_due,
+            "online_order_line_added",
             F.struct(
                 F.col("order_id"),
-                F.col("customer_id"),
+                line["line_num"].cast("long").alias("line_number"),
+                line["product_id"].alias("product_id"),
+                line["quantity"].cast("long").alias("quantity"),
+                (line["unit_cents"] / 100.0).alias("unit_price"),
+                (line["net_cents"] / 100.0).alias("extended_price"),
+                line["promo_code"].alias("promo_code"),
                 F.col("fulfillment_mode"),
-                node_type.alias("node_type"),
-                node_id.alias("node_id"),
-                F.col("basket_n").cast("long").alias("item_count"),
-                _cents_to_dollars(F.col("gross_cents")).alias("subtotal"),
-                _cents_to_dollars(F.col("tax_cents")).alias("tax"),
-                total.alias("total"),
-                F.col("tender").alias("tender_type"),
-                F.when(F.col("_attributed"), F.col("campaign_id")).alias("campaign_id"),
-                F.when(
-                    F.col("_attributed"), F.concat(F.lit("IMPJRN"), F.col("_jhash"), F.lit("N"))
-                ).alias("impression_id"),
-                F.col("gross_cents").alias("gross_subtotal_cents"),
-                F.lit(0).cast("long").alias("discount_cents"),
-                F.col("gross_cents").alias("subtotal_cents"),
-                F.col("tax_cents"),
-                F.col("total_cents"),
+                F.col("node_type"),
+                F.col("node_id"),
             ),
-            ts,
+            created_ts,
             pkey,
-            v,
-            session=session,
-            correlation=journey,
-        ),
-        slot(
-            ctx,
-            always,
-            "payment_processed",
-            F.struct(
-                F.lit(None).cast("string").alias("receipt_id"),
-                F.col("order_id"),
-                F.col("tender").alias("payment_method"),
-                total.alias("amount"),
-                F.col("total_cents").alias("amount_cents"),
-                _prefixed(ctx, "TXN-ONL", v).alias("transaction_id"),
-                iso(ts).alias("processing_time"),
-                (
-                    F.floor(
-                        d.u([v], "online-processing")
-                        * (ONLINE_PROCESSING_MS[1] - ONLINE_PROCESSING_MS[0])
-                    )
-                    + ONLINE_PROCESSING_MS[0]
-                )
-                .cast("int")
-                .alias("processing_time_ms"),
-                F.col("status"),
-                F.lit(None).cast("string").alias("decline_reason"),
-                F.when(node_type == "STORE", node_id)
-                .otherwise(F.lit(None).cast("long"))
-                .alias("store_id"),
-                F.col("customer_id"),
-            ),
-            ts,
-            pkey,
-            v,
+            F.concat(v, F.lit("-"), line["line_num"]),
             session=session,
             parent=F.col("order_id"),
-            correlation=journey,
+        )
+
+    payment_ms = F.col("payment_ms")
+    payment_ts = _ms_ts(payment_ms)
+    events = F.concat(
+        F.array(
+            slot(
+                ctx,
+                created_due,
+                "online_order_created",
+                F.struct(
+                    F.col("order_id"),
+                    F.col("customer_id"),
+                    F.col("fulfillment_mode"),
+                    F.col("node_type"),
+                    F.col("node_id"),
+                    F.size("priced_lines").cast("long").alias("item_count"),
+                    _cents_to_dollars(F.col("subtotal_cents")).alias("subtotal"),
+                    _cents_to_dollars(F.col("tax_cents")).alias("tax"),
+                    total.alias("total"),
+                    F.col("tender").alias("tender_type"),
+                    F.when(F.col("_attributed"), F.col("campaign_id")).alias("campaign_id"),
+                    F.when(
+                        F.col("_attributed"),
+                        F.concat(F.lit("IMPJRN"), F.col("_jhash"), F.lit("N")),
+                    ).alias("impression_id"),
+                    F.col("gross_cents").alias("gross_subtotal_cents"),
+                    F.col("discount_cents"),
+                    F.col("subtotal_cents"),
+                    F.col("tax_cents"),
+                    F.col("total_cents"),
+                ),
+                created_ts,
+                pkey,
+                v,
+                session=session,
+                correlation=journey,
+            ),
+            slot(
+                ctx,
+                payment_ms.isNotNull() & _due(payment_ms, previous_ms, clock_ms),
+                "payment_processed",
+                F.struct(
+                    F.lit(None).cast("string").alias("receipt_id"),
+                    F.col("order_id"),
+                    F.col("tender").alias("payment_method"),
+                    total.alias("amount"),
+                    F.col("total_cents").alias("amount_cents"),
+                    _prefixed(ctx, "TXN-ONL", v).alias("transaction_id"),
+                    iso(payment_ts).alias("processing_time"),
+                    F.col("processing_ms").cast("int").alias("processing_time_ms"),
+                    F.col("status"),
+                    decline_reason_column(
+                        ctx.draws, [F.col("order_id")], F.col("status"), "online-reason"
+                    ).alias("decline_reason"),
+                    # Online payments carry no store, as in history.
+                    F.lit(None).cast("long").alias("store_id"),
+                    F.col("customer_id"),
+                ),
+                payment_ts,
+                pkey,
+                v,
+                session=session,
+                parent=F.col("order_id"),
+                correlation=journey,
+            ),
+            stage("online_order_picked", "picked_ms", "picked_time"),
+            stage("online_order_shipped", "shipped_ms", "shipped_time"),
+            stage("online_order_delivered", "delivered_ms", "delivered_time"),
         ),
-        stage("online_order_picked", "picked_time"),
-        stage("online_order_shipped", "shipped_time"),
+        F.transform("priced_lines", line_event),
     )
-    orders = orders.withColumn("purchase_ts", ts)
+    orders = orders.withColumn("purchase_ts", created_ts)
     return collect_events(orders, events).unionByName(
-        journey_touch_events(ctx, orders, F.lit(True))
+        journey_touch_events(ctx, orders, created_due)
     )
 
 
@@ -1233,147 +1553,256 @@ def marketing_events(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
 
 
 # ---------------------------------------------------------------------------
-# Inventory and logistics (flat lanes until their state machines land)
+# Inventory and logistics
 # ---------------------------------------------------------------------------
 
 
-def inventory_events(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
-    d = ctx.draws
-    v = F.col("v")
-    rows = lanes.where(F.col("lane") == "inventory").where(_keep(ctx, "inventory"))
-    rows = _sample(ctx, rows, "store", "stores", "store_id")
-    rows = _sample(ctx, rows, "iprod", "products", "inv_product_id")
-    quantity = d.h64([v], "iqty") % 60
-    # About 6% of inventory events are a disruption: a stock crash that forces
-    # a stockout and an urgent reorder.
-    disrupted = d.u([v], "disrupt") < F.lit(0.06)
-    delta_draw = d.h64([v], "delta") % 40
-    delta = (
-        F.when(disrupted, -(quantity + F.lit(50)))
-        .when(delta_draw == 20, F.lit(-5))
-        .otherwise(delta_draw - F.lit(20))
-        .cast("long")
+def inventory_seed_frame(
+    ledger: DataFrame, as_of: datetime, lookback_days: int = INVENTORY_SEED_LOOKBACK_DAYS
+) -> DataFrame:
+    """Store stock as of ``as_of`` from the Silver ledger (``fact_store_inventory_txn``).
+
+    One row per store and product: the latest balance at or before ``as_of``
+    (never below zero) and the smoothed daily demand ``rate``, the mean daily
+    requested quantity (sales and lost sales) over the last ``lookback_days``.
+    The stream pins ``as_of`` to its incarnation start, so the seed of an
+    entry it has not touched yet never changes while the incarnation runs.
+    """
+    cutoff = F.lit(as_of.astimezone(timezone.utc).replace(tzinfo=None)).cast("timestamp")
+    rows = ledger.where(F.col("event_ts") <= cutoff)
+    sold = F.when(F.col("txn_type") == "SALE", -F.col("quantity")).otherwise(F.lit(0))
+    requested = (
+        F.coalesce(F.col("requested_quantity"), sold)
+        if "requested_quantity" in ledger.columns
+        else sold
     )
-    effective = F.when(disrupted, F.lit(0)).otherwise(quantity).cast("long")
-    ts = F.col("ts")
+    keys = ["store_id", "product_id"]
+    latest = (
+        rows.where(F.col("balance").isNotNull())
+        .groupBy(*keys)
+        .agg(F.max_by("balance", F.struct("event_ts", "trace_id")).alias("on_hand"))
+    )
+    since = cutoff - F.expr(f"INTERVAL {int(lookback_days)} DAYS")
+    demand = (
+        rows.where((F.col("event_ts") > since) & F.col("txn_type").isin("SALE", "LOST_SALE"))
+        .groupBy(*keys)
+        .agg((F.sum(requested) / F.lit(float(lookback_days))).alias("rate"))
+    )
+    return latest.join(demand, keys, "left").select(
+        F.col("store_id").cast("long").alias("store_id"),
+        F.col("product_id").cast("long").alias("product_id"),
+        F.greatest(F.lit(0), F.col("on_hand")).cast("long").alias("on_hand"),
+        F.coalesce(F.col("rate"), F.lit(0.0)).cast("double").alias("rate"),
+    )
+
+
+def seed_inventory_entries(ctx: StreamContext, spark: SparkSession, keys: set[str]) -> SupplyState:
+    """Inventory entries for ``keys`` the stream has not touched yet.
+
+    From the incarnation's Silver seed when it has the store and product,
+    else history's opening stock with the demand prior.
+    """
+    pairs = sorted(parse_inventory_key(key) for key in keys)
+    seeded: SupplyState = {}
+    if ctx.inventory_seed is not None and pairs:
+        wanted = spark.createDataFrame(pairs, "store_id long, product_id long")
+        for row in ctx.inventory_seed.join(
+            F.broadcast(wanted), ["store_id", "product_id"]
+        ).collect():
+            seeded[inventory_key(row["store_id"], row["product_id"])] = inventory_entry(
+                row["on_hand"], row["rate"]
+            )
+    for store_id, product_id in pairs:
+        key = inventory_key(store_id, product_id)
+        if key not in seeded:
+            seeded[key] = default_inventory_entry(
+                ctx.seed, store_id, product_id, ctx.supply.daily_prior
+            )
+    return seeded
+
+
+def _supply_rows(output: SupplyOutput) -> list[tuple]:
+    def row(event_type: str, at_ms: int, seed: str, **values: Any) -> tuple:
+        names = SUPPLY_SCHEMA.split(", ")[3:]
+        return (event_type, int(at_ms), seed) + tuple(values.get(name.split()[0]) for name in names)
+
+    rows = []
+    for move in output.moves:
+        rows.append(
+            row(
+                "inventory_updated",
+                move.at_ms,
+                f"inv-{move.key}",
+                store_id=move.store_id,
+                dc_id=move.dc_id,
+                product_id=move.product_id,
+                quantity_delta=move.quantity_delta,
+                reason=move.reason,
+                source=move.source,
+                requested_quantity=move.requested_quantity,
+            )
+        )
+    for stockout in output.stockouts:
+        rows.append(
+            row(
+                "stockout_detected",
+                stockout.at_ms,
+                f"so-{stockout.key}",
+                store_id=stockout.store_id,
+                dc_id=stockout.dc_id,
+                product_id=stockout.product_id,
+                last_known_quantity=stockout.last_known_quantity,
+            )
+        )
+    for reorder in output.reorders:
+        rows.append(
+            row(
+                "reorder_triggered",
+                reorder.at_ms,
+                f"ro-{reorder.key}",
+                store_id=reorder.store_id,
+                dc_id=reorder.dc_id,
+                product_id=reorder.product_id,
+                current_quantity=reorder.current_quantity,
+                reorder_quantity=reorder.reorder_quantity,
+                reorder_point=reorder.reorder_point,
+                priority=reorder.priority,
+            )
+        )
+    for arrival in output.arrivals:
+        rows.append(
+            row(
+                "truck_arrived",
+                arrival.at_ms,
+                f"arr-{arrival.shipment_id}",
+                store_id=arrival.store_id,
+                dc_id=arrival.dc_id,
+                truck_id=arrival.truck_id,
+                shipment_id=arrival.shipment_id,
+                planned_ms=arrival.planned_ms,
+                delay_minutes=arrival.delay_minutes,
+                delay_reason=arrival.delay_reason,
+                estimated_unload=arrival.estimated_unload_minutes,
+            )
+        )
+    for departure in output.departures:
+        rows.append(
+            row(
+                "truck_departed",
+                departure.at_ms,
+                f"dep-{departure.shipment_id}",
+                store_id=departure.store_id,
+                dc_id=departure.dc_id,
+                truck_id=departure.truck_id,
+                shipment_id=departure.shipment_id,
+                unload_minutes=departure.unload_minutes,
+            )
+        )
+    return rows
+
+
+def supply_events(ctx: StreamContext, spark: SparkSession, output: SupplyOutput) -> DataFrame:
+    """Inventory, stockout, reorder and truck events of a batch's supply output."""
+    rows = _supply_rows(output)
+    if not rows:
+        return _empty_events(spark)
+    frame = spark.createDataFrame(rows, SUPPLY_SCHEMA)
+    kind = F.col("event_type")
+    ts = _ms_ts(F.col("at_ms"))
+    seed = F.col("seed")
     store = _store_key(F.col("store_id"))
+    dc = F.concat(F.lit("dc_"), F.col("dc_id").cast("string"))
+    truck_id = F.concat(F.lit("TRK"), F.lpad(F.col("truck_id").cast("string"), 4, "0"))
+    shipment = F.col("shipment_id")
     events = F.array(
-        envelope(
+        slot(
             ctx,
+            kind == "inventory_updated",
             "inventory_updated",
             F.struct(
                 F.col("store_id"),
-                F.lit(None).cast("long").alias("dc_id"),
-                F.col("inv_product_id").alias("product_id"),
-                delta.alias("quantity_delta"),
-                F.when(disrupted, F.lit("DISRUPTION")).otherwise(F.lit("SALE")).alias("reason"),
-                F.when(disrupted, F.lit("DC_OUTAGE")).otherwise(F.lit("STORE")).alias("source"),
+                F.col("dc_id"),
+                F.col("product_id"),
+                F.col("quantity_delta"),
+                F.col("reason"),
+                F.col("source"),
+                F.col("requested_quantity"),
             ),
             ts,
             store,
-            v,
+            seed,
         ),
         slot(
             ctx,
-            (quantity < F.lit(STOCKOUT_QUANTITY_THRESHOLD)) | disrupted,
+            kind == "stockout_detected",
             "stockout_detected",
             F.struct(
                 F.col("store_id"),
-                F.lit(None).cast("long").alias("dc_id"),
-                F.col("inv_product_id").alias("product_id"),
-                effective.alias("last_known_quantity"),
+                F.col("dc_id"),
+                F.col("product_id"),
+                F.col("last_known_quantity"),
                 iso(ts).alias("detection_time"),
             ),
             ts,
             store,
-            v,
+            seed,
         ),
         slot(
             ctx,
-            (quantity < F.lit(REORDER_POINT)) | disrupted,
+            kind == "reorder_triggered",
             "reorder_triggered",
             F.struct(
                 F.col("store_id"),
-                F.lit(None).cast("long").alias("dc_id"),
-                F.col("inv_product_id").alias("product_id"),
-                effective.alias("current_quantity"),
-                (d.h64([v], "roq") % 200 + F.lit(50)).cast("long").alias("reorder_quantity"),
-                F.lit(REORDER_POINT).cast("long").alias("reorder_point"),
-                F.when(
-                    disrupted | (quantity < F.lit(URGENT_REORDER_QUANTITY_THRESHOLD)),
-                    F.lit("URGENT"),
-                )
-                .otherwise(F.lit("HIGH"))
-                .alias("priority"),
+                F.col("dc_id"),
+                F.col("product_id"),
+                F.col("current_quantity"),
+                F.col("reorder_quantity"),
+                F.col("reorder_point"),
+                F.col("priority"),
             ),
             ts,
             store,
-            v,
+            seed,
         ),
-    )
-    return collect_events(rows, events)
-
-
-def logistics_events(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
-    d = ctx.draws
-    v = F.col("v")
-    rows = lanes.where(F.col("lane") == "logistics").where(_keep(ctx, "logistics"))
-    for salt, name, output in (
-        ("store", "stores", "store_id"),
-        ("dc", "dcs", "dc_id"),
-        ("truck", "trucks", "truck_num"),
-    ):
-        rows = _sample(ctx, rows, salt, name, output)
-    truck_id = F.concat(F.lit("TRK"), F.lpad(F.col("truck_num").cast("string"), 4, "0"))
-    shipment_id = _prefixed(ctx, "SHP", v)
-    estimated_unload = (
-        d.h64([v], "unload") % (TRUCK_NORMAL_DWELL_MINUTES_MAX - TRUCK_NORMAL_DWELL_MINUTES_MIN + 1)
-        + F.lit(TRUCK_NORMAL_DWELL_MINUTES_MIN)
-    ).cast("long")
-    late = F.pmod(v, F.lit(TRUCK_LATE_BUCKET_MODULUS)) == F.lit(0)
-    dwell = F.when(late, F.lit(TRUCK_LATE_DWELL_MINUTES).cast("long")).otherwise(estimated_unload)
-    arrival = F.timestamp_seconds(F.unix_timestamp(F.col("ts")))
-    departure = F.timestamp_seconds(F.unix_timestamp(arrival) + dwell * F.lit(60))
-    pkey = F.concat(F.lit("dc_"), F.col("dc_id").cast("string"))
-    events = F.array(
-        envelope(
+        slot(
             ctx,
+            kind == "truck_arrived",
             "truck_arrived",
             F.struct(
                 truck_id.alias("truck_id"),
                 F.col("dc_id"),
                 F.col("store_id"),
-                shipment_id.alias("shipment_id"),
-                iso(arrival).alias("arrival_time"),
-                estimated_unload.alias("estimated_unload_duration"),
-                # Live trucks arrive as planned until the incident model adds delays.
-                iso(arrival).alias("planned_arrival_time"),
-                F.lit(0).cast("long").alias("delay_minutes"),
-                F.lit(None).cast("string").alias("delay_reason"),
+                shipment.alias("shipment_id"),
+                iso(ts).alias("arrival_time"),
+                F.col("estimated_unload").alias("estimated_unload_duration"),
+                iso(_ms_ts(F.col("planned_ms"))).alias("planned_arrival_time"),
+                F.col("delay_minutes"),
+                F.col("delay_reason"),
             ),
-            arrival,
-            pkey,
-            v,
-            session=shipment_id,
+            ts,
+            dc,
+            seed,
+            session=shipment,
         ),
-        envelope(
+        slot(
             ctx,
+            kind == "truck_departed",
             "truck_departed",
             F.struct(
                 truck_id.alias("truck_id"),
                 F.col("dc_id"),
                 F.col("store_id"),
-                shipment_id.alias("shipment_id"),
-                iso(departure).alias("departure_time"),
-                dwell.alias("actual_unload_duration"),
+                shipment.alias("shipment_id"),
+                iso(ts).alias("departure_time"),
+                F.col("unload_minutes").alias("actual_unload_duration"),
             ),
-            departure,
-            pkey,
-            v,
-            session=shipment_id,
+            ts,
+            dc,
+            seed,
+            session=shipment,
         ),
     )
-    return collect_events(rows, events)
+    return collect_events(frame, events)
 
 
 # ---------------------------------------------------------------------------
@@ -1417,13 +1846,62 @@ def store_operation_events(ctx: StreamContext, spark: SparkSession, operations: 
 # ---------------------------------------------------------------------------
 
 
-def _visit_payload(row: Any) -> dict[str, Any]:
-    return {
-        "v": int(row["v"]),
-        "start_ms": int(row["start_ms"]),
-        "store_id": int(row["store_id"]),
-        "customer_id": None if row["customer_id"] is None else int(row["customer_id"]),
-    }
+def _lost_frame(spark: SparkSession, lost: dict[str, list[int]]) -> DataFrame:
+    return spark.createDataFrame(sorted(lost.items()), LOST_SCHEMA)
+
+
+def _with_lost(frame: DataFrame, lost: DataFrame, owner: str) -> DataFrame:
+    """Merge this batch's lost-sale lines into ``rejected`` (keyed by receipt or order)."""
+    return (
+        frame.join(F.broadcast(lost.withColumnRenamed("_owner", owner)), owner, "left")
+        .withColumn("rejected", F.coalesce(F.col("_lost"), F.col("rejected")))
+        .drop("_lost")
+    )
+
+
+def _open_frame(
+    spark: SparkSession, state: dict[str, dict[str, Any]], fields: tuple[str, ...], schema: str
+) -> DataFrame:
+    return spark.createDataFrame(
+        [
+            tuple(
+                payload.get(name, []) if name == "rejected" else payload.get(name)
+                for name in fields
+            )
+            for payload in state.values()
+        ],
+        schema,
+    ).withColumn("_is_new", F.lit(False))
+
+
+def _open_entities(
+    frame: DataFrame,
+    fields: tuple[str, ...],
+    owner: str,
+    lost: dict[str, list[int]],
+    drop_when_all_lost: bool = False,
+) -> dict[str, tuple[dict[str, Any], int]]:
+    """State payloads (with their final lost-sale lines) and end times of planned entities.
+
+    With ``drop_when_all_lost``, an entity whose every basket line was a lost
+    sale is not kept: nothing more happens to it (an online order with no line
+    left is never placed).
+    """
+    known = {}
+    columns = [*fields, owner, "end_ms"] + (["basket_n"] if drop_when_all_lost else [])
+    for row in frame.select(*columns).collect():
+        payload = {
+            name: (list(row[name] or []) if name == "rejected" else row[name]) for name in fields
+        }
+        payload["rejected"] = lost.get(row[owner], payload["rejected"])
+        if drop_when_all_lost and len(payload["rejected"]) >= int(row["basket_n"]):
+            continue
+        known[str(row["v"])] = (payload, int(row["end_ms"]))
+    return known
+
+
+VISIT_FIELDS = ("v", "start_ms", "store_id", "customer_id", "rejected")
+ORDER_FIELDS = ("v", "start_ms", "rejected")
 
 
 def generate_stream_batch(
@@ -1432,8 +1910,11 @@ def generate_stream_batch(
     """Events of one micro-batch of rate rows (``ts``, ``v``) and its state changes.
 
     Reads every state as of the previous batch, so a replay of ``batch_id``
-    regenerates identical events. Write the events first, then commit the
-    returned changes with :func:`commit_stream_batch`.
+    regenerates identical events. Purchases and online orders are planned
+    first; their store demand then runs through the supply state machine,
+    whose lost sales are dropped from the receipts and orders before their
+    events are built. Write the events first, then commit the returned
+    changes with :func:`commit_stream_batch`.
     """
     spark = rows.sparkSession
     meta = state.read("meta", batch_id).get("clock")
@@ -1454,36 +1935,67 @@ def generate_stream_batch(
     )
 
     lanes = assign_lanes(ctx, rows).persist()
-    open_state = state.read("visits", batch_id)
-    open_visits = spark.createDataFrame(
-        [(p["v"], p["start_ms"], p["store_id"], p.get("customer_id")) for p in open_state.values()],
-        VISIT_SCHEMA,
-    ).withColumn("_is_new", F.lit(False))
-    started = new_visits(ctx, lanes).withColumn("_is_new", F.lit(True))
-    plan = plan_visits(ctx, open_visits.unionByName(started)).persist()
-    known = {
-        str(row["v"]): (_visit_payload(row), int(row["end_ms"]))
-        for row in plan.select("v", "start_ms", "store_id", "customer_id", "end_ms").collect()
-    }
+    visit_state = state.read("visits", batch_id)
+    started = (
+        new_visits(ctx, lanes)
+        .withColumn("rejected", F.array().cast("array<int>"))
+        .withColumn("_is_new", F.lit(True))
+    )
+    plan = plan_visits(
+        ctx, _open_frame(spark, visit_state, VISIT_FIELDS, VISIT_SCHEMA).unionByName(started)
+    ).persist()
+    buyers = purchase_baskets(ctx, plan, previous_ms, clock_ms).persist()
+
+    order_state = state.read("orders", batch_id)
+    orders = plan_orders(
+        ctx,
+        _open_frame(spark, order_state, ORDER_FIELDS, ORDER_SCHEMA).unionByName(
+            new_orders(ctx, lanes).withColumn("_is_new", F.lit(True))
+        ),
+    ).persist()
+
+    demand = tuple(purchase_demand(buyers) + order_demand(orders))
+    supply, supply_changes = run_supply_batch(
+        state,
+        batch_id,
+        SupplyBatch(ctx.supply, clock_ms, previous_ms, demand),
+        lambda keys: seed_inventory_entries(ctx, spark, keys),
+    )
+    lost = lost_lines(supply)
+    lost_frame = _lost_frame(spark, lost)
+    buyers = _with_lost(buyers, lost_frame, "receipt_id")
+    orders = _with_lost(orders, lost_frame, "order_id")
+
     new_visit_state, _finished = apply_batch(
-        open_state, VisitBatch(clock_ms, known), apply_visit_batch
+        visit_state,
+        VisitBatch(clock_ms, _open_entities(plan, VISIT_FIELDS, "receipt_id", lost)),
+        apply_visit_batch,
+    )
+    new_order_state, _delivered = apply_batch(
+        order_state,
+        VisitBatch(clock_ms, _open_entities(orders, ORDER_FIELDS, "order_id", lost, True)),
+        apply_visit_batch,
     )
 
     events = (
         store_operation_events(ctx, spark, operations)
         .unionByName(visit_events(ctx, plan, previous_ms, clock_ms))
-        .unionByName(purchase_events(ctx, plan, previous_ms, clock_ms))
-        .unionByName(online_events(ctx, lanes))
+        .unionByName(purchase_events(ctx, buyers))
+        .unionByName(online_events(ctx, orders, previous_ms, clock_ms))
         .unionByName(marketing_events(ctx, lanes))
-        .unionByName(inventory_events(ctx, lanes))
-        .unionByName(logistics_events(ctx, lanes))
+        .unionByName(supply_events(ctx, spark, supply))
     )
     changes: dict[str, Changes] = {
         "stores": state_changes(store_state, new_store_state),
-        "visits": state_changes(open_state, new_visit_state),
+        "visits": state_changes(visit_state, new_visit_state),
+        "orders": state_changes(order_state, new_order_state),
+        INVENTORY_STATE: supply_changes[INVENTORY_STATE],
+        LOGISTICS_STATE: supply_changes[LOGISTICS_STATE],
         "meta": {"clock": {"clock_ms": clock_ms}},
     }
-    return StreamBatch(events.select(*EVENT_COLUMNS), clock_ms, changes, [lanes, plan])
+    return StreamBatch(
+        events.select(*EVENT_COLUMNS), clock_ms, changes, [lanes, plan, buyers, orders]
+    )
 
 
 def commit_stream_batch(state: StateStore, batch_id: int, batch: StreamBatch) -> None:

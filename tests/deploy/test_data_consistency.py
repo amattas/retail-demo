@@ -114,6 +114,14 @@ def database():
     _insert(connection, "ag.fact_store_inventory_txn", [
         {"trace_id": "I1", "event_ts": "2026-09-04 08:00:00", "balance": 42},
     ])
+    _insert(connection, "ag.fact_online_order_lines", [
+        {"order_id": "O1", "line_num": 1, "event_ts": "2026-09-04 08:00:00",
+         "picked_ts": "2026-09-04 09:00:00", "shipped_ts": "2026-09-04 11:00:00",
+         "delivered_ts": "2026-09-05 11:00:00"},
+        {"order_id": "O2", "line_num": 1, "event_ts": "2026-09-04 08:30:00",
+         "picked_ts": "2026-09-04 12:00:00", "shipped_ts": None,
+         "delivered_ts": "2026-09-04 13:00:00"},
+    ])
     _insert(connection, "ag.dim_stores", [{"ID": 1}])
     _insert(connection, "ag.dim_customers", [{"ID": 1}])
     _insert(connection, "au.sales_minute_store", [
@@ -161,6 +169,11 @@ def test_reconciliation_accepts_consistent_settled_data_and_ignores_pending_arri
         ),
         ("DELETE FROM ag.fact_store_inventory_txn", "missing_inventory"),
         ("UPDATE ag.fact_store_inventory_txn SET balance = NULL", "null_balances"),
+        ("UPDATE ag.fact_store_inventory_txn SET balance = -1", "negative_balances"),
+        (
+            "UPDATE ag.fact_online_order_lines SET shipped_ts = '2026-09-04 07:00:00'",
+            "lifecycle_out_of_order",
+        ),
         ("DELETE FROM ag.dim_customers", "orphan_receipts"),
         ("UPDATE au.sales_minute_store SET total_sales = 0", "gold_sales_mismatches"),
     ],

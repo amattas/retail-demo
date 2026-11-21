@@ -16,6 +16,7 @@ from retail_setup.generation.stream_calendar import (
     hour_shares,
     is_open_at,
     monthly_factors,
+    online_hour_factors,
     operating_window,
     plan_lanes,
     store_boundaries,
@@ -88,9 +89,11 @@ def test_emit_probability_never_exceeds_one_and_volume_ignores_the_rate() -> Non
         * max(max(hour_shares(PROFILE.hourly_weights, h)) for h in HOURS)
     )
     assert plan.factors["visits"] * peak == pytest.approx(1.0)
-    assert plan.factors["online"] * max(monthly_factors(PROFILE)) == pytest.approx(1.0)
-    for lane in ("marketing", "inventory", "logistics"):
-        assert plan.factors[lane] == pytest.approx(1.0)
+    online_peak = max(monthly_factors(PROFILE)) * max(online_hour_factors())
+    assert plan.factors["online"] * online_peak == pytest.approx(1.0)
+    assert plan.factors["marketing"] == pytest.approx(1.0)
+    # Inventory and logistics follow from purchases, so they have no lane.
+    assert STREAM_LANES == ("visits", "online", "marketing")
 
     faster = _plan(rows_per_second=plan.rows_per_second * 4)
     for lane in STREAM_LANES:

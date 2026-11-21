@@ -39,11 +39,12 @@ is exposed by `fn_pending_recommendations()` because it must reconcile creation,
 approval, and rejection event tables at query time.
 
 The live stream declares twenty-two typed business event tables and emits
-eighteen of them today. `logistics_incident_started`,
-`logistics_incident_resolved`, `online_order_line_added`, and
-`online_order_delivered` are declared for the incident and online-order
-lifecycle models; they follow the same retention and extent-tag retention
-policies as their operational and omnichannel peers. `unknown_event`
+twenty of them today. `logistics_incident_started` and
+`logistics_incident_resolved` are declared for the logistics incident model;
+they follow the same retention and extent-tag retention policies as their
+operational peers. `inventory_updated.requested_quantity` carries the demand of
+a sale or lost sale; `01-create-tables.kql` restates the table with
+`.alter table` so the column sits before the envelope. `unknown_event`
 is a catch-all KQL table, not a generated business event.
 
 Every stream event table drops `ingest-by:` extent tags after seven days

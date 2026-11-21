@@ -24,6 +24,15 @@ outputs, and `gold.py` builds the ten aggregates.
 `fact_truck_moves`, `fact_truck_inventory`, `fact_dc_inventory_txn`,
 `fact_store_inventory_txn`, `fact_stockouts`, and `fact_logistics_incidents`.
 
+`dim_trucks` gives each DC a fleet sized to the stores it serves (its nearest
+stores by geography, the routing `network.store_dc_map` uses): 0.4 trucks per
+store and at least two, plus a shared pool of about 15% of the fleet with a
+NULL `DCID`. The live stream runs these trucks one shipment at a time.
+
+Online orders follow `vocabulary.ONLINE_HOURLY_WEIGHTS` over the UTC day
+(peaking in the US evening), and a BOPIS order is collected 1-24 hours after it
+is picked (`delivered_ts`); the stream uses the same parameters.
+
 `fact_logistics_incidents` holds one row per logistics disruption
 (`incident_type` is `DC_OUTAGE`, `LANE_DELAY`, `WEATHER`, `HOLIDAY`, or
 `SUPPLIER_SHORT_SHIP`), with `resolved_at` null while the incident is open and

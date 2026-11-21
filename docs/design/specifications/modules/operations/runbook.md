@@ -133,9 +133,11 @@ evidence use a 30-minute maximum age, checked per live event table: each
 table's own `max(ingestion_time())` must be recent, so one busy table cannot
 make the rest look fresh. Live volume follows store hours, so tables that are
 quiet by design get extra time (`stream_control.EVENT_TABLE_QUIET`): 26 hours
-for store opened/closed, 12 hours for store-visit, purchase and online-order
-tables (stores close overnight; small fleets have few orders per hour), and 6
-hours for ad impressions. The Silver watermark check adds the same quiet time. Event types declared but not yet emitted
+for store opened/closed; 12 hours for store-visit, purchase, inventory,
+reorder, truck and online-order tables (stores close overnight, loads wait to
+consolidate, small fleets have few orders per hour); 24 hours for stockouts;
+36 hours for online deliveries, which come a day or more after the order; and
+6 hours for ad impressions. The Silver watermark check adds the same quiet time. Event types declared but not yet emitted
 (`stream_control.PENDING_EVENT_TYPES`) are not expected. Silver watermark
 evidence uses the stalest live table's `last_processed_ts` (the event time
 Silver has processed), not `updated_at`, which the daily deep reconciliation
@@ -173,7 +175,11 @@ taxonomy row or make streaming a required deployment capability.
   The test fixture builds `cusn` tables from `01-create-tables.kql`, `ag`/`au`
   tables from `schemas.TABLES`, and `ag._watermarks` from notebook 03, so a
   renamed column fails the test.
-- Recent Silver inventory rows are checked for null balances, and receipts
+- Recent Silver inventory rows are checked for null and negative balances
+  (`negative_balances`; the live stream turns short stock into lost sales, so
+  a balance never goes below zero), recent online order lines for a lifecycle
+  out of order (`lifecycle_out_of_order`: picked before the order, shipped
+  before picked, or delivered before shipped or picked), and receipts
   for missing store or non-null customer dimension keys. These integrity
   scans start at the respective window's lower bound; unlike the ingestion
   anti-joins, they do not exclude the newest three hours.

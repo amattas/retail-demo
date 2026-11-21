@@ -115,6 +115,9 @@
 
 // INVENTORY EVENTS
 
+// reason is SALE, LOST_SALE (quantity_delta 0; the store had too little
+// stock) or INBOUND_SHIPMENT (a truck unload). requested_quantity is the
+// customer's demand of a SALE or LOST_SALE and 0 for receipts of stock.
 .create-merge table inventory_updated (
     store_id:long,
     dc_id:long,
@@ -122,6 +125,29 @@
     quantity_delta:long,
     reason:string,
     payload_source:string,
+    requested_quantity:long,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+// .create-merge appends requested_quantity after the envelope on an existing
+// table; restate the schema so it sits before the envelope, as the stream
+// writes it by position. No existing column changes type.
+.alter table inventory_updated (
+    store_id:long,
+    dc_id:long,
+    product_id:long,
+    quantity_delta:long,
+    reason:string,
+    payload_source:string,
+    requested_quantity:long,
     event_type:string,
     trace_id:string,
     ingest_timestamp:datetime,

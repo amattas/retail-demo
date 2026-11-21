@@ -117,8 +117,9 @@ def test_purchase_carries_the_newer_touch_and_journey_on_linked_events() -> None
     assert 'F.when(F.col("_attributed"), newer_impression).alias("impression_id")' in purchases
     # receipt, payment and each promotion of an attributed purchase
     assert purchases.count("correlation=journey") == 3
-    # order created, payment, and the picked/shipped stages
+    # order created, payment, and the picked/shipped/delivered stages (one stage helper)
     assert online.count("correlation=journey") == 3
+    assert 'stage("online_order_delivered", "delivered_ms", "delivered_time")' in online
     assert 'journey = F.col("journey_id")' in purchases
 
 
@@ -140,8 +141,11 @@ def test_receipt_and_order_payloads_carry_the_imp007_fields() -> None:
         assert expected in receipt, expected
     online = _function_source("online_events")
     order = online[online.index('"online_order_created"') : online.index('"payment_processed"')]
-    assert 'F.lit(0).cast("long").alias("discount_cents")' in order
-    assert 'F.col("gross_cents").alias("subtotal_cents")' in order
+    # Online lines carry history's promo model: gross - discount = net subtotal.
+    assert 'F.col("gross_cents").alias("gross_subtotal_cents")' in order
+    assert 'F.col("discount_cents")' in order
+    assert 'F.col("subtotal_cents")' in order
+    assert '.withColumn("gross_cents", (subtotal + discount).cast("long"))' in online
 
 
 def test_discount_is_applied_per_line_before_tax() -> None:

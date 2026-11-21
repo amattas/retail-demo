@@ -42,6 +42,7 @@ ENGINE_MODULES = [
     "generation/stream_calendar.py",
     "generation/behavior.py",
     "generation/traffic.py",
+    "generation/network.py",
     "generation/dims.py",
     "generation/receipts.py",
     "generation/returns.py",
@@ -145,10 +146,13 @@ STREAM_MODULES = [
     "generation/store_activity.py",
     "generation/marketing.py",
     "generation/attribution.py",
+    "generation/inventory_policy.py",
+    "generation/network.py",
     "generation/stream_baskets.py",
     "generation/stream_control.py",
     "generation/stream_frames.py",
     "generation/stream_state.py",
+    "generation/stream_supply.py",
     "generation/stream_events.py",
 ]
 
