@@ -115,10 +115,12 @@ def test_purchase_carries_the_newer_touch_and_journey_on_linked_events() -> None
     online = _function_source("online_events")
     assert 'newer_impression = F.concat(F.lit("IMPJRN"), F.col("_jhash"), F.lit("N"))' in purchases
     assert 'F.when(F.col("_attributed"), newer_impression).alias("impression_id")' in purchases
-    # receipt, payment and each promotion of an attributed purchase
-    assert purchases.count("correlation=journey") == 3
-    # order created, payment, and the picked/shipped/delivered stages (one stage helper)
-    assert online.count("correlation=journey") == 3
+    # receipt, declined and approved payments, and each promotion of an
+    # attributed purchase
+    assert purchases.count("correlation=journey") == 4
+    # order created, declined and approved payments, and the
+    # picked/shipped/delivered stages (one stage helper)
+    assert online.count("correlation=journey") == 4
     assert 'stage("online_order_delivered", "delivered_ms", "delivered_time")' in online
     assert 'journey = F.col("journey_id")' in purchases
 

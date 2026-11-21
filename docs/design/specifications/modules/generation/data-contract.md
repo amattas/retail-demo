@@ -73,7 +73,7 @@ Silver stores true UTC, the same convention as the live stream:
   reporting. Notebook 03 sets it for streamed receipts from
   `dim_stores.TimeZone`.
 
-Invariants that depend on the local clock (operating hours, returns at noon)
+Invariants that depend on the local clock (operating hours)
 convert back with the store's zone. Existing environments must re-run setup
 after this change; Silver written before it has local timestamps and no
 `TimeZone` or `local_hour`.
@@ -299,6 +299,29 @@ fulfilled lines. The return plan preserves sampled dates and identities while
 only actual fulfilled/refunded units can be restocked. Dependent promotions
 and attribution consume realized sales, not attempted demand.
 
+### Returns and payments
+
+About `return_rate` of sales are returned 1-14 days later, at a random time
+inside the store's hours (store-local), favouring baskets whose categories
+customers return more (`returns.RETURN_CATEGORY_WEIGHTS`: apparel and
+electronics far more than fresh food). A return is partial: each line of the
+receipt is returned with a probability that follows its category (at least one
+line), and a multi-unit line returns some or all of its units. The refund keeps
+the sale's `customer_id`, goes back to the tender that paid for the sale, and
+links it in `fact_receipts.original_receipt_id_ext` (NULL on sales). Refund
+cents are the returned share of each line's net with integer basis-point tax;
+return lines keep their own `promo_code` (`receipt_type = RETURN` marks them).
+Only returned units the store filled can be restocked.
+
+Payments follow the shared decline model (`vocabulary.payment_outcome_column`):
+the first tender declines with its probability; 80% of declined shoppers retry
+on another tender (a DECLINED then an APPROVED payment), the rest walk away and
+the sale is voided, so it never becomes a receipt and takes no stock. A voided
+online order is cancelled (zero totals, no payment). Every receipt and placed
+order therefore has exactly one APPROVED payment, and its header tender is the
+approved one. Transaction IDs derive from the purchase ID and attempt
+(`TXN-<receipt or order>-<attempt>`), so they are unique.
+
 `fact_store_inventory_txn` appends two `long` audit columns after the existing
 schema: `requested_quantity` and `unfulfilled_quantity`. `LOST_SALE` rows
 record rejected demand with zero physical `quantity`; they must not decrement
@@ -373,7 +396,9 @@ Current invariant checks include:
 - truck timing and inventory relationships;
 - sales only within each store's operating hours, evaluated in store-local
   time, and `local_hour` equal to the store-local hour of `event_ts`;
-- returns posted at local noon;
+- returns linked to their sale (same store and customer), posted on a later
+  day, refunding no more than the sale;
+- exactly one approved payment per receipt and order, unique transaction IDs;
 - logistics incidents reference known DCs and stores and resolve after they
   start;
 - no receipt line sold before its product's launch date;

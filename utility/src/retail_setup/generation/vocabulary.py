@@ -7,7 +7,8 @@ definition.
 
 The module holds:
 
-- payment tenders, their mix, and the decline model
+- payment tenders, their mix, and the decline model (decline, then a retry on
+  another tender or a voided sale)
 - the named promotion catalog
 - identifier formats: BLE IDs, ad IDs, beacon and sensor IDs, campaign IDs
 - zone vocabularies and the visit path through a store type's zones
@@ -115,6 +116,68 @@ def payment_status_column(
     """``DECLINED`` with the tender's decline probability, else ``APPROVED``."""
     declined = draws.u(keys, salt) < decline_probability_column(method, tenders)
     return F.when(declined, F.lit("DECLINED")).otherwise(F.lit("APPROVED"))
+
+
+# A declined shopper retries with another tender DECLINE_RETRY_SHARE of the
+# time (the retry is approved); otherwise the sale is voided and never happens.
+DECLINE_RETRY_SHARE = 0.8
+APPROVED, RETRIED, VOIDED = "APPROVED", "RETRIED", "VOIDED"
+
+
+def payment_outcome_column(
+    draws: seeded_draws,
+    keys: list,
+    method: Column,
+    tenders: list[tuple[str, float, float, int, int]] = TENDERS,
+    salt: str = "decline",
+) -> Column:
+    """``APPROVED``, ``RETRIED`` (declined, then approved on a second tender) or ``VOIDED``.
+
+    The first attempt declines with the tender's probability (the same draw as
+    :func:`payment_status_column`); a declined sale is retried
+    ``DECLINE_RETRY_SHARE`` of the time and voided otherwise.
+    """
+    declined = draws.u(keys, salt) < decline_probability_column(method, tenders)
+    retried = draws.u(keys, f"{salt}-retry") < F.lit(DECLINE_RETRY_SHARE)
+    return F.when(~declined, F.lit(APPROVED)).when(retried, F.lit(RETRIED)).otherwise(F.lit(VOIDED))
+
+
+def retry_tender_column(
+    draws: seeded_draws,
+    keys: list,
+    declined: Column,
+    tenders: list[tuple[str, float, float, int, int]] = TENDERS,
+    salt: str = "retry-tender",
+) -> Column:
+    """The second tender after ``declined``: drawn by the mix of the other tenders."""
+    return case_when(
+        (
+            declined == name,
+            draws.pick_by_weights(
+                keys, salt, [(other, weight) for other, weight, *_ in tenders if other != name]
+            ),
+        )
+        for name, *_ in tenders
+    )
+
+
+def outcome_shares(
+    tenders: list[tuple[str, float, float, int, int]] = TENDERS,
+) -> dict[str, float]:
+    """Expected share of sales by payment outcome for a tender mix."""
+    total = sum(weight for _, weight, *_ in tenders)
+    declined = sum(weight * BASE_DECLINE * mult for _, weight, mult, _, _ in tenders) / total
+    return {
+        APPROVED: 1.0 - declined,
+        RETRIED: declined * DECLINE_RETRY_SHARE,
+        VOIDED: declined * (1.0 - DECLINE_RETRY_SHARE),
+    }
+
+
+def transaction_id_column(prefix: str, purchase_id: Column, attempt: Column | int) -> Column:
+    """Payment transaction ID, unique by construction: ``<prefix>-<purchase>-<attempt>``."""
+    attempt_col = attempt if isinstance(attempt, Column) else F.lit(attempt)
+    return F.concat(F.lit(f"{prefix}-"), purchase_id, F.lit("-"), attempt_col.cast("string"))
 
 
 def decline_reason_column(

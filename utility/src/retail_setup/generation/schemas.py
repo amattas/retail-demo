@@ -198,6 +198,8 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("impression_id_ext", "string"),
         # Store-local hour (0-23) of the UTC event_ts, for hour-of-day reporting.
         ("local_hour", "int"),
+        # RETURN rows: the sale they refund. NULL on SALE rows.
+        ("original_receipt_id_ext", "string"),
     ],
     "fact_receipt_lines": [
         ("receipt_id_ext", "string"),

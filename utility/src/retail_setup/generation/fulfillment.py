@@ -24,7 +24,7 @@ from retail_setup.generation.inventory_policy import Demand, InventoryEvent, sim
 from retail_setup.generation.network import store_routes
 from retail_setup.generation.pricing import volume_growth
 from retail_setup.generation.receipts import SEASONAL_LIFT, _fmt
-from retail_setup.generation.returns import build_return_headers
+from retail_setup.generation.returns import build_return_headers, returned_quantity
 from retail_setup.generation.runtime import case_when, seeded_draws
 from retail_setup.generation.stream_calendar import monthly_factors
 from retail_setup.generation.schemas import column_names
@@ -72,6 +72,7 @@ _DEMAND_COLUMNS = (
     "quantity",
     "return_ts",
     "return_id",
+    "return_quantity",
     "prior_rate",
 )
 # Bounded output batches keep Python worker memory flat for very busy SKUs.
@@ -145,13 +146,22 @@ def _simulate_arrow_partition(
         key=lambda row: (row[0], row[1]),
     ):
         first = next(sku_rows)
-        prior = first[8] if first[8] is not None else daily_prior
+        prior = first[9] if first[9] is not None else daily_prior
         slot, transit = routes.get(store_id, (None, None))
         demand = (
-            Demand(event_ts, receipt_id, line_num, quantity, return_ts, return_id)
-            for _, _, event_ts, receipt_id, line_num, quantity, return_ts, return_id, _ in chain(
-                [first], sku_rows
-            )
+            Demand(event_ts, receipt_id, line_num, quantity, return_ts, return_id, returned)
+            for (
+                _,
+                _,
+                event_ts,
+                receipt_id,
+                line_num,
+                quantity,
+                return_ts,
+                return_id,
+                returned,
+                _,
+            ) in chain([first], sku_rows)
             if receipt_id is not None
         )
         for event in simulate_sku(
@@ -396,17 +406,31 @@ def resolve_fulfillment(
     fulfilled receipt filter must consume the exact same policy execution.
     """
     headers = (
-        build_return_headers(sales_group, cfg) if return_headers is None else return_headers
+        build_return_headers(sales_group, cfg, dims) if return_headers is None else return_headers
     ).cache()
-    returns = headers.select(
+    # The lines (and units) each return takes back; a plan without
+    # returned_lines returns the whole receipt.
+    returned = headers.select(
         F.col("orig_receipt_id_ext").alias("receipt_id_ext"),
         F.col("receipt_id_ext").alias("return_id"),
         F.col("event_ts").alias("return_ts"),
+        (
+            F.col("returned_lines")
+            if "returned_lines" in headers.columns
+            else F.lit(None).cast("array<struct<line_num:int,quantity:int>>")
+        ).alias("returned_lines"),
     )
     demand = (
         sales_group["fact_receipt_lines"]
         .join(sales_group["fact_receipts"].select("receipt_id_ext", "store_id"), "receipt_id_ext")
-        .join(returns, "receipt_id_ext", "left")
+        .join(returned, "receipt_id_ext", "left")
+        .withColumn(
+            "return_quantity",
+            F.when(
+                F.col("return_id").isNotNull(),
+                returned_quantity(F.col("returned_lines"), F.col("line_num"), F.col("quantity")),
+            ),
+        )
     )
     restock = (
         seeded_draws(cfg.seed).u(
@@ -414,7 +438,7 @@ def resolve_fulfillment(
             "restock",
         )
         < 0.5
-    )
+    ) & (F.col("return_quantity") > 0)
     demand = demand.select(
         "store_id",
         "product_id",
@@ -423,7 +447,8 @@ def resolve_fulfillment(
         "line_num",
         "quantity",
         F.when(restock, F.col("return_ts")).alias("return_ts"),
-        "return_id",
+        F.when(restock, F.col("return_id")).alias("return_id"),
+        F.when(restock, F.col("return_quantity")).cast("long").alias("return_quantity"),
         F.lit(None).cast("double").alias("prior_rate"),
         F.concat(F.lit("TRC-INV-"), "receipt_id_ext", F.lit("-"), "line_num").alias("_sort"),
     )
@@ -445,6 +470,7 @@ def resolve_fulfillment(
         F.lit(0).alias("quantity"),
         F.lit(None).cast("timestamp").alias("return_ts"),
         F.lit(None).cast("string").alias("return_id"),
+        F.lit(None).cast("long").alias("return_quantity"),
         F.coalesce(F.col("prior_rate"), F.lit(uniform_prior)).alias("prior_rate"),
         F.lit("").alias("_sort"),
     )

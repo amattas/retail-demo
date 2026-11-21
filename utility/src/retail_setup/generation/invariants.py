@@ -748,7 +748,7 @@ def _run_business_invariants(r: InvariantReport, t: dict[str, DataFrame]) -> Non
     # --- sales-while-closed: every SALE receipt's store-local hour must fall
     # inside its store's operating window. event_ts is UTC, so the local hour
     # comes from the store's time zone; local_hour must agree with it.
-    # RETURN rows are stamped at local noon, always open.
+    # RETURN rows fall inside store hours too (a random local time).
     store_hours = t["dim_stores"].select(
         F.col("ID").alias("store_id"), "operating_hours", F.col("TimeZone").alias("_tz")
     )
@@ -790,31 +790,12 @@ def _run_business_invariants(r: InvariantReport, t: dict[str, DataFrame]) -> Non
         ),
     )
 
-    # --- same-day returns: a RETURN must post strictly after its originating
-    # SALE's day. The final fact_receipts contract can't carry the sale link, so
-    # the per-receipt guarantee is enforced in returns.build_return_headers and
-    # proven by an adversarial unit test. Here we assert the checkable global
-    # surrogates: every RETURN is dated at noon (return lifecycle) and strictly
-    # after the earliest SALE on record (no return predates all sales).
-    returns = receipts.filter(F.col("receipt_type") == "RETURN")
-    min_sale = (
-        receipts.filter(F.col("receipt_type") == "SALE")
-        .agg(F.min("event_date").alias("_min"))
-        .collect()[0]["_min"]
-    )
-    if min_sale is not None:
-        _check(
-            r,
-            "fact_receipts no return before first sale",
-            lambda: returns.filter(F.col("event_date") <= F.lit(min_sale)).count(),
-        )
-    _check(
-        r,
-        "fact_receipts returns posted at local noon",
-        lambda: hour_checked.filter(
-            (F.col("receipt_type") == "RETURN") & (F.col("_h") != F.lit(12))
-        ).count(),
-    )
+    # --- returns: every RETURN links the SALE it refunds (same store and
+    # customer), posts on a later day, and refunds no more than it.
+    if "original_receipt_id_ext" in receipts.columns:
+        _return_link_checks(r, receipts)
+    if "fact_payments" in t:
+        _payment_attempt_checks(r, t["fact_payments"])
 
     # --- same-time lifecycles: a product's LaunchDate must be a single instant
     # (no null) and strictly before the far-future horizon; guards against
@@ -823,4 +804,74 @@ def _run_business_invariants(r: InvariantReport, t: dict[str, DataFrame]) -> Non
         r,
         "dim_products LaunchDate present",
         lambda: t["dim_products"].filter(F.col("LaunchDate").isNull()).count(),
+    )
+
+
+def _return_link_checks(r: InvariantReport, receipts: DataFrame) -> None:
+    returns = receipts.filter(F.col("receipt_type") == "RETURN")
+    sales = receipts.filter(F.col("receipt_type") == "SALE").select(
+        F.col("receipt_id_ext").alias("original_receipt_id_ext"),
+        F.col("store_id").alias("_sale_store"),
+        F.col("customer_id").alias("_sale_customer"),
+        F.col("event_ts").alias("_sale_ts"),
+        F.col("total_cents").alias("_sale_total"),
+    )
+    linked = returns.join(sales, "original_receipt_id_ext", "left")
+    _check(
+        r,
+        "fact_receipts returns link their sale",
+        lambda: linked.filter(
+            F.col("_sale_ts").isNull()
+            | (F.col("store_id") != F.col("_sale_store"))
+            | ~F.col("customer_id").eqNullSafe(F.col("_sale_customer"))
+        ).count(),
+    )
+    _check(
+        r,
+        "fact_receipts returns post after their sale day",
+        lambda: linked.filter(
+            F.col("_sale_ts").isNotNull() & (F.to_date("event_ts") <= F.to_date("_sale_ts"))
+        ).count(),
+    )
+    _check(
+        r,
+        "fact_receipts returns refund at most the sale",
+        lambda: linked.filter(-F.col("total_cents") > F.col("_sale_total")).count(),
+    )
+    _check(
+        r,
+        "fact_receipts only returns link a sale",
+        lambda: receipts.filter(
+            (F.col("receipt_type") == "SALE") & F.col("original_receipt_id_ext").isNotNull()
+        ).count(),
+    )
+
+
+def _payment_attempt_checks(r: InvariantReport, payments: DataFrame) -> None:
+    # --- declined payments: every receipt and placed order has exactly one
+    # approved payment (a declined attempt is retried; voided sales never
+    # happen), and transaction IDs are unique.
+    keyed = payments.withColumn(
+        "_purchase", F.coalesce(F.col("receipt_id_ext"), F.col("order_id_ext"))
+    )
+    approved = (
+        keyed.filter(F.col("status") == "APPROVED")
+        .groupBy("_purchase")
+        .agg(F.count("*").alias("_approved"))
+    )
+    _check(
+        r,
+        "fact_payments one approved payment per purchase",
+        lambda: (
+            keyed.select("_purchase")
+            .distinct()
+            .join(approved, "_purchase", "left")
+            .filter(~F.col("_approved").eqNullSafe(F.lit(1)))
+            .count()
+        ),
+    )
+    _check(
+        r,
+        "fact_payments.transaction_id unique",
+        lambda: payments.count() - payments.select("transaction_id").distinct().count(),
     )

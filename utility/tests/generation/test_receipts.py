@@ -85,24 +85,43 @@ def test_lines_fk_and_math(group, spark):
     assert bad_total.count() == 0
 
 
-def test_payments_one_per_receipt(group):
+def test_declined_sales_retry_on_another_tender_or_never_happen(group):
     from pyspark.sql import functions as F
 
     pay, receipts = group["fact_payments"], group["fact_receipts"]
-    assert pay.count() == receipts.count()
     assert pay.filter(F.col("order_id_ext").isNotNull()).count() == 0  # in-store only here
-    joined = pay.join(receipts.select("receipt_id_ext", "total_cents"), "receipt_id_ext")
+    joined = pay.join(
+        receipts.select("receipt_id_ext", "total_cents", "tender_type"), "receipt_id_ext"
+    )
+    assert joined.count() == pay.count()
     assert joined.filter(F.col("amount_cents") != F.col("total_cents")).count() == 0
     cash_declines = pay.filter(
         (F.col("payment_method") == "CASH") & (F.col("status") == "DECLINED")
     )
     assert cash_declines.count() == 0
     declined = pay.filter(F.col("status") == "DECLINED")
+    assert declined.count() > 0
     assert declined.filter(F.col("decline_reason").isNull()).count() == 0
+    # Every receipt has exactly one approved payment, on its own tender; a
+    # declined first attempt is followed by an approved one on another tender.
+    per_receipt = joined.groupBy("receipt_id_ext").agg(
+        F.sum((F.col("status") == "APPROVED").cast("int")).alias("approved"),
+        F.count("*").alias("attempts"),
+        F.max(F.when(F.col("status") == "APPROVED", F.col("payment_method"))).alias("approved_by"),
+        F.max(F.when(F.col("status") == "DECLINED", F.col("payment_method"))).alias("declined_by"),
+        F.first("tender_type").alias("tender_type"),
+    )
+    assert per_receipt.count() == receipts.count()
+    assert per_receipt.filter(F.col("approved") != 1).count() == 0
+    assert per_receipt.filter(F.col("approved_by") != F.col("tender_type")).count() == 0
+    retried = per_receipt.filter(F.col("attempts") == 2)
+    assert retried.count() == declined.count()
+    assert retried.filter(F.col("declined_by") == F.col("approved_by")).count() == 0
+    assert pay.select("transaction_id").distinct().count() == pay.count()
 
 
 def test_tender_mix_roughly_matches(group):
-    pay = group["fact_payments"]
+    pay = group["fact_payments"].filter("status = 'APPROVED'")
     n = pay.count()
     cc = pay.filter("payment_method = 'CREDIT_CARD'").count()
     assert 0.25 < cc / n < 0.55  # 40% nominal, loose bounds for small n

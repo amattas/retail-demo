@@ -292,7 +292,17 @@ def generate_attribution(
     # --- 1. purchase candidates: SALE receipts + online orders, each
     # left-joined to its own payment.
     receipts = t["fact_receipts"].filter(F.col("receipt_type") == "SALE")
-    payments = t["fact_payments"]
+    # A purchase's payment is its final attempt: a declined first tender that
+    # was retried has an approved second payment (vocabulary decline model).
+    final = Window.partitionBy(F.coalesce(F.col("receipt_id_ext"), F.col("order_id_ext"))).orderBy(
+        (F.col("status") == "APPROVED").desc(), F.col("transaction_id").desc()
+    )
+    payments = (
+        t["fact_payments"]
+        .withColumn("_attempt_rank", F.row_number().over(final))
+        .filter(F.col("_attempt_rank") == 1)
+        .drop("_attempt_rank")
+    )
     store_pay = payments.filter(F.col("receipt_id_ext").isNotNull()).select(
         F.col("receipt_id_ext"),
         F.col("status").alias("payment_status"),

@@ -98,6 +98,8 @@ class Demand:
     quantity: int
     return_ts: datetime | None = None
     return_id: str | None = None
+    # Units the return brings back (a partial return); None means the whole line.
+    return_quantity: int | None = None
 
     @property
     def trace_id(self) -> str:
@@ -266,7 +268,7 @@ def simulate_sku(
                     candidate.return_ts,
                     f"TRC-INV-{candidate.return_id}-{candidate.line_num}",
                     "RETURN",
-                    candidate.quantity,
+                    min(candidate.quantity, candidate.return_quantity or candidate.quantity),
                     candidate.return_id,
                 )
                 heappush(pending, (returned.event_ts, returned.trace_id, returned))

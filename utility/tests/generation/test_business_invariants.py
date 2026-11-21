@@ -62,9 +62,10 @@ def test_business_invariants_pass_on_generated_data(generated):
     names = set(r.checks)
     assert "fact_receipts within store operating hours" in names
     assert "fact_receipt_lines no pre-launch sales" in names
-    assert "fact_receipts no return before first sale" in names
     assert "fact_receipts local_hour matches the store time zone" in names
-    assert "fact_receipts returns posted at local noon" in names
+    assert "fact_receipts returns link their sale" in names
+    assert "fact_receipts returns post after their sale day" in names
+    assert "fact_receipts returns refund at most the sale" in names
 
 
 def test_no_pre_launch_sales_on_generated_data(generated):
@@ -176,3 +177,25 @@ def test_pre_launch_invariant_catches_early_sale(spark):
     _run_business_invariants(r, t)
     assert not r.passed
     assert any("pre-launch" in f for f in r.failures)
+
+
+def test_return_invariants_catch_unlinked_or_same_day_returns(spark):
+    receipts = spark.createDataFrame(
+        [
+            ("S1", 1, 7, "2025-01-02 10:00:00", "SALE", 500, None),
+            ("R1", 1, 7, "2025-01-02 15:00:00", "RETURN", -100, "S1"),
+            ("R2", 1, 8, "2025-01-05 15:00:00", "RETURN", -100, "S1"),
+            ("R3", 1, 7, "2025-01-05 15:00:00", "RETURN", -900, "S1"),
+        ],
+        "receipt_id_ext string, store_id long, customer_id long, event_ts string, "
+        "receipt_type string, total_cents long, original_receipt_id_ext string",
+    ).withColumn("event_ts", F.to_timestamp("event_ts"))
+    from retail_setup.generation.invariants import _return_link_checks
+
+    r = InvariantReport()
+    _return_link_checks(r, receipts)
+    assert {failure.split(":")[0] for failure in r.failures} == {
+        "fact_receipts returns link their sale",
+        "fact_receipts returns post after their sale day",
+        "fact_receipts returns refund at most the sale",
+    }

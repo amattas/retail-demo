@@ -416,6 +416,16 @@ table fact_receipts
 
 		annotation SummarizationSetBy = Automatic
 
+	/// For a RETURN row, the receipt ID of the sale it refunds; blank on sales.
+	column 'Original Receipt ID'
+		dataType: string
+		lineageTag: a1a1a1a1-0000-0000-0000-000000000013
+		sourceLineageTag: original_receipt_id_ext
+		summarizeBy: none
+		sourceColumn: original_receipt_id_ext
+
+		annotation SummarizationSetBy = Automatic
+
 	partition fact_receipts = entity
 		mode: directLake
 		source

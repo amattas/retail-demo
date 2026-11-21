@@ -111,8 +111,10 @@ history:
   (`generation/pricing.py`, the same price schedule as history), one
   basket-level promotion priced over the lines the store could fill, the
   40/30/20/10 tender mix and the 2.5% base decline
-  model are the batch helpers. A declined payment keeps its `SALE` receipt,
-  as in history, and is never attributed. One `promotion_applied` is emitted per
+  model are the batch helpers. As in history, a declined first tender is
+  retried on another tender 80% of the time (a `DECLINED` payment at the
+  purchase, then the `APPROVED` one; the receipt carries the approved tender);
+  otherwise the sale is voided and the visit leaves without buying. One `promotion_applied` is emitted per
   receipt and promo code, so at most one per receipt. Visit and online volume
   follow history's year-over-year trend (`annual_volume_growth` from the
   anchor date).
@@ -205,8 +207,9 @@ one fulfillment mode and node, drawn by the historical mix (60% ship from a DC,
 
 2% of orders are cancelled at once: zero totals, no payment and no fulfillment.
 8% of shippable orders are backordered: shipped but not delivered. Payments use
-the online tenders (no cash) and decline like history; a declined order is
-still fulfilled, as in history. Lines carry history's online promo codes, and
+the online tenders (no cash) and the shared decline model: a declined order is
+retried on another tender (a `DECLINED` payment a second after the order, then
+the `APPROVED` one) or voided, which cancels it, as in history. Lines carry history's online promo codes, and
 tax is the fulfilling store's rate for store-fulfilled orders and the
 customer's destination rate (mean store rate of their geography) for DC
 shipments. Orders still in progress live in the order state.

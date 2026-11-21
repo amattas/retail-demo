@@ -126,9 +126,12 @@ from retail_setup.generation.vocabulary import (
     ble_layout,
     campaign_id_column,
     checkout_index,
+    RETRIED,
+    VOIDED,
     decline_reason_column,
-    payment_status_column,
+    payment_outcome_column,
     processing_ms_column,
+    retry_tender_column,
     sensor_id_column,
     tender_column,
     visit_ping_counts,
@@ -546,10 +549,27 @@ def plan_visits(ctx: StreamContext, visits: DataFrame) -> DataFrame:
         .withColumn("_local_hour", F.hour(local_start))
         .withColumn("receipt_id", _prefixed(ctx, "RCP", v))
         .withColumn("session_id", _prefixed(ctx, "SES", v))
+        # Decline model shared with history: a declined buyer retries on
+        # another tender or walks away (a voided sale never happens).
+        .withColumn("_first_tender", tender_column(d, [F.col("receipt_id")]))
+        .withColumn(
+            "_outcome",
+            payment_outcome_column(d, [F.col("receipt_id")], F.col("_first_tender")),
+        )
+        .withColumn(
+            "tender",
+            F.when(
+                F.col("_outcome") == F.lit(RETRIED),
+                retry_tender_column(d, [F.col("receipt_id")], F.col("_first_tender")),
+            ).otherwise(F.col("_first_tender")),
+        )
         .withColumn(
             "converts",
-            d.u([v], "visit-conversion")
-            < visit_conversion(d, F.col("store_id"), F.col("_local_day"), F.col("_local_hour")),
+            (
+                d.u([v], "visit-conversion")
+                < visit_conversion(d, F.col("store_id"), F.col("_local_day"), F.col("_local_hour"))
+            )
+            & (F.col("_outcome") != F.lit(VOIDED)),
         )
         .withColumn(
             "ble_id",
@@ -594,55 +614,58 @@ def plan_visits(ctx: StreamContext, visits: DataFrame) -> DataFrame:
         return F.floor(seconds * 1000 * F.col("_scale")).cast("long")
 
     frame = frame.withColumn("_ping_counts", visit_ping_counts(d, [v], F.col("zones")))
-    frame = frame.withColumn(
-        "pings",
-        F.flatten(
+    frame = (
+        frame.withColumn(
+            "pings",
+            F.flatten(
+                F.transform(
+                    "zones",
+                    lambda zone, i: F.transform(
+                        F.sequence(F.lit(1), F.element_at("_ping_counts", i + 1)),
+                        lambda k: F.struct(
+                            (i + 1).alias("zone_index"),
+                            k.alias("seq"),
+                            zone.alias("zone"),
+                            offset(
+                                F.element_at("starts", i + 1)
+                                + F.element_at("dwell", i + 1)
+                                * k
+                                / (F.element_at("_ping_counts", i + 1) + 1)
+                            ).alias("offset_ms"),
+                        ),
+                    ),
+                )
+            ),
+        )
+        .withColumn(
+            "entries",
             F.transform(
                 "zones",
-                lambda zone, i: F.transform(
-                    F.sequence(F.lit(1), F.element_at("_ping_counts", i + 1)),
-                    lambda k: F.struct(
-                        (i + 1).alias("zone_index"),
-                        k.alias("seq"),
-                        zone.alias("zone"),
-                        offset(
-                            F.element_at("starts", i + 1)
-                            + F.element_at("dwell", i + 1)
-                            * k
-                            / (F.element_at("_ping_counts", i + 1) + 1)
-                        ).alias("offset_ms"),
-                    ),
+                lambda zone, i: F.struct(
+                    (i + 1).alias("zone_index"),
+                    zone.alias("zone"),
+                    offset(F.element_at("starts", i + 1)).alias("offset_ms"),
+                    F.element_at("dwell", i + 1).alias("dwell"),
                 ),
-            )
-        ),
-    ).withColumn(
-        "entries",
-        F.transform(
-            "zones",
-            lambda zone, i: F.struct(
-                (i + 1).alias("zone_index"),
-                zone.alias("zone"),
-                offset(F.element_at("starts", i + 1)).alias("offset_ms"),
-                F.element_at("dwell", i + 1).alias("dwell"),
             ),
-        ),
-    ).withColumn(
-        "changes",
-        F.transform(
-            F.sequence(F.lit(1), F.size("zones") - 1),
-            lambda i: F.struct(
-                i.alias("seq"),
-                F.element_at("zones", i).alias("from_zone"),
-                F.element_at("zones", i + 1).alias("to_zone"),
-                offset(F.element_at("starts", i + 1)).alias("offset_ms"),
+        )
+        .withColumn(
+            "changes",
+            F.transform(
+                F.sequence(F.lit(1), F.size("zones") - 1),
+                lambda i: F.struct(
+                    i.alias("seq"),
+                    F.element_at("zones", i).alias("from_zone"),
+                    F.element_at("zones", i + 1).alias("to_zone"),
+                    offset(F.element_at("starts", i + 1)).alias("offset_ms"),
+                ),
             ),
-        ),
+        )
     )
     # Buyers pay in the checkout zone, the last zone before any exit.
     last = checkout_index(F.col("zones"), layout)
     frame = (
-        frame.withColumn("tender", tender_column(d, [F.col("receipt_id")]))
-        .withColumn(
+        frame.withColumn(
             "processing_ms", processing_ms_column(d, [F.col("receipt_id")], F.col("tender"))
         )
         .withColumn(
@@ -680,6 +703,7 @@ def visit_events(
     v = F.col("v")
     store = _store_key(F.col("store_id"))
     session = F.col("session_id")
+
     # Foot-traffic sensors count every zone the visitor passes, as it enters it.
     def entered(entry: Column) -> Column:
         ms = F.col("start_ms") + entry["offset_ms"]
@@ -845,6 +869,8 @@ def purchase_baskets(
         "receipt_id",
         "session_id",
         "tender",
+        "_first_tender",
+        "_outcome",
         "processing_ms",
         "purchase_ms",
         "payment_ms",
@@ -960,7 +986,8 @@ def purchase_events(ctx: StreamContext, buyers: DataFrame) -> DataFrame:
         .withColumn("subtotal_cents", gross - discount)
         .withColumn("tax_cents", tax)
         .withColumn("total_cents", gross - discount + tax)
-        .withColumn("status", payment_status_column(d, [F.col("receipt_id")], F.col("tender")))
+        # The sale's final payment is approved (voided sales never happen).
+        .withColumn("status", F.lit("APPROVED"))
         .withColumn("_journey_session", F.col("session_id"))
     )
     buyers = _journey(ctx, buyers, "receipt_id", "purchase_ms")
@@ -1027,6 +1054,37 @@ def purchase_events(ctx: StreamContext, buyers: DataFrame) -> DataFrame:
         correlation=journey,
     )
 
+    # A retried sale: the first tender is declined at checkout, at the purchase.
+    declined = slot(
+        ctx,
+        purchase_due & (F.col("_outcome") == F.lit(RETRIED)),
+        "payment_processed",
+        F.struct(
+            F.col("receipt_id"),
+            F.lit(None).cast("string").alias("order_id"),
+            F.col("_first_tender").alias("payment_method"),
+            total.alias("amount"),
+            F.col("total_cents").alias("amount_cents"),
+            _prefixed(ctx, "TXN-D", F.col("v")).alias("transaction_id"),
+            iso(purchase_ts).alias("processing_time"),
+            processing_ms_column(d, [F.col("receipt_id"), F.lit(1)], F.col("_first_tender"))
+            .cast("int")
+            .alias("processing_time_ms"),
+            F.lit("DECLINED").alias("status"),
+            decline_reason_column(d, [F.col("receipt_id")], F.lit("DECLINED")).alias(
+                "decline_reason"
+            ),
+            F.col("store_id"),
+            F.col("customer_id"),
+        ),
+        purchase_ts,
+        store,
+        F.concat(F.col("v"), F.lit("-declined")),
+        session=session,
+        parent=F.col("receipt_id"),
+        correlation=journey,
+    )
+
     def line_event(line: Column) -> Column:
         return slot(
             ctx,
@@ -1082,7 +1140,7 @@ def purchase_events(ctx: StreamContext, buyers: DataFrame) -> DataFrame:
 
     codes = F.array_sort(F.array_distinct(F.transform(discounted, lambda line: line["promo_code"])))
     events = F.concat(
-        F.array(receipt, payment),
+        F.array(receipt, declined, payment),
         F.transform("priced_lines", line_event),
         F.transform(codes, promotion_event),
     )
@@ -1213,11 +1271,22 @@ def plan_orders(ctx: StreamContext, orders: DataFrame) -> DataFrame:
         .join(ctx.customer_tax, "customer_id", "left")
         .withColumn("order_id", _prefixed(ctx, "ONL", v))
         .withColumn("receipt_id", F.col("order_id"))
-        .withColumn("tender", tender_column(d, key, ONLINE_TENDERS, "online-tender"))
+        .withColumn("_first_tender", tender_column(d, key, ONLINE_TENDERS, "online-tender"))
         .withColumn(
-            "status",
-            payment_status_column(d, key, F.col("tender"), ONLINE_TENDERS, "online-decline"),
+            "_outcome",
+            payment_outcome_column(
+                d, key, F.col("_first_tender"), ONLINE_TENDERS, "online-decline"
+            ),
         )
+        .withColumn(
+            "tender",
+            F.when(
+                F.col("_outcome") == F.lit(RETRIED),
+                retry_tender_column(d, key, F.col("_first_tender"), ONLINE_TENDERS, "online-retry"),
+            ).otherwise(F.col("_first_tender")),
+        )
+        # The final payment is approved; a voided order is cancelled.
+        .withColumn("status", F.lit("APPROVED"))
         .withColumn(
             "processing_ms",
             processing_ms_column(d, key, F.col("tender"), ONLINE_TENDERS, "online-proc"),
@@ -1238,7 +1307,11 @@ def plan_orders(ctx: StreamContext, orders: DataFrame) -> DataFrame:
                 F.coalesce(F.col("customer_bps"), F.col("store_bps"))
             ),
         )
-        .withColumn("cancelled", d.u(key, "online-cancel") < F.lit(ONLINE_CANCEL_RATE))
+        .withColumn(
+            "cancelled",
+            (d.u(key, "online-cancel") < F.lit(ONLINE_CANCEL_RATE))
+            | (F.col("_outcome") == F.lit(VOIDED)),
+        )
         .withColumn(
             "backordered",
             ~bopis
@@ -1266,6 +1339,11 @@ def plan_orders(ctx: StreamContext, orders: DataFrame) -> DataFrame:
     )
     orders = (
         orders.withColumn("payment_ms", F.when(live, F.col("start_ms") + F.col("processing_ms")))
+        # A retried order's first tender is declined a second after it is placed.
+        .withColumn(
+            "decline_ms",
+            F.when(live & (F.col("_outcome") == F.lit(RETRIED)), F.col("start_ms") + 1000),
+        )
         .withColumn("picked_ms", F.when(live, F.col("start_ms") + pick_s * 1000))
         .withColumn(
             "shipped_ms",
@@ -1425,6 +1503,33 @@ def online_events(
                 pkey,
                 v,
                 session=session,
+                correlation=journey,
+            ),
+            slot(
+                ctx,
+                F.col("decline_ms").isNotNull() & _due(F.col("decline_ms"), previous_ms, clock_ms),
+                "payment_processed",
+                F.struct(
+                    F.lit(None).cast("string").alias("receipt_id"),
+                    F.col("order_id"),
+                    F.col("_first_tender").alias("payment_method"),
+                    total.alias("amount"),
+                    F.col("total_cents").alias("amount_cents"),
+                    _prefixed(ctx, "TXN-ONL-D", v).alias("transaction_id"),
+                    iso(_ms_ts(F.col("decline_ms"))).alias("processing_time"),
+                    F.lit(1000).cast("int").alias("processing_time_ms"),
+                    F.lit("DECLINED").alias("status"),
+                    decline_reason_column(
+                        ctx.draws, [F.col("order_id")], F.lit("DECLINED"), "online-reason"
+                    ).alias("decline_reason"),
+                    F.lit(None).cast("long").alias("store_id"),
+                    F.col("customer_id"),
+                ),
+                _ms_ts(F.col("decline_ms")),
+                pkey,
+                F.concat(v, F.lit("-declined")),
+                session=session,
+                parent=F.col("order_id"),
                 correlation=journey,
             ),
             slot(

@@ -62,10 +62,14 @@ from retail_setup.generation.runtime import (
 from retail_setup.generation.schemas import column_names
 from retail_setup.generation.traffic import generate_hourly_visits
 from retail_setup.generation.vocabulary import (
+    RETRIED,
+    VOIDED,
     decline_reason_column,
-    payment_status_column,
+    payment_outcome_column,
     processing_ms_column,
+    retry_tender_column,
     tender_column,
+    transaction_id_column,
 )
 
 # Per-department seasonal demand multipliers by month (Jan..Dec), keyed by a
@@ -280,6 +284,62 @@ def _pick_hour(
     return F.lit(12) if expr is None else expr.otherwise(F.lit(12))
 
 
+def payment_attempts(
+    draws: seeded_draws,
+    purchases: DataFrame,
+    key: str,
+    tenders: list[tuple[str, float, float, int, int]] | None = None,
+    salt: str = "",
+) -> DataFrame:
+    """``fact_payments`` rows of purchases with a payment outcome (decline model).
+
+    ``purchases`` holds ``key`` (``receipt_id_ext`` or ``order_id_ext``),
+    ``event_ts``, ``store_id``, ``customer_id``, ``total_cents``, the first
+    tender (``_first_tender``), the approved tender (``tender_type``) and
+    ``_outcome``. Every purchase gets an attempt-1 payment, DECLINED when the
+    sale was retried; a retried sale gets an APPROVED attempt 2 a minute later.
+    Transaction IDs derive from the purchase ID and attempt, so they are unique.
+    """
+    from retail_setup.generation.vocabulary import TENDERS
+
+    tenders = TENDERS if tenders is None else tenders
+    retried = F.col("_outcome") == F.lit(RETRIED)
+    attempts = F.when(retried, F.array(F.lit(1), F.lit(2))).otherwise(F.array(F.lit(1)))
+    second = F.col("_attempt") == 2
+    rows = (
+        purchases.withColumn("_attempt", F.explode(attempts))
+        .withColumn(
+            "payment_method", F.when(second, F.col("tender_type")).otherwise(F.col("_first_tender"))
+        )
+        .withColumn(
+            "status",
+            F.when(retried & ~second, F.lit("DECLINED")).otherwise(F.lit("APPROVED")),
+        )
+        .withColumn(
+            "decline_reason", decline_reason_column(draws, [key], F.col("status"), f"{salt}reason")
+        )
+        .withColumn(
+            "processing_time_ms",
+            processing_ms_column(
+                draws, [key, F.col("_attempt")], F.col("payment_method"), tenders, f"{salt}proc"
+            ),
+        )
+        .withColumn(
+            "event_ts",
+            F.when(second, F.col("event_ts") + F.expr("INTERVAL 1 MINUTE")).otherwise(
+                F.col("event_ts")
+            ),
+        )
+        .withColumn("event_date", F.to_date("event_ts"))
+        .withColumn("transaction_id", transaction_id_column("TXN", F.col(key), F.col("_attempt")))
+        .withColumn("amount_cents", F.col("total_cents"))
+        .withColumn("amount", _fmt(F.col("amount_cents")))
+        .withColumn("attribution_journey_id", F.lit(None).cast("string"))
+    )
+    other = "order_id_ext" if key == "receipt_id_ext" else "receipt_id_ext"
+    return rows.withColumn(other, F.lit(None).cast("string")).select(*column_names("fact_payments"))
+
+
 def generate_receipts_group(
     spark: SparkSession,
     dims: dict[str, DataFrame],
@@ -344,11 +404,22 @@ def generate_receipts_group(
         "_shopper", shopper_key(F.col("customer_id"), F.col("receipt_id_ext"))
     )
 
-    receipts = receipts.withColumn(
-        "_offer", receipt_offer(d, F.col("receipt_id_ext"), profile.promo_rate)
-    ).withColumn(
-        "tender_type",
-        tender_column(d, ["receipt_id_ext"]),
+    # Payment outcome (vocabulary decline model): a declined shopper retries on
+    # another tender or walks away, so a voided sale never becomes a receipt.
+    receipts = (
+        receipts.withColumn("_offer", receipt_offer(d, F.col("receipt_id_ext"), profile.promo_rate))
+        .withColumn("_first_tender", tender_column(d, ["receipt_id_ext"]))
+        .withColumn(
+            "_outcome", payment_outcome_column(d, ["receipt_id_ext"], F.col("_first_tender"))
+        )
+        .filter(F.col("_outcome") != F.lit(VOIDED))
+        .withColumn(
+            "tender_type",
+            F.when(
+                F.col("_outcome") == F.lit(RETRIED),
+                retry_tender_column(d, ["receipt_id_ext"], F.col("_first_tender")),
+            ).otherwise(F.col("_first_tender")),
+        )
     )
 
     # --- lines: explode baskets, weighted department -> price- and
@@ -509,14 +580,14 @@ def generate_receipts_group(
         .withColumn("discount_cents", sum_lines(F.col("_lines"), "discount_cents"))
         .withColumn("tax_cents", sum_lines(F.col("_lines"), "tax_cents"))
     )
+    receipts = receipts.withColumn("total_cents", F.col("subtotal_cents") + F.col("tax_cents"))
     fact_receipts = (
-        receipts.withColumn("total_cents", F.col("subtotal_cents") + F.col("tax_cents"))
-        .withColumn("receipt_type", F.lit("SALE"))
+        receipts.withColumn("receipt_type", F.lit("SALE"))
         .withColumn("payment_method", F.col("tender_type"))
         # IMP-007: discount is applied before tax, so subtotal_cents (kept as
         # the existing net subtotal) plus discount_cents recovers the
         # pre-discount gross subtotal. attribution fields default NULL here;
-        # attribution.py enriches the ~5% of receipts selected for attribution.
+        # attribution.py enriches the converted purchases.
         .withColumn("gross_subtotal_cents", F.col("subtotal_cents") + F.col("discount_cents"))
         .withColumn("attribution_journey_id", F.lit(None).cast("string"))
         .withColumn("campaign_id", F.lit(None).cast("string"))
@@ -547,35 +618,26 @@ def generate_receipts_group(
             "campaign_id",
             "impression_id_ext",
             F.hour("event_ts").alias("local_hour"),
+            F.lit(None).cast("string").alias("original_receipt_id_ext"),
         )
         .select(*column_names("fact_receipts"))
     )
 
-    # --- payments (one per receipt; in-store, so order_id_ext is NULL)
-    fact_payments = (
-        fact_receipts.withColumn("order_id_ext", F.lit(None).cast("string"))
-        .withColumn("amount_cents", F.col("total_cents"))
-        .withColumn(
-            "transaction_id",
-            F.concat(
-                F.lit("TXN_"),
-                F.unix_timestamp("event_ts").cast("string"),
-                F.lit("_"),
-                fixed_width_decimal(
-                    d.h64(["receipt_id_ext"], "txn") % 1_000_000,
-                    6,
-                    "payment transaction suffix",
-                ),
-            ),
-        )
-        .withColumn("status", payment_status_column(d, ["receipt_id_ext"], F.col("payment_method")))
-        .withColumn("decline_reason", decline_reason_column(d, ["receipt_id_ext"], F.col("status")))
-        .withColumn(
-            "processing_time_ms",
-            processing_ms_column(d, ["receipt_id_ext"], F.col("payment_method")),
-        )
-        .withColumn("amount", _fmt(F.col("amount_cents")))
-        .select(*column_names("fact_payments"))
+    # --- payments (in-store, so order_id_ext is NULL): the first attempt, and
+    # for a retried sale the approved attempt on the second tender a minute later.
+    fact_payments = payment_attempts(
+        d,
+        receipts.select(
+            "receipt_id_ext",
+            "event_ts",
+            "store_id",
+            "customer_id",
+            "total_cents",
+            "_first_tender",
+            "tender_type",
+            "_outcome",
+        ),
+        "receipt_id_ext",
     )
 
     return {

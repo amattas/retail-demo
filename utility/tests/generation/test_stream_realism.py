@@ -365,18 +365,27 @@ def test_store_payments_decline_at_the_historical_rate(world) -> None:
     payments = [
         e["payload"] for e in _of(world, "payment_processed") if e["payload"].get("receipt_id")
     ]
-    expected = sum(
-        weight * vocab.decline_probability(name) for name, weight, *_ in vocab.TENDERS
-    ) / sum(weight for _, weight, *_ in vocab.TENDERS)
+    # A declined first tender is retried (approved) or the sale is voided, so a
+    # declined payment is always followed by an approved one for the receipt.
+    shares = vocab.outcome_shares()
+    retried = shares[vocab.RETRIED] / (shares[vocab.APPROVED] + shares[vocab.RETRIED])
+    expected = retried / (1 + retried)
     declined = sum(p["status"] == "DECLINED" for p in payments) / len(payments)
     history = sum(row["status"] == "DECLINED" for row in world["payments"]) / len(world["payments"])
     print(f"STAT declines live={declined:.4f} expected={expected:.4f} history={history:.4f}")
     assert abs(declined - expected) <= 0.012, (declined, expected, history)
+    assert abs(history - expected) <= 0.012, (history, expected)
     assert all(
         p["decline_reason"] in vocab.DECLINE_REASONS for p in payments if p["status"] == "DECLINED"
     )
     receipts = {e["payload"].get("receipt_id") for e in _of(world, "receipt_created")}
     assert {p["receipt_id"] for p in payments} <= receipts
+    approved = {p["receipt_id"]: p for p in payments if p["status"] == "APPROVED"}
+    for p in payments:
+        if p["status"] == "DECLINED" and p["receipt_id"] in approved:
+            assert approved[p["receipt_id"]]["payment_method"] != p["payment_method"]
+    ids = [p["transaction_id"] for p in payments]
+    assert len(ids) == len(set(ids))
 
 
 def test_purchase_money_reconciles_across_events(world) -> None:
@@ -384,7 +393,7 @@ def test_purchase_money_reconciles_across_events(world) -> None:
     payments = {
         e["payload"]["receipt_id"]: e["payload"]
         for e in _of(world, "payment_processed")
-        if e["payload"].get("receipt_id")
+        if e["payload"].get("receipt_id") and e["payload"]["status"] == "APPROVED"
     }
     promotions: dict[str, int] = {}
     for event in _of(world, "promotion_applied"):
@@ -661,7 +670,7 @@ def test_online_orders_follow_a_staged_lifecycle(world) -> None:
     payments = {
         e["payload"]["order_id"]: e["payload"]
         for e in _of(world, "payment_processed")
-        if e["payload"].get("order_id")
+        if e["payload"].get("order_id") and e["payload"]["status"] == "APPROVED"
     }
     stages = {
         name: {e["payload"]["order_id"]: _ms(e["payload"][field]) for e in _of(world, name)}
