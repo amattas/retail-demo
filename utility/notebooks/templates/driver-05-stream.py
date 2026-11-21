@@ -33,6 +33,9 @@ source_rows_per_second = 5     # rate-source rows/sec. Each row emits ONE scenar
                                # bundle, so actual events/sec is several× this.
 sink = "eventhouse"            # "eventhouse" | "delta"
 run_seconds = 0                # 0 = run forever; >0 = stop after N seconds (test/smoke)
+trigger_seconds = 60           # live micro-batch interval; bounded runs use at most 10
+max_lag_seconds = 600          # after a stop, skip source rows older than this
+max_restarts = 5               # supervised restarts of a failed live query
 event_source = "retail-datagen"  # envelope `source`; kept compatible with downstream
 stream_id = ""                 # blank = persist a UUID beside the checkpoint
 
@@ -271,6 +274,8 @@ def slot(cond, event_type, payload, ts, pkey, trace_seed, session=None, parent=N
 # events for that row's scenario, emitted in a single pass (explode of a built
 # array, no self-union).
 rate = spark.readStream.format("rate").option("rowsPerSecond", int(source_rows_per_second)).load()
+# Cap catch-up after a stop: keep only the newest `max_lag_seconds` of rows.
+rate = cap_backlog(rate, int(max_lag_seconds))
 
 v = F.col("value")
 ts = F.col("timestamp")
@@ -849,9 +854,11 @@ def write_to_eventhouse(batch_df, batch_id):
     bounded thread pool — this overlaps the blob-stage + ingest round-trips so a
     micro-batch finishes inside the trigger window instead of serializing ~18
     blocking calls (the old behaviour fell behind and looked "exceptionally slow").
-    Per-table errors are collected so every worker can finish, then raised to
-    prevent Spark from committing the checkpoint. Deterministic Kusto ingestion
-    tags make already-completed sibling writes idempotent when the batch replays.
+    Each table write retries transient errors (throttling, 5xx, timeouts, an
+    expired token) with exponential backoff and a fresh token. Per-table errors
+    are collected so every worker can finish, then raised to prevent Spark from
+    committing the checkpoint. Deterministic Kusto ingestion tags make
+    already-completed sibling writes idempotent when the batch replays.
     """
     import concurrent.futures as cf
 
@@ -867,8 +874,15 @@ def write_to_eventhouse(batch_df, batch_id):
         token = notebookutils.credentials.getToken(kusto_uri)  # noqa: F821
 
         def _task(event_type):
+            def _attempt(attempt):
+                # A retry fetches a fresh token in case the last one expired.
+                credential = token if attempt == 1 else (
+                    notebookutils.credentials.getToken(kusto_uri)  # noqa: F821
+                )
+                _write_event_table(batch_df, event_type, batch_id, credential)
+
             try:
-                _write_event_table(batch_df, event_type, batch_id, token)
+                call_with_retry(_attempt, label=f"batch {batch_id} {event_type}")
                 return (event_type, None)
             except Exception as exc:  # noqa: BLE001 - collect, then fail the batch below
                 return (event_type, exc)
@@ -921,14 +935,12 @@ def _resolve_kusto_uri(database_name):
 
 
 # %%
-# Write the stream to the chosen sink. The checkpoint is sink-specific so the
-# sinks never share offset/commit state.
-writer = events.writeStream.option("checkpointLocation", f"{checkpoint_path}/{sink}")
-if int(run_seconds) > 0:
-    writer = writer.trigger(processingTime="2 seconds")
-elif sink == "eventhouse":
-    # Batch a few seconds of events per Kusto write to keep ingestion calls coarse.
-    writer = writer.trigger(processingTime="10 seconds")
+# Write the stream to the chosen sink. Each sink has its own checkpoint, and
+# bounded (smoke) runs never share offsets with the live run, so a short test
+# can't leave a half-processed batch in front of the live stream.
+CHECKPOINT_NAME = stream_checkpoint_name(sink, int(run_seconds))
+CHECKPOINT_LOCATION = f"{checkpoint_path.rstrip('/')}/{CHECKPOINT_NAME}"
+TRIGGER_SECONDS = trigger_interval_seconds(int(run_seconds), int(trigger_seconds))
 
 if sink == "eventhouse":
     # NOTE: the Kusto Spark connector (com.microsoft.kusto.spark) ships with the
@@ -938,17 +950,27 @@ if sink == "eventhouse":
         # without manual configuration. Set kusto_uri explicitly to override.
         kusto_uri = _resolve_kusto_uri(kql_database)
         print(f"Using Eventhouse '{kql_database}' Query URI: {kusto_uri}")
-    query = writer.foreachBatch(write_to_eventhouse).start()
 elif sink == "delta":
     spark.sql(f"CREATE DATABASE IF NOT EXISTS {delta_landing_table.rsplit('.', 1)[0]}")
-    query = writer.format("delta").toTable(delta_landing_table)
 else:
     raise ValueError(f"unknown sink: {sink!r} (expected 'eventhouse' or 'delta')")
 
+
+def start_query():
+    """Start (or restart) the streaming query from the sink checkpoint."""
+    writer = (events.writeStream
+              .option("checkpointLocation", CHECKPOINT_LOCATION)
+              .trigger(processingTime=f"{TRIGGER_SECONDS} seconds"))
+    if sink == "eventhouse":
+        return writer.foreachBatch(write_to_eventhouse).start()
+    return writer.format("delta").toTable(delta_landing_table)
+
+
+print(f"streaming ~{source_rows_per_second} bundles/s to {sink} every {TRIGGER_SECONDS}s "
+      f"(checkpoint {CHECKPOINT_LOCATION}, max lag {int(max_lag_seconds)}s)")
+restarts = run_supervised(start_query, run_seconds=int(run_seconds),
+                          max_restarts=int(max_restarts))
 if int(run_seconds) > 0:
-    query.awaitTermination(int(run_seconds))
-    query.stop()
     print(f"stopped after {run_seconds}s")
 else:
-    print(f"streaming ~{source_rows_per_second} bundles/s to {sink}; stop the query to end")
-    query.awaitTermination()
+    print(f"stream stopped after {restarts} supervised restart(s)")

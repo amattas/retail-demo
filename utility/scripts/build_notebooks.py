@@ -141,6 +141,8 @@ STREAM_MODULES = [
     "generation/traffic.py",
     "generation/receipts.py",
     "generation/stream_baskets.py",
+    "generation/stream_control.py",
+    "generation/stream_frames.py",
 ]
 
 _PKG_IMPORT = re.compile(r"^\s*(from retail_setup|import retail_setup)")

@@ -12,6 +12,8 @@ from unittest.mock import Mock
 
 import pytest
 
+from retail_setup.generation.stream_control import call_with_retry
+
 ROOT = Path(__file__).resolve().parents[1]
 STREAM_TEMPLATE = ROOT / "utility" / "notebooks" / "templates" / "driver-05-stream.py"
 SILVER_NOTEBOOK = ROOT / "fabric" / "lakehouse" / "03-streaming-to-silver.ipynb"
@@ -202,6 +204,7 @@ def test_eventhouse_sink_returns_only_after_every_required_write(failure) -> Non
         {
             "_write_event_table": write,
             "_WRITE_PARALLELISM": 2,
+            "call_with_retry": call_with_retry,
             "EVENT_PAYLOADS": {"receipt_created": [], "inventory_updated": []},
             "notebookutils": SimpleNamespace(
                 credentials=SimpleNamespace(getToken=token)
@@ -219,6 +222,53 @@ def test_eventhouse_sink_returns_only_after_every_required_write(failure) -> Non
         assert set(attempted) == {"receipt_created", "inventory_updated"}
     else:
         assert not attempted
+    batch.unpersist.assert_called_once()
+
+
+@pytest.mark.parametrize("permanent", [False, True])
+def test_eventhouse_sink_retries_transient_writes_with_a_fresh_token(permanent) -> None:
+    tree = ast.parse(STREAM_TEMPLATE.read_text(encoding="utf-8"))
+    batch = Mock()
+    batch.persist.return_value = batch
+    batch.select.return_value.distinct.return_value.collect.return_value = [
+        {"event_type": "receipt_created"}
+    ]
+    tokens = iter(["token-1", "token-2", "token-3"])
+    credentials = []
+    sleeps: list[float] = []
+
+    def write(_frame, _event_type, _batch_id, credential):
+        credentials.append(credential)
+        if permanent:
+            raise ValueError("Kusto table receipt_created does not exist")
+        if len(credentials) == 1:
+            raise RuntimeError("Request failed: HTTP 429 TooManyRequests (throttled)")
+
+    namespace = _exec_nodes(
+        tree,
+        {"write_to_eventhouse"},
+        {
+            "_write_event_table": write,
+            "_WRITE_PARALLELISM": 2,
+            "call_with_retry": lambda operation, label: call_with_retry(
+                operation, label=label, sleep=sleeps.append, log=lambda _m: None
+            ),
+            "EVENT_PAYLOADS": {"receipt_created": []},
+            "notebookutils": SimpleNamespace(
+                credentials=SimpleNamespace(getToken=lambda _uri: next(tokens))
+            ),
+            "kusto_uri": "https://unit-test.invalid",
+        },
+    )
+    if permanent:
+        with pytest.raises(RuntimeError, match="does not exist"):
+            namespace["write_to_eventhouse"](batch, 3)
+        assert credentials == ["token-1"]
+        assert sleeps == []
+    else:
+        namespace["write_to_eventhouse"](batch, 3)
+        assert credentials == ["token-1", "token-2"]
+        assert sleeps == [2.0]
     batch.unpersist.assert_called_once()
 
 
