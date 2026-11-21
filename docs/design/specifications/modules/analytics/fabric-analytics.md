@@ -100,6 +100,12 @@ Live-specific behavior and divergences:
 - `inventory_updated` deterministically continues prior balances, orders deltas
   by event time and trace ID, and repairs legacy null-balance suffixes for
   affected store/product keys;
+- `ad_impression` rows are dated by `impression_time` (when a journey touch
+  was shown) while the watermark follows `ingest_timestamp` (when it arrived
+  with its purchase), so touches fall inside the replay window;
+- store operations are written as lower-case `opened`/`closed`, like history,
+  and older upper-case rows are normalized; `promotion_applied.product_ids`
+  becomes the historical comma-separated, sorted ID list;
 - picked and shipped events populate `ag.fact_online_order_status`;
 - `fact_online_order_status` is an owned streaming-only Silver contract: its
   exact schema and routes are declared in the Silver notebook, its terminal

@@ -100,6 +100,13 @@ time zones in `src/retail_setup/generation/timezones.py`; the build inlines the
 first two into the stream notebook. Silver timestamps are UTC and generation
 works in store-local time (see the data contract).
 
+The live stream reuses the historical models instead of its own: store hours,
+traffic weights and lane sizing (`stream_calendar.py`), customer visits,
+purchases, marketing and store operations (`stream_events.py`), and the
+versioned Delta state that carries store and visit state across micro-batches
+(`stream_state.py`). `tests/generation/test_stream_realism.py` simulates
+micro-batches offline and compares them with generated history.
+
 Setup 01 verifies dictionary repository/ref, JSON inventory, and SHA-256
 content before reusing an immutable-revision cache; mutable refs refresh on
 every run. Forks must configure `RETAIL_SETUP_REPOSITORY_OWNER` and
