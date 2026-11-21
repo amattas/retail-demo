@@ -30,7 +30,7 @@ def test_required_shortcuts_are_the_stream_event_tables():
     assert sorted(_event_tables()) == list(expected_event_tables(ROOT))
 
 
-@pytest.mark.parametrize("present", [18, 17])
+@pytest.mark.parametrize("present", [22, 21])
 def test_missing_eventhouse_shortcut_fails_the_notebook(present):
     tables = _event_tables()
     verify = next(source for source in _cells() if "def missing_event_shortcuts" in source)

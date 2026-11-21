@@ -168,15 +168,15 @@ def test_kusto_writer_projection_matches_table_and_mapping_order(
 
 
 def test_envelope_kql_and_fixture_counts_are_exact() -> None:
-    assert VALIDATION.event_count == 18
+    assert VALIDATION.event_count == 22
     assert VALIDATION.envelope_field_count == 9
-    assert VALIDATION.typed_kql_table_count == 18
+    assert VALIDATION.typed_kql_table_count == 22
     assert VALIDATION.operational_kql_table_count == 1
-    assert VALIDATION.mapping_count == 19
-    assert VALIDATION.path_count == 19
+    assert VALIDATION.mapping_count == 23
+    assert VALIDATION.path_count == 23
     assert VALIDATION.exception_count == 4
     assert VALIDATION.fixture_scenario_count == 8
-    assert VALIDATION.fixture_event_count == 23
+    assert VALIDATION.fixture_event_count == 27
 
 
 def test_derived_attribution_route_uses_verified_inputs_and_terminals() -> None:
@@ -214,7 +214,6 @@ def test_named_boundaries_match_only_source_derived_differences() -> None:
         "dim_stores",
         "dim_trucks",
         "fact_dc_inventory_txn",
-        "fact_online_order_lines",
         "fact_promo_lines",
         "fact_truck_inventory",
     }
@@ -252,6 +251,7 @@ def test_streaming_state_tables_have_owned_contract_and_maintenance_path() -> No
     assert set(paths) == {
         "event-path.online-order-picked",
         "event-path.online-order-shipped",
+        "event-path.online-order-delivered",
     }
     assert exception.target_names == ("fact_online_order_status",)
     assert exception.verification_owner == "owner.streaming"
@@ -284,7 +284,7 @@ def test_nullable_and_unknown_fixtures_cover_intentional_boundaries() -> None:
 
 
 def test_active_tmdl_types_and_legacy_names_are_source_derived() -> None:
-    assert len(SNAPSHOT.semantic_tables) == 42
+    assert len(SNAPSHOT.semantic_tables) == 43
     assert (
         next(
             field
@@ -526,7 +526,7 @@ def test_contract_check_command_is_non_mutating() -> None:
 
     assert result.returncode == 0, result.stderr
     report = json.loads(result.stdout)
-    assert report["events"] == 18
+    assert report["events"] == 22
     assert report["ml_required_outputs"] == [
         "churn_predictions",
         "customer_segments",

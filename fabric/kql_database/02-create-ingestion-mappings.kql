@@ -236,6 +236,9 @@
   {"column":"shipment_id","path":"$.payload.shipment_id","datatype":"string"},
   {"column":"arrival_time","path":"$.payload.arrival_time","datatype":"datetime"},
   {"column":"estimated_unload_duration","path":"$.payload.estimated_unload_duration","datatype":"long"},
+  {"column":"planned_arrival_time","path":"$.payload.planned_arrival_time","datatype":"datetime"},
+  {"column":"delay_minutes","path":"$.payload.delay_minutes","datatype":"long"},
+  {"column":"delay_reason","path":"$.payload.delay_reason","datatype":"string"},
   {"column":"event_type","path":"$.event_type","datatype":"string"},
   {"column":"trace_id","path":"$.trace_id","datatype":"string"},
   {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
@@ -444,6 +447,94 @@
 [
   {"column":"event_type","path":"$.event_type","datatype":"string"},
   {"column":"payload","path":"$.payload","datatype":"dynamic"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+.create-or-alter table logistics_incident_started ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"incident_id","path":"$.payload.incident_id","datatype":"string"},
+  {"column":"incident_type","path":"$.payload.incident_type","datatype":"string"},
+  {"column":"dc_id","path":"$.payload.dc_id","datatype":"long"},
+  {"column":"store_id","path":"$.payload.store_id","datatype":"long"},
+  {"column":"started_at","path":"$.payload.started_at","datatype":"datetime"},
+  {"column":"severity","path":"$.payload.severity","datatype":"string"},
+  {"column":"affected_store_count","path":"$.payload.affected_store_count","datatype":"long"},
+  {"column":"description","path":"$.payload.description","datatype":"string"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+.create-or-alter table logistics_incident_resolved ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"incident_id","path":"$.payload.incident_id","datatype":"string"},
+  {"column":"incident_type","path":"$.payload.incident_type","datatype":"string"},
+  {"column":"dc_id","path":"$.payload.dc_id","datatype":"long"},
+  {"column":"store_id","path":"$.payload.store_id","datatype":"long"},
+  {"column":"resolved_at","path":"$.payload.resolved_at","datatype":"datetime"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+.create-or-alter table online_order_line_added ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"order_id","path":"$.payload.order_id","datatype":"string"},
+  {"column":"line_number","path":"$.payload.line_number","datatype":"long"},
+  {"column":"product_id","path":"$.payload.product_id","datatype":"long"},
+  {"column":"quantity","path":"$.payload.quantity","datatype":"long"},
+  {"column":"unit_price","path":"$.payload.unit_price","datatype":"real"},
+  {"column":"extended_price","path":"$.payload.extended_price","datatype":"real"},
+  {"column":"promo_code","path":"$.payload.promo_code","datatype":"string"},
+  {"column":"fulfillment_mode","path":"$.payload.fulfillment_mode","datatype":"string"},
+  {"column":"node_type","path":"$.payload.node_type","datatype":"string"},
+  {"column":"node_id","path":"$.payload.node_id","datatype":"long"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
+  {"column":"trace_id","path":"$.trace_id","datatype":"string"},
+  {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
+  {"column":"schema_version","path":"$.schema_version","datatype":"string"},
+  {"column":"source","path":"$.source","datatype":"string"},
+  {"column":"correlation_id","path":"$.correlation_id","datatype":"string"},
+  {"column":"partition_key","path":"$.partition_key","datatype":"string"},
+  {"column":"session_id","path":"$.session_id","datatype":"string"},
+  {"column":"parent_event_id","path":"$.parent_event_id","datatype":"string"}
+]
+```
+
+.create-or-alter table online_order_delivered ingestion json mapping 'EventMapping'
+```
+[
+  {"column":"order_id","path":"$.payload.order_id","datatype":"string"},
+  {"column":"node_type","path":"$.payload.node_type","datatype":"string"},
+  {"column":"node_id","path":"$.payload.node_id","datatype":"long"},
+  {"column":"fulfillment_mode","path":"$.payload.fulfillment_mode","datatype":"string"},
+  {"column":"delivered_time","path":"$.payload.delivered_time","datatype":"datetime"},
+  {"column":"event_type","path":"$.event_type","datatype":"string"},
   {"column":"trace_id","path":"$.trace_id","datatype":"string"},
   {"column":"ingest_timestamp","path":"$.ingest_timestamp","datatype":"datetime"},
   {"column":"schema_version","path":"$.schema_version","datatype":"string"},

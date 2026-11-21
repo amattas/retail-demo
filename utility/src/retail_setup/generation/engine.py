@@ -219,6 +219,7 @@ _LEDGERS = (
     "fact_truck_inventory",
     "fact_reorders",
     "fact_stockouts",
+    "fact_logistics_incidents",
 )
 
 STAGES: tuple[Stage, ...] = (

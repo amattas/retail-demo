@@ -615,6 +615,10 @@ events_arr = F.array(
         truck_id.alias("truck_id"), F.col("dc_id"), F.col("store_id"), F.col("shipment_id"),
         _iso(truck_arrival_ts).alias("arrival_time"),
         truck_estimated_unload_minutes.alias("estimated_unload_duration"),
+        # Live trucks arrive as planned until the incident model adds delays.
+        _iso(truck_arrival_ts).alias("planned_arrival_time"),
+        F.lit(0).cast("long").alias("delay_minutes"),
+        F.lit(None).cast("string").alias("delay_reason"),
     ), truck_arrival_ts, F.concat(F.lit("dc_"), F.col("dc_id").cast("string")), F.col("v"),
         session=F.col("shipment_id")),
     slot(log, "truck_departed", F.struct(
@@ -734,7 +738,7 @@ EVENT_PAYLOADS = {
     "customer_entered": [("store_id", "store_id", "long"), ("sensor_id", "sensor_id", "string"), ("zone", "zone", "string"), ("customer_count", "customer_count", "long"), ("dwell_time", "dwell_time", "long")],
     "customer_zone_changed": [("store_id", "store_id", "long"), ("customer_ble_id", "customer_ble_id", "string"), ("from_zone", "from_zone", "string"), ("to_zone", "to_zone", "string"), ("timestamp", "timestamp", "datetime")],
     "ble_ping_detected": [("store_id", "store_id", "long"), ("beacon_id", "beacon_id", "string"), ("customer_ble_id", "customer_ble_id", "string"), ("rssi", "rssi", "long"), ("zone", "zone", "string")],
-    "truck_arrived": [("truck_id", "truck_id", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("shipment_id", "shipment_id", "string"), ("arrival_time", "arrival_time", "datetime"), ("estimated_unload_duration", "estimated_unload_duration", "long")],
+    "truck_arrived": [("truck_id", "truck_id", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("shipment_id", "shipment_id", "string"), ("arrival_time", "arrival_time", "datetime"), ("estimated_unload_duration", "estimated_unload_duration", "long"), ("planned_arrival_time", "planned_arrival_time", "datetime"), ("delay_minutes", "delay_minutes", "long"), ("delay_reason", "delay_reason", "string")],
     "truck_departed": [("truck_id", "truck_id", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("shipment_id", "shipment_id", "string"), ("departure_time", "departure_time", "datetime"), ("actual_unload_duration", "actual_unload_duration", "long")],
     "store_opened": [("store_id", "store_id", "long"), ("operation_time", "operation_time", "datetime"), ("operation_type", "operation_type", "string")],
     "store_closed": [("store_id", "store_id", "long"), ("operation_time", "operation_time", "datetime"), ("operation_type", "operation_type", "string")],
@@ -743,6 +747,12 @@ EVENT_PAYLOADS = {
     "online_order_created": [("order_id", "order_id", "string"), ("customer_id", "customer_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("item_count", "item_count", "long"), ("subtotal", "subtotal", "real"), ("tax", "tax", "real"), ("total", "total", "real"), ("tender_type", "tender_type", "string"), ("campaign_id", "campaign_id", "string"), ("impression_id", "impression_id", "string"), ("gross_subtotal_cents", "gross_subtotal_cents", "long"), ("discount_cents", "discount_cents", "long"), ("subtotal_cents", "subtotal_cents", "long"), ("tax_cents", "tax_cents", "long"), ("total_cents", "total_cents", "long")],
     "online_order_picked": [("order_id", "order_id", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("picked_time", "picked_time", "datetime")],
     "online_order_shipped": [("order_id", "order_id", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("shipped_time", "shipped_time", "datetime")],
+    # Declared for the incident and online-order lifecycle models; the stream
+    # does not emit these yet.
+    "logistics_incident_started": [("incident_id", "incident_id", "string"), ("incident_type", "incident_type", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("started_at", "started_at", "datetime"), ("severity", "severity", "string"), ("affected_store_count", "affected_store_count", "long"), ("description", "description", "string")],
+    "logistics_incident_resolved": [("incident_id", "incident_id", "string"), ("incident_type", "incident_type", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("resolved_at", "resolved_at", "datetime")],
+    "online_order_line_added": [("order_id", "order_id", "string"), ("line_number", "line_number", "long"), ("product_id", "product_id", "long"), ("quantity", "quantity", "long"), ("unit_price", "unit_price", "real"), ("extended_price", "extended_price", "real"), ("promo_code", "promo_code", "string"), ("fulfillment_mode", "fulfillment_mode", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long")],
+    "online_order_delivered": [("order_id", "order_id", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("delivered_time", "delivered_time", "datetime")],
 }
 
 # Columns present in the KQL table but NOT produced by the stream. They sit

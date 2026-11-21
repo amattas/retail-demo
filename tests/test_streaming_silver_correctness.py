@@ -1235,6 +1235,10 @@ def test_event_time_rules_are_explicit_and_payload_first() -> None:
         "online_order_created": ("ingest_timestamp",),
         "online_order_picked": ("picked_time", "ingest_timestamp"),
         "online_order_shipped": ("shipped_time", "ingest_timestamp"),
+        "online_order_line_added": ("ingest_timestamp",),
+        "online_order_delivered": ("delivered_time", "ingest_timestamp"),
+        "logistics_incident_started": ("started_at", "ingest_timestamp"),
+        "logistics_incident_resolved": ("resolved_at", "ingest_timestamp"),
     }
 
     helper_source = _source("_event_time_columns")
@@ -1347,8 +1351,9 @@ def test_streaming_driver_does_not_swallow_individual_source_failures() -> None:
         for node in ast.walk(execution_tree)
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
-        and node.func.id in {"process_events", "process_truck_lifecycles"}
-    ) == 17
+        and node.func.id
+        in {"process_events", "process_truck_lifecycles", "process_logistics_incidents"}
+    ) == 20
 
 
 def test_merges_project_explicit_contracts_without_schema_auto_merge() -> None:

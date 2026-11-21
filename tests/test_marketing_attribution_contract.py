@@ -117,7 +117,7 @@ def test_attribution_uses_existing_envelope_without_new_event_type() -> None:
     payloads = _event_payloads()
     source = STREAM_TEMPLATE.read_text(encoding="utf-8")
 
-    assert len(payloads) == 18
+    assert len(payloads) == 22
     assert "marketing_attribution" not in payloads
     assert '_str(correlation).alias("correlation_id")' in source
     assert "attribution_journey_id" not in {

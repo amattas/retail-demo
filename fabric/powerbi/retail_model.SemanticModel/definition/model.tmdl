@@ -44,6 +44,7 @@ ref table fact_dc_inventory_txn
 ref table fact_store_inventory_txn
 ref table fact_store_ops
 ref table fact_stockouts
+ref table fact_logistics_incidents
 ref table fact_customer_zone_changes
 ref table dim_geographies
 ref table dim_date

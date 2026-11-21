@@ -22,7 +22,7 @@ from retail_setup.generation.runtime import (
     legacy_index,
     seeded_draws,
 )
-from retail_setup.generation.schemas import column_names
+from retail_setup.generation.schemas import column_names, spark_schema
 from retail_setup.generation.timezones import localize_by_store
 
 
@@ -208,6 +208,10 @@ def _truck_moves(shipments: DataFrame) -> DataFrame:
         )
         .withColumn("departure_time", F.when(done, F.col("etd")).cast("timestamp"))
         .withColumn("actual_unload_duration", F.when(done, F.col("unload_minutes")).cast("double"))
+        # Trucks arrive as planned until the logistics incident model adds delays.
+        .withColumn("planned_arrival_time", F.col("eta"))
+        .withColumn("delay_minutes", F.lit(0.0))
+        .withColumn("delay_reason", F.lit(None).cast("string"))
         .withColumn(
             "trace_id",
             F.concat(F.lit("TRC-TM-"), F.col("shipment_id"), F.lit("-"), F.col("status")),
@@ -338,7 +342,9 @@ def generate_inventory_chain(
     planned = events.filter(F.col("kind") == "SHIPMENT").join(store_dc, "store_id")
     shipments = _shipments(spark, planned, dims, cfg)
     truck_moves = localize_by_store(
-        _truck_moves(shipments), dims, ["event_ts", "eta", "etd", "departure_time"]
+        _truck_moves(shipments),
+        dims,
+        ["event_ts", "eta", "etd", "departure_time", "planned_arrival_time"],
     )
     truck_inv = localize_by_store(
         _truck_inventory(shipments).filter(F.col("event_date") <= F.lit(cfg.end_date)),
@@ -385,4 +391,18 @@ def generate_inventory_chain(
         "fact_truck_inventory": _with_index(truck_inv, "fact_truck_inventory"),
         "fact_reorders": _with_index(reorders, "fact_reorders"),
         "fact_stockouts": _with_index(stockouts_df, "fact_stockouts"),
+        "fact_logistics_incidents": logistics_incidents(spark),
     }
+
+
+INCIDENT_TYPES = ["DC_OUTAGE", "LANE_DELAY", "WEATHER", "HOLIDAY", "SUPPLIER_SHORT_SHIP"]
+
+
+def logistics_incidents(spark: SparkSession) -> DataFrame:
+    """Historical logistics incidents (``INCIDENT_TYPES``).
+
+    The incident model that drives delays, outages and short-ships is not
+    built yet, so history publishes a valid, empty table; the live stream
+    already fills it from incident events.
+    """
+    return spark.createDataFrame([], spark_schema("fact_logistics_incidents"))

@@ -250,6 +250,29 @@ def run_invariants(
             .count,
         )
 
+    incidents = t["fact_logistics_incidents"]
+    _check(
+        r,
+        "fact_logistics_incidents -> dim_distribution_centers FK",
+        lambda: (
+            incidents.filter(F.col("dc_id").isNotNull()).join(dc_ids, "dc_id", "left_anti").count()
+        ),
+    )
+    _check(
+        r,
+        "fact_logistics_incidents -> dim_stores FK",
+        lambda: (
+            incidents.filter(F.col("store_id").isNotNull())
+            .join(stores, "store_id", "left_anti")
+            .count()
+        ),
+    )
+    _check(
+        r,
+        "fact_logistics_incidents resolved after start",
+        lambda: incidents.filter(F.col("resolved_at") < F.col("started_at")).count(),
+    )
+
     # --- truck timing: arrival (eta) must not be after completion (etd)
     tm = t["fact_truck_moves"]
     _check(

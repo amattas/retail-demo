@@ -276,10 +276,10 @@ def test_source_derived_data_event_model_and_ml_counts_match_guide() -> None:
 
     dimensions = {name for name in tables if name.startswith("dim_")}
     facts = {name for name in tables if name.startswith("fact_")}
-    assert (len(dimensions), len(facts), len(gold_tables)) == (7, 19, 10)
-    assert len(event_names) == 18
+    assert (len(dimensions), len(facts), len(gold_tables)) == (7, 20, 10)
+    assert len(event_names) == 22
     assert kql_tables == event_names | {"unknown_event"}
-    assert len(model_tables) == 42
+    assert len(model_tables) == 43
     assert model_tables == set(tables) | set(gold_tables) | required_ml
     assert tier_counts == {"required": 6, "optional": 5, "experimental": 3}
 
@@ -295,11 +295,11 @@ def test_source_derived_data_event_model_and_ml_counts_match_guide() -> None:
     guide = GUIDE_PATH.read_text(encoding="utf-8")
     for claim in (
         "**7 dimensions**",
-        "**19 facts**",
+        "**20 facts**",
         "**10 Gold aggregates**",
-        "**18 emitted business event types**",
-        "**19 KQL event tables**",
-        "**42 tables**",
+        "**22 declared business event types**",
+        "**23 KQL event tables**",
+        "**43 tables**",
         "| required | 6 |",
         "| optional | 5 |",
         "| experimental | 3 |",

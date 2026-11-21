@@ -268,3 +268,16 @@ relationship 'Marketing Attribution to Date'
 relationship 'Campaign Performance Daily to Date'
 	fromColumn: campaign_performance_daily.Day
 	toColumn: dim_date.Date
+
+relationship 'Logistics Incidents to Stores'
+	fromColumn: fact_logistics_incidents.'Store ID'
+	toColumn: dim_stores.ID
+
+relationship 'Logistics Incidents to Date'
+	fromColumn: fact_logistics_incidents.'Event Date'
+	toColumn: dim_date.Date
+
+relationship 'Logistics Incidents to Distribution Centers'
+	isActive: false
+	fromColumn: fact_logistics_incidents.'DC ID'
+	toColumn: dim_distribution_centers.ID

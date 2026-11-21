@@ -166,8 +166,12 @@ def test_exactly_two_attributed_touches_are_emitted_per_journey() -> None:
         "online_order_created",
         "online_order_picked",
         "online_order_shipped",
+        "online_order_line_added",
+        "online_order_delivered",
+        "logistics_incident_started",
+        "logistics_incident_resolved",
     }
-    assert len(payloads) == 18
+    assert len(payloads) == 22
 
 
 def _assignment_value_dict(source: str) -> dict:
