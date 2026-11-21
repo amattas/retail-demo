@@ -32,9 +32,9 @@ from pyspark.sql import functions as F
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.generation.runtime import legacy_index, seeded_draws
 from retail_setup.generation.schemas import column_names
+from retail_setup.generation.vocabulary import BLE_ZONES, beacon_id_column
 
-# BLE zone names (5 total); zone selection is without replacement
-BLE_ZONES = ["ENTRANCE", "ELECTRONICS", "GROCERY", "CLOTHING", "CHECKOUT"]
+# zone selection is without replacement
 _N_ZONES = len(BLE_ZONES)  # 5
 
 
@@ -245,7 +245,7 @@ def generate_ble(
         ),
     ).withColumn(
         "beacon_id",
-        F.format_string("BEACON_%03d_%s", F.col("store_id"), F.col("zone")),
+        beacon_id_column(F.col("store_id"), F.col("zone")),
     )
 
     # __index_level_0__ = hash-derived via legacy_index(trace_id)

@@ -169,21 +169,22 @@ print("attrs: using real dim_products / dim_stores prices+tax")
 # the event-envelope builder. All expressions are pure Catalyst — no UDFs.
 from pyspark.sql import functions as F
 
-ZONES = ["ENTRANCE_MAIN", "ENTRANCE_SIDE", "AISLES_A", "AISLES_B", "CHECKOUT"]
-TENDERS = ["CREDIT_CARD", "DEBIT_CARD", "CASH", "MOBILE"]
-CHANNELS = ["SEARCH", "EMAIL", "SOCIAL", "DISPLAY"]
-DEVICES = ["mobile", "desktop", "tablet"]
-PROMOS = ["SAVE10", "BFRIDAY30", "SUMMER25"]
-FULFILL = ["SHIP_FROM_DC", "SHIP_FROM_STORE", "BOPIS"]
+# Zones, fulfillment modes and ID formats come from the shared vocabulary
+# (retail_setup.generation.vocabulary, inlined in the behavior cell). The LIVE_*
+# values below still differ from it; tests/generation/test_vocabulary.py lists
+# each difference as a known gap until the stream adopts the shared value.
+LIVE_TENDERS = ["CREDIT_CARD", "DEBIT_CARD", "CASH", "MOBILE"]
+LIVE_CHANNELS = ["SEARCH", "EMAIL", "SOCIAL", "DISPLAY"]
+LIVE_DEVICES = ["mobile", "desktop", "tablet"]
 TRUCK_DWELL_THRESHOLD_MINUTES = 90
 TRUCK_NORMAL_DWELL_MINUTES_MIN = 30
 TRUCK_NORMAL_DWELL_MINUTES_MAX = 75
 TRUCK_LATE_DWELL_MINUTES = 120
 TRUCK_LATE_BUCKET_MODULUS = 5
 
-# Named promo catalog for the live feed (mirrors batch receipts.PROMO_CATALOG):
+# Named promo catalog for the live feed (a subset of vocabulary.PROMO_CATALOG):
 # (code, discount_pct, eligible_months | None, min_subtotal_dollars, kind)
-NAMED_PROMOS = [
+LIVE_NAMED_PROMOS = [
     ("SAVE10", 10, None, 0.0, "PCT"),
     ("SAVE20", 20, None, 50.0, "PCT"),
     ("CLEARANCE30", 30, None, 0.0, "PCT"),
@@ -195,7 +196,7 @@ NAMED_PROMOS = [
     ("BFRIDAY30", 30, [11], 0.0, "PCT"),
     ("HOLIDAY20", 20, [12], 0.0, "PCT"),
 ]
-EVERGREEN_PROMOS = [("SAVE10", 10), ("CLEARANCE30", 30)]
+LIVE_EVERGREEN_PROMOS = [("SAVE10", 10), ("CLEARANCE30", 30)]
 
 
 def _taxmult(taxa):
@@ -204,9 +205,9 @@ def _taxmult(taxa):
 
 
 def _promo_elig(idx, month, subtotal):
-    """True when the NAMED_PROMOS entry at idx is in-month and meets its min."""
+    """True when the LIVE_NAMED_PROMOS entry at idx is in-month and meets its min."""
     expr = None
-    for i, (_c, _p, months, mn, _k) in enumerate(NAMED_PROMOS):
+    for i, (_c, _p, months, mn, _k) in enumerate(LIVE_NAMED_PROMOS):
         e = F.lit(True) if months is None else month.isin(*months)
         if mn:
             e = e & (subtotal >= F.lit(mn))
@@ -305,8 +306,8 @@ b0 = (rate.select(ts.alias("ts"), v.alias("v"))
       .withColumn("shipment_id", F.concat(F.lit("SHP-"), stream_prefix, F.col("v").cast("string")))
       .withColumn("session_id", F.concat(F.lit("SES-"), stream_prefix, F.col("v").cast("string")))
       .withColumn("ble_id", F.concat(F.lit("BLE"), F.col("customer_id").cast("string")))
-      .withColumn("zone", _pick(F.col("v"), "zone", ZONES))
-      .withColumn("tender", _pick(F.col("v"), "tender", TENDERS)))
+      .withColumn("zone", _pick(F.col("v"), "zone", FOOT_TRAFFIC_ZONES))
+      .withColumn("tender", _pick(F.col("v"), "tender", LIVE_TENDERS)))
 b0 = b0.join(_bcast(STORE_ATTR), F.col("store_id") == F.col("as_id"), "left").withColumn(
     "store_bps", F.when(F.col("as_bps").isNotNull(), F.col("as_bps")).otherwise(
         F.raise_error("Live purchase references a missing store tax rate")
@@ -325,18 +326,18 @@ b = (b0
      ) / 100.0)
      .withColumn("total", F.round(F.col("subtotal") + F.col("tax"), 2))
      # named promo (month-eligible + min-purchase + BOGO), evergreen fallback
-     .withColumn("_pidx", _h(F.col("v"), "promoidx", len(NAMED_PROMOS)))
+     .withColumn("_pidx", _h(F.col("v"), "promoidx", len(LIVE_NAMED_PROMOS)))
      .withColumn("_pelig", _promo_elig(
          F.col("_pidx"), F.month(F.col("ts")), F.col("subtotal")))
-     .withColumn("_evidx", _h(F.col("v"), "promoev", len(EVERGREEN_PROMOS)))
+     .withColumn("_evidx", _h(F.col("v"), "promoev", len(LIVE_EVERGREEN_PROMOS)))
      .withColumn("promo_code", F.when(F.col("_pelig"), F.element_at(
-         F.array(*[F.lit(t[0]) for t in NAMED_PROMOS]), (F.col("_pidx") + F.lit(1)).cast("int")))
+         F.array(*[F.lit(t[0]) for t in LIVE_NAMED_PROMOS]), (F.col("_pidx") + F.lit(1)).cast("int")))
          .otherwise(F.element_at(
-             F.array(*[F.lit(c) for c, _ in EVERGREEN_PROMOS]), (F.col("_evidx") + F.lit(1)).cast("int"))))
+             F.array(*[F.lit(c) for c, _ in LIVE_EVERGREEN_PROMOS]), (F.col("_evidx") + F.lit(1)).cast("int"))))
      .withColumn("_ppct", F.when(F.col("_pelig"), F.element_at(
-         F.array(*[F.lit(t[1]) for t in NAMED_PROMOS]), (F.col("_pidx") + F.lit(1)).cast("int")))
+         F.array(*[F.lit(t[1]) for t in LIVE_NAMED_PROMOS]), (F.col("_pidx") + F.lit(1)).cast("int")))
          .otherwise(F.element_at(
-             F.array(*[F.lit(p) for _, p in EVERGREEN_PROMOS]), (F.col("_evidx") + F.lit(1)).cast("int"))))
+             F.array(*[F.lit(p) for _, p in LIVE_EVERGREEN_PROMOS]), (F.col("_evidx") + F.lit(1)).cast("int"))))
      .withColumn("promo_type", F.when(
          F.col("promo_code").startswith("BOGO"), F.lit("BOGO")).otherwise(F.lit("PERCENTAGE")))
      .withColumn("pkey", F.concat(F.lit("store_"), F.col("store_id").cast("string"))))
@@ -438,10 +439,9 @@ attr_campaign_id = F.concat(
     F.lit("CMP-"), (_h(F.col("v"), "attrcamp", 20) + F.lit(1)).cast("string"))
 attr_creative_id = F.concat(
     F.lit("CRVLIVE"), stream_prefix, (_h(F.col("v"), "attrcrv", 50) + F.lit(1)).cast("string"))
-attr_channel = _pick(F.col("v"), "attrchan", CHANNELS)
-attr_device = _pick(F.col("v"), "attrdev", DEVICES)
-attr_customer_ad_id = F.concat(
-    F.lit("AD"), F.lpad(F.col("customer_id").cast("string"), 8, "0"))
+attr_channel = _pick(F.col("v"), "attrchan", LIVE_CHANNELS)
+attr_device = _pick(F.col("v"), "attrdev", LIVE_DEVICES)
+attr_customer_ad_id = ad_id_column(F.col("customer_id"))
 # session shared by the two touches: the shopping session for a store
 # journey, the order id (the online "session") for an online journey.
 attr_session = F.when(online_attr, F.col("order_id")).otherwise(F.col("session_id"))
@@ -494,7 +494,7 @@ def _attr_touch(which, touch_ts, impression_id):
 
 
 # online derived fields
-node_type = F.when(_pick(F.col("v"), "omode", FULFILL) == "SHIP_FROM_DC", "DC").otherwise("STORE")
+node_type = F.when(_pick(F.col("v"), "omode", FULFILLMENT_MODES) == "SHIP_FROM_DC", "DC").otherwise("STORE")
 node_id = F.when(node_type == "DC", F.col("dc_id")).otherwise(F.col("store_id"))
 inv_qty = _h(F.col("v"), "iqty", 60).cast("long")  # 0..59
 # Supply-chain disruption: ~6% of inventory events are a disruption (sudden
@@ -629,13 +629,13 @@ events_arr = F.array(
 
     # --- marketing ---
     slot(mkt, "ad_impression", F.struct(
-        _pick(F.col("v"), "chan", CHANNELS).alias("channel"),
+        _pick(F.col("v"), "chan", LIVE_CHANNELS).alias("channel"),
         F.concat(F.lit("CMP-"), (_h(F.col("v"), "camp", 20) + F.lit(1)).cast("string")).alias("campaign_id"),
         F.concat(F.lit("CRV-"), (_h(F.col("v"), "crv", 50) + F.lit(1)).cast("string")).alias("creative_id"),
         F.concat(F.lit("AD"), _id(F.col("v"), "adcust", CUSTOMER_COUNT).cast("string")).alias("customer_ad_id"),
         F.concat(F.lit("IMP-"), stream_prefix, F.col("v").cast("string")).alias("impression_id"),
         F.round(_u(F.col("v"), "cost") * F.lit(2.0) + F.lit(0.1), 4).alias("cost"),
-        _pick(F.col("v"), "dev", DEVICES).alias("device_type"),
+        _pick(F.col("v"), "dev", LIVE_DEVICES).alias("device_type"),
         _id(F.col("v"), "adcust", CUSTOMER_COUNT).alias("customer_id"),
     ), F.col("ts"), F.concat(F.lit("camp_"), (_h(F.col("v"), "camp", 20) + F.lit(1)).cast("string")), F.col("v")),
 
@@ -649,7 +649,7 @@ events_arr = F.array(
     # --- online order (created -> picked -> shipped share order_id) ---
     slot(onl, "online_order_created", F.struct(
         F.col("order_id"), F.col("customer_id"),
-        _pick(F.col("v"), "omode", FULFILL).alias("fulfillment_mode"),
+        _pick(F.col("v"), "omode", FULFILLMENT_MODES).alias("fulfillment_mode"),
         node_type.alias("node_type"), node_id.alias("node_id"),
         F.col("basket_n").cast("long").alias("item_count"),
         F.col("subtotal"), F.col("tax"), F.col("total"), F.col("tender").alias("tender_type"),
@@ -677,14 +677,14 @@ events_arr = F.array(
         correlation=attr_correlation_online),
     slot(onl, "online_order_picked", F.struct(
         F.col("order_id"), node_type.alias("node_type"), node_id.alias("node_id"),
-        _pick(F.col("v"), "omode", FULFILL).alias("fulfillment_mode"),
+        _pick(F.col("v"), "omode", FULFILLMENT_MODES).alias("fulfillment_mode"),
         _iso(F.col("ts")).alias("picked_time"),
     ), F.col("ts"), F.concat(F.lit("order_"), F.col("order_id")), F.col("v"),
         session=F.col("order_id"), parent=F.col("order_id"),
         correlation=attr_correlation_online),
     slot(onl, "online_order_shipped", F.struct(
         F.col("order_id"), node_type.alias("node_type"), node_id.alias("node_id"),
-        _pick(F.col("v"), "omode", FULFILL).alias("fulfillment_mode"),
+        _pick(F.col("v"), "omode", FULFILLMENT_MODES).alias("fulfillment_mode"),
         _iso(F.col("ts")).alias("shipped_time"),
     ), F.col("ts"), F.concat(F.lit("order_"), F.col("order_id")), F.col("v"),
         session=F.col("order_id"), parent=F.col("order_id"),

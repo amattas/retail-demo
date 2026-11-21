@@ -18,10 +18,10 @@ from retail_setup.generation.runtime import (
     derive_seed,
     fixed_width_decimal,
     minimum_width_decimal,
-    minimum_width_text,
     seeded_draws,
 )
 from retail_setup.generation.schemas import spark_schema
+from retail_setup.generation.vocabulary import ad_id_column, ble_id_column
 
 # datagen StoreProfiler equivalents (volume class -> traffic multiplier range).
 # Five tiers incl. KIOSK, matching datagen's StoreVolumeClass (the kiosk tier
@@ -266,7 +266,6 @@ def generate_dimensions(
     phone_line = (customer_draws.h64(["ID"], "customer-phone-line") % F.lit(8999) + 1000).cast(
         "long"
     )
-    ble_id = F.upper(F.conv(F.col("ID").cast("string"), 10, 36))
 
     customers = customers.select(
         "ID",
@@ -280,8 +279,8 @@ def generate_dimensions(
             fixed_width_decimal(loyalty_suffix, 3, "loyalty suffix"),
         ).alias("LoyaltyCard"),
         F.format_string("555-%03d-%04d", phone_exchange, phone_line).alias("Phone"),
-        F.concat(F.lit("BLE"), minimum_width_text(ble_id, 6)).alias("BLEId"),
-        F.concat(F.lit("AD"), minimum_width_decimal(F.col("ID"), 8)).alias("AdId"),
+        ble_id_column(F.col("ID")).alias("BLEId"),
+        ad_id_column(F.col("ID")).alias("AdId"),
     )
     out["dim_customers"] = customers.select(
         *[field.name for field in spark_schema("dim_customers").fields]

@@ -32,32 +32,17 @@ from retail_setup.generation.runtime import (
     seeded_draws,
 )
 from retail_setup.generation.schemas import column_names
+from retail_setup.generation.vocabulary import (
+    CAMPAIGN_ARCHETYPES,
+    CHANNEL_COSTS,
+    DEVICE_MULTIPLIERS,
+    DEVICE_WEIGHTS,
+    campaign_id_column,
+)
 
-# (archetype, channels, base impressions/day at the legacy 86-store fleet,
-#  campaign duration in days — datagen MarketingCampaignSimulator templates)
-ARCHETYPES: list[tuple[str, list[str], int, int]] = [
-    ("seasonal_sale", ["FACEBOOK", "GOOGLE", "EMAIL"], 1000, 7),
-    ("product_launch", ["INSTAGRAM", "YOUTUBE", "DISPLAY"], 2000, 14),
-    ("loyalty_program", ["EMAIL", "SOCIAL"], 500, 30),
-    ("flash_sale", ["SOCIAL", "SEARCH"], 5000, 1),  # runs ~1 day in 7
-]
-
-# channel -> (lo, hi) cost-per-impression band in dollars (uniform draw)
-CHANNEL_COSTS: dict[str, tuple[float, float]] = {
-    "EMAIL": (0.005, 0.05),
-    "DISPLAY": (0.10, 0.50),
-    "SOCIAL": (0.08, 0.25),
-    "SEARCH": (0.15, 0.75),
-    "FACEBOOK": (0.10, 0.40),
-    "GOOGLE": (0.25, 1.50),
-    "INSTAGRAM": (0.08, 0.35),
-    "YOUTUBE": (0.30, 1.50),
-}
+ARCHETYPES = CAMPAIGN_ARCHETYPES
 
 LEGACY_FLEET_SIZE = 86  # datagen's store count; volumes scale store_count/86
-
-DEVICE_WEIGHTS = [("MOBILE", 0.6), ("DESKTOP", 0.3), ("TABLET", 0.1)]
-DEVICE_MULTIPLIERS = {"MOBILE": 1.2, "DESKTOP": 0.8, "TABLET": 0.9}
 
 
 def generate_marketing(
@@ -118,11 +103,7 @@ def generate_marketing(
         .withColumn(
             # campaign_id keyed on the campaign window so it spans multiple days
             "campaign_id",
-            F.concat(
-                F.lit("CAMP"),
-                F.date_format("campaign_start", "yyyyMMdd"),
-                fixed_width_decimal(F.col("archetype_idx"), 2, "campaign archetype index"),
-            ),
+            campaign_id_column(F.col("campaign_start"), F.col("archetype_idx")),
         )
         .withColumn(
             # impression id stays day-unique (campaign_id now repeats across days)
