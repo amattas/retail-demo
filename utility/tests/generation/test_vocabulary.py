@@ -89,7 +89,7 @@ KNOWN_STREAM_GAPS: dict[str, tuple[str, Callable[[], bool]]] = {
     ),
     "organic-ad-id-padding": (
         "S-14/L-25: organic live customer_ad_id is AD + unpadded customer ID",
-        _present(r'F\.concat\(F\.lit\("AD"\), _id\('),
+        _present(r'F\.concat\(F\.lit\("AD"\), F\.col\("customer_id"\)\.cast\("string"\)\)'),
     ),
     "ble-id-format": (
         "S-6: live BLE IDs are BLE + decimal customer ID, not base-36 padded to 6",

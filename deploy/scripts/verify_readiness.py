@@ -23,6 +23,12 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
+from retail_setup.generation.stream_control import (
+    INGEST_TAG_PREFIX,
+    PENDING_EVENT_TYPES,
+    parse_ingest_tag,
+)
+
 from deploy.scripts import _output as console
 from deploy.scripts._auth import build_credential
 from deploy.scripts.apply_kql import resolve_kql_database
@@ -77,6 +83,8 @@ _STREAM_MAX_AGE = timedelta(minutes=30)
 _SILVER_LAG_WARNING = timedelta(days=3)
 # Missed streaming-data-load intervals tolerated before anomaly detection is stale.
 _ANOMALY_MISSED_INTERVALS = 3
+# Silver watermarks may be this many streaming-data-load intervals old.
+_SILVER_FRESHNESS_INTERVALS = 2
 # The Operations Agent query and case notebook reject evidence older than this.
 _OPERATIONS_SIGNAL_MAX_AGE = timedelta(days=7)
 _RETENTION_RE = re.compile(
@@ -85,6 +93,7 @@ _RETENTION_RE = re.compile(
 )
 _FUTURE_SKEW = timedelta(minutes=5)
 _CORRELATION_SKEW = timedelta(minutes=5)
+_INGEST_TAG_FILTER = f"ingest-by:{INGEST_TAG_PREFIX}:"
 _MAX_EVIDENCE_STRING = 300
 _MAX_EVIDENCE_ITEMS = 25
 _MAX_EVIDENCE_DEPTH = 5
@@ -2101,12 +2110,26 @@ class ReadinessRunner:
                 "unprocessed events may already be purged.",
                 evidence=lag,
             )
+        # Freshness follows the event time Silver has processed (last_processed_ts)
+        # for the stalest live table, not updated_at, which the daily deep
+        # reconciliation refreshes even when no new rows arrive.
+        live_tables = _live_stream_tables(self.context.manifest)
+        processed = {
+            table: timestamp
+            for table, timestamp in (signal.get("sources") or {}).items()
+            if table in live_tables and timestamp
+        }
+        if not processed:
+            raise EvidenceNotObserved(_UNOBSERVED_STREAM_MESSAGES["freshness.watermarks"])
+        stalest_table, stalest = min(
+            processed.items(), key=lambda item: _parse_time(item[1])
+        )
         try:
             freshness = evaluate_freshness(
-                signal.get("updated_at"),
+                stalest,
                 observed_at=self.context.observed_at,
-                max_age=_STREAM_MAX_AGE,
-                lineage="ag._watermarks maximum updated_at",
+                max_age=self._silver_max_age(),
+                lineage=f"ag._watermarks last_processed_ts (stalest: {stalest_table})",
             )
         except CheckFailed as exc:
             if lag is not None and lag["lag_seconds"] > _SILVER_LAG_WARNING.total_seconds():
@@ -2168,23 +2191,58 @@ class ReadinessRunner:
             observed_at=self.context.observed_at,
         )
 
+    def _silver_max_age(self) -> timedelta:
+        """Silver advances once per streaming-data-load run, so allow two intervals.
+
+        One interval would flap: a watermark is up to a full interval old just
+        before the next run, plus the run's own duration.
+        """
+
+        interval = committed_schedule_interval(self.context.repo_root, "streaming-data-load")
+        return (interval or _STREAM_MAX_AGE) * _SILVER_FRESHNESS_INTERVALS
+
     def _eventhouse_freshness(self) -> Observation:
         tables = _stream_event_tables(self.context.manifest)
+        live_tables = _live_stream_tables(self.context.manifest)
         signal = self.adapter.eventhouse_signal(tables)
         if not signal:
             raise EvidenceNotObserved(_UNOBSERVED_STREAM_MESSAGES["freshness.eventhouse_ingestion"])
         observed_tables = frozenset(str(name) for name in signal.get("tables", []))
-        comparison = compare_sets(tables, observed_tables)
+        comparison = compare_sets(live_tables, observed_tables)
         if comparison["missing"]:
-            raise CheckFailed("Eventhouse ingestion is missing selected event tables.")
+            raise CheckFailed(
+                "Eventhouse ingestion is missing selected event tables.", evidence=comparison
+            )
+        # Each live table must be fresh on its own; one busy table must not make
+        # the whole Eventhouse look fresh.
+        per_table = signal.get("table_ingestion") or {}
+        ingested = {table: (per_table.get(table) or {}).get("ingested") for table in live_tables}
+        stale: list[str] = []
+        for table in sorted(live_tables):
+            try:
+                evaluate_freshness(
+                    ingested[table],
+                    observed_at=self.context.observed_at,
+                    max_age=_STREAM_MAX_AGE,
+                    lineage=table,
+                )
+            except (CheckFailed, EvidenceUnknown):
+                stale.append(table)
+        if stale:
+            raise CheckFailed(
+                f"Eventhouse ingestion is stale or invalid for {len(stale)} of "
+                f"{len(live_tables)} live event tables: {', '.join(stale)}.",
+                evidence={**comparison, "stale": stale},
+            )
+        stalest_table = min(live_tables, key=lambda table: _parse_time(ingested[table]))
         freshness = evaluate_freshness(
-            signal.get("latest_ingestion"),
+            ingested[stalest_table],
             observed_at=self.context.observed_at,
             max_age=_STREAM_MAX_AGE,
-            lineage="Eventhouse selected event tables max ingest_timestamp",
+            lineage=f"Eventhouse per-table max ingestion_time() (stalest: {stalest_table})",
         )
         return Observation(
-            "Eventhouse ingestion covers every selected event table and is recent.",
+            "Ingestion into every live Eventhouse event table is recent.",
             comparison,
             freshness,
         )
@@ -2603,6 +2661,23 @@ def _stream_event_tables(manifest: SolutionManifest) -> frozenset[str]:
     return frozenset()
 
 
+def _live_stream_tables(manifest: SolutionManifest) -> frozenset[str]:
+    """Event tables the stream emits today (declared types minus pending ones)."""
+
+    return _stream_event_tables(manifest) - PENDING_EVENT_TYPES
+
+
+def _row_ingest_tags(row: dict[str, Any]) -> list[dict[str, Any]]:
+    """Parse every stream ingest tag on an extent row (``tag`` or raw ``Tags``)."""
+
+    raw = row.get("tag") if row.get("tag") is not None else row.get("Tags")
+    if isinstance(raw, list | tuple):
+        values = [str(value) for value in raw]
+    else:
+        values = re.split(r"[\s,\"\[\]]+", str(raw or ""))
+    return [parsed for value in values if (parsed := parse_ingest_tag(value)) is not None]
+
+
 def checkpoint_signal_from_rows(
     rows: list[dict[str, Any]],
     expected_tables: frozenset[str],
@@ -2611,36 +2686,26 @@ def checkpoint_signal_from_rows(
 
     parsed: list[dict[str, Any]] = []
     for row in rows:
-        tag = str(row.get("tag", ""))
-        marker = tag.find("retail-demo:")
-        parts = tag[marker:].split(":") if marker >= 0 else []
-        if len(parts) != 4 or parts[0] != "retail-demo":
-            continue
         table = str(row.get("TableName", ""))
-        if table not in expected_tables or parts[2] != table:
+        if table not in expected_tables:
             continue
-        try:
-            batch_id = int(parts[3])
-        except ValueError:
-            continue
-        parsed.append(
-            {
-                "table": table,
-                "stream_id": parts[1],
-                "batch_id": batch_id,
-                "created": row.get("MaxCreatedOn"),
-            }
-        )
+        for tag in _row_ingest_tags(row):
+            if tag["event_type"] != table:
+                continue
+            parsed.append({**tag, "table": table, "created": row.get("MaxCreatedOn")})
     if not parsed:
         return None
     latest_row = max(
         parsed,
-        key=lambda row: _parse_time(_iso_value(row["created"])),
+        key=lambda row: (_parse_time(_iso_value(row["created"])), row["batch_id"]),
     )
-    stream_id = str(latest_row["stream_id"])
-    same_stream = [row for row in parsed if row["stream_id"] == stream_id]
+    identity = (latest_row["stream_id"], latest_row["incarnation"])
+    same_stream = [
+        row for row in parsed if (row["stream_id"], row["incarnation"]) == identity
+    ]
     return {
-        "stream_id_hash": _hash_identifier(stream_id),
+        "stream_id_hash": _hash_identifier(latest_row["stream_id"]),
+        "incarnation_hash": _hash_identifier(latest_row["incarnation"]),
         "latest_batch_id": max(int(row["batch_id"]) for row in same_stream),
         "latest_extent": _iso_value(latest_row["created"]),
         "table_count": len({str(row["table"]) for row in same_stream}),
@@ -2908,11 +2973,13 @@ class FabricReadinessAdapter:
         return {
             "tables": [str(row.get("table_name", "")) for row in rows],
             "latest_ingestion": _iso_value(latest),
-            # Compared with ag._watermarks, which advance on ingest_timestamp.
+            # earliest/latest are ingest_timestamp (event time), compared with
+            # ag._watermarks; ingested is the table's own max ingestion_time().
             "table_ingestion": {
                 str(row.get("table_name", "")): {
                     "earliest": _iso_value(row.get("earliest_event")),
                     "latest": _iso_value(row.get("latest_event")),
+                    "ingested": _iso_value(row.get("latest_ingestion")),
                 }
                 for row in rows
             },
@@ -2928,12 +2995,16 @@ class FabricReadinessAdapter:
         self,
         expected_tables: frozenset[str],
     ) -> dict[str, Any] | None:
+        if not expected_tables:
+            return None
+        # Table-scoped extents filtered by tag inside the command (the cheap form
+        # the Kusto docs recommend), bounded to one day, one row per table.
+        tables = ", ".join(sorted(expected_tables))
         rows = self._execute_kql(
-            ".show database extents "
-            "| extend tag_values=todynamic(Tags) "
-            "| mv-expand tag=tag_values "
-            "| where tostring(tag) contains 'retail-demo:' "
-            "| project TableName, tag=tostring(tag), MaxCreatedOn",
+            f".show tables ({tables}) extents "
+            f"where tags contains '{_INGEST_TAG_FILTER}' "
+            "| where MaxCreatedOn > ago(1d) "
+            "| summarize arg_max(MaxCreatedOn, Tags) by TableName",
             management=True,
         )
         return checkpoint_signal_from_rows(rows, expected_tables)

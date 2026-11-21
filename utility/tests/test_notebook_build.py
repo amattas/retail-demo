@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from retail_setup.generation.stream_control import PENDING_EVENT_TYPES
+
 UTILITY = Path(__file__).resolve().parents[1]
 PY = sys.executable
 NOTEBOOKS = [
@@ -106,15 +108,9 @@ def test_stream_template_emits_declared_eventhouse_event_types():
     kql_tables = set(re.findall(r"^\.create-merge table ([a-z_]+) \(", kql, re.MULTILINE))
 
     # Declared (KQL, mappings, Silver routes) ahead of the incident and online
-    # lifecycle models that will emit them; shrink this set as they land.
-    not_yet_emitted = {
-        "logistics_incident_started",
-        "logistics_incident_resolved",
-        "online_order_line_added",
-        "online_order_delivered",
-    }
+    # lifecycle models that will emit them; readiness reads the same set.
     assert len(declared_events) == 22
-    assert stream_events == declared_events - not_yet_emitted
+    assert stream_events == declared_events - PENDING_EVENT_TYPES
     assert declared_events <= kql_tables
     assert "unknown_event" in kql_tables - declared_events
 

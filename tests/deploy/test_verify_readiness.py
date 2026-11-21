@@ -13,6 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 from retail_setup.contracts import load_repository_manifest, resolve_profile
+from retail_setup.generation.stream_control import PENDING_EVENT_TYPES
 
 from deploy.scripts.build_artifacts import SETUP_NOTEBOOKS
 from deploy.scripts.deploy_config import OperationsPlanningConfig, TwinsConfig
@@ -550,6 +551,39 @@ def test_checkpoint_signal_parses_kusto_wrapped_tags_and_rejects_mismatches() ->
     assert signal["stream_id_hash"]
 
 
+def test_checkpoint_signal_follows_the_newest_incarnation_across_extent_tags() -> None:
+    rows = [
+        # A reset checkpoint: the old incarnation reached batch 900.
+        {
+            "TableName": "receipt_created",
+            "Tags": "ingest-by:retail-demo:stream-a:0a1b2c3d:receipt_created:900",
+            "MaxCreatedOn": "2026-07-21T08:00:00Z",
+        },
+        # A merged extent lists several tags, newline separated.
+        {
+            "TableName": "receipt_created",
+            "Tags": "drop-by:x\r\ningest-by:retail-demo:stream-a:ffee0011:receipt_created:4"
+            "\r\ningest-by:retail-demo:stream-a:ffee0011:receipt_created:5",
+            "MaxCreatedOn": "2026-07-21T09:58:00Z",
+        },
+        {
+            "TableName": "payment_processed",
+            "Tags": "ingest-by:retail-demo:stream-a:ffee0011:payment_processed:5",
+            "MaxCreatedOn": "2026-07-21T09:57:00Z",
+        },
+    ]
+
+    signal = checkpoint_signal_from_rows(
+        rows, frozenset({"receipt_created", "payment_processed"})
+    )
+
+    assert signal is not None
+    assert signal["latest_batch_id"] == 5
+    assert signal["table_count"] == 2
+    assert signal["incarnation_hash"]
+    assert signal["latest_extent"] == "2026-07-21T09:58:00Z"
+
+
 def test_sql_signals_normalize_driver_datetimes_without_credentials() -> None:
     timestamp = datetime(2026, 7, 21, 9, 58)
     adapter = object.__new__(FabricReadinessAdapter)
@@ -616,18 +650,27 @@ def test_setup_signal_does_not_treat_missing_catalog_evidence_as_zero(metadata) 
         adapter.setup_signal()
 
 
-def test_checkpoint_query_coerces_extent_tags_to_dynamic() -> None:
+def test_checkpoint_query_filters_tags_in_the_table_scoped_command() -> None:
     adapter = object.__new__(FabricReadinessAdapter)
     queries = []
     adapter._execute_kql = (  # type: ignore[method-assign]
         lambda query, **kwargs: queries.append((query, kwargs)) or []
     )
 
-    signal = adapter.checkpoint_signal(frozenset({"receipt_created"}))
+    signal = adapter.checkpoint_signal(frozenset({"receipt_created", "ad_impression"}))
 
     assert signal is None
-    assert "todynamic(Tags)" in queries[0][0]
-    assert "mv-expand tag=tag_values" in queries[0][0]
+    query, kwargs = queries[0]
+    assert kwargs == {"management": True}
+    assert query.startswith(
+        ".show tables (ad_impression, receipt_created) extents "
+        "where tags contains 'ingest-by:retail-demo:'"
+    )
+    assert "ago(1d)" in query
+    assert "arg_max(MaxCreatedOn, Tags) by TableName" in query
+    assert "mv-expand" not in query
+    assert adapter.checkpoint_signal(frozenset()) is None
+    assert len(queries) == 1
 
 
 def test_sql_connection_prefers_installed_system_odbc_driver(monkeypatch) -> None:
@@ -2025,17 +2068,69 @@ def _watermark_adapter(watermark):
 
 
 @pytest.mark.parametrize(
-    ("days_behind", "status", "text"),
-    [(1, "PASS", "reconcile"), (4, "UNKNOWN", "7-day retention"), (8, "FAIL", "purged")],
+    ("behind", "status", "text"),
+    [
+        (timedelta(minutes=20), "PASS", "reconcile"),
+        # Two 30-minute schedule intervals: a run that is due soon is not stale.
+        (timedelta(minutes=50), "PASS", "reconcile"),
+        # updated_at is five minutes old, but Silver has processed nothing for a
+        # day: freshness follows last_processed_ts, so this is not a pass.
+        (timedelta(days=1), "FAIL", "stale"),
+        (timedelta(days=4), "FAIL", "7-day retention"),
+        (timedelta(days=8), "FAIL", "purged"),
+    ],
 )
 def test_watermark_check_warns_before_retention_purges_unprocessed_events(
-    days_behind, status, text
+    behind, status, text
 ):
-    watermark = (NOW - timedelta(days=days_behind)).isoformat()
+    watermark = (NOW - behind).isoformat()
     runner = _freshness_runner(_watermark_adapter(watermark))
     result = _status(runner, runner._watermark_freshness)
     assert result.status == status
     assert text in result.summary
+    if status == "PASS":
+        assert result.freshness["max_age_seconds"] == 2 * 30 * 60
+        assert "last_processed_ts" in result.freshness["lineage"]
+
+
+def _live_tables() -> frozenset[str]:
+    return frozenset(
+        event.event_type
+        for contract in _repository_manifest().data_contracts
+        if contract.kind == "event"
+        for event in contract.events
+    ) - PENDING_EVENT_TYPES
+
+
+@pytest.mark.parametrize("stale_table", [None, "store_closed"])
+def test_eventhouse_freshness_is_checked_per_live_table(stale_table):
+    ingestion = {
+        table: {
+            "ingested": (
+                NOW - (timedelta(hours=2) if table == stale_table else timedelta(minutes=2))
+            ).isoformat()
+        }
+        for table in _live_tables()
+    }
+    adapter = SimpleNamespace(
+        eventhouse_signal=lambda _tables: {
+            "tables": sorted(ingestion),
+            # One busy table used to make the whole Eventhouse look fresh.
+            "latest_ingestion": NOW.isoformat(),
+            "table_ingestion": ingestion,
+        }
+    )
+    runner = _freshness_runner(adapter)
+
+    result = _status(runner, runner._eventhouse_freshness)
+
+    assert PENDING_EVENT_TYPES.isdisjoint(ingestion)
+    if stale_table is None:
+        assert result.status == "PASS"
+        assert result.freshness["age_seconds"] == 120
+    else:
+        assert result.status == "FAIL"
+        assert stale_table in result.summary
 
 
 def _alert_adapter(**signal):

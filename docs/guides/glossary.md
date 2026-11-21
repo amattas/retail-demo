@@ -83,7 +83,7 @@ These definitions describe this demo, not every use of each term in Fabric.
 | --- | --- |
 | **Event** | A time-stamped message that describes something that happened, such as a receipt being created or inventory changing. |
 | **Ingestion time** | When Eventhouse received an event. This can differ from the business event time because delivery is asynchronous. |
-| **Micro-batch** | A small group of events processed together every few seconds. Grouping events makes streaming more efficient. |
+| **Micro-batch** | A small group of events processed together, once a minute in a live stream. Grouping events makes streaming more efficient. |
 | **Partition key** | A value used to keep related events together for processing. Consumers must still tolerate events arriving out of order. |
 | **Spark Kusto connector** | The Fabric connector used by the Spark stream notebook to write event groups directly into Eventhouse KQL tables. |
 

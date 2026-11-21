@@ -1,5 +1,7 @@
 """Variable live baskets using the same catalog, mission, quantity and budget model."""
 
+from datetime import date
+
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
@@ -21,11 +23,18 @@ def attach_stream_baskets(
     products: DataFrame,
     profile: StoreTypeProfile,
     seed: int,
+    catalog_date: date,
 ) -> DataFrame:
-    """Snapshot launch eligibility at stream start; restart to include new launches."""
+    """Attach baskets drawn from the catalog as of ``catalog_date``.
+
+    Launch eligibility and the seasonal department weights both come from
+    ``catalog_date``, not the clock, so a replayed micro-batch rebuilds the same
+    baskets. The stream keeps the date in its checkpoint incarnation record and
+    moves it forward on a restart that has no batch to replay.
+    """
     draws = seeded_draws(seed)
     catalog = retail_catalog(
-        products, spark.range(1).select(F.current_date().alias("event_date")), draws
+        products, spark.range(1).select(F.lit(catalog_date).alias("event_date")), draws
     )
     weight = sum(
         (

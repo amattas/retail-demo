@@ -368,7 +368,9 @@ stream:
   interval is 30 minutes; the pipeline runs one instance at a time.
 - `stream.start_after_deploy` runs last, after readiness, so readiness
   evaluates the deployed baseline. It submits one `stream-events` notebook job
-  with `source_rows_per_second` and `run_seconds`. If a stream is already
+  with `source_rows_per_second` and `run_seconds`; the notebook's other
+  parameters keep their defaults (a 60-second trigger, a 10-minute catch-up
+  cap after a stop, five supervised restarts). If a stream is already
   queued or running, it reports that run instead of starting another. A
   failure leaves the deployment `DEGRADED`, not failed, and records
   `stream-report.json`. An unbounded stream holds a Spark session and capacity

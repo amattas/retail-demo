@@ -525,9 +525,10 @@ kql_database = "retail_eventhouse"
     that the notebook stops after three minutes.
 
 Leaving `kusto_uri` blank makes the notebook resolve the KQL Query URI by
-database display name in the current workspace. Every few seconds, the
-notebook groups generated events and writes them directly to Eventhouse through
-the Fabric Spark Kusto connector. It does not require Kafka, Event Hubs, or a
+database display name in the current workspace. A bounded run groups
+generated events every 10 seconds (a live run every 60 seconds,
+`trigger_seconds`) and writes them directly to Eventhouse through the Fabric
+Spark Kusto connector. It does not require Kafka, Event Hubs, or a
 Fabric Eventstream.
 
 Eventhouse receives data asynchronously, so the last event may appear shortly

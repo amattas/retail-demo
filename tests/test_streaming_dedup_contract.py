@@ -11,10 +11,12 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
+from retail_setup.generation.stream_control import call_with_retry, ingest_tag
 
 ROOT = Path(__file__).resolve().parents[1]
 STREAM_TEMPLATE = ROOT / "utility" / "notebooks" / "templates" / "driver-05-stream.py"
 SILVER_NOTEBOOK = ROOT / "fabric" / "lakehouse" / "03-streaming-to-silver.ipynb"
+KQL_TABLES = ROOT / "fabric" / "kql_database" / "01-create-tables.kql"
 
 
 def _function(tree: ast.Module, name: str) -> ast.FunctionDef:
@@ -125,37 +127,59 @@ def test_stream_identity_persists_with_checkpoint_metadata() -> None:
 @pytest.mark.parametrize("count", [0, 5])
 def test_live_driver_requires_nonempty_real_dimensions(count) -> None:
     spark = Mock()
-    spark.table.return_value.count.return_value = count
+    lookups = []
+
+    def dense_id_lookup(frame):
+        lookups.append(frame)
+        return "lookup", count
+
     namespace = _exec_nodes(
         ast.parse(STREAM_TEMPLATE.read_text(encoding="utf-8")),
-        {"_count"},
-        {"spark": spark, "LAKEHOUSE_NAME": "lh", "SILVER_DB": "ag"},
+        {"_ids"},
+        {
+            "spark": spark,
+            "LAKEHOUSE_NAME": "lh",
+            "SILVER_DB": "ag",
+            "dense_id_lookup": dense_id_lookup,
+        },
     )
     if count:
-        assert namespace["_count"]("dim_stores") == count
+        assert namespace["_ids"]("dim_stores") == ("lookup", count)
+        assert lookups == [spark.table.return_value]
+        namespace["_ids"]("dim_products", "launched")
+        spark.table.return_value.where.assert_called_once_with("launched")
     else:
         with pytest.raises(ValueError, match="Required streaming dimension"):
-            namespace["_count"]("dim_stores")
-    spark.table.assert_called_once_with("lh.ag.dim_stores")
+            namespace["_ids"]("dim_stores")
+    spark.table.assert_any_call("lh.ag.dim_stores")
     spark.table.side_effect = RuntimeError("permission denied")
     with pytest.raises(RuntimeError, match="permission denied"):
-        namespace["_count"]("dim_stores")
+        namespace["_ids"]("dim_stores")
 
 
 def test_eventhouse_batch_uses_idempotent_transaction_metadata() -> None:
     source = STREAM_TEMPLATE.read_text(encoding="utf-8")
     tree = ast.parse(source)
-    namespace = _exec_nodes(
-        tree,
-        {"_kusto_write_metadata"},
-        {"json": json, "uuid": uuid, "STREAM_ID": "stream-a"},
-    )
 
-    properties_json, request_id = namespace["_kusto_write_metadata"](
-        "receipt_created", 17
-    )
-    properties = json.loads(properties_json)
-    expected_tag = "retail-demo:stream-a:receipt_created:17"
+    def metadata(incarnation: str, batch_id: int) -> tuple[dict, str]:
+        namespace = _exec_nodes(
+            tree,
+            {"_kusto_write_metadata"},
+            {
+                "json": json,
+                "uuid": uuid,
+                "ingest_tag": ingest_tag,
+                "STREAM_ID": "stream-a",
+                "INCARNATION": incarnation,
+            },
+        )
+        properties_json, request_id = namespace["_kusto_write_metadata"](
+            "receipt_created", batch_id
+        )
+        return json.loads(properties_json), request_id
+
+    properties, request_id = metadata("0a1b2c3d", 17)
+    expected_tag = "retail-demo:stream-a:0a1b2c3d:receipt_created:17"
 
     assert properties == {
         "flushImmediately": True,
@@ -163,6 +187,12 @@ def test_eventhouse_batch_uses_idempotent_transaction_metadata() -> None:
         "ingestIfNotExists": [expected_tag],
     }
     assert uuid.UUID(request_id)
+    # A replay of the same batch reuses its tag and request ID; a reset
+    # checkpoint (new incarnation, batch IDs from 0 again) never does.
+    assert metadata("0a1b2c3d", 17) == (properties, request_id)
+    reset_properties, reset_request = metadata("ffee0011", 17)
+    assert reset_properties["ingestIfNotExists"] != [expected_tag]
+    assert reset_request != request_id
 
     write_source = ast.get_source_segment(source, _function(tree, "_write_event_table"))
     assert write_source is not None
@@ -170,6 +200,32 @@ def test_eventhouse_batch_uses_idempotent_transaction_metadata() -> None:
     assert '"ensureNoDuplicatedBlobs", "true"' in write_source
     assert '"sparkIngestionPropertiesJson", ingestion_properties' in write_source
     assert '"sparkIngestionProperties", ingestion_properties' not in write_source
+    assert ".coalesce(1)" in write_source
+
+
+def test_stream_ingest_cadence_and_tag_retention_policies() -> None:
+    tree = ast.parse(STREAM_TEMPLATE.read_text(encoding="utf-8"))
+    assert ast.literal_eval(_assignment(tree, "trigger_seconds").value) == 60
+    event_tables = set(ast.literal_eval(_assignment(tree, "EVENT_PAYLOADS").value))
+    kql = KQL_TABLES.read_text(encoding="utf-8")
+    retention = dict(
+        re.findall(
+            r"(?m)^\.alter table (\w+) policy extent_tags_retention\s*```\s*(\[.*?\])\s*```",
+            kql,
+        )
+    )
+
+    assert set(retention) == event_tables
+    for policy in retention.values():
+        assert json.loads(policy) == [
+            {"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}
+        ]
+    # The connector's transactional writes never use these, so the stream's
+    # tables don't declare them; only the queued-ingestion catch-all does.
+    dead = set(
+        re.findall(r"(?m)^\.alter table (\w+) policy (?:streamingingestion|ingestionbatching)", kql)
+    )
+    assert dead == {"unknown_event"}
 
 
 @pytest.mark.parametrize("failure", ["none", "partial", "unmapped", "credentials"])
@@ -202,6 +258,7 @@ def test_eventhouse_sink_returns_only_after_every_required_write(failure) -> Non
         {
             "_write_event_table": write,
             "_WRITE_PARALLELISM": 2,
+            "call_with_retry": call_with_retry,
             "EVENT_PAYLOADS": {"receipt_created": [], "inventory_updated": []},
             "notebookutils": SimpleNamespace(
                 credentials=SimpleNamespace(getToken=token)
@@ -222,14 +279,62 @@ def test_eventhouse_sink_returns_only_after_every_required_write(failure) -> Non
     batch.unpersist.assert_called_once()
 
 
+@pytest.mark.parametrize("permanent", [False, True])
+def test_eventhouse_sink_retries_transient_writes_with_a_fresh_token(permanent) -> None:
+    tree = ast.parse(STREAM_TEMPLATE.read_text(encoding="utf-8"))
+    batch = Mock()
+    batch.persist.return_value = batch
+    batch.select.return_value.distinct.return_value.collect.return_value = [
+        {"event_type": "receipt_created"}
+    ]
+    tokens = iter(["token-1", "token-2", "token-3"])
+    credentials = []
+    sleeps: list[float] = []
+
+    def write(_frame, _event_type, _batch_id, credential):
+        credentials.append(credential)
+        if permanent:
+            raise ValueError("Kusto table receipt_created does not exist")
+        if len(credentials) == 1:
+            raise RuntimeError("Request failed: HTTP 429 TooManyRequests (throttled)")
+
+    namespace = _exec_nodes(
+        tree,
+        {"write_to_eventhouse"},
+        {
+            "_write_event_table": write,
+            "_WRITE_PARALLELISM": 2,
+            "call_with_retry": lambda operation, label: call_with_retry(
+                operation, label=label, sleep=sleeps.append, log=lambda _m: None
+            ),
+            "EVENT_PAYLOADS": {"receipt_created": []},
+            "notebookutils": SimpleNamespace(
+                credentials=SimpleNamespace(getToken=lambda _uri: next(tokens))
+            ),
+            "kusto_uri": "https://unit-test.invalid",
+        },
+    )
+    if permanent:
+        with pytest.raises(RuntimeError, match="does not exist"):
+            namespace["write_to_eventhouse"](batch, 3)
+        assert credentials == ["token-1"]
+        assert sleeps == []
+    else:
+        namespace["write_to_eventhouse"](batch, 3)
+        assert credentials == ["token-1", "token-2"]
+        assert sleeps == [2.0]
+    batch.unpersist.assert_called_once()
+
+
 def test_generator_dedupe_ids_include_persistent_stream_and_row_identity() -> None:
     source = STREAM_TEMPLATE.read_text(encoding="utf-8")
     tree = ast.parse(source)
     slot_source = ast.get_source_segment(source, _function(tree, "slot"))
 
     assert slot_source is not None
-    assert "F.xxhash64(F.lit(STREAM_ID), trace_seed, et)" in slot_source
-    assert 'stream_prefix = F.lit(f"{STREAM_ID}-")' in source
+    assert "F.xxhash64(F.lit(STREAM_NAMESPACE), trace_seed, et)" in slot_source
+    assert 'stream_prefix = F.lit(f"{STREAM_NAMESPACE}-")' in source
+    assert "STREAM_NAMESPACE = INCARNATION_PLAN.namespace" in source
     assert (
         'F.concat(F.lit("TXN-"), stream_prefix, '
         'F.col("v").cast("string")).alias("transaction_id")'
