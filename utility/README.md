@@ -20,6 +20,13 @@ ignored `utility\config\environments\<env>.yaml` generation configuration and
 `utility\config.yaml` is read only when the environment-specific generation
 file is absent.
 
+The generation file also pins `anchor_date` the first time an environment is
+configured (re-running `configure` keeps it). Dimensions depend only on the
+seed, scale settings, and this anchor, so re-rendering a `months`
+configuration on a later day regenerates the same stores, customers, and
+products. Handoff tables also record a hash of the dictionary content, so a
+setup run never mixes handoffs generated from different dictionaries.
+
 To build the demo around a named business instead of a preset store type, run
 `retail-setup customize --env alice --business "Kroger"` (or
 `configure --business "Kroger"`). GitHub Copilot drafts the departments,
@@ -86,7 +93,12 @@ report and the native Operations Agent by default.
 
 The authoritative base table schema is
 `src/retail_setup/generation/schemas.py`. The authoritative live payload mapping
-is `notebooks/templates/driver-05-stream.py`.
+is `notebooks/templates/driver-05-stream.py`. Vocabularies and ID formats that
+history and the stream share live in `src/retail_setup/generation/vocabulary.py`,
+consumer thresholds in `src/retail_setup/generation/calibration.py`, and store
+time zones in `src/retail_setup/generation/timezones.py`; the build inlines the
+first two into the stream notebook. Silver timestamps are UTC and generation
+works in store-local time (see the data contract).
 
 Setup 01 verifies dictionary repository/ref, JSON inventory, and SHA-256
 content before reusing an immutable-revision cache; mutable refs refresh on

@@ -34,7 +34,10 @@ retained for existing TMDL bindings.
 `customer_entered`, `customer_zone_changed`, `ble_ping_detected`,
 `truck_arrived`, `truck_departed`, `store_opened`, `store_closed`,
 `ad_impression`, `promotion_applied`, `online_order_created`,
-`online_order_picked`, and `online_order_shipped`.
+`online_order_picked`, `online_order_shipped`, `online_order_line_added`,
+`online_order_delivered`, `logistics_incident_started`, and
+`logistics_incident_resolved`. The last four are declared for the online-order
+and logistics-incident lifecycle models; the stream does not emit them yet.
 
 ### Other KQL tables
 
@@ -56,7 +59,7 @@ recommendation, approval, and rejection event tables.
 `dim_geographies`, `dim_stores`, `dim_distribution_centers`, `dim_trucks`,
 `dim_customers`, `dim_products`, `dim_date`.
 
-### Facts (19)
+### Facts (20)
 
 `fact_receipts`, `fact_receipt_lines`, `fact_payments`, `fact_store_ops`,
 `fact_foot_traffic`, `fact_ble_pings`, `fact_customer_zone_changes`,
@@ -64,7 +67,10 @@ recommendation, approval, and rejection event tables.
 `fact_promo_lines`,
 `fact_online_order_headers`, `fact_online_order_lines`, `fact_reorders`,
 `fact_truck_moves`, `fact_truck_inventory`, `fact_dc_inventory_txn`,
-`fact_store_inventory_txn`, `fact_stockouts`.
+`fact_store_inventory_txn`, `fact_stockouts`, `fact_logistics_incidents`.
+
+Silver timestamps are UTC; `dim_stores.TimeZone` converts them to store-local
+time and `fact_receipts.local_hour` keeps the store-local hour.
 
 ### Operational state
 
@@ -73,8 +79,8 @@ recommendation, approval, and rejection event tables.
 - owned streaming-only output `fact_online_order_status`
 
 `fact_online_order_status` is not part of the base contract or active semantic
-model. The streaming Silver notebook declares its schema and PICKED/SHIPPED
-routes. The solution manifest validates its named downstream exception, and
+model. The streaming Silver notebook declares its schema and
+PICKED/SHIPPED/DELIVERED routes. The solution manifest validates its named downstream exception, and
 the Delta maintenance inventory includes both this table and the
 `ag._watermarks` control table.
 
@@ -87,24 +93,24 @@ the Delta maintenance inventory includes both this table and the
 
 ## Semantic model
 
-The Direct Lake model has 42 active tables. Direct Lake is a Power BI
+The Direct Lake model has 43 active tables. Direct Lake is a Power BI
 connection mode that reads Delta/Parquet data from OneLake directly, without a
 separate import copy or DirectQuery round trip:
 
 - 7 dimensions
-- 19 facts
+- 20 facts
 - 10 Gold aggregates
 - 6 ML outputs: `churn_predictions`, `customer_segments`, `demand_forecast`,
   `stockout_risk`, `product_recommendations`, `price_elasticity`
 
 ```mermaid
 flowchart LR
-    Events[18 live event types] --> KQL[Eventhouse tables]
+    Events[22 declared live event types] --> KQL[Eventhouse tables]
     KQL --> Projection[Optional live projection]
-    Generation[Historical generator] --> Silver[7 dimensions + 19 facts]
+    Generation[Historical generator] --> Silver[7 dimensions + 20 facts]
     Projection --> Silver
     Silver --> Gold[10 aggregates]
-    Silver --> Model[42-table Direct Lake model]
+    Silver --> Model[43-table Direct Lake model]
     Gold --> Model
     ML[6 active ML outputs] --> Model
 ```

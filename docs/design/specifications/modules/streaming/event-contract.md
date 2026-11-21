@@ -20,6 +20,21 @@ provide prices and tax data. Missing/empty dimensions or failed attribute
 reads stop startup rather than substituting arbitrary ID ranges or synthetic
 attribute frames. Complete historical setup before starting the stream.
 
+## Time and shared vocabulary
+
+Every timestamp the stream writes is UTC; the stream never assumes store-local
+time. Historical Silver uses the same convention (see the
+[historical data contract](../generation/data-contract.md#time-convention)), and
+`fact_receipts.local_hour` gives the store-local hour for both producers.
+
+Tenders, zones, ID formats, marketing channels and devices, promotions, and the
+decline model come from `retail_setup.generation.vocabulary`, which the build
+inlines into the notebook. Where the live values still differ from history
+(for example the `MOBILE` tender, decimal BLE IDs, lower-case devices, and
+`CMP-` campaign IDs), the stream keeps a `LIVE_*` constant and
+`utility/tests/generation/test_vocabulary.py` lists the difference as a known
+gap. That test fails when a gap closes, so the list only shrinks.
+
 ## Envelope
 
 Every event contains:
@@ -56,9 +71,32 @@ Payload fields are event-specific and mapped by `EVENT_PAYLOADS`.
 16. `online_order_created`
 17. `online_order_picked`
 18. `online_order_shipped`
+19. `logistics_incident_started` (declared, not yet emitted)
+20. `logistics_incident_resolved` (declared, not yet emitted)
+21. `online_order_line_added` (declared, not yet emitted)
+22. `online_order_delivered` (declared, not yet emitted)
+
+Types 19-22 are declared end to end (KQL table, mapping, `EVENT_PAYLOADS`,
+Silver route, contract path and fixture) so the logistics-incident and
+online-order lifecycle models can start emitting them without another
+contract change. The stream emits the first eighteen today.
+
+- `logistics_incident_started` carries `incident_id`, `incident_type`
+  (`DC_OUTAGE`, `LANE_DELAY`, `WEATHER`, `HOLIDAY`, `SUPPLIER_SHORT_SHIP`),
+  `dc_id`, `store_id` (null for DC- or network-wide incidents), `started_at`,
+  `severity`, `affected_store_count`, and `description`.
+  `logistics_incident_resolved` carries the same identity and `resolved_at`.
+  Silver keeps one `fact_logistics_incidents` row per incident: the start
+  inserts it and the resolution sets `resolved_at` once (Delta `MERGE`). A
+  resolution whose start has aged out of Bronze only updates an existing row.
+- `online_order_line_added` carries the order line (`line_number`,
+  `product_id`, `quantity`, prices, `promo_code`) and its fulfillment node; it
+  lands in `fact_online_order_lines` with status `PENDING`.
+- `online_order_delivered` adds a `DELIVERED` row to the streaming-only
+  `fact_online_order_status` table, like picked and shipped.
 
 KQL defines an additional `unknown_event` catch-all table. It is not a
-nineteenth generated business event. The current notebook rejects unmapped
+generated business event. The current notebook rejects unmapped
 event types before committing the micro-batch checkpoint. The catch-all is an
 operational queued-ingestion boundary, not an active direct-writer DLQ.
 Here DLQ means dead-letter queue: a place to preserve messages that could not
@@ -136,7 +174,16 @@ inventories from the driver, KQL, `schemas.py`, notebooks, and active TMDL.
 `shipment_id`. The departure payload and envelope timestamp are later than the
 arrival timestamp. Normal dwell is a deterministic 30-75 minutes; every fifth
 eligible logistics value takes the deterministic 120-minute late path, above the
-90-minute rule threshold.
+90-minute dwell SLA. These values come from
+`utility/src/retail_setup/generation/calibration.py`, the same module the rules,
+anomaly functions, and semantic model are checked against.
+
+`truck_arrived` also carries `planned_arrival_time`, `delay_minutes`, and
+`delay_reason`. Until the logistics incident model lands, live trucks arrive as
+planned (`delay_minutes = 0`, no reason). Silver copies them to
+`fact_truck_moves`. The KQL script restates the table with `.alter table` so an
+existing Eventhouse takes the declared column order, which the positional
+Spark Kusto writes rely on.
 
 Silver joins the two event tables on all four lifecycle keys and writes one
 completed `fact_truck_moves` row. Eventhouse and Gold expose dwell in minutes
@@ -182,7 +229,7 @@ equations. A live Fabric smoke run remains the deployment verification gate.
 
 ## Contract evidence and live boundary
 
-Eight fixture scenarios cover all 18 emitted types plus nullable and
+Eight fixture scenarios cover all 22 declared types plus nullable and
 unknown-event variants. The parameterized matrix validates the nine-field
 envelope, KQL DDL/mappings, UTC values, business/dedupe keys, Silver/Gold
 routes, and either an active semantic terminal or the named streaming-only
