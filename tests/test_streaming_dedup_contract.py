@@ -16,6 +16,7 @@ from retail_setup.generation.stream_control import call_with_retry, ingest_tag
 ROOT = Path(__file__).resolve().parents[1]
 STREAM_TEMPLATE = ROOT / "utility" / "notebooks" / "templates" / "driver-05-stream.py"
 SILVER_NOTEBOOK = ROOT / "fabric" / "lakehouse" / "03-streaming-to-silver.ipynb"
+KQL_TABLES = ROOT / "fabric" / "kql_database" / "01-create-tables.kql"
 
 
 def _function(tree: ast.Module, name: str) -> ast.FunctionDef:
@@ -186,6 +187,32 @@ def test_eventhouse_batch_uses_idempotent_transaction_metadata() -> None:
     assert '"ensureNoDuplicatedBlobs", "true"' in write_source
     assert '"sparkIngestionPropertiesJson", ingestion_properties' in write_source
     assert '"sparkIngestionProperties", ingestion_properties' not in write_source
+    assert ".coalesce(1)" in write_source
+
+
+def test_stream_ingest_cadence_and_tag_retention_policies() -> None:
+    tree = ast.parse(STREAM_TEMPLATE.read_text(encoding="utf-8"))
+    assert ast.literal_eval(_assignment(tree, "trigger_seconds").value) == 60
+    event_tables = set(ast.literal_eval(_assignment(tree, "EVENT_PAYLOADS").value))
+    kql = KQL_TABLES.read_text(encoding="utf-8")
+    retention = dict(
+        re.findall(
+            r"(?m)^\.alter table (\w+) policy extent_tags_retention\s*```\s*(\[.*?\])\s*```",
+            kql,
+        )
+    )
+
+    assert set(retention) == event_tables
+    for policy in retention.values():
+        assert json.loads(policy) == [
+            {"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}
+        ]
+    # The connector's transactional writes never use these, so the stream's
+    # tables don't declare them; only the queued-ingestion catch-all does.
+    dead = set(
+        re.findall(r"(?m)^\.alter table (\w+) policy (?:streamingingestion|ingestionbatching)", kql)
+    )
+    assert dead == {"unknown_event"}
 
 
 @pytest.mark.parametrize("failure", ["none", "partial", "unmapped", "credentials"])

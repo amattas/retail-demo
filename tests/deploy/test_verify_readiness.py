@@ -649,18 +649,27 @@ def test_setup_signal_does_not_treat_missing_catalog_evidence_as_zero(metadata) 
         adapter.setup_signal()
 
 
-def test_checkpoint_query_coerces_extent_tags_to_dynamic() -> None:
+def test_checkpoint_query_filters_tags_in_the_table_scoped_command() -> None:
     adapter = object.__new__(FabricReadinessAdapter)
     queries = []
     adapter._execute_kql = (  # type: ignore[method-assign]
         lambda query, **kwargs: queries.append((query, kwargs)) or []
     )
 
-    signal = adapter.checkpoint_signal(frozenset({"receipt_created"}))
+    signal = adapter.checkpoint_signal(frozenset({"receipt_created", "ad_impression"}))
 
     assert signal is None
-    assert "todynamic(Tags)" in queries[0][0]
-    assert "mv-expand tag=tag_values" in queries[0][0]
+    query, kwargs = queries[0]
+    assert kwargs == {"management": True}
+    assert query.startswith(
+        ".show tables (ad_impression, receipt_created) extents "
+        "where tags contains 'ingest-by:retail-demo:'"
+    )
+    assert "ago(1d)" in query
+    assert "arg_max(MaxCreatedOn, Tags) by TableName" in query
+    assert "mv-expand" not in query
+    assert adapter.checkpoint_signal(frozenset()) is None
+    assert len(queries) == 1
 
 
 def test_sql_connection_prefers_installed_system_odbc_driver(monkeypatch) -> None:

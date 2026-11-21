@@ -591,284 +591,139 @@
 .alter-merge table unknown_event policy retention softdelete = 7d
 
 // ============================================================================
-// STREAMING INGESTION POLICIES
+// EXTENT TAG RETENTION
 // ============================================================================
-// Enable streaming ingestion on all event tables to allow real-time data flow
-// from the stream-events notebook (Spark Kusto connector). Without this, data
-// would only arrive via batch ingestion.
+// The stream-events notebook writes each event table once per micro-batch with
+// a unique ingest-by tag (retail-demo:<stream>:<incarnation>:<table>:<batch>),
+// which makes a replayed batch idempotent. Kusto keeps extent tags for the life
+// of the extent, so without this policy the tag set grows for the whole 7-30 day
+// soft-delete retention and every tag check and `.show extents` scan slows
+// down. A failed batch replays within minutes, so seven days is ample.
+//
+// The event tables set no streaming-ingestion or ingestion-batching policy.
+// The notebook's Spark connector writes are transactional queued ingestion
+// with flushImmediately, which bypasses batching, and nothing streams into
+// these tables. Policies applied by earlier versions of this script are inert
+// and can stay. The unknown_event catch-all keeps both policies for queued
+// ingestion.
 // ============================================================================
 
-// --- TRANSACTION EVENTS ---
-.alter table receipt_created policy streamingingestion enable
+.alter table receipt_created policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-.alter table receipt_line_added policy streamingingestion enable
+.alter table receipt_line_added policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-.alter table payment_processed policy streamingingestion enable
+.alter table payment_processed policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-// --- INVENTORY EVENTS ---
-.alter table inventory_updated policy streamingingestion enable
+.alter table inventory_updated policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-.alter table stockout_detected policy streamingingestion enable
+.alter table stockout_detected policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-.alter table reorder_triggered policy streamingingestion enable
+.alter table reorder_triggered policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-// --- CUSTOMER EVENTS ---
-.alter table customer_entered policy streamingingestion enable
+.alter table customer_entered policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-.alter table customer_zone_changed policy streamingingestion enable
+.alter table customer_zone_changed policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-.alter table ble_ping_detected policy streamingingestion enable
+.alter table ble_ping_detected policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-// --- OPERATIONAL EVENTS ---
-.alter table truck_arrived policy streamingingestion enable
+.alter table truck_arrived policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-.alter table truck_departed policy streamingingestion enable
+.alter table truck_departed policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-.alter table store_opened policy streamingingestion enable
+.alter table store_opened policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-.alter table store_closed policy streamingingestion enable
+.alter table store_closed policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-.alter table logistics_incident_started policy streamingingestion enable
+.alter table logistics_incident_started policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-.alter table logistics_incident_resolved policy streamingingestion enable
+.alter table logistics_incident_resolved policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-// --- MARKETING EVENTS ---
-.alter table ad_impression policy streamingingestion enable
+.alter table ad_impression policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-.alter table promotion_applied policy streamingingestion enable
+.alter table promotion_applied policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-// --- OMNICHANNEL EVENTS ---
-.alter table online_order_created policy streamingingestion enable
+.alter table online_order_created policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-.alter table online_order_picked policy streamingingestion enable
+.alter table online_order_picked policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-.alter table online_order_shipped policy streamingingestion enable
+.alter table online_order_shipped policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-.alter table online_order_line_added policy streamingingestion enable
+.alter table online_order_line_added policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-.alter table online_order_delivered policy streamingingestion enable
+.alter table online_order_delivered policy extent_tags_retention
+```
+[{"TagPrefix": "ingest-by:", "RetentionPeriod": "7.00:00:00"}]
+```
 
-// --- UNKNOWN EVENTS ---
+// ============================================================================
+// UNKNOWN EVENTS: queued-ingestion catch-all
+// ============================================================================
+
 .alter table unknown_event policy streamingingestion enable
 
-// ============================================================================
-// INGESTION BATCHING POLICIES
-// ============================================================================
-// Configure batching behavior for optimal throughput vs. latency trade-off.
-//
-// Parameters:
-// - MaximumBatchingTimeSpan: Max time to wait before flushing (default: 5 min)
-// - MaximumNumberOfItems: Max events per batch (default: 1000)
-// - MaximumRawDataSizeMB: Max batch size in MB (default: 1024)
-//
-// High-volume tables use smaller batching windows for faster availability.
-// ============================================================================
-
-// --- HIGH-VOLUME TABLES: 30 second batching ---
-
-.alter table receipt_created policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:00:30",
-    "MaximumNumberOfItems": 500,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table receipt_line_added policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:00:30",
-    "MaximumNumberOfItems": 1000,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table inventory_updated policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:00:30",
-    "MaximumNumberOfItems": 500,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table customer_entered policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:00:30",
-    "MaximumNumberOfItems": 500,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-// --- MEDIUM-VOLUME TABLES: 1 minute batching ---
-
-.alter table payment_processed policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:01:00",
-    "MaximumNumberOfItems": 500,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table stockout_detected policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:01:00",
-    "MaximumNumberOfItems": 200,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table reorder_triggered policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:01:00",
-    "MaximumNumberOfItems": 200,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table customer_zone_changed policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:01:00",
-    "MaximumNumberOfItems": 500,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table ble_ping_detected policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:01:00",
-    "MaximumNumberOfItems": 1000,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table ad_impression policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:01:00",
-    "MaximumNumberOfItems": 500,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table promotion_applied policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:01:00",
-    "MaximumNumberOfItems": 200,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-// --- LOW-VOLUME TABLES: 2 minute batching ---
-
-.alter table truck_arrived policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:02:00",
-    "MaximumNumberOfItems": 100,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table truck_departed policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:02:00",
-    "MaximumNumberOfItems": 100,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table store_opened policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:02:00",
-    "MaximumNumberOfItems": 50,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table store_closed policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:02:00",
-    "MaximumNumberOfItems": 50,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table online_order_created policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:01:00",
-    "MaximumNumberOfItems": 500,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table online_order_picked policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:02:00",
-    "MaximumNumberOfItems": 200,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table online_order_shipped policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:02:00",
-    "MaximumNumberOfItems": 200,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table logistics_incident_started policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:02:00",
-    "MaximumNumberOfItems": 50,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table logistics_incident_resolved policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:02:00",
-    "MaximumNumberOfItems": 50,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table online_order_line_added policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:01:00",
-    "MaximumNumberOfItems": 1000,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-.alter table online_order_delivered policy ingestionbatching
-```
-{
-    "MaximumBatchingTimeSpan": "00:02:00",
-    "MaximumNumberOfItems": 200,
-    "MaximumRawDataSizeMB": 100
-}
-```
-
-// --- UNKNOWN EVENTS: 1 minute batching ---
 .alter table unknown_event policy ingestionbatching
 ```
 {
@@ -887,13 +742,9 @@
 // .show table * policy retention
 // | project TableName, SoftDeletePeriod
 //
-// -- Check streaming ingestion status:
-// .show table * policy streamingingestion
-// | project TableName, IsEnabled
-//
-// -- Check ingestion batching settings:
-// .show table * policy ingestionbatching
-// | project TableName, MaximumBatchingTimeSpan, MaximumNumberOfItems
+// -- Check extent tag retention:
+// .show table * policy extent_tags_retention
+// | project EntityName, Policy
 //
 // -- Verify streaming ingestion is working:
 // receipt_created

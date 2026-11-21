@@ -23,7 +23,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
-from retail_setup.generation.stream_control import parse_ingest_tag
+from retail_setup.generation.stream_control import INGEST_TAG_PREFIX, parse_ingest_tag
 
 from deploy.scripts import _output as console
 from deploy.scripts._auth import build_credential
@@ -87,6 +87,7 @@ _RETENTION_RE = re.compile(
 )
 _FUTURE_SKEW = timedelta(minutes=5)
 _CORRELATION_SKEW = timedelta(minutes=5)
+_INGEST_TAG_FILTER = f"ingest-by:{INGEST_TAG_PREFIX}:"
 _MAX_EVIDENCE_STRING = 300
 _MAX_EVIDENCE_ITEMS = 25
 _MAX_EVIDENCE_DEPTH = 5
@@ -2931,12 +2932,16 @@ class FabricReadinessAdapter:
         self,
         expected_tables: frozenset[str],
     ) -> dict[str, Any] | None:
+        if not expected_tables:
+            return None
+        # Table-scoped extents filtered by tag inside the command (the cheap form
+        # the Kusto docs recommend), bounded to one day, one row per table.
+        tables = ", ".join(sorted(expected_tables))
         rows = self._execute_kql(
-            ".show database extents "
-            "| extend tag_values=todynamic(Tags) "
-            "| mv-expand tag=tag_values "
-            "| where tostring(tag) contains 'retail-demo:' "
-            "| project TableName, tag=tostring(tag), MaxCreatedOn",
+            f".show tables ({tables}) extents "
+            f"where tags contains '{_INGEST_TAG_FILTER}' "
+            "| where MaxCreatedOn > ago(1d) "
+            "| summarize arg_max(MaxCreatedOn, Tags) by TableName",
             management=True,
         )
         return checkpoint_signal_from_rows(rows, expected_tables)

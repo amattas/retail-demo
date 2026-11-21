@@ -18,9 +18,11 @@
 # optional **live driver**, not part of the ordered batch setup. Stop the streaming
 # query to stop generating.
 #
-# Low latency: each Kusto write sets `flushImmediately` so events are queryable in
-# seconds instead of waiting for the table IngestionBatching policy (30s-2min), and
-# the per-table writes run concurrently so a micro-batch keeps up with the trigger.
+# Latency and cadence: a live run triggers a micro-batch every `trigger_seconds`
+# (60 by default) and writes each event table once per batch, as one coalesced
+# partition. Each write sets `flushImmediately`, so events are queryable seconds
+# after the batch instead of waiting for queued-ingestion batching. The per-table
+# writes run concurrently so a micro-batch keeps up with the trigger.
 # If a table looks empty or rows seem dropped, run `.show ingestion failures` in the
 # KQL database — rows that fail schema/type validation are reported there, not lost
 # silently.
@@ -789,11 +791,13 @@ EVENT_PAYLOADS = {
 TABLE_EXTRA_NULLS = {}
 
 KUSTO_FORMAT = "com.microsoft.kusto.spark.synapse.datasource"
-# flushImmediately tells the Kusto data-management service to flush each ingestion
-# right away instead of aggregating per the table IngestionBatching policy
-# (30s-2min). At this demo's low volume that cuts end-to-end latency from minutes
-# to seconds — the dominant cause of the live feed looking "exceptionally slow".
-# (Trade-off: more, smaller extents, acceptable for a demo.)
+# flushImmediately tells the Kusto data-management service to ingest each write
+# right away instead of waiting for queued-ingestion batching, so events are
+# queryable seconds after their micro-batch. To keep extents and ingest-by tags
+# few, every table is written once per batch from a single coalesced partition,
+# and live runs trigger once a minute (S-17). The event tables carry an
+# extent_tags_retention policy (01-create-tables.kql) that drops the stream's
+# ingest-by tags after seven days.
 
 # The per-event_type writes each target a different table, so run them concurrently
 # to overlap the blob-stage + ingest round-trips; sequential writes serialize ~18
@@ -855,7 +859,9 @@ def _write_event_table(batch_df, event_type, batch_id, token):
     mapped = (batch_df.where(F.col("event_type") == event_type)
               .select(F.from_json("value", _from_json_schema(event_type)).alias("e"))
               .select("e.*")
-              .select(*_kusto_columns(event_type)))
+              .select(*_kusto_columns(event_type))
+              # One partition -> one blob, one extent and one tag per table per batch.
+              .coalesce(1))
     (mapped.write.format(KUSTO_FORMAT)
         .option("kustoCluster", kusto_uri)
         .option("kustoDatabase", kql_database)
