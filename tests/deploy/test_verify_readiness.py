@@ -2102,13 +2102,22 @@ def _live_tables() -> frozenset[str]:
     ) - PENDING_EVENT_TYPES
 
 
-@pytest.mark.parametrize("stale_table", [None, "store_closed"])
-def test_eventhouse_freshness_is_checked_per_live_table(stale_table):
+@pytest.mark.parametrize(
+    ("stale_table", "age", "status"),
+    [
+        (None, None, "PASS"),
+        ("inventory_updated", timedelta(hours=2), "FAIL"),
+        # Store operations happen only at opening and closing time, and store
+        # visits stop overnight: those tables are quiet by design.
+        ("store_closed", timedelta(hours=20), "PASS"),
+        ("receipt_created", timedelta(hours=9), "PASS"),
+        ("store_closed", timedelta(hours=27), "FAIL"),
+    ],
+)
+def test_eventhouse_freshness_is_checked_per_live_table(stale_table, age, status):
     ingestion = {
         table: {
-            "ingested": (
-                NOW - (timedelta(hours=2) if table == stale_table else timedelta(minutes=2))
-            ).isoformat()
+            "ingested": (NOW - (age if table == stale_table else timedelta(minutes=2))).isoformat()
         }
         for table in _live_tables()
     }
@@ -2125,11 +2134,10 @@ def test_eventhouse_freshness_is_checked_per_live_table(stale_table):
     result = _status(runner, runner._eventhouse_freshness)
 
     assert PENDING_EVENT_TYPES.isdisjoint(ingestion)
+    assert result.status == status
     if stale_table is None:
-        assert result.status == "PASS"
         assert result.freshness["age_seconds"] == 120
-    else:
-        assert result.status == "FAIL"
+    elif status == "FAIL":
         assert stale_table in result.summary
 
 
