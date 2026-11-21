@@ -142,7 +142,7 @@
       "id": "01f01a29-ec9a-4e20-b865-d1f7954fcfe7",
       "type": "prepare data",
       "name": "Transform Real-Time Data",
-      "description": "Run only after the required Eventhouse shortcuts exist; project selected events through Silver and Gold.",
+      "description": "Run only after the required Eventhouse shortcuts exist; project selected events through Silver and Gold and persist anomaly alerts.",
       "items": [
         {
           "artifactUniqueId": "Pipeline:3c6f0a0d-07e5-4c68-8f4b-83d269033fa8",
@@ -161,6 +161,12 @@
           "artifactType": "SynapseNotebook",
           "artifactObjectId": null,
           "artifactName": "03-streaming-to-silver"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:4a19957e-1a82-53d4-9a7e-c632afa9be58",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "16-persist-anomaly-alerts"
         }
       ],
       "loc": "-180 220"
@@ -190,7 +196,7 @@
       "id": "15781dbc-2ab3-4cce-9622-2aa894cb145a",
       "type": "general",
       "name": "Maintain Lakehouse",
-      "description": "Maintain Lakehouse Delta tables. The retained parquet historical-load pipeline and notebook stay available for older flows; the destructive reset notebook remains a manual action.",
+      "description": "Maintain Lakehouse Delta tables and refresh the Operations Agent's availability signals nightly. The retained parquet historical-load pipeline and notebook stay available for older flows; the destructive reset notebook remains a manual action.",
       "items": [
         {
           "artifactUniqueId": "Pipeline:abdd84f4-4893-46c0-ab7f-66aa5f65c5d0",
@@ -215,6 +221,12 @@
           "artifactType": "SynapseNotebook",
           "artifactObjectId": null,
           "artifactName": "05-maintain-delta-tables"
+        },
+        {
+          "artifactUniqueId": "SynapseNotebook:2b91286a-a50e-586d-af1f-30ef3ce68235",
+          "artifactType": "SynapseNotebook",
+          "artifactObjectId": null,
+          "artifactName": "17-refresh-availability-signals"
         },
         {
           "artifactUniqueId": "SynapseNotebook:6dc40ab4-7dd7-4f70-a7f0-5de864120106",

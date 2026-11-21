@@ -83,7 +83,7 @@ validators. Validation checks:
 - representative wire fixtures, including nullable and unknown-event cases;
 - all 14 ML producer/source/schema/grain/temporal/lineage declarations;
 - required ML agreement across producer, validator, and active TMDL;
-- all 26 readiness check IDs, categories, profile applicability, and
+- all 27 readiness check IDs, categories, profile applicability, and
   required/optional behavior against the unchanged runtime taxonomy;
 - declared inventory exceptions.
 

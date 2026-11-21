@@ -2486,9 +2486,9 @@ def test_yes_flag_runs_required_gates_without_prompt(monkeypatch, tmp_path):
     assert journal["manifest"]["hash"] == profile.manifest_hash
     assert journal["manifest"]["profile_support_status"] == "preview"
     assert journal["manifest"]["expected_item_counts"] == {
-        "infrastructure": 47,
+        "infrastructure": 49,
         "reporting": 2,
-        "all": 49,
+        "all": 51,
     }
     assert journal["manifest"]["asset_boundaries"]["preview"] == list(profile.preview_asset_ids)
     assert journal["manifest"]["asset_boundaries"]["manual"] == list(profile.manual_asset_ids)
