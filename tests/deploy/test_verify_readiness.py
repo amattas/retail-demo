@@ -13,7 +13,10 @@ from types import SimpleNamespace
 
 import pytest
 from retail_setup.contracts import load_repository_manifest, resolve_profile
-from retail_setup.generation.stream_control import PENDING_EVENT_TYPES
+from retail_setup.generation.stream_control import (
+    EVENT_TABLE_QUIET,
+    PENDING_EVENT_TYPES,
+)
 
 from deploy.scripts.build_artifacts import SETUP_NOTEBOOKS
 from deploy.scripts.deploy_config import OperationsPlanningConfig, TwinsConfig
@@ -2089,7 +2092,11 @@ def test_watermark_check_warns_before_retention_purges_unprocessed_events(
     assert result.status == status
     assert text in result.summary
     if status == "PASS":
-        assert result.freshness["max_age_seconds"] == 2 * 30 * 60
+        # Two schedule intervals plus the table's quiet time (store visits stop
+        # overnight while every store is closed).
+        assert result.freshness["max_age_seconds"] == (
+            2 * 30 * 60 + EVENT_TABLE_QUIET["customer_entered"].total_seconds()
+        )
         assert "last_processed_ts" in result.freshness["lineage"]
 
 
