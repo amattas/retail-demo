@@ -62,6 +62,11 @@ from deploy.scripts.fabric_runtime import decode_definition_parts, paginated_get
 from deploy.scripts.verify_readiness import _connect_lakehouse_sql, write_report_atomic
 
 ROOT = Path(__file__).resolve().parents[2]
+UNCOUNTED_ALERTABLE_CASES = (
+    "The recorded signals predate alert-rule counting, so it is unknown whether "
+    "any case would alert; the agent was left stopped. Rerun the full Operations "
+    "publication to reseed and count the signals, then activate it."
+)
 PLAN_NAME = "retail-replenishment"
 PLAN_MEASURES = (
     "Forecasted Units Next 7 Days", "Forecast Lower Bound Next 7 Days",
@@ -198,6 +203,9 @@ def _activate_agent(
         return None
     agent = report["operations_agent"]
     alertable = report.get("alertable_signal_count")
+    if alertable is None:
+        agent["activation_refused"] = UNCOUNTED_ALERTABLE_CASES
+        return UNCOUNTED_ALERTABLE_CASES
     if not isinstance(alertable, int) or isinstance(alertable, bool) or alertable < 1:
         agent["activation_refused"] = NO_ALERTABLE_CASE
         return NO_ALERTABLE_CASE

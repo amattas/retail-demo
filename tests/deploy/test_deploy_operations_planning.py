@@ -407,6 +407,23 @@ def test_watchlist_with_no_alertable_case_refuses_activation_and_fails_the_step(
     assert "never alert" in report["operations_agent"]["activation_refused"]
 
 
+@pytest.mark.parametrize(
+    "count,message", [(None, "predate alert-rule counting"), (0, "never alert")]
+)
+def test_activation_is_refused_without_a_counted_alertable_case(monkeypatch, count, message):
+    activate = Mock()
+    monkeypatch.setattr(deploy, "activate_operations_agent", activate)
+    report = {"operations_agent": {"id": ID}, "acceptance": ""}
+    if count is not None:
+        report["alertable_signal_count"] = count
+
+    refused = deploy._activate_agent(Mock(), config(activate_agent=True), ID, report)
+
+    assert message in refused
+    assert report["operations_agent"]["activation_refused"] == refused
+    activate.assert_not_called()
+
+
 def test_agent_rejection_preserves_supporting_asset_evidence(publication, tmp_path):
     _session, publish_item = publication
     publish_item.side_effect = [ID, deploy.NativeItemError("Create OperationsAgent failed: HTTP 400")]
