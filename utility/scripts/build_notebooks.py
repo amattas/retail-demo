@@ -38,6 +38,7 @@ ENGINE_MODULES = [
     "generation/schemas.py",
     "generation/runtime.py",
     "generation/vocabulary.py",
+    "generation/calibration.py",
     "generation/timezones.py",
     "generation/stream_calendar.py",
     "generation/pricing.py",

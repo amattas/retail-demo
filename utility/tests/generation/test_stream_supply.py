@@ -287,7 +287,7 @@ def test_replay_and_batch_size_do_not_change_the_outcome() -> None:
         delta = sum(
             m.quantity_delta for m in moves if (m.store_id, m.product_id) == (store_id, product_id)
         )
-        assert entry["on_hand"] == opening_stock(7, store_id, product_id) + delta
+        assert entry["on_hand"] == opening_stock(7, store_id, product_id, 20.0) + delta
     received = {m.source: m.quantity_delta for m in moves if m.reason == "INBOUND_SHIPMENT"}
     assert set(received) == {d.shipment_id for d in flatten(whole, "departures")}
     reordered = sum(r.reorder_quantity for r in flatten(whole, "reorders"))

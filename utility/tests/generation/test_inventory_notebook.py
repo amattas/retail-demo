@@ -33,7 +33,7 @@ for _probe_name, _probe_source in _probe_json.load(_probe_sys.stdin):
     exec(compile(_probe_source, _probe_name, "exec"), globals())
 _probe_worker = partial(
     _simulate_arrow_partition, start_date=date(2024, 1, 1), end_date=date(2024, 1, 3),
-    seed=17, capacity=25, daily_prior=1.0, time_zone="UTC",
+    seed=17, daily_prior=1.0, time_zone="UTC",
 )
 print(_probe_base64.b64encode(_probe_pickle.dumps(_probe_worker)).decode("ascii"))
 """,
@@ -87,7 +87,8 @@ assert len(lost) == 1 and lost[0]["unfulfilled_quantity"] == 1000
 returns = [event for event in events if event["kind"] == "RETURN"]
 assert len(returns) == 1 and returns[0]["source"] == "RET1"
 assert returns[0]["event_ts"] == datetime(2024, 1, 2, 12, tzinfo=timezone.utc)
-assert all(event["quantity"] <= 25 for event in events if event["kind"] == "SHIPMENT")
+orders = [event["quantity"] for event in events if event["kind"] == "REORDER"]
+assert orders == [event["quantity"] for event in events if event["kind"] == "SHIPMENT"]
 assert not any(name.startswith("retail_setup") for name in sys.modules)
 """,
         ],

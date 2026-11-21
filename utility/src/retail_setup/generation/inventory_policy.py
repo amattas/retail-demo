@@ -3,9 +3,15 @@
 Each SKU learns an EWMA of attempted daily demand (including lost sales).
 There are no backorders: rejected whole lines have no stock commitment.
 Inventory position includes outstanding deliveries and accepted restock returns.
-SKU-specific shipments use deterministic 1-3 day service, capacity-bounded
-legs, and unlimited just-in-time supplier replenishment at the DC. This is a
-stock/service simulation, not a vehicle-routing or supplier-capacity model.
+
+Deliveries follow the store's delivery slot, as in the live stream: every SKU a
+store reorders when a day closes ships on that store's next consolidated load,
+which leaves the DC at the store's daily slot (``network.plan_routes``), drives
+the lane and is unloaded on arrival. The SKU simulation only needs the slot and
+the lane time, so it stays independent of other SKUs; ``inventory.py``
+consolidates the reorders into capacity-bounded shipments and puts them on
+trucks. The DC is an unlimited just-in-time supplier. This is a stock/service
+simulation, not a vehicle-routing or supplier-capacity model.
 """
 
 from dataclasses import dataclass
@@ -16,6 +22,13 @@ from heapq import heappop, heappush
 from math import ceil
 from typing import Iterable, Iterator
 
+from retail_setup.generation.calibration import (
+    TRUCK_CHECKIN_MINUTES,
+    TRUCK_LOAD_MINUTES,
+    TRUCK_TRANSIT_MINUTES_MAX,
+    TRUCK_TRANSIT_MINUTES_MIN,
+)
+
 CASE_PACK = 12
 
 
@@ -25,9 +38,26 @@ def stable_int(seed: int, *keys: object) -> int:
     return int.from_bytes(sha256(value.encode("utf-8")).digest()[:8], "big")
 
 
-def opening_stock(seed: int, store_id: int, product_id: int) -> int:
-    """History-independent opening state; never inspect future demand."""
-    return 40 + stable_int(seed, store_id, product_id, "opening") % 81
+def opening_stock(seed: int, store_id: int, product_id: int, rate: float = 1.0) -> int:
+    """Opening shelf stock for a SKU expected to sell ``rate`` units a day.
+
+    A stable draw between the reorder point and the order-up-to target, so a
+    store opens with 4-8 days of cover and its SKUs do not all reorder on the
+    first day. ``rate`` is a prior from the demand model, never generated demand.
+    """
+    point, target = reorder_levels(rate)
+    return point + 1 + stable_int(seed, store_id, product_id, "opening") % (target - point)
+
+
+def delivery_slot_minute(seed: int, store_id: int) -> int:
+    """Fallback daily delivery slot (minute of the day) of a store without a route."""
+    return stable_int(seed, int(store_id), "slot") % 1440
+
+
+def lane_transit_minutes(seed: int, dc_id: int, store_id: int) -> int:
+    """One-way drive between a store and its DC (a stable draw per lane)."""
+    span = TRUCK_TRANSIT_MINUTES_MAX - TRUCK_TRANSIT_MINUTES_MIN + 1
+    return TRUCK_TRANSIT_MINUTES_MIN + stable_int(seed, int(dc_id), int(store_id), "lane") % span
 
 
 # The replenishment policy, shared by history (``simulate_sku``) and the live
@@ -100,42 +130,50 @@ class InventoryEvent:
     etd: datetime | None = None
 
 
-def shipment_events(
-    seed: int,
+def shipment_base_id(dispatch: datetime, store_id: int) -> str:
+    """A store's consolidated load of one dispatch day (``inventory.py`` adds the leg)."""
+    return f"SHP-{dispatch:%Y%m%d}-{int(store_id):04d}"
+
+
+def shipment_event(
     store_id: int,
     product_id: int,
     day: date,
     quantity: int,
-    capacity: int,
-) -> Iterator[InventoryEvent]:
-    """One SKU per shipment leg; the ledger consumes these exact timestamps."""
-    draw = stable_int(seed, store_id, product_id, day, "service")
-    service_day = day + timedelta(days=1 + draw % 3)
-    for leg, offset in enumerate(range(0, quantity, capacity)):
-        stagger = timedelta(minutes=30 * leg)
-        loading = datetime.combine(service_day, inventory_time(4)) + stagger
-        departure = loading + timedelta(hours=2)
-        arrival = departure + timedelta(minutes=120 + (draw // 3) % 601)
-        unloading = arrival + timedelta(minutes=15)
-        completed = arrival + timedelta(minutes=30 + (draw // 1803) % 91)
-        shipment_id = f"SHIP-{day:%Y%m%d}-{store_id}-{product_id}-{leg}"
-        yield InventoryEvent(
-            store_id,
-            product_id,
-            datetime.combine(day, inventory_time(23, 59, 59)),
-            f"TRC-PLAN-{shipment_id}",
-            "SHIPMENT",
-            min(capacity, quantity - offset),
-            shipment_id,
-            shipment_id=shipment_id,
-            leg=leg,
-            scheduled_ts=datetime.combine(day + timedelta(days=1), inventory_time()),
-            loading_ts=loading,
-            depart_ts=departure,
-            eta=arrival,
-            unloading_ts=unloading,
-            etd=completed,
-        )
+    *,
+    slot_minute: int,
+    transit_minutes: int,
+) -> InventoryEvent:
+    """The SKU's line on its store's next load: the day after the reorder, at the slot.
+
+    Timing depends only on the store's slot and lane, so every SKU the store
+    reorders on ``day`` shares one dispatch and one arrival. Stock is received
+    when unloading starts; ``inventory.py`` adds the unload duration (``etd``).
+    """
+    if not 0 <= slot_minute < 1440 or transit_minutes < 0:
+        raise ValueError("invalid delivery slot or lane time")
+    loading = datetime.combine(day + timedelta(days=1), inventory_time()) + timedelta(
+        minutes=slot_minute
+    )
+    departure = loading + timedelta(minutes=TRUCK_LOAD_MINUTES)
+    arrival = departure + timedelta(minutes=transit_minutes)
+    shipment_id = shipment_base_id(loading, store_id)
+    return InventoryEvent(
+        store_id,
+        product_id,
+        datetime.combine(day, inventory_time(23, 59, 59)),
+        f"TRC-PLAN-{shipment_id}-{product_id}",
+        "SHIPMENT",
+        quantity,
+        shipment_id,
+        shipment_id=shipment_id,
+        leg=0,
+        scheduled_ts=datetime.combine(day + timedelta(days=1), inventory_time()),
+        loading_ts=loading,
+        depart_ts=departure,
+        eta=arrival,
+        unloading_ts=arrival + timedelta(minutes=TRUCK_CHECKIN_MINUTES),
+    )
 
 
 def simulate_sku(
@@ -146,13 +184,24 @@ def simulate_sku(
     start_date: date,
     end_date: date,
     seed: int,
-    capacity: int,
     daily_prior: float = 1.0,
+    slot_minute: int | None = None,
+    transit_minutes: int | None = None,
 ) -> Iterator[InventoryEvent]:
-    """Consume sorted demand with O(one SKU + pending deliveries/returns) state."""
-    if capacity < 1 or daily_prior < 0 or end_date < start_date:
+    """Consume sorted demand with O(one SKU + pending deliveries/returns) state.
+
+    ``daily_prior`` is the SKU's expected daily demand: it sizes the opening
+    stock and starts the demand estimate, so history has no start-up stockout
+    wave. ``slot_minute`` and ``transit_minutes`` are the store's delivery slot
+    and lane (``network.plan_routes``); they default to the stable fallbacks.
+    """
+    if daily_prior < 0 or end_date < start_date:
         raise ValueError("invalid inventory simulation bounds")
-    on_hand = opening_stock(seed, store_id, product_id)
+    if slot_minute is None:
+        slot_minute = delivery_slot_minute(seed, store_id)
+    if transit_minutes is None:
+        transit_minutes = lane_transit_minutes(seed, 0, store_id)
+    on_hand = opening_stock(seed, store_id, product_id, daily_prior)
     yield InventoryEvent(
         store_id,
         product_id,
@@ -261,21 +310,28 @@ def simulate_sku(
                 reorder_point=point,
                 priority=priority,
             )
-            for shipment in shipment_events(seed, store_id, product_id, day, quantity, capacity):
-                yield shipment
-                if shipment.unloading_ts is None:
-                    raise RuntimeError(f"shipment {shipment.source} has no unloading time")
-                delivery = InventoryEvent(
-                    store_id,
-                    product_id,
-                    shipment.unloading_ts,
-                    f"TRC-SI-{shipment.source}-{product_id}",
-                    "INBOUND_SHIPMENT",
-                    shipment.quantity,
-                    shipment.source,
-                )
-                heappush(pending, (delivery.event_ts, delivery.trace_id, delivery))
-                inbound += delivery.quantity
+            shipment = shipment_event(
+                store_id,
+                product_id,
+                day,
+                quantity,
+                slot_minute=slot_minute,
+                transit_minutes=transit_minutes,
+            )
+            yield shipment
+            if shipment.unloading_ts is None:
+                raise RuntimeError(f"shipment {shipment.source} has no unloading time")
+            delivery = InventoryEvent(
+                store_id,
+                product_id,
+                shipment.unloading_ts,
+                f"TRC-SI-{shipment.source}-{product_id}",
+                "INBOUND_SHIPMENT",
+                shipment.quantity,
+                shipment.source,
+            )
+            heappush(pending, (delivery.event_ts, delivery.trace_id, delivery))
+            inbound += delivery.quantity
         day += timedelta(days=1)
     if candidate is not None:
         raise ValueError("candidate demand falls outside the simulation history")

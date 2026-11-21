@@ -327,12 +327,14 @@ except Exception:  # noqa: BLE001 - no ledger yet; stock starts from opening sto
 INVENTORY_SEED = (None if _ledger is None
                   else inventory_seed_frame(_ledger, INVENTORY_SEED_AS_OF).persist())
 
-# Stores route to their nearest DC and trucks serve their DC's fleet, exactly as
-# in the historical inventory chain; the demand prior is history's.
+# Stores route to their DC, ship at their route's daily delivery slot (store
+# local time) and trucks serve their DC's fleet, exactly as in the historical
+# inventory chain; the demand prior is history's.
 _DIM_DCS = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_distribution_centers")
-_store_dc = {int(r["store_id"]): int(r["dc_id"]) for r in store_dc_map(
-    DIM_STORES, spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_geographies"), _DIM_DCS,
-).collect()}
+_routes = store_routes(
+    SEED, DIM_STORES, spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_geographies"), _DIM_DCS,
+)
+_store_dc = {store: route.dc_id for store, route in _routes.items()}
 _fleets = dc_fleets(
     ((r["ID"], r["DCID"]) for r in spark.table(
         f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_trucks").select("ID", "DCID").collect()),
@@ -345,6 +347,8 @@ STREAM_SUPPLY = SupplyNetwork(
     fleets=_fleets,
     daily_prior=TRANSACTIONS_PER_STORE_DAY * 10.0
     / max(1, spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_products").count()),
+    slots={store: route.slot_minute for store, route in _routes.items()},
+    zones={int(r["ID"]): r["TimeZone"] for r in DIM_STORES.select("ID", "TimeZone").collect()},
 )
 print(f"supply: {len(_store_dc)} stores on {len(_fleets)} DC fleets "
       f"({sum(len(f) for f in _fleets.values())} trucks); stock seeded as of "

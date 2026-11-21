@@ -149,8 +149,8 @@ replays, in time order, everything that changes it in a micro-batch:
   `reason = INBOUND_SHIPMENT`, `source` = the shipment ID.
 
 Every inventory, stockout and reorder event carries the store's DC (`dc_id`),
-the nearest DC by geography, as in the historical inventory chain
-(`network.store_dc_map`). A store and product the stream has not touched yet
+assigned as in the historical inventory chain (`network.assign_dcs`: same
+state, else region, least loaded). A store and product the stream has not touched yet
 starts from its latest Silver `fact_store_inventory_txn` balance as of the
 incarnation start (never below zero) and the mean daily demand of the 7 days
 before it; one Silver has never seen starts from history's opening stock. The
@@ -161,19 +161,20 @@ the policy reorders that stock.
 ## Trucks
 
 A reorder joins its store's pending load at the DC. Each store takes one
-consolidated delivery a day: at the store's daily delivery slot (a stable
-minute of the UTC day, so the slots spread over the day), the next free truck
-of the DC's fleet (`dim_trucks.DCID`; pool trucks only for a DC with none)
-loads the whole pending load for `TRUCK_LOAD_MINUTES`, drives the lane (a
-stable 1-4 hour draw per DC and store), and arrives. Each DC's fleet is sized
-to the stores it serves (`network.TRUCKS_PER_STORE`, at least two trucks), so
-a typical fleet is busy about 70% of the day. `planned_arrival_time` is set at
+consolidated delivery a day: at the store's daily delivery slot (the minute of
+the store-local day its delivery route gives it, `network.plan_routes`, the
+same slot history uses), the next free truck of the DC's fleet
+(`dim_trucks.DCID`; pool trucks only for a DC with none) loads the whole pending
+load for `TRUCK_LOAD_MINUTES`, drives the lane (a stable 1-4 hour draw per DC
+and store), and arrives. Each DC's fleet has one truck per delivery route, so
+its routes never need more trucks than it has. `planned_arrival_time` is set at
 dispatch; the actual arrival is the planned time plus `delay_minutes`, which
 stays 0 with no `delay_reason` until the logistics incident model adds delays
 (`SupplyBatch.held_dcs` already lets an incident stop a DC dispatching). The
 unload takes `TRUCK_UNLOAD_BASE_MINUTES` plus the load at
 `TRUCK_UNLOAD_UNITS_PER_MINUTE`, scaled by a per-store dock factor, with a few
-minutes of noise (`estimated_unload_duration` is the plan, the departure's
+minutes of noise, capped at `TRUCK_UNLOAD_MINUTES_MAX` (`network.unload_minutes`,
+shared with history; `estimated_unload_duration` is the plan, the departure's
 `actual_unload_duration` the outcome). A typical load unloads inside the
 normal 30-75 minute range; an unusually large one can breach the 90-minute SLA.
 The truck departs when the unload is done, which restocks the store, and drives

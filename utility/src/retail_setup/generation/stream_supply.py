@@ -43,23 +43,24 @@ from typing import Any
 
 from retail_setup.generation.calibration import (
     STOCKOUT_QUANTITY_THRESHOLD,
-    TRUCK_DOCK_FACTOR_RANGE,
     TRUCK_LOAD_MINUTES,
     TRUCK_NORMAL_DWELL_MINUTES_MIN,
-    TRUCK_TRANSIT_MINUTES_MAX,
-    TRUCK_TRANSIT_MINUTES_MIN,
-    TRUCK_UNLOAD_BASE_MINUTES,
-    TRUCK_UNLOAD_NOISE_MINUTES,
-    TRUCK_UNLOAD_UNITS_PER_MINUTE,
 )
 from retail_setup.generation.inventory_policy import (
     decay_demand,
+    delivery_slot_minute,
+    lane_transit_minutes,
     opening_stock,
     reorder_levels,
     reorder_priority,
     reorder_quantity,
     smooth_demand,
-    stable_int,
+)
+from retail_setup.generation.network import (
+    dock_factor,
+    estimated_unload_minutes,
+    next_slot_ms,
+    unload_minutes,
 )
 from retail_setup.generation.stream_state import Changes, StateStore, apply_batch, state_changes
 
@@ -100,7 +101,7 @@ def default_inventory_entry(
     seed: int, store_id: int, product_id: int, daily_prior: float
 ) -> dict[str, Any]:
     """Entry for a store-product the Silver ledger has never seen (history's opening stock)."""
-    return inventory_entry(opening_stock(seed, store_id, product_id), daily_prior)
+    return inventory_entry(opening_stock(seed, store_id, product_id, daily_prior), daily_prior)
 
 
 def split_supply_state(state: SupplyState) -> tuple[SupplyState, SupplyState]:
@@ -112,45 +113,50 @@ def split_supply_state(state: SupplyState) -> tuple[SupplyState, SupplyState]:
 
 @dataclass(frozen=True)
 class SupplyNetwork:
-    """Static supply inputs: store routing, DC fleets and the demand prior."""
+    """Static supply inputs: store routing, DC fleets, delivery slots and the demand prior.
+
+    ``slots`` and ``zones`` hold each store's delivery slot (minute of the local
+    day, from ``network.plan_routes`` as in history) and IANA time zone; a store
+    without them ships at a stable UTC minute.
+    """
 
     seed: int
     namespace: str
     store_dc: dict[int, int]
     fleets: dict[int, tuple[int, ...]]
     daily_prior: float
+    slots: dict[int, int] = field(default_factory=dict)
+    zones: dict[int, str] = field(default_factory=dict)
 
     def dc_of(self, store_id: int) -> int:
         return self.store_dc[int(store_id)]
 
     def transit_minutes(self, store_id: int) -> int:
         """One-way drive between a store and its DC (a stable draw per lane)."""
-        span = TRUCK_TRANSIT_MINUTES_MAX - TRUCK_TRANSIT_MINUTES_MIN + 1
-        draw = stable_int(self.seed, self.dc_of(store_id), int(store_id), "lane")
-        return TRUCK_TRANSIT_MINUTES_MIN + draw % span
+        return lane_transit_minutes(self.seed, self.dc_of(store_id), int(store_id))
 
     def delivery_slot_minute(self, store_id: int) -> int:
-        """Minute of the UTC day at which a store's pending load ships (a stable draw)."""
-        return stable_int(self.seed, int(store_id), "slot") % 1440
+        """Minute of the store's day at which its pending load ships."""
+        slot = self.slots.get(int(store_id))
+        return delivery_slot_minute(self.seed, store_id) if slot is None else int(slot)
+
+    def next_slot_ms(self, store_id: int, since_ms: int) -> int:
+        """The store's first delivery slot at or after ``since_ms``."""
+        return next_slot_ms(
+            since_ms, self.delivery_slot_minute(store_id), self.zones.get(int(store_id))
+        )
 
     def dock_factor(self, store_id: int) -> float:
         """How slowly a store's dock unloads relative to the calibrated rate."""
-        low, high = TRUCK_DOCK_FACTOR_RANGE
-        return low + (high - low) * (stable_int(self.seed, int(store_id), "dock") % 1001) / 1000
+        return dock_factor(self.seed, store_id)
 
     def estimated_unload_minutes(self, store_id: int, units: int) -> int:
         """Planned dwell of a load: base time plus the units at the site's rate."""
-        handling = units / TRUCK_UNLOAD_UNITS_PER_MINUTE * self.dock_factor(store_id)
-        return max(TRUCK_NORMAL_DWELL_MINUTES_MIN, round(TRUCK_UNLOAD_BASE_MINUTES + handling))
+        return estimated_unload_minutes(self.seed, store_id, units)
 
     def unload_minutes(self, store_id: int, units: int, shipment_id: str) -> int:
         """Actual dwell: the estimate plus a little noise per shipment."""
-        span = 2 * TRUCK_UNLOAD_NOISE_MINUTES + 1
-        noise = stable_int(self.seed, shipment_id, "unload") % span - TRUCK_UNLOAD_NOISE_MINUTES
-        return max(
-            TRUCK_NORMAL_DWELL_MINUTES_MIN,
-            self.estimated_unload_minutes(store_id, units) + noise,
-        )
+        return unload_minutes(self.seed, store_id, units, shipment_id)
 
 
 @dataclass(frozen=True)
@@ -264,11 +270,7 @@ def _earliest_dispatch(
     network: SupplyNetwork, store_id: int, pending: dict[str, Any], floor_ms: int
 ) -> int:
     """The store's first delivery slot at or after its oldest pending reorder."""
-    since = int(pending["since_ms"])
-    slot = since - since % _DAY_MS + network.delivery_slot_minute(store_id) * _MINUTE_MS
-    if slot < since:
-        slot += _DAY_MS
-    return max(slot, floor_ms)
+    return max(network.next_slot_ms(store_id, int(pending["since_ms"])), floor_ms)
 
 
 def batch_floor(batch: SupplyBatch) -> int:

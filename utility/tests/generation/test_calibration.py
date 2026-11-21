@@ -34,6 +34,11 @@ STREAM_EVENTS = (
 STREAM_SUPPLY = (
     REPO / "utility" / "src" / "retail_setup" / "generation" / "stream_supply.py"
 ).read_text(encoding="utf-8")
+# Delivery timing and the unload model the stream shares with history.
+SHARED_DELIVERY = "\n".join(
+    (REPO / "utility" / "src" / "retail_setup" / "generation" / name).read_text(encoding="utf-8")
+    for name in ("network.py", "inventory_policy.py")
+)
 
 
 def _rule(title_prefix: str) -> str:
@@ -159,18 +164,23 @@ def test_stream_reads_thresholds_from_calibration() -> None:
         if isinstance(target, ast.Name)
     }
     assert not supply_assigned & constants, "stream_supply redefines calibration constants"
+    for name in ("TRUCK_LOAD_MINUTES", "STOCKOUT_QUANTITY_THRESHOLD"):
+        assert re.search(rf"\b{name}\b", STREAM_SUPPLY), name
+    # The unload and lane models are shared with history (network, inventory_policy).
+    for helper in ("unload_minutes", "lane_transit_minutes", "next_slot_ms", "dock_factor"):
+        assert helper in STREAM_SUPPLY, helper
     for name in (
         "TRUCK_NORMAL_DWELL_MINUTES_MIN",
         "TRUCK_UNLOAD_BASE_MINUTES",
         "TRUCK_UNLOAD_UNITS_PER_MINUTE",
         "TRUCK_UNLOAD_NOISE_MINUTES",
+        "TRUCK_UNLOAD_MINUTES_MAX",
         "TRUCK_DOCK_FACTOR_RANGE",
-        "TRUCK_LOAD_MINUTES",
         "TRUCK_TRANSIT_MINUTES_MIN",
         "TRUCK_TRANSIT_MINUTES_MAX",
-        "STOCKOUT_QUANTITY_THRESHOLD",
+        "TRUCK_TURNAROUND_MINUTES",
     ):
-        assert re.search(rf"\b{name}\b", STREAM_SUPPLY), name
+        assert re.search(rf"\b{name}\b", SHARED_DELIVERY), name
     # Reorder points and priorities come from the shared replenishment policy.
     for helper in ("reorder_levels(", "reorder_priority(", "reorder_quantity("):
         assert helper in STREAM_SUPPLY, helper

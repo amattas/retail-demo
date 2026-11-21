@@ -92,7 +92,7 @@ def _simulate(spark):
     from retail_setup.generation.baskets import basket_products
     from retail_setup.generation.customers import lifecycle_for
     from retail_setup.generation.dims import generate_dimensions
-    from retail_setup.generation.network import dc_fleets, store_dc_map
+    from retail_setup.generation.network import dc_fleets, store_routes
     from retail_setup.generation.receipts import generate_receipts_group
     from retail_setup.generation.sensors import generate_ble
     from retail_setup.generation.stream_baskets import prepare_basket_catalog
@@ -148,12 +148,10 @@ def _simulate(spark):
     rate = sum(plan.peaks.values())
     shares = {lane: share * plan.rows_per_second / rate for lane, share in plan.shares.items()}
     lanes = replace(plan, rows_per_second=rate, shares=shares)
-    store_dc = {
-        row["store_id"]: row["dc_id"]
-        for row in store_dc_map(
-            dims["dim_stores"], dims["dim_geographies"], dims["dim_distribution_centers"]
-        ).collect()
-    }
+    routes = store_routes(
+        cfg.seed, dims["dim_stores"], dims["dim_geographies"], dims["dim_distribution_centers"]
+    )
+    store_dc = {store: route.dc_id for store, route in routes.items()}
     trucks = dims["dim_trucks"].select("ID", "DCID").collect()
     fleets = dc_fleets(
         ((row["ID"], row["DCID"]) for row in trucks),
@@ -165,6 +163,8 @@ def _simulate(spark):
         store_dc=store_dc,
         fleets=fleets,
         daily_prior=TRANSACTIONS * 10.0 / dims["dim_products"].count(),
+        slots={store: route.slot_minute for store, route in routes.items()},
+        zones={row["ID"]: row["TimeZone"] for row in store_rows},
     )
     stock = (
         dims["dim_stores"]

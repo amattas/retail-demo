@@ -24,10 +24,18 @@ outputs, and `gold.py` builds the ten aggregates.
 `fact_truck_moves`, `fact_truck_inventory`, `fact_dc_inventory_txn`,
 `fact_store_inventory_txn`, `fact_stockouts`, and `fact_logistics_incidents`.
 
-`dim_trucks` gives each DC a fleet sized to the stores it serves (its nearest
-stores by geography, the routing `network.store_dc_map` uses): 0.4 trucks per
-store and at least two, plus a shared pool of about 15% of the fleet with a
-NULL `DCID`. The live stream runs these trucks one shipment at a time.
+Each store is served by a DC in its own state, else its region, else any DC;
+among those the store goes to the DC serving the fewest stores so far, so DCs
+in one state share the load (`network.assign_dcs`). Geographies are sampled one
+city per state in turn, so the shared dictionary's skew (most cities in five
+states) does not concentrate stores and DCs. `dim_trucks` gives each DC one
+truck per daily delivery route (`network.plan_routes`, at least two trucks),
+plus a shared pool of about 15% of the fleet with a NULL `DCID`. A route is a
+set of the DC's stores in one time zone, each with a daily delivery slot in
+store-local time; slots on a route are spaced by the longest possible trip
+(load, the lane both ways, the maximum unload, a turnaround), so a truck on its
+route is never in two places at once. History and the live stream use the same
+routes and slots.
 
 Online orders follow `vocabulary.ONLINE_HOURLY_WEIGHTS` over the UTC day
 (peaking in the US evening), and a BOPIS order is collected 1-24 hours after it
@@ -263,9 +271,26 @@ regardless of how Spark delivers rows.
 The replenishment policy covers every selling store/SKU. It learns from past
 attempted demand, considers on-hand and pending deliveries/accepted restocks,
 and orders case-pack quantities against coverage and safety-stock targets.
-Opening stock is seeded independently of future transactions. Deterministic
-delivery delays allow depletion and recovery rather than permanent negative
-balances or a blanket zero floor.
+Each SKU starts from a prior of its expected daily demand at the first history
+day (store volume and multiplier, lines per basket, seasonal department weight,
+the SKU's popularity share of its launched department, units per line): the
+prior starts the demand estimate and sizes opening stock between the reorder
+point and the order-up-to target (4-8 days of cover). It never looks at
+generated demand, and it removes the start-of-history stockout wave a flat
+opening stock caused.
+
+Every SKU a store reorders when a day closes ships on its next delivery slot
+as one load, which drives the lane and is received when unloading starts, 15
+minutes after arrival. `inventory.py` packs each load into shipments of at most
+`truck_capacity` units in product order (`_split_reorders_by_capacity`; IDs
+`SHP-<dispatch yyyyMMdd>-<store>-<leg>`), splitting a SKU's receipt across legs
+when needed. Shipments go, in loading order, to a truck that is free for the
+whole trip (loading until it is back at the DC): the store's route truck for
+the first leg, the shared pool and then the DC's other trucks for overflow legs.
+Dwell is the unload model shared with the live stream (`network.unload_minutes`:
+base minutes plus units at the site's rate, 30-180 minutes).
+`planned_arrival_time` equals the arrival, `delay_minutes` is 0 and
+`delay_reason` NULL until the logistics incident model adds delays.
 
 A candidate line is fulfilled in full only when its stock is available.
 Rejected lines are omitted from realized receipts; empty receipts disappear.
@@ -291,9 +316,10 @@ migrate the target before resuming streaming against an older table.
 Live deltas have zero unfulfilled demand; this is
 not evidence of measured lost demand in the live scenario generator.
 
-The current baseline assumes unlimited just-in-time supply at the DC and
-SKU-specific shipments. It does not optimize fleet routing or simulate
-supplier capacity constraints. Historical online orders retain their separate
+The current baseline assumes unlimited just-in-time supply at the DC. It does
+not optimize fleet routing or simulate supplier capacity constraints. Overflow
+legs can only overlap a truck's earlier trip when they outnumber the shared
+pool. Historical online orders retain their separate
 synthetic fulfillment model; do not interpret its statuses as reservations
 against the store policy.
 

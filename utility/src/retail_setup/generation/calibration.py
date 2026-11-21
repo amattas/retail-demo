@@ -17,12 +17,13 @@ from retail_setup.dictionaries.models import StoreTypeProfile
 # ---------------------------------------------------------------------------
 
 # One SLA for every consumer: the dwell-breach rule and the semantic model's
-# breach-day measure. Historical dwell is 30-120 minutes (mean 75), so a
+# breach-day measure. A typical consolidated load dwells 30-75 minutes, so a
 # site-day averaging above 90 is a real outlier.
 TRUCK_DWELL_SLA_MINUTES = 90
-# Live stream unload model (stream_supply): a truck dwells the base minutes
-# plus its load at the site's unload rate (units per minute times a per-store
-# dock factor), plus a little noise, and never less than the minimum. A typical
+# Unload model shared by history and the live stream (network.unload_minutes):
+# a truck dwells the base minutes plus its load at the site's unload rate
+# (units per minute times a per-store dock factor), plus a little noise, never
+# less than the minimum and never more than the maximum. A typical
 # consolidated store load stays inside the normal range, under the SLA; only an
 # unusually large load (a store served late after a backlog) breaches it.
 TRUCK_NORMAL_DWELL_MINUTES_MIN = 30
@@ -31,6 +32,10 @@ TRUCK_UNLOAD_BASE_MINUTES = 25
 TRUCK_UNLOAD_UNITS_PER_MINUTE = 120
 TRUCK_UNLOAD_NOISE_MINUTES = 6
 TRUCK_DOCK_FACTOR_RANGE = (0.8, 1.2)
+TRUCK_UNLOAD_MINUTES_MAX = 180
+# History: unloading (and the store's stock receipt) starts this long after
+# the truck arrives.
+TRUCK_CHECKIN_MINUTES = 15
 # Rule evaluation window for completed lifecycles.
 TRUCK_DWELL_RULE_WINDOW_MINUTES = 5
 
@@ -48,7 +53,7 @@ STOCKOUT_RULE_WINDOW_MINUTES = 5
 URGENT_REORDER_RULE_WINDOW_MINUTES = 10
 
 # ---------------------------------------------------------------------------
-# Live truck logistics (stream_supply)
+# Truck logistics (history and stream_supply)
 # ---------------------------------------------------------------------------
 
 # Reorders wait at the DC for the store's daily delivery slot, so one truck
@@ -58,6 +63,11 @@ URGENT_REORDER_RULE_WINDOW_MINUTES = 10
 TRUCK_LOAD_MINUTES = 45
 TRUCK_TRANSIT_MINUTES_MIN = 60
 TRUCK_TRANSIT_MINUTES_MAX = 240
+# Delivery routes (network.plan_routes): each DC truck serves a fixed set of
+# stores, one delivery a day each, at slots spaced by the longest possible
+# trip (load, both legs of the lane, the maximum unload) plus this turnaround,
+# which also absorbs the hour lost when clocks spring forward.
+TRUCK_TURNAROUND_MINUTES = 60
 
 # ---------------------------------------------------------------------------
 # Zone arrivals

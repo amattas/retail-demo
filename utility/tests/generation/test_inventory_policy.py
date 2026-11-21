@@ -2,10 +2,12 @@ from datetime import date, datetime, timedelta
 
 import pytest
 
+from retail_setup.generation.calibration import TRUCK_CHECKIN_MINUTES, TRUCK_LOAD_MINUTES
 from retail_setup.generation.inventory_policy import (
     CASE_PACK,
     Demand,
     opening_stock,
+    reorder_levels,
     simulate_sku,
 )
 
@@ -39,7 +41,6 @@ def _run(demand, days, product=1, **kwargs):
             start_date=START,
             end_date=START + timedelta(days=days - 1),
             seed=17,
-            capacity=100,
             **kwargs,
         )
     )
@@ -85,7 +86,7 @@ def test_all_ten_skus_replenish_and_recover_without_deficits(days):
             if event.kind == "RETURN":
                 assert event.source.removeprefix("RET-") in accepted
         shipments = [event for event in events if event.kind == "SHIPMENT"]
-        assert all(0 < event.quantity <= 100 for event in shipments)
+        assert [event.quantity for event in shipments] == [order.quantity for order in orders]
         delivered = sum(
             event.quantity
             for event in shipments
@@ -205,7 +206,6 @@ def test_partition_adapter_uses_utc_and_isolates_sku_state():
                 start_date=START,
                 end_date=START + timedelta(days=2),
                 seed=17,
-                capacity=100,
                 daily_prior=1.0,
                 time_zone="UTC",
             )
@@ -219,3 +219,53 @@ def test_partition_adapter_uses_utc_and_isolates_sku_state():
         returned = next(event for event in events if event["kind"] == "RETURN")
         assert returned["quantity"] == opening_stock(17, 1, product)
         assert returned["event_ts"] == datetime(2024, 1, 2, 12, tzinfo=timezone.utc)
+
+
+def test_opening_stock_covers_the_expected_demand_between_reorder_point_and_target():
+    for rate in (0.1, 2.0, 40.0):
+        point, target = reorder_levels(rate)
+        stocks = {opening_stock(17, 1, product, rate) for product in range(1, 200)}
+        assert point < min(stocks) and max(stocks) <= target
+        assert len(stocks) > 1
+    # A fast seller opens with days of cover, not a fixed 40-120 units.
+    assert opening_stock(17, 1, 1, 40.0) > 4 * 40
+
+
+def test_a_demand_prior_removes_the_start_of_history_stockout_wave():
+    def lost_in_first_week(prior):
+        events = _run(_demand(30, 60), 30, daily_prior=prior)
+        return sum(
+            1
+            for event in events
+            if event.kind == "LOST_SALE" and (event.event_ts.date() - START).days < 7
+        )
+
+    assert lost_in_first_week(1.0) > 0
+    assert lost_in_first_week(60.0) == 0
+
+
+def test_skus_reordered_on_one_day_share_the_store_delivery_slot():
+    events = [
+        event
+        for product in range(1, 4)
+        for event in _run(_demand(3, 60), 3, product, slot_minute=22 * 60 + 30, transit_minutes=90)
+    ]
+    shipments = [event for event in events if event.kind == "SHIPMENT"]
+    assert shipments
+    by_day = {}
+    for event in shipments:
+        by_day.setdefault(event.event_ts.date(), set()).add(
+            (event.source, event.loading_ts, event.eta, event.unloading_ts)
+        )
+    for day, loads in by_day.items():
+        assert len(loads) == 1, day
+        ((source, loading, eta, unloading),) = loads
+        assert source == f"SHP-{day + timedelta(days=1):%Y%m%d}-0001"
+        assert loading == datetime.combine(
+            day + timedelta(days=1), datetime.min.time()
+        ) + timedelta(minutes=22 * 60 + 30)
+        assert eta == loading + timedelta(minutes=TRUCK_LOAD_MINUTES + 90)
+        assert unloading == eta + timedelta(minutes=TRUCK_CHECKIN_MINUTES)
+    unloads = {load[3] for loads in by_day.values() for load in loads}
+    inbound = [event for event in events if event.kind == "INBOUND_SHIPMENT"]
+    assert inbound and all(event.event_ts in unloads for event in inbound)
