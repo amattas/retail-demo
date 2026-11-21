@@ -89,8 +89,10 @@ history:
   (`behavior.customer_visit_tickets`). The churned history cohort
   (`customer_id % 10 == 0`) no longer shops.
 - **Visit path.** A visit enters (`customer_entered`, sensor zone by store
-  format), walks from `ENTRANCE` through one to three department zones in
-  random order, and ends at `CHECKOUT` when it buys. Each zone has a dwell time
+  format), walks from the store type's entrance zone through one to three of its
+  department zones (`profile.zones`, upper-cased) in random order, passes
+  `CHECKOUT` when it buys and leaves through `EXIT` when the store type has
+  one. Each zone has a dwell time
   in its foot-traffic range, two to five BLE pings, and a zone change on
   arrival. 30% of visits carry the customer's `dim_customers.BLEId`; the rest
   are `ANON-<store>-<n>`, as in history. The receipt, lines and promotions are
@@ -173,7 +175,8 @@ has passed.
 
 ## Online orders
 
-Online orders arrive at `online_orders_per_day`, shaped by the profile's
+Online orders arrive at `online_orders_per_day` (by default derived so online
+orders are the profile's `online_order_share` of all orders), shaped by the profile's
 monthly weights and the online hourly curve (`vocabulary.ONLINE_HOURLY_WEIGHTS`,
 UTC, peaking in the US evening; history uses the same curve). Each order has
 one fulfillment mode and node, drawn by the historical mix (60% ship from a DC,

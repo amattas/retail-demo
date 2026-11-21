@@ -13,6 +13,7 @@ from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.loader import DictionarySet
+from retail_setup.dictionaries.models import STORE_FORMATS
 from retail_setup.generation.network import fleet_sizes, nearest_dc, pool_size
 from retail_setup.generation.runtime import (
     date_grid,
@@ -35,17 +36,18 @@ VOLUME_CLASSES = [
     ("low_volume", 0.20, (0.4, 0.8)),
     ("kiosk", 0.05, (0.25, 0.35)),
 ]
-# Five formats incl. EXPRESS (datagen's StoreFormat.EXPRESS). store_activity
-# carries a matching express zone-share row.
-STORE_FORMATS = ["hypermarket", "superstore", "standard", "neighborhood", "express"]
+# Formats each volume class's size suits; a store picks among those its
+# store type runs (StoreTypeProfile.resolved_store_formats), else the store
+# type's smallest (small classes) or largest format. store_activity carries a
+# zone-share row for every format in models.STORE_FORMATS.
 VOLUME_FORMATS = {
-    "flagship": ["hypermarket", "superstore"],
-    "high_volume": ["hypermarket", "superstore", "standard"],
-    "standard": ["superstore", "standard", "neighborhood"],
-    "low_volume": ["standard", "neighborhood", "express"],
-    "kiosk": ["express"],
+    "flagship": ["hypermarket", "superstore", "boutique"],
+    "high_volume": ["hypermarket", "superstore", "standard", "boutique"],
+    "standard": ["superstore", "standard", "neighborhood", "boutique"],
+    "low_volume": ["standard", "neighborhood", "express", "boutique"],
+    "kiosk": ["express", "boutique"],
 }
-OPERATING_HOURS = ["6-22", "7-22", "7-23", "24h"]
+SMALL_VOLUME_CLASSES = {"low_volume", "kiosk"}
 # Fixed day for the dimension RNG seed: dimensions depend on the seed alone.
 DIMENSION_SEED_DAY = date(2000, 1, 1)
 DEFAULT_TAX_RATE = 0.07407  # datagen receipts_mixin fallback
@@ -179,9 +181,11 @@ def generate_dimensions(
         dc_rows, spark_schema("dim_distribution_centers")
     )
 
-    # --- stores in DC states
+    # --- stores in DC states; formats and hours come from the store type
     dc_states = {geos[int(g)].State for g in dc_geo_idx}
     eligible = [i for i, g in enumerate(geos) if g.State in dc_states] or list(range(n_geo))
+    profile_formats = [f for f in STORE_FORMATS if f in dicts.profile.resolved_store_formats()]
+    profile_hours = dicts.profile.resolved_operating_hours()
     store_rows = []
     store_geo_indices: list[int] = []
     for sid in range(1, cfg.store_count + 1):
@@ -191,6 +195,9 @@ def generate_dimensions(
         classes, probs = zip(*[(c, p) for c, p, _ in VOLUME_CLASSES])
         vc = str(rng.choice(classes, p=probs))
         lo, hi = next(r for c, _, r in VOLUME_CLASSES if c == vc)
+        formats = [f for f in VOLUME_FORMATS[vc] if f in profile_formats] or [
+            profile_formats[-1] if vc in SMALL_VOLUME_CLASSES else profile_formats[0]
+        ]
         store_rows.append(
             (
                 sid,
@@ -199,8 +206,8 @@ def generate_dimensions(
                 gi + 1,
                 tax_for(g.State, g.City),
                 vc,
-                str(rng.choice(VOLUME_FORMATS[vc])),
-                str(rng.choice(OPERATING_HOURS)),
+                str(rng.choice(formats)),
+                str(rng.choice(profile_hours)),
                 float(np.round(rng.uniform(lo, hi), 2)),
                 state_time_zone(g.State),
             )

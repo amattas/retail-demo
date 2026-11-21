@@ -22,6 +22,7 @@ Column helpers here (tender, decline, promotion and BLE draws) are the single
 implementation both producers call, keyed on each producer's own IDs.
 """
 
+from dataclasses import dataclass
 from datetime import date
 
 from pyspark.sql import Column
@@ -379,12 +380,57 @@ def ble_zones_for_profile(profile: StoreTypeProfile | None) -> list[str]:
 
     Profile zone names are normalized to upper case so they match the rest of
     the zone vocabulary. Without a profile the default ``BLE_ZONES`` apply.
-    Generators switch to this helper when profile-driven zones land (B-7,
-    B-18); until then they use ``BLE_ZONES`` directly.
+    History (``sensors.py``) and the live stream both use these zones.
     """
     if profile is None or not profile.zones:
         return list(BLE_ZONES)
     return list(dict.fromkeys(zone.strip().upper() for zone in profile.zones if zone.strip()))
+
+
+BLE_EXIT_ZONE = "EXIT"
+# Dwell of zones outside BLE_ZONE_DWELL: exits pass like entrances, every other
+# store-type zone (produce, tools, jewelry, ...) dwells like a secondary aisle.
+BLE_EXIT_DWELL = FOOT_TRAFFIC_ZONE_DWELL["ENTRANCE_MAIN"]
+BLE_DEPARTMENT_DWELL = FOOT_TRAFFIC_ZONE_DWELL["AISLES_B"]
+
+
+@dataclass(frozen=True)
+class BleLayout:
+    """A store type's BLE zones by their role in a shopper's path."""
+
+    entry: str
+    middle: list[str]
+    checkout: str | None
+    exit: str | None
+    dwell: dict[str, tuple[int, int]]
+
+    @property
+    def zones(self) -> list[str]:
+        ordered = [self.entry, *self.middle, self.checkout, self.exit]
+        return list(dict.fromkeys(zone for zone in ordered if zone is not None))
+
+
+def ble_layout(profile: StoreTypeProfile | None) -> BleLayout:
+    """Entry, department, checkout and exit zones with their dwell ranges.
+
+    The entry is ``ENTRANCE`` (else the first zone), checkout and exit are the
+    ``CHECKOUT`` and ``EXIT`` zones when the store type has them, and every
+    other zone is a department zone a shopper may browse.
+    """
+    zones = ble_zones_for_profile(profile)
+    entry = BLE_ENTRY_ZONE if BLE_ENTRY_ZONE in zones else zones[0]
+    checkout = BLE_CHECKOUT_ZONE if BLE_CHECKOUT_ZONE in zones else None
+    exit_zone = BLE_EXIT_ZONE if BLE_EXIT_ZONE in zones and BLE_EXIT_ZONE != entry else None
+    middle = [zone for zone in zones if zone not in (entry, checkout, exit_zone)]
+    if not middle:
+        middle = [zone for zone in zones if zone != entry] or [entry]
+    dwell = {
+        zone: BLE_ZONE_DWELL.get(
+            zone, BLE_EXIT_DWELL if zone == BLE_EXIT_ZONE else BLE_DEPARTMENT_DWELL
+        )
+        for zone in zones
+    }
+    return BleLayout(entry, middle, checkout, exit_zone, dwell)
 
 
 # ---------------------------------------------------------------------------

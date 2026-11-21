@@ -48,6 +48,8 @@ def test_hour_shares_cover_only_open_hours() -> None:
     assert shares[:7] == [0.0] * 7 and shares[22:] == [0.0, 0.0]
     assert sum(shares) == pytest.approx(1.0)
     assert operating_window("bogus") == (6, 22)
+    # Store types declare their own patterns (a luxury boutique opens 10-20).
+    assert operating_window("10-20") == (10, 20)
     assert sum(hour_shares(PROFILE.hourly_weights, "24h")) == pytest.approx(1.0)
 
 

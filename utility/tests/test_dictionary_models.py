@@ -11,6 +11,7 @@ from retail_setup.dictionaries.models import (
     ProductTagEntry,
     StoreTypeProfile,
     TaxJurisdictionEntry,
+    parse_operating_hours,
 )
 
 
@@ -168,3 +169,41 @@ def test_profile_rejects_zero_department_weight():
     # excludes the department from every basket.
     with pytest.raises(ValidationError):
         StoreTypeProfile(**_profile_kwargs(department_weights={"Grocery": 1.0, "Deli": 0.0}))
+
+
+def test_profile_store_knobs_default_from_ticket_and_hourly_weights():
+    # Custom layouts leave the knobs unset: traffic falls with the ticket, hours
+    # cover the hours whose weight reaches 10% of the peak, and high-ticket
+    # stores are boutiques.
+    evening = [0.0] * 10 + [1.0] * 10 + [0.0] * 4
+    boutique = StoreTypeProfile(**_profile_kwargs(avg_ticket_target=3000.0, hourly_weights=evening))
+    assert boutique.resolved_transactions_per_store_day() == round(400 * (85 / 3000) ** 0.6)
+    assert boutique.resolved_operating_hours() == ["10-20"]
+    assert boutique.resolved_store_formats() == ["boutique"]
+    around_the_clock = StoreTypeProfile(**_profile_kwargs())
+    assert around_the_clock.resolved_operating_hours() == ["24h"]
+    assert "boutique" not in around_the_clock.resolved_store_formats()
+    assert around_the_clock.resolved_transactions_per_store_day() == round(400 * (85 / 55) ** 0.6)
+
+
+def test_profile_store_knobs_override_and_validate():
+    explicit = StoreTypeProfile(
+        **_profile_kwargs(
+            transactions_per_store_day=40,
+            operating_hours=["10-19", " 24h "],
+            store_formats=["boutique", "boutique"],
+        )
+    )
+    assert explicit.resolved_transactions_per_store_day() == 40
+    assert explicit.resolved_operating_hours() == ["10-19", "24h"]
+    assert explicit.resolved_store_formats() == ["boutique"]
+    assert parse_operating_hours("7-23") == (7, 23)
+    for bad in (["22-7"], ["9-25"], ["nine-five"]):
+        with pytest.raises(ValidationError, match="operating hours"):
+            StoreTypeProfile(**_profile_kwargs(operating_hours=bad))
+    with pytest.raises(ValidationError, match="store formats"):
+        StoreTypeProfile(**_profile_kwargs(store_formats=["warehouse"]))
+    # Opening hours that carry no traffic weight would never sell.
+    night_only = [1.0] * 6 + [0.0] * 18
+    with pytest.raises(ValidationError, match="no hourly traffic"):
+        StoreTypeProfile(**_profile_kwargs(hourly_weights=night_only, operating_hours=["9-17"]))

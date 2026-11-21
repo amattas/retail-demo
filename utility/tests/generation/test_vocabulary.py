@@ -98,6 +98,34 @@ def test_profile_zones_drive_ble_zones_when_declared() -> None:
     assert vocab.ble_zones_for_profile(_Profile()) == ["ENTRANCE", "PRODUCE", "CHECKOUT"]  # type: ignore[arg-type]
 
 
+def test_ble_layout_orders_a_store_types_zones_into_a_path() -> None:
+    class _Grocery:
+        zones = ["entrance", "produce", "bakery", "checkout", "exit"]
+
+    layout = vocab.ble_layout(_Grocery())  # type: ignore[arg-type]
+    assert (layout.entry, layout.middle, layout.checkout, layout.exit) == (
+        "ENTRANCE",
+        ["PRODUCE", "BAKERY"],
+        "CHECKOUT",
+        "EXIT",
+    )
+    assert layout.zones == ["ENTRANCE", "PRODUCE", "BAKERY", "CHECKOUT", "EXIT"]
+    assert layout.dwell["CHECKOUT"] == vocab.BLE_ZONE_DWELL["CHECKOUT"]
+    assert layout.dwell["EXIT"] == vocab.BLE_EXIT_DWELL
+    assert layout.dwell["BAKERY"] == vocab.BLE_DEPARTMENT_DWELL
+
+    class _Custom:
+        zones = ["lobby", "pro-desk", "yard"]
+
+    custom = vocab.ble_layout(_Custom())  # type: ignore[arg-type]
+    assert (custom.entry, custom.middle, custom.checkout, custom.exit) == (
+        "LOBBY",
+        ["PRO-DESK", "YARD"],
+        None,
+        None,
+    )
+
+
 def test_stream_does_not_redefine_shared_vocabulary() -> None:
     shared = _shared_values()
     duplicates = {
@@ -132,7 +160,7 @@ def test_stream_uses_the_shared_definitions() -> None:
         "impression_device_cost(",
         'ad_id_column(F.col("customer_pick"))',
         "ONLINE_TENDERS",
-        "BLE_ZONE_DWELL",
+        "ble_layout(ctx.profile)",
         # Online orders: the historical fulfillment mix and the decline model.
         'd.pick_by_weights(key, "online-mode", ONLINE_FULFILLMENT_MIX)',
         'payment_status_column(d, key, F.col("tender"), ONLINE_TENDERS, "online-decline")',

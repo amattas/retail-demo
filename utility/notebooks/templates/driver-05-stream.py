@@ -17,8 +17,9 @@
 #   Stores open and close at their local operating-hour boundaries.
 # - **Customers.** Shoppers come from each store's local pool, weighted by visit
 #   frequency like history; about 22% of visits buy. Visits follow an ordered
-#   path (entrance → zones → checkout) with realistic dwell times, and their
-#   BLE IDs resolve to `dim_customers.BLEId`.
+#   path through the store type's zones (entrance → departments → checkout →
+#   exit) with realistic dwell times, and their BLE IDs resolve to
+#   `dim_customers.BLEId`.
 # - **Purchases and marketing.** Baskets, per-line promotions, the tender mix,
 #   declines and campaigns use the historical catalogs. Marketing journey
 #   touches carry their touch time in `impression_time` and arrive with the
@@ -103,7 +104,7 @@ STORE_TYPE = _param("{{STORE_TYPE}}", "supercenter")
 SEED = int(_param("{{SEED}}", "42"))
 # The historical volume the live stream continues, and the first history day
 # (campaign windows are anchored on it).
-TRANSACTIONS_PER_STORE_DAY = int(_param("{{TRANSACTIONS_PER_STORE_DAY}}", "400"))
+TRANSACTIONS_PER_STORE_DAY = int(_param("{{TRANSACTIONS_PER_STORE_DAY}}", "0"))
 ONLINE_ORDERS_PER_DAY = int(_param("{{ONLINE_ORDERS_PER_DAY}}", "0"))
 HISTORY_START = _param("{{START_DATE}}", "")
 
@@ -254,8 +255,13 @@ enforce_history_handoff(
 if not HISTORY_START:
     HISTORY_START = (_history["start"] or CATALOG_DATE).isoformat()
 HISTORY_START_DATE = _date.fromisoformat(HISTORY_START)
+# Unrendered runs take the store type's volumes, as configuration derives them.
+if TRANSACTIONS_PER_STORE_DAY <= 0:
+    TRANSACTIONS_PER_STORE_DAY = STREAM_PROFILE.resolved_transactions_per_store_day()
 if ONLINE_ORDERS_PER_DAY <= 0:
-    ONLINE_ORDERS_PER_DAY = STORE_COUNT * 8
+    ONLINE_ORDERS_PER_DAY = default_online_orders_per_day(
+        STREAM_PROFILE.online_order_share, STORE_COUNT, TRANSACTIONS_PER_STORE_DAY
+    )
 
 _store_rows = DIM_STORES.select("daily_traffic_multiplier", "operating_hours").collect()
 # The rate source takes whole rows per second; 0 derives the rate from history.

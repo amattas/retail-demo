@@ -334,7 +334,9 @@ def test_live_vocabularies_equal_history(world) -> None:
     history_tenders = {row["payment_method"] for row in world["payments"]}
     assert tenders == history_tenders == set(vocab.tender_names())
     ble_zones = {e["payload"]["zone"] for e in _of(world, "ble_ping_detected")}
-    assert ble_zones == {row["zone"] for row in world["pings"]} == set(vocab.BLE_ZONES)
+    # Both producers use the store type's own zones (profile.zones).
+    profile_zones = set(vocab.ble_zones_for_profile(world["profile"]))
+    assert ble_zones == {row["zone"] for row in world["pings"]} == profile_zones
     sensor_zones = {e["payload"]["zone"] for e in _of(world, "customer_entered")}
     assert sensor_zones <= set(vocab.FOOT_TRAFFIC_ZONES)
     for event in _of(world, "ble_ping_detected"):

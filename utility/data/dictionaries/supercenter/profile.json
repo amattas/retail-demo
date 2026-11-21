@@ -23,5 +23,8 @@
  "promo_rate": 0.18,
  "online_order_share": 0.12,
  "zones": ["entrance", "produce", "grocery", "dairy", "frozen", "electronics",
-           "clothing", "home", "garden", "pharmacy", "checkout", "exit"]
+           "clothing", "home", "garden", "pharmacy", "checkout", "exit"],
+ "transactions_per_store_day": 400,
+ "operating_hours": ["6-22", "7-23", "24h"],
+ "store_formats": ["hypermarket", "superstore", "standard"]
 }

@@ -9,8 +9,7 @@ from retail_setup.generation.dims import generate_dimensions
 from retail_setup.generation.receipts import generate_receipts_group
 from retail_setup.generation.sensors import generate_ble
 from retail_setup.generation.schemas import column_names
-
-BLE_ZONES = {"ENTRANCE", "ELECTRONICS", "GROCERY", "CLOTHING", "CHECKOUT"}
+from retail_setup.generation.vocabulary import ble_zones_for_profile
 
 
 @pytest.fixture(scope="module")
@@ -28,23 +27,26 @@ def setup(spark):
     dicts = load_dictionaries(default_dictionary_root(), "grocery")
     dims = generate_dimensions(spark, dicts, cfg)
     sales = generate_receipts_group(spark, dims, dicts.profile, cfg)
-    pings, zc = generate_ble(spark, sales["fact_receipts"], dims, cfg)
-    return sales, pings, zc
+    pings, zc = generate_ble(spark, sales["fact_receipts"], dims, cfg, dicts.profile)
+    return sales, pings, zc, dicts.profile
 
 
 def test_contract_columns(setup):
-    _, pings, zc = setup
+    _, pings, zc, _ = setup
     assert pings.columns == column_names("fact_ble_pings")
     assert zc.columns == column_names("fact_customer_zone_changes")
 
 
 def test_ping_properties(setup):
-    sales, pings, _ = setup
+    sales, pings, _, profile = setup
     n_receipts = sales["fact_receipts"].count()
     # 2-5 zones x 2-5 pings per visit => 4-25 pings per receipt
     assert 4 * n_receipts <= pings.count() <= 25 * n_receipts
     assert pings.filter((F.col("rssi") < -80) | (F.col("rssi") > -29)).count() == 0
-    assert {r.zone for r in pings.select("zone").distinct().collect()} <= BLE_ZONES
+    # The store type's own zones (grocery: produce, bakery, deli, ...).
+    zones = {r.zone for r in pings.select("zone").distinct().collect()}
+    assert zones <= set(ble_zones_for_profile(profile))
+    assert {"PRODUCE", "BAKERY", "DELI"} & zones
     known = pings.filter(F.col("customer_id").isNotNull()).count() / pings.count()
     assert 0.15 < known < 0.45  # 30% of visits nominal
     anon = pings.filter(F.col("customer_ble_id").startswith("ANON-"))
@@ -52,7 +54,7 @@ def test_ping_properties(setup):
 
 
 def test_zone_changes_derive_from_pings(setup):
-    _, pings, zc = setup
+    _, pings, zc, _ = setup
     assert zc.count() > 0
     assert zc.filter(F.col("from_zone") == F.col("to_zone")).count() == 0
     # every (store, ble) in zone-changes exists in pings

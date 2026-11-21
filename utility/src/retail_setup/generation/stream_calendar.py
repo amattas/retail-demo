@@ -26,7 +26,7 @@ from zoneinfo import ZoneInfo
 from pyspark.sql import Column
 from pyspark.sql import functions as F
 
-from retail_setup.dictionaries.models import StoreTypeProfile
+from retail_setup.dictionaries.models import StoreTypeProfile, parse_operating_hours
 from retail_setup.generation.runtime import seeded_draws
 from retail_setup.generation.vocabulary import ONLINE_HOURLY_WEIGHTS
 
@@ -34,7 +34,9 @@ from retail_setup.generation.vocabulary import ONLINE_HOURLY_WEIGHTS
 # Operating hours
 # ---------------------------------------------------------------------------
 
-# operating_hours literal -> [open_hour, close_hour); "24h" maps to 0/24.
+# operating_hours literal -> [open_hour, close_hour); "24h" maps to 0/24. Store
+# types may declare other "open-close" patterns (StoreTypeProfile); these are
+# the historical defaults.
 OPERATING_HOURS_MAP: dict[str, tuple[int, int]] = {
     "6-22": (6, 22),
     "7-22": (7, 22),
@@ -53,7 +55,10 @@ def operating_window(operating_hours: str | None) -> tuple[int, int]:
     """``[open_hour, close_hour)`` of an ``operating_hours`` value."""
     if operating_hours is None:
         return DEFAULT_OPERATING_WINDOW
-    return OPERATING_HOURS_MAP.get(operating_hours.strip(), DEFAULT_OPERATING_WINDOW)
+    try:
+        return parse_operating_hours(operating_hours)
+    except ValueError:
+        return DEFAULT_OPERATING_WINDOW
 
 
 def is_closed_date(day: date) -> bool:

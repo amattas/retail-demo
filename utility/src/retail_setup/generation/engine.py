@@ -152,7 +152,9 @@ def _build_foot_traffic(ctx: GenerationContext, plan: StageOutputs) -> StageOutp
 
 
 def _build_ble(ctx: GenerationContext, plan: StageOutputs) -> StageOutputs:
-    pings, zone_changes = sensors.generate_ble(ctx.spark, plan["fact_receipts"], ctx.dims, ctx.cfg)
+    pings, zone_changes = sensors.generate_ble(
+        ctx.spark, plan["fact_receipts"], ctx.dims, ctx.cfg, ctx.dicts.profile
+    )
     return {
         "fact_ble_pings": localize_by_store(pings, ctx.dims, ["event_ts"]),
         "fact_customer_zone_changes": localize_by_store(zone_changes, ctx.dims, ["event_ts"]),

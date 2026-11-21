@@ -1,8 +1,8 @@
 """Store ops + foot traffic facts, Spark-native.
 
 fact_store_ops: exactly two rows (opened/closed) per store-day, with the
-open/close hours parsed from `dim_stores.operating_hours` over the four
-known formats ("6-22", "7-22", "7-23", "24h"). Dec 25 is skipped entirely
+open/close hours parsed from `dim_stores.operating_hours` ("24h" or
+"open-close", from the store type's profile). Dec 25 is skipped entirely
 (stores closed for Christmas, any year).
 
 Footfall uses the same independently generated visitors as receipt conversion.
@@ -14,9 +14,10 @@ from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.loader import load_dictionaries
+from retail_setup.generation.receipts import _open_close_cols
 from retail_setup.generation.runtime import case_when, seeded_draws, store_day_grid
 from retail_setup.generation.schemas import column_names
-from retail_setup.generation.stream_calendar import OPERATING_HOURS_MAP
+from retail_setup.generation.stream_calendar import DEFAULT_OPERATING_WINDOW
 from retail_setup.generation.traffic import generate_hourly_visits
 from retail_setup.generation.vocabulary import (
     FOOT_TRAFFIC_ZONE_DWELL,
@@ -44,6 +45,7 @@ FORMAT_ZONE_SHARES = {
     "standard": [0.30, 0.15, 0.25, 0.15, 0.15],
     "neighborhood": [0.35, 0.15, 0.20, 0.10, 0.20],
     "express": [0.45, 0.15, 0.10, 0.05, 0.25],
+    "boutique": [0.40, 0.05, 0.25, 0.15, 0.15],
 }
 
 
@@ -63,13 +65,12 @@ def generate_store_ops(
         .join(stores, "store_id")
     )
 
-    # operating_hours -> open/close hour via a F.when chain over known formats
-    hours = F.col("operating_hours")
-    open_hour = case_when((hours == literal, o) for literal, (o, _) in OPERATING_HOURS_MAP.items())
-    close_hour = case_when((hours == literal, c) for literal, (_, c) in OPERATING_HOURS_MAP.items())
-    # unknown formats fall back to standard hours instead of silent NULL event_ts
-    grid = grid.withColumn("open_hour", open_hour.otherwise(6)).withColumn(
-        "close_hour", close_hour.otherwise(22)
+    # operating_hours ("24h" or "open-close") -> open/close hour; unknown
+    # formats fall back to standard hours instead of silent NULL event_ts
+    open_hour, close_hour = _open_close_cols(F.col("operating_hours"))
+    default_open, default_close = DEFAULT_OPERATING_WINDOW
+    grid = grid.withColumn("open_hour", F.coalesce(open_hour, F.lit(default_open))).withColumn(
+        "close_hour", F.coalesce(close_hour, F.lit(default_close))
     )
 
     day_ts = F.unix_timestamp(F.col("day").cast("timestamp"))

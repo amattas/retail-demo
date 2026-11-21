@@ -1,14 +1,16 @@
 """Generation settings (utility/config.yaml). Environment settings live in deploy/config/."""
 
 import calendar
+import json
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 from retail_setup.dictionaries.loader import available_store_types, default_dictionary_root
+from retail_setup.dictionaries.models import StoreTypeProfile
 
 # Minimum number of synthetic customers, regardless of store_count. The churn
 # model (fabric/lakehouse/09-ml-churn-prediction.ipynb) needs at least two
@@ -19,6 +21,40 @@ from retail_setup.dictionaries.loader import available_store_types, default_dict
 # demos trainable. This is a no-op for store_count >= 5, where the derived
 # value (store_count * 1000) already exceeds the floor.
 MIN_CUSTOMER_COUNT = 5000
+# Fallbacks when the store type's profile cannot be read (the store type is
+# then reported as unknown by validation).
+DEFAULT_TRANSACTIONS_PER_STORE_DAY = 400
+DEFAULT_ONLINE_ORDER_SHARE = 0.12
+# Expected store daily_traffic_multiplier: the mean of generation.dims
+# VOLUME_CLASSES (a test keeps the two in step).
+MEAN_TRAFFIC_MULTIPLIER = 1.0525
+
+
+def default_online_orders_per_day(
+    online_order_share: float, store_count: int, transactions_per_store_day: float
+) -> int:
+    """Network online orders per day so online is ``online_order_share`` of all orders.
+
+    In-store volume is ``store_count * transactions_per_store_day`` at the mean
+    traffic multiplier; online orders make up the given share of the total.
+    """
+    share = min(max(online_order_share, 0.0), 0.95)
+    in_store = store_count * transactions_per_store_day * MEAN_TRAFFIC_MULTIPLIER
+    return max(1, round(in_store * share / (1.0 - share)))
+
+
+def _profile_for(data: dict[str, Any]) -> StoreTypeProfile | None:
+    """The configured store type's profile, or None when it cannot be read."""
+    root = data.get("dictionary_root")
+    base = Path(root) if root else default_dictionary_root()
+    store_type = data.get("store_type", GenerationConfig.model_fields["store_type"].default)
+    if not isinstance(store_type, str):
+        return None
+    try:
+        raw = json.loads((base / store_type / "profile.json").read_text(encoding="utf-8"))
+        return StoreTypeProfile.model_validate(raw)
+    except (OSError, ValueError, ValidationError):
+        return None
 
 
 def _subtract_months(anchor: date, months: int) -> date:
@@ -58,13 +94,15 @@ class GenerationConfig(BaseModel):
     dc_count: int = Field(gt=0, le=999)
     customer_count: int = Field(gt=0)
     # base in-store transactions per store-day at multiplier 1.0; profiles'
-    # hourly/daily/monthly weights shape it, store daily_traffic_multiplier scales it
-    transactions_per_store_day: int = Field(default=400, gt=0)
+    # hourly/daily/monthly weights shape it, store daily_traffic_multiplier scales it.
+    # Omitted -> the store type's profile value (luxury boutiques far below supercenters).
+    transactions_per_store_day: int = Field(gt=0)
     # fraction of SALE receipts returned per day (Dec 26 spikes 6x, capped 10%)
     # nominal daily return share; Dec 26 applies a 6x spike capped at 0.10, so
     # values near the ceiling flatten the spike - keep this small (~0.01)
     return_rate: float = Field(default=0.01, ge=0.0, le=0.10)
-    # network-wide online orders per day at multiplier 1.0; None -> store_count * 8
+    # network-wide online orders per day at multiplier 1.0; omitted -> derived so
+    # online orders are the profile's online_order_share of all orders
     online_orders_per_day: int = Field(gt=0)
     # number of category-matched branded SKUs generated per base catalog product
     # (datagen combinatorial SKUs); 1 = one SKU per dictionary row
@@ -92,6 +130,13 @@ class GenerationConfig(BaseModel):
             raise ValueError("provide `months`, or both `start_date` and `end_date`")
         if data.get("anchor_date") is None:
             data["anchor_date"] = data["start_date"]
+        profile = _profile_for(data)
+        if data.get("transactions_per_store_day") is None:
+            data["transactions_per_store_day"] = (
+                profile.resolved_transactions_per_store_day()
+                if profile is not None
+                else DEFAULT_TRANSACTIONS_PER_STORE_DAY
+            )
         store_count = data.get("store_count", cls.model_fields["store_count"].default)
         if isinstance(store_count, int) and not isinstance(store_count, bool):
             if data.get("dc_count") is None:
@@ -99,7 +144,15 @@ class GenerationConfig(BaseModel):
             if data.get("customer_count") is None:
                 data["customer_count"] = store_count * 1000
             if data.get("online_orders_per_day") is None:
-                data["online_orders_per_day"] = store_count * 8
+                transactions = data["transactions_per_store_day"]
+                if isinstance(transactions, (int, float)) and not isinstance(transactions, bool):
+                    data["online_orders_per_day"] = default_online_orders_per_day(
+                        profile.online_order_share
+                        if profile is not None
+                        else DEFAULT_ONLINE_ORDER_SHARE,
+                        store_count,
+                        transactions,
+                    )
         return data
 
     @model_validator(mode="after")

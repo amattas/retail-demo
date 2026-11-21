@@ -6,9 +6,10 @@ One micro-batch of ``rate`` rows becomes the events of that minute:
   multiplier and is kept with the store's local hour/day/month weight (no
   visits while closed). The shopper comes from the store's own customer pool
   (or, as in history, a network-wide pick), weighted by visit tickets. Each
-  visit follows an ordered path (entrance, department zones, checkout for
-  buyers) with per-zone dwell times; its events are emitted as their time
-  passes, so a visit that spans micro-batches lives in the visit state.
+  visit follows an ordered path through the store type's zones (entrance,
+  department zones, checkout for buyers, exit) with per-zone dwell times; its
+  events are emitted as their time passes, so a visit that spans micro-batches
+  lives in the visit state.
   About 22% of visits buy, as in history.
 - **Purchases.** Baskets, per-line promotions, tender mix, declines and
   marketing journeys reuse the batch helpers. Journey touches carry their
@@ -91,11 +92,7 @@ from retail_setup.generation.stream_supply import (
     run_supply_batch,
 )
 from retail_setup.generation.vocabulary import (
-    BLE_CHECKOUT_ZONE,
-    BLE_ENTRY_ZONE,
     BLE_KNOWN_SHARE,
-    BLE_ZONE_DWELL,
-    BLE_ZONES,
     CAMPAIGN_ARCHETYPES,
     FOOT_TRAFFIC_ZONE_DWELL,
     FOOT_TRAFFIC_ZONES,
@@ -113,6 +110,7 @@ from retail_setup.generation.vocabulary import (
     anonymous_ble_id_column,
     beacon_id_column,
     ble_id_column,
+    ble_layout,
     campaign_id_column,
     decline_reason_column,
     line_promotion,
@@ -128,8 +126,9 @@ VISIT_SCHEMA = "v long, start_ms long, store_id long, customer_id long, rejected
 ORDER_SCHEMA = "v long, start_ms long, rejected array<int>"
 STORE_OP_SCHEMA = "store_id long, event_ms long, operation_type string"
 LOST_SCHEMA = "_owner string, _lost array<int>"
-# BLE department zones a shopper may visit between the entrance and checkout.
-BLE_MIDDLE_ZONES = [zone for zone in BLE_ZONES if zone not in (BLE_ENTRY_ZONE, BLE_CHECKOUT_ZONE)]
+# A shopper browses 1-3 of the store type's department zones between the
+# entrance and checkout.
+BLE_MAX_MIDDLE_ZONES = 3
 BLE_PINGS_PER_ZONE = (2, 5)
 # Pings carry an RSSI uniform in [-80, -29] dBm, as in history.
 RSSI_FLOOR = -80
@@ -563,41 +562,40 @@ def plan_visits(ctx: StreamContext, visits: DataFrame) -> DataFrame:
     )
 
     # Ordered path: entrance, 1-3 department zones in random order, checkout (buyers).
+    layout = ble_layout(ctx.profile)
     shuffled = F.array_sort(
         F.array(
             *[
                 F.struct(
                     d.u([v, F.lit(zone)], "zone-order").alias("draw"), F.lit(zone).alias("zone")
                 )
-                for zone in BLE_MIDDLE_ZONES
+                for zone in layout.middle
             ]
         )
     )
-    middle_count = (F.floor(d.u([v], "zone-count") * len(BLE_MIDDLE_ZONES)) + 1).cast("int")
+    browse = min(BLE_MAX_MIDDLE_ZONES, len(layout.middle))
+    middle_count = (F.floor(d.u([v], "zone-count") * browse) + 1).cast("int")
     middle = F.transform(F.slice(shuffled, 1, middle_count), lambda entry: entry["zone"])
+    no_zone = F.array().cast("array<string>")
+    checkout = (
+        F.when(F.col("converts"), F.array(F.lit(layout.checkout))).otherwise(no_zone)
+        if layout.checkout is not None
+        else no_zone
+    )
+    exit_zone = F.array(F.lit(layout.exit)) if layout.exit is not None else no_zone
     frame = frame.withColumn(
         "zones",
-        F.concat(
-            F.array(F.lit(BLE_ENTRY_ZONE)),
-            middle,
-            F.when(F.col("converts"), F.array(F.lit(BLE_CHECKOUT_ZONE))).otherwise(
-                F.array().cast("array<string>")
-            ),
-        ),
+        F.concat(F.array(F.lit(layout.entry)), middle, checkout, exit_zone),
     )
     frame = frame.withColumn(
         "dwell",
         F.transform(
             "zones",
             lambda zone, i: (
-                _zone_bound(zone, BLE_ZONE_DWELL, 0)
+                _zone_bound(zone, layout.dwell, 0)
                 + F.floor(
                     d.u([v, i], "zone-dwell")
-                    * (
-                        _zone_bound(zone, BLE_ZONE_DWELL, 1)
-                        - _zone_bound(zone, BLE_ZONE_DWELL, 0)
-                        + 1
-                    )
+                    * (_zone_bound(zone, layout.dwell, 1) - _zone_bound(zone, layout.dwell, 0) + 1)
                 )
             ).cast("long"),
         ),
@@ -678,7 +676,8 @@ def plan_visits(ctx: StreamContext, visits: DataFrame) -> DataFrame:
             ),
         ),
     )
-    last = F.size("zones")
+    # Buyers pay in the checkout zone, the last zone before any exit.
+    last = F.size("zones") - (1 if layout.exit is not None else 0)
     frame = (
         frame.withColumn("tender", tender_column(d, [F.col("receipt_id")]))
         .withColumn(

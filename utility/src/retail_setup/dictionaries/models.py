@@ -10,7 +10,7 @@ import re
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class TaxJurisdictionEntry(BaseModel):
@@ -101,10 +101,44 @@ class ProductTagEntry(BaseModel):
     Tags: str = Field(..., min_length=1)
 
 
+# Store formats, largest first. Volume classes pick among the formats their size
+# suits (generation.dims.VOLUME_FORMATS); a profile may narrow the set.
+STORE_FORMATS = ["hypermarket", "superstore", "standard", "neighborhood", "express", "boutique"]
+_HOURS_PATTERN = re.compile(r"^(\d{1,2})-(\d{1,2})$")
+# Derived defaults for profiles that leave the store-format knobs unset (custom
+# layouts): traffic falls with ticket size around the supercenter reference.
+_REFERENCE_TICKET = 85.0
+_REFERENCE_TRANSACTIONS = 400
+_TICKET_TRAFFIC_EXPONENT = 0.6
+_MIN_DERIVED_TRANSACTIONS = 20
+_MAX_DERIVED_TRANSACTIONS = 1000
+# A custom profile's hours are the hours whose traffic weight reaches this
+# share of its peak hour; a profile busy around the clock runs "24h".
+_OPEN_HOUR_PEAK_SHARE = 0.10
+# Above this average ticket a derived profile runs boutique stores.
+_BOUTIQUE_TICKET = 500.0
+
+
+def parse_operating_hours(value: str) -> tuple[int, int]:
+    """``[open_hour, close_hour)`` of an ``operating_hours`` value ("24h" or "H-H")."""
+    text = value.strip()
+    if text == "24h":
+        return 0, 24
+    match = _HOURS_PATTERN.fullmatch(text)
+    if match is None:
+        raise ValueError(f"operating hours {value!r} must be '24h' or 'open-close' hours")
+    open_hour, close_hour = int(match.group(1)), int(match.group(2))
+    if not 0 <= open_hour < close_hour <= 24:
+        raise ValueError(f"operating hours {value!r} must open before closing, within 0-24")
+    return open_hour, close_hour
+
+
 class StoreTypeProfile(BaseModel):
     """Behavioral knobs that make a store type act differently.
 
-    Weight lists are relative (normalized at use time, not here).
+    Weight lists are relative (normalized at use time, not here). The store
+    knobs (transactions, hours, formats) are optional: presets set them, and
+    custom layouts derive them from the ticket size and hourly weights.
     """
 
     store_type: str = Field(..., min_length=1)
@@ -118,6 +152,72 @@ class StoreTypeProfile(BaseModel):
     promo_rate: float = Field(..., ge=0, le=1, description="Share of lines with a promotion")
     online_order_share: float = Field(..., ge=0, le=1)
     zones: list[str] = Field(..., min_length=1, description="Store footprint zones for BLE")
+    transactions_per_store_day: int | None = Field(
+        default=None, gt=0, le=5000, description="In-store receipts per store-day at multiplier 1"
+    )
+    operating_hours: list[str] | None = Field(
+        default=None, min_length=1, description="Opening-hour patterns stores pick from"
+    )
+    store_formats: list[str] | None = Field(
+        default=None, min_length=1, description="Store formats this store type runs"
+    )
+
+    @field_validator("operating_hours")
+    @classmethod
+    def _hours_parse(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return v
+        for value in v:
+            parse_operating_hours(value)
+        return [value.strip() for value in v]
+
+    @field_validator("store_formats")
+    @classmethod
+    def _known_formats(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return v
+        unknown = sorted(set(v) - set(STORE_FORMATS))
+        if unknown:
+            raise ValueError(f"unknown store formats {unknown}; known: {STORE_FORMATS}")
+        return list(dict.fromkeys(v))
+
+    def resolved_transactions_per_store_day(self) -> int:
+        """Receipts per store-day: the profile's value, else derived from the ticket."""
+        if self.transactions_per_store_day is not None:
+            return self.transactions_per_store_day
+        derived = (
+            _REFERENCE_TRANSACTIONS
+            * (_REFERENCE_TICKET / self.avg_ticket_target) ** _TICKET_TRAFFIC_EXPONENT
+        )
+        return int(min(_MAX_DERIVED_TRANSACTIONS, max(_MIN_DERIVED_TRANSACTIONS, round(derived))))
+
+    def resolved_operating_hours(self) -> list[str]:
+        """Opening-hour patterns: the profile's, else the hours its traffic weights use."""
+        if self.operating_hours is not None:
+            return list(self.operating_hours)
+        floor = max(self.hourly_weights) * _OPEN_HOUR_PEAK_SHARE
+        busy = [hour for hour, weight in enumerate(self.hourly_weights) if weight >= floor]
+        open_hour, close_hour = busy[0], busy[-1] + 1
+        if open_hour <= 1 and close_hour >= 23:
+            return ["24h"]
+        return [f"{open_hour}-{close_hour}"]
+
+    def resolved_store_formats(self) -> list[str]:
+        """Store formats: the profile's, else boutiques for high tickets, else every format."""
+        if self.store_formats is not None:
+            return list(self.store_formats)
+        if self.avg_ticket_target >= _BOUTIQUE_TICKET:
+            return ["boutique"]
+        return [name for name in STORE_FORMATS if name != "boutique"]
+
+    @model_validator(mode="after")
+    def _hours_have_traffic(self) -> "StoreTypeProfile":
+        # A store pattern whose open hours all carry zero weight would never sell.
+        for value in self.resolved_operating_hours():
+            open_hour, close_hour = parse_operating_hours(value)
+            if sum(self.hourly_weights[open_hour:close_hour]) <= 0:
+                raise ValueError(f"operating hours {value!r} have no hourly traffic weight")
+        return self
 
     @field_validator("hourly_weights", "daily_weights", "monthly_weights")
     @classmethod

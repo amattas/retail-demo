@@ -105,6 +105,35 @@ def test_scale_overrides_respected():
     assert (cfg.dc_count, cfg.customer_count, cfg.transactions_per_store_day) == (2, 8000, 50)
 
 
+def test_store_volumes_derive_from_the_store_type_profile():
+    def cfg(store_type: str, **overrides) -> GenerationConfig:
+        return GenerationConfig(
+            store_type=store_type,
+            start_date=date(2025, 1, 1),
+            end_date=date(2025, 1, 31),
+            store_count=10,
+            **overrides,
+        )
+
+    supercenter, luxury = cfg("supercenter"), cfg("luxury")
+    assert (supercenter.transactions_per_store_day, luxury.transactions_per_store_day) == (400, 40)
+    # Online orders are the profile's online_order_share of all orders: 12% of
+    # supercenter orders, 25% of luxury orders (mean traffic multiplier 1.0525).
+    assert supercenter.online_orders_per_day == round(10 * 400 * 1.0525 * 0.12 / 0.88)
+    assert luxury.online_orders_per_day == round(10 * 40 * 1.0525 * 0.25 / 0.75)
+    explicit = cfg("luxury", transactions_per_store_day=100)
+    assert explicit.online_orders_per_day == round(10 * 100 * 1.0525 * 0.25 / 0.75)
+    assert cfg("luxury", online_orders_per_day=3).online_orders_per_day == 3
+
+
+def test_mean_traffic_multiplier_matches_the_volume_classes():
+    from retail_setup.config.generation import MEAN_TRAFFIC_MULTIPLIER
+    from retail_setup.generation.dims import VOLUME_CLASSES
+
+    expected = sum(share * (lo + hi) / 2 for _, share, (lo, hi) in VOLUME_CLASSES)
+    assert MEAN_TRAFFIC_MULTIPLIER == pytest.approx(expected)
+
+
 def test_customer_count_floored_at_minimum():
     from retail_setup.config.generation import MIN_CUSTOMER_COUNT
 

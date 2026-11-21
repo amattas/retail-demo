@@ -382,11 +382,30 @@ Current derived defaults include:
 - `gold_db = au`
 - `dc_count = max(1, store_count // 10)`
 - `customer_count = max(store_count * 1000, 5000)`
-- `online_orders_per_day = store_count * 8`
-- `transactions_per_store_day = 400`
+- `transactions_per_store_day` = the store type's profile value (see below)
+- `online_orders_per_day = store_count * transactions_per_store_day * 1.0525 *
+  s / (1 - s)`, where `s` is the profile's `online_order_share` and 1.0525 is
+  the mean store traffic multiplier, so online orders are `s` of all orders
 - `return_rate = 0.01`
 - `brands_per_product = 3`
 - `truck_capacity = 15000`
+
+Each store type's profile sets its store knobs. Presets declare them; custom
+layouts derive them:
+
+| Store type | Receipts per store-day | Operating hours | Store formats | Online share |
+| --- | --- | --- | --- | --- |
+| `supercenter` | 400 | 6-22, 7-23, 24h | hypermarket, superstore, standard | 12% |
+| `grocery` | 280 | 6-22, 7-22, 7-23 | superstore, standard, neighborhood, express | 15% |
+| `hardware` | 180 | 6-21, 7-21, 7-22 | superstore, standard, neighborhood | 20% |
+| `luxury` | 40 | 10-19, 10-20, 11-19 | boutique | 25% |
+| custom | `400 * (85 / avg_ticket_target) ** 0.6`, 20-1000 | hours whose hourly weight reaches 10% of the peak (`24h` when that is all day) | boutique at a $500+ ticket, else all other formats | profile value |
+
+A store's format is drawn from those its volume class suits among the store
+type's formats. Every store follows its store type's `operating_hours`
+patterns ("24h" or "open-close"). BLE pings and zone changes use the store
+type's `zones` (upper-cased), in history and in the live stream; a live visit
+walks entrance, one to three department zones, checkout (buyers) and exit.
 
 In-store customer assignment reserves a deterministic 10% cohort whose
 purchases stop at seeded, staggered dates inside the generation window.

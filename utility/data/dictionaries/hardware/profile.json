@@ -13,5 +13,8 @@
   "promo_rate": 0.1,
   "online_order_share": 0.2,
   "zones": ["entrance", "tools", "lumber", "electrical", "plumbing", "paint",
-            "garden", "pro-desk", "checkout", "exit"]
+            "garden", "pro-desk", "checkout", "exit"],
+  "transactions_per_store_day": 180,
+  "operating_hours": ["6-21", "7-21", "7-22"],
+  "store_formats": ["superstore", "standard", "neighborhood"]
 }
