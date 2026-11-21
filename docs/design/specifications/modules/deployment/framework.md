@@ -336,7 +336,8 @@ rejection of the agent degrades the deployment instead of failing it.
 Committed schedules stay disabled in source. Deployment configuration
 (`schedules`) switches them on when staging pipeline definitions, and readiness
 compares live schedules with that configured state. `daily_maintenance` defaults
-on; `streaming_data_load` defaults off. `stream.start_after_deploy` (default
+on; `streaming_data_load` defaults to `stream.start_after_deploy`, so a started
+stream is always moved to Silver before Eventhouse retention purges it. `stream.start_after_deploy` (default
 off) submits one `stream-events` run after readiness and never duplicates an
 active run. Dashboard templates
 and rule definitions remain manual sources even though full-demo classifies

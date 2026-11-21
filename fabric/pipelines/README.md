@@ -4,7 +4,7 @@
 | --- | --- | --- |
 | `setup-pipeline` | Setup 01-10 (02-05 and 06-08 in parallel) | On demand; required before ML |
 | `historical-data-load` | Retained historical-load notebook | On demand |
-| `streaming-data-load` | Streaming Silver (`03`) then Gold (`04`); `16-persist-anomaly-alerts` in parallel | Disabled; every 30 minutes (UTC) when `schedules.streaming_data_load` is true |
+| `streaming-data-load` | Streaming Silver (`03`) then Gold (`04`); `16-persist-anomaly-alerts` in parallel | Disabled; every 30 minutes (UTC) when `schedules.streaming_data_load` is true (by default, when `stream.start_after_deploy` is true) |
 | `daily-maintenance` | Delta maintenance (`05`), then `06-ml-demand-forecast` and `12-ml-stockout-prediction`, then `17-refresh-availability-signals` | Disabled; daily 00:00 Eastern when `schedules.daily_maintenance` is true (the default) |
 | `ml-required` | Gold (`setup-11`, then customer segmentation in the same lane) and the other required producers in parallel, then `15-validate-required-ml-contract` | Terminal Reporting gate |
 | `ml-optional` | Promoted optional outputs | Full-demo post-Reporting |

@@ -267,9 +267,31 @@ def test_automation_settings_load_explicit_choices(tmp_path):
 
 
 @pytest.mark.parametrize(
+    "streaming_data_load,expected",
+    [(None, ("streaming-data-load",)), (False, ())],
+)
+def test_streaming_schedule_follows_a_started_stream_unless_set(
+    tmp_path, streaming_data_load, expected
+):
+    config = _load_automation_config(
+        tmp_path,
+        {
+            "schedules": {
+                "daily_maintenance": False,
+                "streaming_data_load": streaming_data_load,
+            },
+            "stream": {"start_after_deploy": True},
+        },
+    )
+
+    assert config.schedules.enabled_pipelines() == expected
+
+
+@pytest.mark.parametrize(
     "settings,match",
     [
         ({"schedules": {"daily_maintenance": "yes"}}, "schedules.daily_maintenance"),
+        ({"schedules": {"streaming_data_load": "on"}}, "schedules.streaming_data_load"),
         ({"stream": {"start_after_deploy": 1}}, "stream.start_after_deploy"),
         ({"stream": {"rows_per_second": 0}}, "stream.rows_per_second"),
         ({"stream": {"run_seconds": -1}}, "stream.run_seconds"),

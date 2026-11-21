@@ -66,7 +66,7 @@ still fails the deployment when a required table is not queryable.
 | --- | --- | --- |
 | `setup-pipeline` | Setup 01-10 (02-05 and 06-08 in parallel) | On demand; mandatory for Reporting profiles |
 | `historical-data-load` | Retained historical-load notebook | On demand |
-| `streaming-data-load` | Streaming Silver then Gold, with `16-persist-anomaly-alerts` in parallel | Committed disabled, every 30 minutes (UTC); `schedules.streaming_data_load` enables it |
+| `streaming-data-load` | Streaming Silver then Gold, with `16-persist-anomaly-alerts` in parallel | Committed disabled, every 30 minutes (UTC); `schedules.streaming_data_load` enables it, and by default follows `stream.start_after_deploy` |
 | `daily-maintenance` | Delta maintenance, then `06-ml-demand-forecast` and `12-ml-stockout-prediction`, then `17-refresh-availability-signals` | Committed disabled, daily 00:00 Eastern; enabled by `schedules.daily_maintenance` (default) |
 | `ml-required` | Demand, segmentation, churn, stockout, market-basket, and promotion/elasticity producers, then runtime contract validation | Terminal Reporting gate |
 | `ml-optional` | Promoted optional outputs | Full-demo post-Reporting |

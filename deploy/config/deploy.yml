@@ -24,8 +24,10 @@ schedules:
   # signal refresh (17-refresh-availability-signals).
   daily_maintenance: true
   # Every 30 minutes (UTC): streaming Silver then Gold, plus anomaly-alert
-  # persistence; useful only while stream-events is producing events.
-  streaming_data_load: false
+  # persistence; useful only while stream-events is producing events. null
+  # follows stream.start_after_deploy, so a started stream is always moved to
+  # Silver before Eventhouse retention (7 days for some tables) purges it.
+  streaming_data_load: null
 # Start the live stream-events notebook after deployment. A running stream holds
 # a Spark session (and capacity) until it stops.
 stream:
