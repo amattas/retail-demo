@@ -416,8 +416,9 @@ Current invariant checks include:
 - truck timing and inventory relationships;
 - sales only within each store's operating hours, evaluated in store-local
   time, and `local_hour` equal to the store-local hour of `event_ts`;
-- returns linked to their sale (same store and customer), posted on a later
-  day, refunding no more than the sale;
+- returns linked to their sale (same store and customer), posted after it
+  (on a later store-local day, by construction), refunding no more than the
+  sale;
 - exactly one approved payment per receipt and order, unique transaction IDs;
 - logistics incidents reference known DCs and stores and resolve after they
   start;

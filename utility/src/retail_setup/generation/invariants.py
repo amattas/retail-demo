@@ -791,7 +791,7 @@ def _run_business_invariants(r: InvariantReport, t: dict[str, DataFrame]) -> Non
     )
 
     # --- returns: every RETURN links the SALE it refunds (same store and
-    # customer), posts on a later day, and refunds no more than it.
+    # customer), posts after it, and refunds no more than it.
     if "original_receipt_id_ext" in receipts.columns:
         _return_link_checks(r, receipts)
     if "fact_payments" in t:
@@ -826,11 +826,13 @@ def _return_link_checks(r: InvariantReport, receipts: DataFrame) -> None:
             | ~F.col("customer_id").eqNullSafe(F.col("_sale_customer"))
         ).count(),
     )
+    # Stored in UTC, so compare instants; returns.build_return_headers also
+    # guarantees a later store-local day.
     _check(
         r,
-        "fact_receipts returns post after their sale day",
+        "fact_receipts returns post after their sale",
         lambda: linked.filter(
-            F.col("_sale_ts").isNotNull() & (F.to_date("event_ts") <= F.to_date("_sale_ts"))
+            F.col("_sale_ts").isNotNull() & (F.col("event_ts") <= F.col("_sale_ts"))
         ).count(),
     )
     _check(

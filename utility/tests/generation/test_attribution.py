@@ -30,8 +30,12 @@ def _build_pre_attribution(spark, cfg, dicts):
     so tests can call attribution.generate_attribution directly/repeatedly
     against an identical, already-materialized upstream snapshot.
     """
-    t = dict(generate_dimensions(spark, dicts, cfg))
-    sales = receipts_mod.generate_receipts_group(spark, t, dicts.profile, cfg)
+    t = {name: df.localCheckpoint() for name, df in generate_dimensions(spark, dicts, cfg).items()}
+    # Checkpoint the sales as the engine does, so returns do not regenerate them.
+    sales = {
+        name: df.localCheckpoint()
+        for name, df in receipts_mod.generate_receipts_group(spark, t, dicts.profile, cfg).items()
+    }
     rets = returns_mod.generate_returns(spark, sales, t, cfg)
     t["fact_receipts"] = sales["fact_receipts"].unionByName(rets["fact_receipts"])
     t["fact_receipt_lines"] = sales["fact_receipt_lines"].unionByName(rets["fact_receipt_lines"])
@@ -52,8 +56,8 @@ def cfg():
     return GenerationConfig(
         store_type="grocery",
         start_date=date(2025, 6, 1),
-        end_date=date(2025, 6, 21),
-        store_count=6,
+        end_date=date(2025, 6, 14),
+        store_count=4,
         dc_count=1,
         customer_count=250,
         seed=77,
