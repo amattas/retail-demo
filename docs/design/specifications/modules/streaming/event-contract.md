@@ -483,10 +483,18 @@ deployment verification gate.
 
 ## Marketing attribution
 
-About 5% of approved store and online purchases with a customer are selected
-for a journey with the batch helper (`attribution.with_journey_plan`): one
-journey ID, a product-launch or loyalty campaign, and two `ad_impression`
-touches 3-7 days and 1 minute-2 days before the purchase. The existing envelope
+Approved store and online purchases with a customer are selected for a
+journey at the rate that makes the attributed net revenue about
+`attribution.TARGET_ROAS` (4x) the live impression spend
+(`attribution.live_journey_rate`, from the lane volumes, identified buyers and
+the pre-tax ticket), as history converts impressions. A journey
+(`attribution.with_journey_plan`) has one journey ID and one to three
+`ad_impression` touches 1 minute to 7 days before the purchase, each on an
+archetype drawn by impression volume, in the campaign window of its own time,
+with a creative from the campaign's pool, a CPM cost, a device and a
+CRM-matched `customer_id` exactly like background impressions; their impression
+IDs have the background format. The purchase carries the last touch's
+`campaign_id` and `impression_id`. The existing envelope
 `correlation_id` carries `attribution_journey_id` through impressions,
 receipt/order creation, promotion, payment, and online status events.
 

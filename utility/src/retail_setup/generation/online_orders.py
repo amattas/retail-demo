@@ -441,7 +441,7 @@ def generate_online_orders(
         .withColumn("payment_method", F.col("tender_type"))
         # IMP-007: subtotal_cents stays net (existing behavior); gross recovers
         # the pre-discount total. Attribution fields default NULL; enriched for
-        # the ~5% of orders selected for attribution (attribution.py).
+        # the orders an impression converts (attribution.py).
         .withColumn("gross_subtotal_cents", F.col("subtotal_cents") + F.col("discount_cents"))
         .withColumn("attribution_journey_id", F.lit(None).cast("string"))
         .withColumn("campaign_id", F.lit(None).cast("string"))

@@ -52,8 +52,8 @@ def cfg():
     return GenerationConfig(
         store_type="grocery",
         start_date=date(2025, 6, 1),
-        end_date=date(2025, 6, 10),
-        store_count=3,
+        end_date=date(2025, 6, 21),
+        store_count=6,
         dc_count=1,
         customer_count=250,
         seed=77,
@@ -169,14 +169,21 @@ def test_journey_id_set_iff_attributed(fma):
     assert mismatched.count() == 0
 
 
-def test_selection_rate_bounded(fma):
-    reconciled = fma.filter(
-        F.col("attribution_status").isin("ATTRIBUTED", "UNATTRIBUTED_NO_JOURNEY")
-    )
+def test_conversion_economics_are_realistic(attr, fma):
+    impressions = attr["fact_marketing"]
+    spend = impressions.agg(F.sum("cost_cents")).first()[0]
     attributed = fma.filter(F.col("attribution_status") == "ATTRIBUTED")
-    share = attributed.count() / reconciled.count()
-    # deterministic ~5% draw; allow generous slack for small-sample noise
-    assert 0.01 < share < 0.12, share
+    revenue = attributed.agg(F.sum("attributed_revenue_cents")).first()[0]
+    conversions = attributed.count()
+    n_impressions = impressions.count()
+    roas = revenue / spend
+    print(f"STAT roas={roas:.2f} conversions/impression={conversions / n_impressions:.4f}")
+    assert 2.0 <= roas <= 8.0, roas
+    assert conversions / n_impressions < 0.01
+    # Real CPMs: every impression costs $0.002-$0.03.
+    costs = impressions.select(F.col("cost").cast("double").alias("c")).agg(F.min("c"), F.max("c"))
+    low, high = costs.first()
+    assert 0.002 <= low and high <= 0.03, (low, high)
 
 
 # --------------------------------------------------------------------------
@@ -191,16 +198,39 @@ def test_one_purchase_per_journey_and_vice_versa(fma):
     assert n == fma.filter(F.col("attribution_journey_id").isNotNull()).count()
 
 
-def test_fact_marketing_two_touches_per_journey(attr):
+def test_journeys_are_real_impressions_indistinguishable_from_the_rest(attr, pre):
     mk = attr["fact_marketing"]
+    # Attribution adds no rows: journeys are background impressions.
+    assert mk.count() == pre["fact_marketing"].count()
     journeys = mk.filter(F.col("attribution_journey_id").isNotNull())
-    counts = journeys.groupBy("attribution_journey_id").agg(F.count("*").alias("n"))
-    assert counts.filter(F.col("n") != 2).count() == 0
-    # every synthetic touch has a real customer/ad linkage
-    assert (
-        journeys.filter(F.col("customer_ad_id").isNull() | F.col("customer_id").isNull()).count()
-        == 0
+    others = mk.filter(F.col("attribution_journey_id").isNull())
+    assert journeys.count() > 0
+    for frame in (journeys, others):
+        assert frame.filter(~F.col("impression_id_ext").rlike(r"^IMP\d{17}$")).count() == 0
+        assert frame.filter(~F.col("creative_id").rlike(r"^CRT\d{10}-[A-Z]+-[1-4]$")).count() == 0
+        assert frame.filter(~F.col("customer_ad_id").rlike(r"^AD\d{8,}$")).count() == 0
+    # No null-pattern tell: journey touches are CRM-matched as rarely as others.
+    matched = journeys.filter(F.col("customer_id").isNotNull()).count() / journeys.count()
+    assert matched < 0.5, matched
+    # A small creative pool per campaign and channel.
+    pools = mk.groupBy("campaign_id", "channel").agg(F.countDistinct("creative_id").alias("n"))
+    assert pools.filter(F.col("n") > 4).count() == 0
+
+
+def test_touches_lie_inside_their_campaign_window(attr):
+    from retail_setup.generation.vocabulary import CAMPAIGN_ARCHETYPES
+
+    durations = {index + 1: entry[3] for index, entry in enumerate(CAMPAIGN_ARCHETYPES)}
+    rows = (
+        attr["fact_marketing"]
+        .filter(F.col("attribution_journey_id").isNotNull())
+        .select("campaign_id", F.to_date("event_ts").alias("day"))
+        .collect()
     )
+    for row in rows:
+        start = datetime.strptime(row.campaign_id[4:12], "%Y%m%d").date()
+        days = durations[int(row.campaign_id[12:])]
+        assert start <= row.day < start + timedelta(days=days), row
 
 
 def test_fact_marketing_journeys_match_attributed_purchases(attr, fma):
@@ -332,7 +362,8 @@ def test_payment_enrichment_matches_attribution(attr, fma):
         .filter(F.col("p.attribution_journey_id") != F.col("e.attribution_journey_id"))
     )
     assert mismatched.count() == 0
-    assert payments.join(enrich, "pay_key").count() == enrich.count()
+    # A retried purchase has a declined and an approved payment; both carry it.
+    assert payments.join(enrich, "pay_key").select("pay_key").distinct().count() == enrich.count()
 
 
 def test_promotion_enrichment_matches_attribution(attr, fma):

@@ -5,82 +5,74 @@ online order, including attributed, unattributed, declined, and
 reconciliation-failed outcomes, using deterministic last-touch attribution
 within an inclusive 7-day window.
 
+Conversion is driven by exposure. Every background impression
+(``marketing.py``) reaches the customer whose ad ID it carries; an impression
+converts with a small per-impression probability weighted by channel
+(``vocabulary.CHANNEL_CONVERSION_WEIGHTS``) when that customer makes an
+eligible purchase within the 7 days after it. The probability is calibrated
+per run so the campaigns return about ``TARGET_ROAS`` times their spend
+(realistic retail ROAS), which keeps conversions far below 1% of impressions
+at real CPMs. Journeys are therefore made of real impressions: a journey's
+touches are indistinguishable from other impressions except for their
+``attribution_journey_id``, every campaign family can convert, and each touch
+lies inside its own campaign window.
+
 Pipeline:
 
 1. Purchase candidates are built from SALE receipts and online order headers,
-   each left-joined to its own payment row. A purchase is "reconciled" only
-   when it has an APPROVED payment whose ``amount_cents`` exactly equals the
-   purchase's ``total_cents``; anything else is ``PAYMENT_DECLINED`` (a
-   payment exists but is DECLINED) or ``RECONCILIATION_FAILED`` (no payment
-   row at all — e.g. a cancelled online order — or an approved payment that
-   doesn't reconcile to the total).
-2. A deterministic, seed-bound ~5% share of the reconciled purchases is
-   selected for attribution (``seeded_draws.u`` keyed on the purchase's own
-   id, so selection is independent of cluster shape and stable for a given
-   (config, seed)). Each selected purchase gets a unique
-   ``attribution_journey_id`` and two synthetic ad-impression touches for the
-   SAME customer/campaign/journey: an "older" touch (3-7 days before
-   purchase) and a "newer" touch (1 minute-2 days before purchase). Both land
-   inside the 7-day attribution window, and the two offset ranges never
-   overlap, so the newer touch is always the more recent of the two.
-3. The two touches are unioned into ``fact_marketing`` (customer_ad_id/
-   customer_id populated, ``attribution_journey_id`` set). Last-touch
-   attribution is then DERIVED — not copied — via ``_last_touch``: a real
-   window/rank join keyed on ``touch_ts <= purchase_ts <= touch_ts + 7d``,
-   ordered by ``touch_ts`` desc then ``impression_id_ext`` desc. Because the
-   "newer" touch's timestamp is always later than the "older" touch's (by
-   construction — the offset ranges never overlap), the newer touch always
-   wins the rank; the winner is computed, not assumed, so a swapped
-   offset/ordering bug would surface as a failing rank/tie-break test rather
-   than silently passing.
-4. All other reconciled purchases get ``UNATTRIBUTED_NO_JOURNEY`` (no journey
-   was selected for them); ``attributed_revenue_cents`` is 0 for every
-   non-ATTRIBUTED row and equals ``net_subtotal_cents`` (tax-exclusive) for
-   ATTRIBUTED rows.
-5. Selected receipts/orders/payments/promotions are enriched in place with
-   the *derived* ``attribution_journey_id``/``campaign_id``/
-   ``impression_id_ext`` — every other row keeps the NULL placeholders the
-   base generators already emit.
+   each joined to its final payment (a declined first tender that was retried
+   has an approved second payment). A purchase is "reconciled" only when that
+   payment is APPROVED and equals the purchase's ``total_cents``; anything else
+   is ``PAYMENT_DECLINED`` or ``RECONCILIATION_FAILED``.
+2. Candidate impressions (a stable draw ``u`` below ``CANDIDATE_RATE`` x the
+   channel weight) are joined to the reached customer's eligible purchases
+   within the window; each reaches the customer's next purchase.
+3. A purchase's conversion score is the smallest ``u / weight`` of the
+   impressions reaching it. Purchases convert in score order until their net
+   revenue reaches ``TARGET_ROAS`` x the spend of all impressions; the
+   impressions at or under the cut are the journey's touches.
+4. Last-touch attribution is DERIVED via ``_last_touch`` (window/rank join
+   ordered by touch time then impression ID); ``attributed_revenue_cents`` is
+   ``net_subtotal_cents`` for ATTRIBUTED rows and 0 otherwise.
+5. Receipts/orders/payments/promotions are enriched with the derived
+   ``attribution_journey_id``/``campaign_id``/``impression_id_ext``, and the
+   journey's impressions in ``fact_marketing`` carry the journey ID.
 """
 
-from datetime import date
-
-from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
+from datetime import date
+
 from retail_setup.config.generation import GenerationConfig
-from retail_setup.generation.marketing import campaign_window_start, impression_device_cost
-from retail_setup.generation.runtime import (
-    legacy_index,
-    seeded_draws,
-)
+from retail_setup.generation.marketing import campaign_window_start
+from retail_setup.generation.runtime import case_when, seeded_draws
 from retail_setup.generation.schemas import column_names
 from retail_setup.generation.vocabulary import (
+    AD_ID_PREFIX,
     CAMPAIGN_ARCHETYPES,
+    CHANNEL_CONVERSION_WEIGHTS,
+    CHANNEL_COSTS,
+    DEVICE_MULTIPLIERS,
+    DEVICE_WEIGHTS,
     campaign_id_column,
+    channel_conversion_weight,
 )
 
 ATTRIBUTION_MODEL = "LAST_TOUCH_7D"
 ATTRIBUTION_WINDOW_DAYS = 7
-SELECTION_RATE = 0.05  # deterministic bounded share (~5%) of eligible purchases
-
-# Linked journeys reuse the product-launch and loyalty campaign families from
-# marketing.py. Their 14/30-day durations provide real background spend while
-# still allowing a conversion up to seven days after the selected touch.
-JOURNEY_CAMPAIGNS = [
-    (2, CAMPAIGN_ARCHETYPES[1][1], CAMPAIGN_ARCHETYPES[1][3]),
-    (3, CAMPAIGN_ARCHETYPES[2][1], CAMPAIGN_ARCHETYPES[2][3]),
-]
-
-# Touch offsets (seconds before purchase_ts). The ranges never overlap
-# (older_min = 3d > newer_max = 2d), so the "newer" touch is always the more
-# recent one of the pair — attribution is still DERIVED by real ranking (see
-# _last_touch); this just keeps the pipeline's own construction sane.
-OLDER_OFFSET_MIN_S = 3 * 86400
-OLDER_OFFSET_MAX_S = ATTRIBUTION_WINDOW_DAYS * 86400
-NEWER_OFFSET_MIN_S = 60
-NEWER_OFFSET_MAX_S = 2 * 86400
+# Campaigns return about this many dollars of net revenue per dollar spent.
+TARGET_ROAS = 4.0
+# Impressions that may convert at all: a stable draw below this rate times the
+# channel's weight relative to the strongest channel. Bounds the conversion
+# probability (and the join) well above what TARGET_ROAS needs.
+CANDIDATE_RATE = 0.03
+# Live stream journeys (with_journey_plan): 1-3 touches, 1 minute to 7 days
+# before the purchase, each in the campaign window of its own time.
+JOURNEY_MAX_TOUCHES = 3
+JOURNEY_TOUCH_MIN_S = 60
+FLASH_SALE_DAY_SHARE = 1.0 / 7.0
 
 
 def _last_touch(touches: DataFrame, purchases: DataFrame) -> DataFrame:
@@ -145,133 +137,136 @@ def _last_touch(touches: DataFrame, purchases: DataFrame) -> DataFrame:
     )
 
 
-def _journey_touch_rows(
-    selected: DataFrame,
-    d: seeded_draws,
-    ts_col: str,
-    suffix: str,
-) -> DataFrame:
-    """Build one fact_marketing row per selected journey for a single touch
-    ("older" or "newer"). Device/cost draws mirror marketing.py's organic
-    impressions, keyed on this touch's own impression id so the two touches
-    of a journey draw independently of each other.
+def reached_customer(customer_ad_id: Column) -> Column:
+    """The customer an impression reaches: the ID inside its ad ID (``AD`` + digits)."""
+    return F.substring(customer_ad_id, len(AD_ID_PREFIX) + 1, 32).cast("long")
+
+
+def conversion_score(d: seeded_draws, impression_id: Column, channel: Column) -> Column:
+    """An impression's conversion score: a stable draw over its channel weight.
+
+    Lower converts first; candidates are impressions scoring below
+    ``CANDIDATE_RATE / max weight``.
     """
-    rows = selected.withColumn("touch_ts", F.col(ts_col)).withColumn(
-        "impression_id_ext",
-        F.concat(F.lit("IMPJRN"), F.col("_jhash"), F.lit(suffix[0].upper())),
-    )
-    key = [F.col("impression_id_ext")]
-    device, cost = impression_device_cost(
-        d, key, F.col("channel"), f"attr_device_{suffix}", f"attr_cost_{suffix}"
-    )
-    rows = rows.withColumn("device", device).withColumn("_cost_dollars", cost)
-    cost_dollars = F.col("_cost_dollars")
-    rows = (
-        rows.withColumn("cost_cents", F.round(cost_dollars * 100).cast("long"))
-        .withColumn("cost", F.format_string("%.2f", cost_dollars))
-        .withColumn("trace_id", F.concat(F.lit("TRC-MKT-"), F.col("impression_id_ext")))
-        .withColumn("creative_id", F.concat(F.col("creative_id"), F.lit(f"-{suffix.upper()}")))
-        .withColumn("event_date", F.col("touch_ts").cast("date"))
-    )
-    out = rows.select(
-        F.col("touch_ts").alias("event_ts"),
-        "trace_id",
-        "channel",
-        "campaign_id",
-        "creative_id",
-        "customer_ad_id",
-        F.col("customer_id").cast("double").alias("customer_id"),
-        "cost_cents",
-        F.col("customer_id").cast("double").alias("CustomerId"),
-        F.col("cost_cents").alias("CostCents"),
-        "impression_id_ext",
-        "cost",
-        "device",
-        "event_date",
-        "attribution_journey_id",
-    ).withColumn("__index_level_0__", legacy_index("impression_id_ext"))
-    return out.select(*column_names("fact_marketing"))
+    return d.u([impression_id], "attr_conversion") / channel_conversion_weight(channel)
+
+
+def candidate_score_limit() -> float:
+    return CANDIDATE_RATE / max(CHANNEL_CONVERSION_WEIGHTS.values())
+
+
+def archetype_weights() -> list[tuple[str, float]]:
+    """Each campaign archetype's share of impressions (flash sales run one day in 7)."""
+    return [
+        (str(index + 1), base * (FLASH_SALE_DAY_SHARE if name == "flash_sale" else 1.0))
+        for index, (name, _, base, _) in enumerate(CAMPAIGN_ARCHETYPES)
+    ]
+
+
+def archetype_share(name: str) -> float:
+    """An archetype's share of the background impression picks (before flash gating)."""
+    total = sum(base for _, _, base, _ in CAMPAIGN_ARCHETYPES)
+    return sum(base for archetype, _, base, _ in CAMPAIGN_ARCHETYPES if archetype == name) / total
+
+
+def mean_impression_cost() -> float:
+    """Expected dollars per background impression across archetypes, channels and devices."""
+    device = sum(weight * DEVICE_MULTIPLIERS[name] for name, weight in DEVICE_WEIGHTS)
+    weights = dict(archetype_weights())
+    total = sum(weights.values())
+    cost = 0.0
+    for index, (_, channels, _, _) in enumerate(CAMPAIGN_ARCHETYPES):
+        mean = sum(sum(CHANNEL_COSTS[channel]) / 2 for channel in channels) / len(channels)
+        cost += weights[str(index + 1)] / total * mean
+    return cost * device
+
+
+def live_journey_rate(
+    impressions_per_day: float, eligible_purchases_per_day: float, net_ticket_dollars: float
+) -> float:
+    """Share of the live stream's eligible purchases it attributes.
+
+    Sized like history: the attributed net revenue is ``TARGET_ROAS`` times the
+    day's impression spend.
+    """
+    if eligible_purchases_per_day <= 0 or net_ticket_dollars <= 0:
+        return 0.0
+    spend = impressions_per_day * mean_impression_cost()
+    return min(1.0, TARGET_ROAS * spend / (eligible_purchases_per_day * net_ticket_dollars))
 
 
 def with_journey_plan(purchases: DataFrame, d: seeded_draws, history_start: date) -> DataFrame:
-    """Add a selected purchase's journey: ID, campaign, channel and two touch times.
+    """Add a live purchase's journey: its ID and 1-3 touches, oldest first.
 
     ``purchases`` needs ``match_key`` (the purchase's own ID) and
-    ``purchase_ts``. Every draw is keyed on ``match_key``, so the batch and the
-    live stream plan journeys the same way for their own purchases.
+    ``purchase_ts``. Each touch (``journey_touches``: ``seq``, ``touch_ts``,
+    ``archetype``, ``campaign_id``, ``channel``) is 1 minute to 7 days before
+    the purchase, on an archetype drawn by impression volume (a flash sale only
+    on its active days), in the campaign window of its own time, on one of the
+    archetype's channels, like a background impression. ``campaign_id`` and
+    ``touch_ts`` are the last touch's.
     """
+    key = F.col("match_key")
+    window_s = ATTRIBUTION_WINDOW_DAYS * 86400
+    count = (1 + F.floor(d.u([key], "attr_touches") * JOURNEY_MAX_TOUCHES)).cast("int")
+    offsets = F.slice(
+        F.array(
+            *[
+                (
+                    F.lit(JOURNEY_TOUCH_MIN_S)
+                    + d.u([key], f"attr_touch{index}") * (window_s - JOURNEY_TOUCH_MIN_S)
+                ).cast("long")
+                for index in range(1, JOURNEY_MAX_TOUCHES + 1)
+            ]
+        ),
+        1,
+        count,
+    )
+    oldest_first = F.reverse(F.array_sort(offsets))
+    flash = next(
+        str(index + 1)
+        for index, (name, *_) in enumerate(CAMPAIGN_ARCHETYPES)
+        if name == "flash_sale"
+    )
+    durations = {str(index + 1): entry[3] for index, entry in enumerate(CAMPAIGN_ARCHETYPES)}
+    channels = {str(index + 1): entry[1] for index, entry in enumerate(CAMPAIGN_ARCHETYPES)}
+
+    def touch(offset: Column, index: Column) -> Column:
+        ts = F.timestamp_seconds(F.col("purchase_ts").cast("long") - offset)
+        day = F.to_date(ts)
+        drawn = d.pick_by_weights([key, index], "attr_archetype", archetype_weights())
+        archetype = F.when(
+            (drawn == flash) & ~(d.u([day], "mk_flash_gate") < F.lit(FLASH_SALE_DAY_SHARE)),
+            F.lit("2"),
+        ).otherwise(drawn)
+        duration = case_when((archetype == name, F.lit(days)) for name, days in durations.items())
+        channel = case_when(
+            (
+                archetype == name,
+                d.pick_by_weights(
+                    [key, index], f"attr_channel_{name}", [(c, 1.0) for c in options]
+                ),
+            )
+            for name, options in channels.items()
+        )
+        start = campaign_window_start(day, history_start, duration)
+        return F.struct(
+            (index + 1).alias("seq"),
+            ts.alias("touch_ts"),
+            archetype.cast("int").alias("archetype"),
+            campaign_id_column(start, archetype.cast("int")).alias("campaign_id"),
+            channel.alias("channel"),
+        )
+
+    last = F.element_at(F.col("journey_touches"), -1)
     return (
         purchases.withColumn(
-            "_jhash", F.hex(F.xxhash64(F.col("match_key"), F.lit(f"attr_journey|{d.seed}")))
+            "attribution_journey_id",
+            F.concat(F.lit("JRN"), F.hex(F.xxhash64(key, F.lit(f"attr_journey|{d.seed}")))),
         )
-        .withColumn("attribution_journey_id", F.concat(F.lit("JRN"), F.col("_jhash")))
-        .withColumn("creative_id", F.concat(F.lit("CREATJRN"), F.substring(F.col("_jhash"), 1, 12)))
-        .withColumn(
-            "_campaign_choice",
-            (d.h64(["match_key"], "attr_campaign") % len(JOURNEY_CAMPAIGNS)).cast("int"),
-        )
-        .withColumn(
-            "_campaign_index",
-            F.when(F.col("_campaign_choice") == 0, F.lit(JOURNEY_CAMPAIGNS[0][0])).otherwise(
-                F.lit(JOURNEY_CAMPAIGNS[1][0])
-            ),
-        )
-        .withColumn(
-            "_campaign_duration",
-            F.when(F.col("_campaign_choice") == 0, F.lit(JOURNEY_CAMPAIGNS[0][2])).otherwise(
-                F.lit(JOURNEY_CAMPAIGNS[1][2])
-            ),
-        )
-        .withColumn(
-            "channel",
-            F.when(
-                F.col("_campaign_choice") == 0,
-                d.pick_by_weights(
-                    ["match_key"],
-                    "attr_channel_product",
-                    [(channel, 1.0) for channel in JOURNEY_CAMPAIGNS[0][1]],
-                ),
-            ).otherwise(
-                d.pick_by_weights(
-                    ["match_key"],
-                    "attr_channel_loyalty",
-                    [(channel, 1.0) for channel in JOURNEY_CAMPAIGNS[1][1]],
-                )
-            ),
-        )
-        .withColumn(
-            "older_offset",
-            (
-                F.lit(OLDER_OFFSET_MIN_S)
-                + d.u(["match_key"], "attr_older") * F.lit(OLDER_OFFSET_MAX_S - OLDER_OFFSET_MIN_S)
-            ).cast("long"),
-        )
-        .withColumn(
-            "newer_offset",
-            (
-                F.lit(NEWER_OFFSET_MIN_S)
-                + d.u(["match_key"], "attr_newer") * F.lit(NEWER_OFFSET_MAX_S - NEWER_OFFSET_MIN_S)
-            ).cast("long"),
-        )
-        .withColumn(
-            "touch_ts_older",
-            F.timestamp_seconds(F.col("purchase_ts").cast("long") - F.col("older_offset")),
-        )
-        .withColumn(
-            "touch_ts_newer",
-            F.timestamp_seconds(F.col("purchase_ts").cast("long") - F.col("newer_offset")),
-        )
-        .withColumn("_campaign_touch_day", F.to_date("touch_ts_newer"))
-        .withColumn(
-            "_campaign_start",
-            campaign_window_start(
-                F.col("_campaign_touch_day"), history_start, F.col("_campaign_duration")
-            ),
-        )
-        .withColumn(
-            "campaign_id",
-            campaign_id_column(F.col("_campaign_start"), F.col("_campaign_index")),
-        )
+        .withColumn("journey_touches", F.transform(oldest_first, touch))
+        .withColumn("campaign_id", last["campaign_id"])
+        .withColumn("touch_ts", last["touch_ts"])
     )
 
 
@@ -369,64 +364,92 @@ def generate_attribution(
         .otherwise(F.lit("ELIGIBLE")),
     )
 
-    # --- 3. deterministic ~5% selection of eligible (reconciled) purchases,
-    # with a known customer to anchor the journey's touches to.
-    earliest_purchase_ts = F.date_add(F.lit(cfg.start_date), ATTRIBUTION_WINDOW_DAYS).cast(
-        "timestamp"
-    )
+    # --- 3. exposure-driven conversion: candidate impressions reach their
+    # customer's next eligible purchase within the window.
+    earliest_purchase_ts = F.lit(cfg.start_date).cast("timestamp")
     eligible = purchases_all.filter(
         (F.col("base_status") == "ELIGIBLE")
         & F.col("customer_id").isNotNull()
-        # Keep generated touches inside the requested historical range.
         & (F.col("purchase_ts") >= earliest_purchase_ts)
     )
-    selected = (
-        eligible.withColumn("_sel_u", d.u(["match_key"], "attr_select"))
-        .filter(F.col("_sel_u") < F.lit(SELECTION_RATE))
-        .drop("_sel_u")
-    )
-
-    selected = with_journey_plan(selected, d, cfg.start_date)
-
-    cust_ad = t["dim_customers"].select(
-        F.col("ID").alias("customer_id"), F.col("AdId").alias("customer_ad_id")
-    )
-    selected = selected.join(cust_ad, "customer_id", "left")
-
-    # --- 4. the two linked touches per journey, unioned into fact_marketing.
-    older_rows = _journey_touch_rows(selected, d, "touch_ts_older", "older")
-    newer_rows = _journey_touch_rows(selected, d, "touch_ts_newer", "newer")
-    fact_marketing = t["fact_marketing"].unionByName(older_rows).unionByName(newer_rows)
-
-    # --- 5. derive last-touch attribution via a real window/rank join,
-    # scoped to each journey's own two touches (never mixed with organic
-    # background impressions or other journeys — deterministic regardless of
-    # catalog size/config) but still a genuine ranking computation.
-    touches = older_rows.select(
-        F.col("attribution_journey_id").alias("match_key"),
-        F.col("event_ts").alias("touch_ts"),
-        "impression_id_ext",
-        "campaign_id",
-        "creative_id",
-        "channel",
-        "customer_ad_id",
-        "customer_id",
-    ).unionByName(
-        newer_rows.select(
-            F.col("attribution_journey_id").alias("match_key"),
+    impressions = t["fact_marketing"]
+    spend_cents = impressions.agg(F.sum("cost_cents")).collect()[0][0] or 0
+    candidates = (
+        impressions.withColumn(
+            "_score", conversion_score(d, F.col("impression_id_ext"), F.col("channel"))
+        )
+        .filter(F.col("_score") < F.lit(candidate_score_limit()))
+        .select(
+            "impression_id_ext",
             F.col("event_ts").alias("touch_ts"),
+            "campaign_id",
+            "creative_id",
+            "channel",
+            "customer_ad_id",
+            reached_customer(F.col("customer_ad_id")).alias("_reached"),
+            "_score",
+        )
+    )
+    window_s = ATTRIBUTION_WINDOW_DAYS * 86400
+    reach = candidates.join(
+        eligible.select("match_key", "customer_id", "purchase_ts", "net_subtotal_cents"),
+        (F.col("_reached") == F.col("customer_id"))
+        & (F.col("purchase_ts").cast("long") > F.col("touch_ts").cast("long"))
+        & (F.col("purchase_ts").cast("long") <= F.col("touch_ts").cast("long") + window_s),
+    ).drop("_reached")
+    next_purchase = Window.partitionBy("impression_id_ext").orderBy("purchase_ts", "match_key")
+    reach = (
+        reach.withColumn("_n", F.row_number().over(next_purchase))
+        .filter(F.col("_n") == 1)
+        .drop("_n")
+    )
+    # --- 4. convert purchases in score order until revenue reaches the target.
+    scored = reach.groupBy("match_key").agg(
+        F.min("_score").alias("_purchase_score"),
+        F.first("net_subtotal_cents").alias("_revenue"),
+    )
+    by_score = Window.orderBy("_purchase_score", "match_key").rowsBetween(
+        Window.unboundedPreceding, -1
+    )
+    target_cents = TARGET_ROAS * spend_cents
+    cut = (
+        scored.withColumn("_before", F.coalesce(F.sum("_revenue").over(by_score), F.lit(0)))
+        .filter(F.col("_before") < F.lit(target_cents))
+        .agg(F.max("_purchase_score"))
+        .collect()[0][0]
+    )
+    # No purchase converts when nothing was reached (or nothing was spent).
+    touches_all = reach.filter(F.col("_score") <= F.lit(-1.0 if cut is None else float(cut)))
+    selected = eligible.join(touches_all.select("match_key").distinct(), "match_key").withColumn(
+        "attribution_journey_id",
+        F.concat(
+            F.lit("JRN"),
+            F.hex(F.xxhash64(F.col("match_key"), F.lit(f"attr_journey|{d.seed}"))),
+        ),
+    )
+    touches = touches_all.join(selected.select("match_key", "attribution_journey_id"), "match_key")
+    journey_of = touches.select("impression_id_ext", "attribution_journey_id")
+    fact_marketing = (
+        impressions.drop("attribution_journey_id")
+        .join(journey_of, "impression_id_ext", "left")
+        .select(*column_names("fact_marketing"))
+    )
+
+    # --- 5. derive last-touch attribution via a real window/rank join over
+    # each journey's own touches.
+    best_touch = _last_touch(
+        touches.select(
+            F.col("attribution_journey_id").alias("match_key"),
+            "touch_ts",
             "impression_id_ext",
             "campaign_id",
             "creative_id",
             "channel",
             "customer_ad_id",
             "customer_id",
-        )
-    )
-    purchase_for_rank = selected.select(
-        F.col("attribution_journey_id").alias("match_key"), "purchase_ts"
-    )
-    best_touch = _last_touch(touches, purchase_for_rank).select(
+        ),
+        selected.select(F.col("attribution_journey_id").alias("match_key"), "purchase_ts"),
+    ).select(
         F.col("match_key").alias("attribution_journey_id"),
         "touch_ts",
         "impression_id_ext",
@@ -437,25 +460,8 @@ def generate_attribution(
         "lag_seconds",
     )
 
-    attributed = (
-        selected.drop(
-            "channel",
-            "campaign_id",
-            "creative_id",
-            "customer_ad_id",
-            "_jhash",
-            "older_offset",
-            "newer_offset",
-            "touch_ts_older",
-            "touch_ts_newer",
-            "_campaign_choice",
-            "_campaign_index",
-            "_campaign_duration",
-            "_campaign_touch_day",
-            "_campaign_start",
-        )
-        .join(best_touch, "attribution_journey_id")
-        .withColumn("attribution_status", F.lit("ATTRIBUTED"))
+    attributed = selected.join(best_touch, "attribution_journey_id").withColumn(
+        "attribution_status", F.lit("ATTRIBUTED")
     )
 
     non_attributed = (

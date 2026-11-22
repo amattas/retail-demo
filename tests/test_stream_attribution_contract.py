@@ -2,9 +2,10 @@
 
 The live stream (``utility/src/retail_setup/generation/stream_events.py``,
 inlined into ``stream-events``) mirrors the batch attribution semantics of
-``attribution.py``: the same ~5% journey selection, two linked touches per
-journey, a shared correlation ID, and promotion-before-tax money. Touches
-carry their touch time in ``impression_time`` and arrive with the purchase.
+``attribution.py``: journeys sized to the same return on ad spend, one to
+three touches built exactly like background impressions, a shared
+correlation ID, and promotion-before-tax money. Touches carry their touch
+time in ``impression_time`` and arrive with the purchase.
 
 All checks here are static (AST/source inspection) or pure-Python arithmetic;
 the money and arrival-time behavior is exercised with Spark in
@@ -84,37 +85,54 @@ def test_envelope_carries_optional_correlation_and_arrival_time() -> None:
     assert 'iso(ts if arrival is None else arrival).alias("ingest_timestamp")' in envelope
 
 
-def test_journeys_reuse_the_batch_selection_and_plan() -> None:
+def test_journeys_reuse_the_batch_plan_at_the_calibrated_rate() -> None:
     journey = _function_source("_journey")
     assert "with_journey_plan(" in journey
     assert '(F.col("status") == "APPROVED")' in journey
     assert 'F.col("customer_id").isNotNull()' in journey
-    assert '"attr_select") < F.lit(SELECTION_RATE)' in journey
-    assert "from retail_setup.generation.attribution import SELECTION_RATE, with_journey_plan" in (
-        _source()
-    )
+    assert '"attr_select") < F.lit(ctx.journey_rate)' in journey
+    context = _function_source("build_stream_context")
+    assert "live_journey_rate(" in context
+    assert "journey_rate=journey_rate" in context
+    rate = _function_source("live_journey_rate", ATTRIBUTION)
+    assert "TARGET_ROAS * spend" in rate
 
 
-def test_each_journey_has_two_touches_that_arrive_with_the_purchase() -> None:
+def test_journey_touches_look_like_background_impressions() -> None:
     touches = _function_source("journey_touch_events")
-    assert '("older", "touch_ts_older"), ("newer", "touch_ts_newer")' in touches
+    background = _function_source("marketing_events")
+    assert 'F.transform("journey_touches", touch_event)' in touches
     assert '"ad_impression"' in touches
-    assert 'iso(F.col(ts_col)).alias("impression_time")' in touches
+    assert 'iso(touch["touch_ts"]).alias("impression_time")' in touches
     assert 'arrival=F.col("purchase_ts")' in touches
     assert 'correlation=F.col("journey_id")' in touches
     assert 'due & F.col("_attributed")' in touches
-    older_min = _constant(ATTRIBUTION, "OLDER_OFFSET_MIN_S")
-    older_max = _constant(ATTRIBUTION, "OLDER_OFFSET_MAX_S")
-    newer_min = _constant(ATTRIBUTION, "NEWER_OFFSET_MIN_S")
-    newer_max = _constant(ATTRIBUTION, "NEWER_OFFSET_MAX_S")
-    assert 0 < newer_min <= newer_max < older_min <= older_max == 7 * 86400
+    # Same cost, device, creative and CRM draws as background impressions.
+    for shared in (
+        '"mk_device", "mk_cost"',
+        "creative_id_column(",
+        '"mk_crm") < F.lit(CRM_MATCH_RATE)',
+        "F.round(cost, 4)",
+    ):
+        assert shared in touches, shared
+        assert shared in background, shared
+    source = _source() + _source(ATTRIBUTION)
+    assert "IMPJRN" not in source and "CREATJRN" not in source
+    impression_id = _function_source("_journey_impression_id")
+    assert 'F.lit("IMP")' in impression_id and 'F.date_format(touch["touch_ts"], "yyyyMMdd")' in (
+        impression_id
+    )
+    assert _constant(ATTRIBUTION, "JOURNEY_TOUCH_MIN_S") == 60
+    assert _constant(ATTRIBUTION, "ATTRIBUTION_WINDOW_DAYS") == 7
 
 
-def test_purchase_carries_the_newer_touch_and_journey_on_linked_events() -> None:
+def test_purchase_carries_the_last_touch_and_journey_on_linked_events() -> None:
     purchases = _function_source("purchase_events")
     online = _function_source("online_events")
-    assert 'newer_impression = F.concat(F.lit("IMPJRN"), F.col("_jhash"), F.lit("N"))' in purchases
-    assert 'F.when(F.col("_attributed"), newer_impression).alias("impression_id")' in purchases
+    assert 'F.when(F.col("_attributed"), F.col("journey_impression")).alias("impression_id")' in (
+        purchases
+    )
+    assert 'F.col("journey_impression")' in online
     # receipt, declined and approved payments, and each promotion of an
     # attributed purchase
     assert purchases.count("correlation=journey") == 4
@@ -216,7 +234,7 @@ def test_generated_stream_notebook_contains_the_live_contract() -> None:
     for expected in (
         "def with_journey_plan(",
         "def journey_touch_events(",
-        'iso(F.col(ts_col)).alias("impression_time")',
+        'iso(touch["touch_ts"]).alias("impression_time")',
         "def generate_stream_batch(",
         "generate_stream_batch(STREAM_CONTEXT, rows, batch_id, STREAM_STATE)",
         "commit_stream_batch(STREAM_STATE, batch_id, batch)",

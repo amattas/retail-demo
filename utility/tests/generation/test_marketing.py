@@ -37,10 +37,22 @@ def test_ids_and_costs(setup):
     assert n > 0
     assert mk.select("impression_id_ext").distinct().count() == n
     assert mk.filter(~F.col("campaign_id").startswith("CAMP")).count() == 0
-    # cost_cents within channel band x device multiplier envelope
-    for r in mk.select("channel", "cost_cents").collect():
+    # Real CPMs: cost (four decimals) within the channel band x device multiplier,
+    # $0.002-$0.03 an impression, and cost_cents rounds it at random.
+    rows = mk.select("channel", "cost", "cost_cents", "campaign_id", "creative_id").collect()
+    for r in rows:
         lo, hi = CHANNEL_COSTS[r.channel]
-        assert lo * 100 * 0.8 - 1 <= r.cost_cents <= hi * 100 * 1.2 + 1, r
+        cost = float(r.cost)
+        assert lo * 0.8 - 1e-4 <= cost <= hi * 1.2 + 1e-4, r
+        assert 0.002 <= cost <= 0.03, r
+        assert r.cost_cents in (int(cost * 100), int(cost * 100) + 1), r
+    dollars = sum(float(r.cost) for r in rows)
+    assert abs(sum(r.cost_cents for r in rows) / 100 - dollars) < 0.05 * dollars
+    # A small creative pool per campaign and channel.
+    pools: dict[tuple[str, str], set[str]] = {}
+    for r in rows:
+        pools.setdefault((r.campaign_id, r.channel), set()).add(r.creative_id)
+    assert max(len(pool) for pool in pools.values()) <= 4
 
 
 def test_crm_match_share(setup):

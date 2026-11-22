@@ -371,6 +371,26 @@ notebook 03 lower-cases rows written by earlier stream versions. Live
 (`impression_time`), not when they arrived, and live `fact_promotions.product_ids`
 is the same comma-separated, numerically sorted list as history.
 
+### Marketing and attribution
+
+Background impressions cost real CPMs: $0.002-$0.03 an impression by channel
+and device (`vocabulary.CHANNEL_COSTS`), with `cost` to four decimals and
+`cost_cents` rounded at random so summed spend is unbiased. Each campaign
+rotates a small creative pool per channel (`CRT<campaign>-<channel>-<n>`, four
+creatives). Conversion follows exposure (`attribution.py`): an impression
+reaches the customer of its ad ID and converts with a small probability
+weighted by channel (search and email best, display worst) when that customer
+makes an eligible purchase within seven days; the probability is calibrated
+per run so the campaigns return about `TARGET_ROAS` (4x) their spend, which
+keeps conversions well under 1% of impressions. A journey is the converting
+impressions themselves, so its touches look like every other impression
+(same ID and creative formats, CRM-matched `customer_id` at the same rate)
+except for `attribution_journey_id`; every campaign family can convert, and
+each touch sits in its own campaign window. Last touch decides the campaign.
+The live stream attributes the share of eligible purchases that returns the
+same ROAS on its spend (`attribution.live_journey_rate`), with one to three
+touches built like background impressions.
+
 ### Statistical acceptance
 
 Use multiple seeds and short and multi-year windows. Check ticket and basket

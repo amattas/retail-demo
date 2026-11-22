@@ -549,17 +549,63 @@ CAMPAIGN_ARCHETYPES: list[tuple[str, list[str], int, int]] = [
     ("flash_sale", ["SOCIAL", "SEARCH"], 5000, 1),  # runs ~1 day in 7
 ]
 
-# channel -> (lo, hi) cost-per-impression band in dollars (uniform draw)
+# channel -> (lo, hi) cost-per-impression band in dollars (uniform draw), at
+# real CPMs ($2.50-$21 per thousand); the device multiplier keeps every
+# impression between $0.002 and $0.03.
 CHANNEL_COSTS: dict[str, tuple[float, float]] = {
-    "EMAIL": (0.005, 0.05),
-    "DISPLAY": (0.10, 0.50),
-    "SOCIAL": (0.08, 0.25),
-    "SEARCH": (0.15, 0.75),
-    "FACEBOOK": (0.10, 0.40),
-    "GOOGLE": (0.25, 1.50),
-    "INSTAGRAM": (0.08, 0.35),
-    "YOUTUBE": (0.30, 1.50),
+    "EMAIL": (0.0025, 0.006),
+    "DISPLAY": (0.003, 0.010),
+    "SOCIAL": (0.005, 0.014),
+    "SEARCH": (0.010, 0.025),
+    "FACEBOOK": (0.006, 0.016),
+    "GOOGLE": (0.008, 0.022),
+    "INSTAGRAM": (0.006, 0.016),
+    "YOUTUBE": (0.010, 0.025),
 }
+# Relative chance that an impression on a channel converts (attribution.py):
+# search and email convert best, display worst.
+CHANNEL_CONVERSION_WEIGHTS: dict[str, float] = {
+    "SEARCH": 2.0,
+    "EMAIL": 1.6,
+    "GOOGLE": 1.5,
+    "FACEBOOK": 1.0,
+    "INSTAGRAM": 0.9,
+    "SOCIAL": 0.8,
+    "YOUTUBE": 0.7,
+    "DISPLAY": 0.5,
+}
+# Each campaign rotates a small pool of creatives per channel.
+CREATIVES_PER_CAMPAIGN = 4
+CREATIVE_ID_PREFIX = "CRT"
+
+
+def channel_conversion_weight(channel: Column) -> Column:
+    """Column form of ``CHANNEL_CONVERSION_WEIGHTS`` (1.0 for an unknown channel)."""
+    return case_when(
+        (channel == name, F.lit(weight)) for name, weight in CHANNEL_CONVERSION_WEIGHTS.items()
+    ).otherwise(F.lit(1.0))
+
+
+def creative_id_column(
+    draws: seeded_draws, keys: list, campaign: Column, channel: Column
+) -> Column:
+    """A creative from the campaign's small pool on the channel: ``CRT<campaign>-<channel>-<n>``."""
+    index = (draws.h64(keys, "creative") % CREATIVES_PER_CAMPAIGN + 1).cast("int")
+    return F.concat(
+        F.lit(CREATIVE_ID_PREFIX),
+        F.substring(campaign, len(CAMPAIGN_ID_PREFIX) + 1, 32),
+        F.lit("-"),
+        channel,
+        F.lit("-"),
+        index.cast("string"),
+    )
+
+
+def impression_cost_cents(draws: seeded_draws, keys: list, dollars: Column) -> Column:
+    """Whole cents of a sub-cent cost, rounded at random so sums stay unbiased."""
+    return F.floor(dollars * 100 + draws.u(keys, "cost-round")).cast("long")
+
+
 MARKETING_CHANNELS = list(CHANNEL_COSTS)
 
 # Device types are upper case; cost multipliers scale the channel band.
