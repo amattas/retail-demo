@@ -1,4 +1,5 @@
 from datetime import date
+from graphlib import TopologicalSorter
 
 import pytest
 from pyspark.sql import functions as F
@@ -59,7 +60,10 @@ def _rows(frame):
 def test_notebook_pipeline_reproduces_single_session_generation(result, spark, dicts):
     _, expected = result
     store = MemoryHandoffs()
-    for notebook in engine.STAGE_NOTEBOOKS:  # pipeline order is a topological order
+    # Run the notebooks in an order the pipeline allows (setup-03 waits for 04).
+    graph = engine.setup_notebook_dependencies()
+    order = TopologicalSorter({n: graph[n] for n in engine.STAGE_NOTEBOOKS}).static_order()
+    for notebook in (n for n in order if n in engine.STAGE_NOTEBOOKS):
         engine.run_generation_notebook(spark, dicts, CFG, notebook, store)
     tables, prestaged = engine.load_publication(spark, dicts, CFG, store)
 

@@ -301,10 +301,19 @@ def test_spark_fulfillment_finances_returns_and_all_ledgers(spark, candidate_cas
         ]
     assert {row.product_id for row in rows["fact_reorders"]} == set(range(1, 11))
     assert rows["fact_stockouts"]
+    # Store stockouts are on the store ledger; DC stockouts (no store) on the DC's.
     for row in rows["fact_stockouts"]:
+        node, ledger = (
+            ("store_id", store)
+            if row.StoreID is not None
+            else ("dc_id", rows["fact_dc_inventory_txn"])
+        )
         assert any(
-            txn.balance == 0 and txn.event_ts == row.event_ts and txn.product_id == row.ProductID
-            for txn in store
+            txn.balance == 0
+            and txn.event_ts == row.event_ts
+            and txn.product_id == row.ProductID
+            and txn[node] == (row.StoreID if row.StoreID is not None else row.DCID)
+            for txn in ledger
         )
 
 
