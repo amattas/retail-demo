@@ -260,6 +260,7 @@
     planned_arrival_time:datetime,
     delay_minutes:long,
     delay_reason:string,
+    load_units:long,
     event_type:string,
     trace_id:string,
     ingest_timestamp:datetime,
@@ -273,8 +274,9 @@
 
 // .create-merge appends new columns to an existing table, but the stream writes
 // columns by position. Restate the full schema so existing Eventhouses take the
-// declared order (planned_arrival_time, delay_minutes and delay_reason before the
-// envelope). Every existing column keeps its type, so no data is dropped.
+// declared order (planned_arrival_time, delay_minutes, delay_reason and
+// load_units before the envelope). Every existing column keeps its type, so no
+// data is dropped.
 .alter table truck_arrived (
     truck_id:string,
     dc_id:long,
@@ -285,6 +287,7 @@
     planned_arrival_time:datetime,
     delay_minutes:long,
     delay_reason:string,
+    load_units:long,
     event_type:string,
     trace_id:string,
     ingest_timestamp:datetime,
@@ -480,8 +483,10 @@
     parent_event_id:string
 )
 
-// LOGISTICS INCIDENTS (DC outages, lane delays, weather, holidays, supplier
-// short-ships). Started and resolved events share incident_id.
+// LOGISTICS INCIDENTS (incidents.INCIDENT_TYPES: DC_OUTAGE, LANE_DELAY, WEATHER,
+// HOLIDAY_CAPACITY, SUPPLIER_SHORT_SHIP). Started and resolved events share
+// incident_id; affected_store_ids lists every store the incident affects (the
+// DC's stores, the lane's store, or the geography's stores).
 
 .create-merge table logistics_incident_started (
     incident_id:string,
@@ -492,6 +497,30 @@
     severity:string,
     affected_store_count:long,
     description:string,
+    affected_store_ids:dynamic,
+    event_type:string,
+    trace_id:string,
+    ingest_timestamp:datetime,
+    schema_version:string,
+    source:string,
+    correlation_id:string,
+    partition_key:string,
+    session_id:string,
+    parent_event_id:string
+)
+
+// Restate the full schema so Eventhouses created before affected_store_ids take
+// the declared (positional) order; existing columns keep their types.
+.alter table logistics_incident_started (
+    incident_id:string,
+    incident_type:string,
+    dc_id:long,
+    store_id:long,
+    started_at:datetime,
+    severity:string,
+    affected_store_count:long,
+    description:string,
+    affected_store_ids:dynamic,
     event_type:string,
     trace_id:string,
     ingest_timestamp:datetime,

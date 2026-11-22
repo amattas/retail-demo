@@ -42,3 +42,56 @@ receipt_created
 | where ingest_timestamp > ago(5m)
 | where total > 255.0
 | project store_id, receipt_id, total, trace_id
+
+// Late truck: arrived 30+ minutes after its planned arrival
+// (calibration.TRUCK_LATE_MINUTES), with the cause.
+truck_arrived
+| where ingest_timestamp > ago(5m)
+| where delay_minutes >= 30
+| project truck_id, dc_id, store_id, shipment_id, planned_arrival_time,
+          arrival_time, delay_minutes, delay_reason, trace_id
+
+// Lane delay over threshold: a DC-to-store lane whose trucks ran on average
+// 60+ minutes late in the last hour because of a lane incident or severe
+// weather (calibration.LANE_DELAY_RULE_MINUTES), one alert per lane. Traffic
+// alone raises only the late-truck alert.
+truck_arrived
+| where ingest_timestamp > ago(60m)
+| where delay_reason in ('LANE_DELAY', 'WEATHER')
+| summarize trucks = dcount(shipment_id),
+            avg_delay_minutes = avg(todouble(delay_minutes)),
+            max_delay_minutes = max(delay_minutes),
+            delay_reason = take_any(delay_reason)
+    by dc_id, store_id
+| where avg_delay_minutes >= 60.0
+| project dc_id, store_id, trucks, avg_delay_minutes, max_delay_minutes, delay_reason
+
+// DC outage started: a DC stopped dispatching; every store it serves is affected.
+logistics_incident_started
+| where ingest_timestamp > ago(5m)
+| where incident_type == 'DC_OUTAGE'
+| summarize arg_min(started_at, *) by incident_id
+| project incident_id, dc_id, started_at, severity, affected_store_count,
+          affected_store_ids, description
+
+// Incident stockouts: 3+ distinct stockouts in the last hour at stores an
+// open incident affects (calibration.INCIDENT_STOCKOUT_RULE_MIN_STOCKOUTS),
+// one alert per incident.
+let open_incidents = logistics_incident_started
+    | summarize arg_min(started_at, *) by incident_id
+    | join kind=leftanti logistics_incident_resolved on incident_id
+    | mv-expand affected_store_id = affected_store_ids to typeof(long)
+    | project incident_id, incident_type, dc_id, store_id = affected_store_id,
+              started_at, description;
+stockout_detected
+| where ingest_timestamp > ago(60m)
+| summarize arg_min(detection_time, *) by trace_id
+| where isnotnull(store_id)
+| join kind=inner open_incidents on store_id
+| where detection_time >= started_at
+| summarize stockouts = dcount(trace_id), stores = dcount(store_id),
+            products = dcount(product_id), first_stockout = min(detection_time)
+    by incident_id, incident_type, dc_id, description
+| where stockouts >= 3
+| project incident_id, incident_type, dc_id, stockouts, stores, products,
+          first_stockout, description

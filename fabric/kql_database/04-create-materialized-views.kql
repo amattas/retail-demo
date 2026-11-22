@@ -86,3 +86,20 @@
 }
 
 .alter-merge materialized-view mv_zone_dwell_minute policy retention softdelete = 7d recoverability = disabled
+
+// ============================================================================
+// LOGISTICS KPIs
+// ============================================================================
+
+// Planned vs actual arrival per lane and hour (late = 30+ minutes after plan).
+.create-or-alter materialized-view mv_truck_delay_hourly on table truck_arrived
+{
+    truck_arrived
+    | where isnotnull(dc_id) and isnotnull(store_id)
+    | summarize trucks = count(), late_trucks = countif(delay_minutes >= 30),
+                avg_delay_minutes = avg(todouble(delay_minutes)),
+                max_delay_minutes = max(delay_minutes)
+              by dc_id, store_id, ts = bin(ingest_timestamp, 1h)
+}
+
+.alter-merge materialized-view mv_truck_delay_hourly policy retention softdelete = 7d recoverability = disabled

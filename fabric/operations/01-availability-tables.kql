@@ -16,7 +16,14 @@
     shortage_units:long,
     scenario:string,
     provenance:string,
-    plan_cohort:bool
+    plan_cohort:bool,
+    dc_id:long,
+    lead_time_days:real,
+    inbound_units:long,
+    expected_inbound_ts:datetime,
+    active_incident_id:string,
+    active_incident_type:string,
+    active_incident_cause:string
 )
 
 .create-merge table ops_case_actions (

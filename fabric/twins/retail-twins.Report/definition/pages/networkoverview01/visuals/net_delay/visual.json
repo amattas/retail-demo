@@ -22,11 +22,11 @@
                       "Entity": "dim_trucks"
                     }
                   },
-                  "Property": "Twin Truck Delay Scenario ETA"
+                  "Property": "Twin Truck Planned ETA"
                 }
               },
-              "queryRef": "dim_trucks.Twin Truck Delay Scenario ETA",
-              "nativeQueryRef": "Twin Truck Delay Scenario ETA",
+              "queryRef": "dim_trucks.Twin Truck Planned ETA",
+              "nativeQueryRef": "Twin Truck Planned ETA",
               "active": true
             }
           ]
@@ -50,7 +50,7 @@
             }
           },
           "selector": {
-            "metadata": "dim_trucks.Twin Truck Delay Scenario ETA"
+            "metadata": "dim_trucks.Twin Truck Planned ETA"
           }
         }
       ]

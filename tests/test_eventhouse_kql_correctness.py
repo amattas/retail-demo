@@ -25,6 +25,7 @@ EXPECTED_MATERIALIZED_VIEWS = {
     "mv_zone_dwell_minute",
     "mv_pricing_approval_metrics",
     "mv_pricing_rejection_metrics",
+    "mv_truck_delay_hourly",
 }
 ANOMALY_FUNCTIONS = {
     "fn_detect_transaction_velocity_anomalies",

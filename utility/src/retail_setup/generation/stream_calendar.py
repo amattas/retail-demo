@@ -36,7 +36,6 @@ into the stream notebook.
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
-from functools import lru_cache
 from math import ceil, sqrt
 from zoneinfo import ZoneInfo
 
@@ -163,9 +162,21 @@ def _nth_weekday(year: int, month: int, weekday: int, n: int) -> date:
     return last - timedelta(days=(last.weekday() - weekday) % 7)
 
 
-@lru_cache(maxsize=256)
+# A plain dict, not functools.lru_cache: Spark workers of the setup notebooks
+# (which inline this module into __main__) call it through is_closed_date, and
+# cloudpickle ships lru_cache wrappers by reference.
+_HOLIDAYS: dict[int, dict[date, str]] = {}
+
+
 def holiday_dates(year: int) -> dict[date, str]:
     """The retail holidays of ``year`` (US calendar), by date."""
+    found = _HOLIDAYS.get(year)
+    if found is None:
+        found = _HOLIDAYS[year] = _holiday_dates(year)
+    return found
+
+
+def _holiday_dates(year: int) -> dict[date, str]:
     easter = easter_sunday(year)
     memorial = _nth_weekday(year, 5, 0, -1)
     thanksgiving = _nth_weekday(year, 11, 3, 4)

@@ -118,7 +118,7 @@ def test_time_series_properties_are_ordered_by_ingest_timestamp(parts):
 def test_relationships_reference_existing_tom_relationships(parts):
     model.validate_definition(parts)
     names = re.findall(r"^entityRelationship (\S+)$", parts["entityRelationships.tmdl"], re.M)
-    assert len(names) == len(model.RELATIONSHIPS) + len(model.JUNCTIONS) == 17
+    assert len(names) == len(model.RELATIONSHIPS) + len(model.JUNCTIONS) == 20
 
 
 def _notebook_model() -> dict:

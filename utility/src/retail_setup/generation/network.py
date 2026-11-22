@@ -15,13 +15,14 @@ it, so both deliver the same way:
 - **Fleets.** ``dim_trucks`` gives each DC one truck per route (at least
   ``MIN_DC_FLEET``) plus a shared pool (``DCID`` NULL) for overflow loads; a DC
   without assigned trucks falls back to the pool.
-- **Unloading.** Dwell is driven by load size and a per-store dock factor
+- **Unloading.** Dwell is driven by load size, a per-store dock factor, the
+  store-local hour of arrival and a missed-appointment wait for late trucks
   (``unload_minutes``), capped at ``TRUCK_UNLOAD_MINUTES_MAX``.
 """
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from pyspark.sql import DataFrame, SparkSession
@@ -29,15 +30,30 @@ from pyspark.sql import functions as F
 
 from retail_setup.generation.calibration import (
     TRUCK_DOCK_FACTOR_RANGE,
+    TRUCK_LATE_DOCK_WAIT_MINUTES,
+    TRUCK_LATE_MINUTES,
     TRUCK_LOAD_MINUTES,
     TRUCK_NORMAL_DWELL_MINUTES_MIN,
     TRUCK_TURNAROUND_MINUTES,
     TRUCK_UNLOAD_BASE_MINUTES,
+    TRUCK_UNLOAD_BUSY_FACTOR,
+    TRUCK_UNLOAD_BUSY_HOURS,
     TRUCK_UNLOAD_MINUTES_MAX,
+    TRUCK_UNLOAD_NIGHT_FACTOR,
+    TRUCK_UNLOAD_NIGHT_HOURS,
     TRUCK_UNLOAD_NOISE_MINUTES,
     TRUCK_UNLOAD_UNITS_PER_MINUTE,
 )
+from retail_setup.generation.incidents import (
+    INCIDENT_LOOKBACK_DAYS,
+    WEATHER_LOOKAHEAD_DAYS,
+    Incident,
+    IncidentNetwork,
+    plan_incidents,
+)
 from retail_setup.generation.inventory_policy import lane_transit_minutes, stable_int
+from retail_setup.generation.runtime import date_grid, seeded_draws
+from retail_setup.generation.stream_calendar import severe_weather_column
 
 MIN_DC_FLEET = 2
 POOL_TRUCK_SHARE = 0.15
@@ -172,23 +188,57 @@ def dock_factor(seed: int, store_id: int) -> float:
     return low + (high - low) * (stable_int(seed, int(store_id), "dock") % 1001) / 1000
 
 
-def estimated_unload_minutes(seed: int, store_id: int, units: int) -> int:
-    """Planned dwell of a load: base time plus the units at the site's rate."""
-    handling = units / TRUCK_UNLOAD_UNITS_PER_MINUTE * dock_factor(seed, store_id)
+def unload_hour_factor(hour: int | None) -> float:
+    """How the store's local hour scales unloading: slower when busy, quicker at night."""
+    if hour is None:
+        return 1.0
+    busy_from, busy_to = TRUCK_UNLOAD_BUSY_HOURS
+    night_from, night_to = TRUCK_UNLOAD_NIGHT_HOURS
+    if busy_from <= hour < busy_to:
+        return TRUCK_UNLOAD_BUSY_FACTOR
+    if hour >= night_from or hour < night_to:
+        return TRUCK_UNLOAD_NIGHT_FACTOR
+    return 1.0
+
+
+def estimated_unload_minutes(seed: int, store_id: int, units: int, hour: int | None = None) -> int:
+    """Planned dwell of a load: base time plus the units at the site's rate and hour.
+
+    ``hour`` is the store-local hour of arrival (None ignores the hour).
+    """
+    handling = (
+        units
+        / TRUCK_UNLOAD_UNITS_PER_MINUTE
+        * dock_factor(seed, store_id)
+        * unload_hour_factor(hour)
+    )
     return min(
         TRUCK_UNLOAD_MINUTES_MAX,
         max(TRUCK_NORMAL_DWELL_MINUTES_MIN, round(TRUCK_UNLOAD_BASE_MINUTES + handling)),
     )
 
 
-def unload_minutes(seed: int, store_id: int, units: int, shipment_id: str) -> int:
-    """Actual dwell: the estimate plus a little noise per shipment, within the bounds."""
+def unload_minutes(
+    seed: int,
+    store_id: int,
+    units: int,
+    shipment_id: str,
+    hour: int | None = None,
+    delay_minutes: int = 0,
+) -> int:
+    """Actual dwell: the estimate plus a missed-appointment wait and a little noise.
+
+    A truck ``TRUCK_LATE_MINUTES`` or more late waits ``TRUCK_LATE_DOCK_WAIT_MINUTES``
+    for a door. The result stays within the dwell bounds.
+    """
     span = 2 * TRUCK_UNLOAD_NOISE_MINUTES + 1
     noise = stable_int(seed, shipment_id, "unload") % span - TRUCK_UNLOAD_NOISE_MINUTES
+    wait = TRUCK_LATE_DOCK_WAIT_MINUTES if delay_minutes >= TRUCK_LATE_MINUTES else 0
     return min(
         TRUCK_UNLOAD_MINUTES_MAX,
         max(
-            TRUCK_NORMAL_DWELL_MINUTES_MIN, estimated_unload_minutes(seed, store_id, units) + noise
+            TRUCK_NORMAL_DWELL_MINUTES_MIN,
+            estimated_unload_minutes(seed, store_id, units, hour) + wait + noise,
         ),
     )
 
@@ -256,3 +306,56 @@ def dc_fleets(
             raise ValueError(f"DC {dc} has neither assigned nor shared trucks")
         fleets[dc] = tuple(fleet)
     return fleets
+
+
+def incident_network(
+    dim_stores: DataFrame, dim_geographies: DataFrame, dim_distribution_centers: DataFrame
+) -> IncidentNetwork:
+    """The routing, zones and geographies the incident model runs on."""
+    stores, dcs, zones = _store_sites(dim_stores, dim_geographies, dim_distribution_centers)
+    store_geo = {
+        int(row["ID"]): int(row["GeographyID"])
+        for row in dim_stores.select("ID", "GeographyID").collect()
+    }
+    geo_state = {
+        int(row["ID"]): row["State"] for row in dim_geographies.select("ID", "State").collect()
+    }
+    return IncidentNetwork(
+        store_dc=assign_dcs(stores, dcs),
+        store_zones=zones,
+        store_geo=store_geo,
+        geo_state=geo_state,
+    )
+
+
+def severe_weather_days(
+    spark: SparkSession, seed: int, geography_ids: Iterable[int], start: date, end: date
+) -> set[tuple[int, date]]:
+    """``(geography_id, date)`` severe-weather days (``severe_weather_column``)."""
+    geos = sorted({int(geo) for geo in geography_ids})
+    if not geos or end < start:
+        return set()
+    grid = date_grid(spark, start, end).crossJoin(
+        spark.createDataFrame([(geo,) for geo in geos], "geo long")
+    )
+    severe = grid.where(severe_weather_column(seeded_draws(seed), F.col("geo"), F.col("day")))
+    return {(int(row["geo"]), row["day"]) for row in severe.select("geo", "day").collect()}
+
+
+def network_incidents(
+    spark: SparkSession, seed: int, network: IncidentNetwork, start: date, end: date
+) -> list[Incident]:
+    """Incidents that can be open between ``start`` and ``end`` (planned from earlier days)."""
+    first = start - timedelta(days=INCIDENT_LOOKBACK_DAYS)
+    severe = severe_weather_days(
+        spark,
+        seed,
+        network.store_geo.values(),
+        first - timedelta(days=1),
+        end + timedelta(days=WEATHER_LOOKAHEAD_DAYS),
+    )
+    return [
+        incident
+        for incident in plan_incidents(seed, network, first, end, severe)
+        if incident.resolved_at.date() >= start
+    ]

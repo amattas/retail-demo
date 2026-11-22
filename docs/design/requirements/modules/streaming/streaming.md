@@ -3,9 +3,8 @@
 ### REQ-STREAM-001 - Event set and envelope
 
 The live driver shall emit the documented event types with one common
-envelope and typed event-specific payload. Twenty-two types are declared;
-eighteen are emitted today and four (logistics incidents, online order lines
-and delivery) are declared ahead of the models that emit them.
+envelope and typed event-specific payload. Twenty-two types are declared and
+emitted; the two logistics incident types are sporadic (a few per DC and year).
 
 ### REQ-STREAM-002 - Supported sinks
 

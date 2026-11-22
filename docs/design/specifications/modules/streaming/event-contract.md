@@ -156,6 +156,18 @@ replays, in time order, everything that changes it in a micro-batch:
   inbound) with the reorder point and emits `reorder_triggered`.
 - **Receipts of stock.** A truck unload adds its units:
   `reason = INBOUND_SHIPMENT`, `source` = the shipment ID.
+- **DC stock.** Each DC keeps its own stock with the historical DC policy
+  (`inventory_policy` DC functions): supplier orders at the reorder point,
+  received after the product's 3-7 day lead time (short during a supplier
+  short-ship), truck loads, and ship-from-DC online lines when the order is
+  placed (expedited when the DC lacks units). These moves are
+  `inventory_updated` events with no `store_id` and `reason`
+  `INBOUND_SHIPMENT`, `OUTBOUND_SHIPMENT` (`requested_quantity` is what the
+  load asked for; less moved means a short-ship), `ONLINE_SHIPMENT` or
+  `EXPEDITED_RECEIPT`. Silver routes them to `fact_dc_inventory_txn`. A DC
+  reaching zero is a `stockout_detected` with no `store_id`. DC entries start
+  from the latest Silver DC balance as of the incarnation start, else from
+  history's DC opening stock.
 
 Every inventory, stockout and reorder event carries the store's DC (`dc_id`),
 assigned as in the historical inventory chain (`network.assign_dcs`: same
@@ -170,19 +182,24 @@ the policy reorders that stock.
 ## Trucks
 
 A reorder joins its store's pending load at the DC. Each store takes one
-consolidated delivery a day: at the store's daily delivery slot (the minute of
-the store-local day its delivery route gives it, `network.plan_routes`, the
-same slot history uses), the next free truck of the DC's fleet
-(`dim_trucks.DCID`; pool trucks only for a DC with none) loads the whole pending
-load for `TRUCK_LOAD_MINUTES`, drives the lane (a stable 1-4 hour draw per DC
-and store), and arrives. Each DC's fleet has one truck per delivery route, so
-its routes never need more trucks than it has. `planned_arrival_time` is set at
-dispatch; the actual arrival is the planned time plus `delay_minutes`, which
-stays 0 with no `delay_reason` until the logistics incident model adds delays
-(`SupplyBatch.held_dcs` already lets an incident stop a DC dispatching). The
-unload takes `TRUCK_UNLOAD_BASE_MINUTES` plus the load at
-`TRUCK_UNLOAD_UNITS_PER_MINUTE`, scaled by a per-store dock factor, with a few
-minutes of noise, capped at `TRUCK_UNLOAD_MINUTES_MAX` (`network.unload_minutes`,
+consolidated delivery a day. The load's schedule comes from
+`incidents.plan_delivery`, as in history: the store's next delivery slot (the
+minute of the store-local day its delivery route gives it,
+`network.plan_routes`) whose arrival day the store is open, held to the next
+slot after a DC outage, loaded late under holiday capacity limits. When it is
+due, the next free truck of the DC's fleet (`dim_trucks.DCID`; pool trucks only
+for a DC with none) loads what the DC has of the pending load for
+`TRUCK_LOAD_MINUTES`, drives the lane (a stable 1-4 hour draw per DC and
+store), and arrives. `planned_arrival_time` is the plan of the load's oldest
+reorder; the actual arrival is the planned time plus `delay_minutes`, and
+`delay_reason` names the largest cause (`DC_OUTAGE`, `HOLIDAY_CAPACITY`,
+`LANE_DELAY`, `WEATHER`, `TRAFFIC`, or `TRUCK_AVAILABILITY` when the load
+waited for a free truck). `SupplyBatch.held_dcs` can still hold a DC by hand.
+The unload takes `TRUCK_UNLOAD_BASE_MINUTES` plus the load at
+`TRUCK_UNLOAD_UNITS_PER_MINUTE`, scaled by a per-store dock factor and the
+store-local hour (slower 11:00-19:00, quicker 22:00-06:00), plus a 10-minute
+door wait for a truck 30 or more minutes late and a few minutes of noise,
+capped at `TRUCK_UNLOAD_MINUTES_MAX` (`network.unload_minutes`,
 shared with history; `estimated_unload_duration` is the plan, the departure's
 `actual_unload_duration` the outcome). A typical load unloads inside the
 normal 30-75 minute range; an unusually large one can breach the 90-minute SLA.
@@ -287,22 +304,29 @@ Payload fields are event-specific and mapped by `EVENT_PAYLOADS`.
 18. `online_order_shipped`
 19. `online_order_line_added`
 20. `online_order_delivered`
-21. `logistics_incident_started` (declared, not yet emitted)
-22. `logistics_incident_resolved` (declared, not yet emitted)
+21. `logistics_incident_started`
+22. `logistics_incident_resolved`
 
-Types 21-22 are declared end to end (KQL table, mapping, `EVENT_PAYLOADS`,
-Silver route, contract path and fixture) so the logistics-incident model can
-start emitting them without another contract change. The stream emits the
-first twenty today.
+The stream emits all twenty-two. Incidents are sporadic (a few per DC and
+year), so readiness does not expect fresh incident rows
+(`stream_control.SPORADIC_EVENT_TYPES`).
 
 - `logistics_incident_started` carries `incident_id`, `incident_type`
-  (`DC_OUTAGE`, `LANE_DELAY`, `WEATHER`, `HOLIDAY`, `SUPPLIER_SHORT_SHIP`),
-  `dc_id`, `store_id` (null for DC- or network-wide incidents), `started_at`,
-  `severity`, `affected_store_count`, and `description`.
+  (`DC_OUTAGE`, `LANE_DELAY`, `WEATHER`, `HOLIDAY_CAPACITY`,
+  `SUPPLIER_SHORT_SHIP`), `dc_id`, `store_id` (the lane's store of a lane
+  delay, else null), `started_at`, `severity`, `affected_store_count`,
+  `description`, and `affected_store_ids` (every affected store).
   `logistics_incident_resolved` carries the same identity and `resolved_at`.
-  Silver keeps one `fact_logistics_incidents` row per incident: the start
-  inserts it and the resolution sets `resolved_at` once (Delta `MERGE`). A
-  resolution whose start has aged out of Bronze only updates an existing row.
+  The stream plans incidents exactly as history does
+  (`incidents.plan_incidents` with the severe-weather days of the stores'
+  geographies), so the same seed opens the same incident IDs on the same days.
+  Each start and resolution is emitted once, in the batch whose window holds
+  it (`stream_supply.incident_transitions`); the first batch of an incarnation
+  starts the incidents already open. Silver keeps one
+  `fact_logistics_incidents` row per incident: the start inserts it and the
+  resolution sets `resolved_at` once (Delta `MERGE`), and
+  `fact_logistics_incident_stores` gets one row per affected store. A
+  resolution whose start has aged out of Bronze only updates existing rows.
 - `online_order_line_added` carries the order line (`line_number`,
   `product_id`, `quantity`, prices, `promo_code`) and its fulfillment node; it
   lands in `fact_online_order_lines` with status `PENDING`. Each Silver run
@@ -473,9 +497,8 @@ and dock model under [Trucks](#trucks). Its parameters come from
 `utility/src/retail_setup/generation/calibration.py`, the same module the rules,
 anomaly functions, and semantic model are checked against.
 
-`truck_arrived` also carries `planned_arrival_time`, `delay_minutes`, and
-`delay_reason`. Until the logistics incident model lands, live trucks arrive as
-planned (`delay_minutes = 0`, no reason). Silver copies them to
+`truck_arrived` also carries `planned_arrival_time`, `delay_minutes`,
+`delay_reason` and `load_units` (see [Trucks](#trucks)). Silver copies them to
 `fact_truck_moves`. The KQL script restates the table with `.alter table` so an
 existing Eventhouse takes the declared column order, which the positional
 Spark Kusto writes rely on.

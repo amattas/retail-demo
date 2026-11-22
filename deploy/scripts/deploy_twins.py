@@ -146,7 +146,7 @@ def publish_twins(repo_root: Path, config: Any, outputs: dict[str, Any]) -> dict
         "boundaries": [
             "Synthetic/historical source observations, not live GPS or physical geometry.",
             "Warehouse balance is not available-to-promise stock.",
-            "Delay scenario is a labeled +60 minute what-if, not a revised actual ETA.",
+            "Delay is the recorded actual minus planned arrival, not a forecast.",
             "No native Digital Twin Builder, Planning or Operations Agent dependency.",
             "Report appearance and interactive navigation require separate UI acceptance.",
         ],

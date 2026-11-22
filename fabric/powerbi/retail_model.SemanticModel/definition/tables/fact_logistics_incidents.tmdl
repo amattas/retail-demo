@@ -2,7 +2,7 @@ table fact_logistics_incidents
 	lineageTag: c2300000-0000-0000-0000-000000000001
 	sourceLineageTag: [ag].[fact_logistics_incidents]
 
-	/// Count of logistics incidents (DC outages, lane delays, weather, holidays, supplier short-ships).
+	/// Count of logistics incidents (DC outages, lane delays, weather, holiday capacity, supplier short-ships).
 	measure 'Logistics Incidents' = COUNTROWS('fact_logistics_incidents')
 		formatString: #,0
 		displayFolder: Logistics\Incidents
@@ -14,8 +14,21 @@ table fact_logistics_incidents
 		displayFolder: Logistics\Incidents
 		lineageTag: c2300002-0000-0000-0000-000000000002
 
+	/// Distinct stores affected by the incidents in context (fact_logistics_incident_stores).
+	measure 'Incident Affected Stores' = DISTINCTCOUNT('fact_logistics_incident_stores'[Store ID])
+		formatString: #,0
+		displayFolder: Logistics\Incidents
+		lineageTag: c2300002-0000-0000-0000-000000000003
+
+	/// Average hours from start to resolution of resolved incidents.
+	measure 'Average Incident Hours' = AVERAGEX(FILTER('fact_logistics_incidents', NOT ISBLANK('fact_logistics_incidents'[Resolved At])), ('fact_logistics_incidents'[Resolved At] - 'fact_logistics_incidents'[Started At]) * 24)
+		formatString: #,0.0
+		displayFolder: Logistics\Incidents
+		lineageTag: c2300002-0000-0000-0000-000000000004
+
 	column 'Incident ID'
 		dataType: string
+		isKey
 		lineageTag: c2300001-0000-0000-0000-000000000001
 		sourceLineageTag: incident_id
 		summarizeBy: none
@@ -25,7 +38,7 @@ table fact_logistics_incidents
 
 		annotation SummarizationSetBy = Automatic
 
-	/// DC_OUTAGE, LANE_DELAY, WEATHER, HOLIDAY or SUPPLIER_SHORT_SHIP.
+	/// DC_OUTAGE, LANE_DELAY, WEATHER, HOLIDAY_CAPACITY or SUPPLIER_SHORT_SHIP.
 	column 'Incident Type'
 		dataType: string
 		lineageTag: c2300001-0000-0000-0000-000000000002
@@ -49,7 +62,7 @@ table fact_logistics_incidents
 
 		annotation SummarizationSetBy = Automatic
 
-	/// Affected store; blank for DC- or network-wide incidents.
+	/// The lane's store of a LANE_DELAY; blank for DC- or geography-wide incidents (fact_logistics_incident_stores lists every affected store).
 	column 'Store ID'
 		dataType: int64
 		formatString: 0

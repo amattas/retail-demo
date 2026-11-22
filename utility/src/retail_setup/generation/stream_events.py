@@ -31,8 +31,9 @@ One micro-batch of ``rate`` rows becomes the events of that minute:
 statistical tests run the same functions offline.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from math import floor
 from typing import Any
 
@@ -57,6 +58,13 @@ from retail_setup.generation.baskets import (
     with_complements,
 )
 from retail_setup.generation.behavior import pick_retail_product
+from retail_setup.generation.incidents import (
+    INCIDENT_LOOKBACK_DAYS,
+    WEATHER_LOOKAHEAD_DAYS,
+    Incident,
+    IncidentNetwork,
+    plan_incidents,
+)
 from retail_setup.generation.customers import (
     HOME_STORE_SHARE,
     ONLINE_CUSTOMER_ATTEMPTS,
@@ -105,12 +113,17 @@ from retail_setup.generation.stream_supply import (
     LOGISTICS_STATE,
     ONLINE_SALE_SOURCE,
     STORE_SALE_SOURCE,
+    DcStockDemand,
     StockDemand,
     SupplyBatch,
     SupplyNetwork,
     SupplyOutput,
     SupplyState,
+    dc_entry,
+    dc_key,
+    default_dc_entry,
     default_inventory_entry,
+    incident_transitions,
     inventory_entry,
     inventory_key,
     lost_lines,
@@ -171,8 +184,18 @@ SUPPLY_SCHEMA = (
     "quantity_delta long, reason string, source string, requested_quantity long, "
     "last_known_quantity long, current_quantity long, reorder_quantity long, "
     "reorder_point long, priority string, truck_id long, shipment_id string, planned_ms long, "
-    "delay_minutes long, delay_reason string, estimated_unload long, unload_minutes long"
+    "delay_minutes long, delay_reason string, estimated_unload long, unload_minutes long, "
+    "load_units long"
 )
+INCIDENT_SCHEMA = (
+    "event_type string, at_ms long, incident_id string, incident_type string, dc_id long, "
+    "store_id long, severity string, affected_store_count long, description string, "
+    "affected_store_ids array<long>"
+)
+# Days ahead of a batch whose incidents can already time its pending loads.
+INCIDENT_HORIZON_DAYS = 3
+# Severe-weather days are computed in blocks of this many days.
+SEVERE_WEATHER_BLOCK_DAYS = 32
 
 
 @dataclass(frozen=True)
@@ -195,6 +218,10 @@ class StreamContext:
     supply: SupplyNetwork
     customer_tax: DataFrame
     inventory_seed: DataFrame | None = None
+    # DC stock (``dc_id, product_id, on_hand, rate``) as of the incarnation start.
+    dc_inventory_seed: DataFrame | None = None
+    # The logistics incident plan (None: no incidents).
+    incidents: "IncidentPlanner | None" = None
     # Year-over-year volume trend, as history (pricing.volume_growth).
     anchor_date: date | None = None
     annual_volume_growth: float = 0.0
@@ -209,6 +236,61 @@ class StreamContext:
     @property
     def draws(self) -> seeded_draws:
         return seeded_draws(self.seed)
+
+
+class IncidentPlanner:
+    """Logistics incidents of the live stream, planned as history plans them.
+
+    Incidents of each day come from ``incidents.plan_incidents`` with the
+    severe-weather days of the network's geographies, which ``severe_days``
+    computes (``network.severe_weather_days``) in cached blocks.
+    """
+
+    def __init__(
+        self,
+        seed: int,
+        network: IncidentNetwork,
+        severe_days: Callable[[date, date], set[tuple[int, date]]],
+    ) -> None:
+        self.seed = seed
+        self.network = network
+        self._severe_days = severe_days
+        self._severe: dict[int, set[tuple[int, date]]] = {}
+        self._days: dict[date, list[Incident]] = {}
+
+    def _severe_block(self, day: date) -> set[tuple[int, date]]:
+        block = day.toordinal() // SEVERE_WEATHER_BLOCK_DAYS
+        if block not in self._severe:
+            first = date.fromordinal(block * SEVERE_WEATHER_BLOCK_DAYS)
+            last = first + timedelta(days=SEVERE_WEATHER_BLOCK_DAYS - 1)
+            self._severe[block] = self._severe_days(first, last)
+        return self._severe[block]
+
+    def on(self, day: date) -> list[Incident]:
+        """Incidents that start on ``day``."""
+        if day not in self._days:
+            severe: set[tuple[int, date]] = set()
+            for offset in range(-1, WEATHER_LOOKAHEAD_DAYS + 1):
+                severe |= self._severe_block(day + timedelta(days=offset))
+            self._days[day] = plan_incidents(self.seed, self.network, day, day, severe)
+        return self._days[day]
+
+    def window(self, previous_ms: int | None, clock_ms: int) -> tuple[Incident, ...]:
+        """Incidents that can be open between the previous clock and a few days ahead."""
+        clock = datetime.fromtimestamp(clock_ms / 1000, timezone.utc)
+        since = (
+            clock
+            if previous_ms is None
+            else datetime.fromtimestamp(previous_ms / 1000, timezone.utc)
+        )
+        first = since.date() - timedelta(days=INCIDENT_LOOKBACK_DAYS)
+        last = clock.date() + timedelta(days=INCIDENT_HORIZON_DAYS)
+        found: list[Incident] = []
+        day = first
+        while day <= last:
+            found.extend(i for i in self.on(day) if i.resolved_at >= since)
+            day += timedelta(days=1)
+        return tuple(sorted(found, key=lambda i: (i.started_at, i.incident_id)))
 
 
 @dataclass
@@ -254,6 +336,8 @@ def build_stream_context(
     annual_volume_growth: float = 0.0,
     dim_geographies: DataFrame | None = None,
     tax_rules: TaxRules | None = None,
+    dc_inventory_seed: DataFrame | None = None,
+    incidents: IncidentPlanner | None = None,
 ) -> StreamContext:
     """Collect the bounded store metadata and build the customer pools.
 
@@ -263,6 +347,8 @@ def build_stream_context(
     ``inventory_seed`` (``store_id, product_id, on_hand, rate``, see
     :func:`inventory_seed_frame`) seeds store stock the stream has not
     touched yet; without it, stock starts from history's opening stock.
+    ``dc_inventory_seed`` (``dc_id, product_id, on_hand, rate``) does the same
+    for DC stock, and ``incidents`` plans the logistics incidents.
     ``dim_geographies`` gives each store's and customer's state (weather
     climate and state taxability rules, ``tax_rules``), as in history; without
     it every store has the temperate climate and the default tax rule.
@@ -446,6 +532,8 @@ def build_stream_context(
         supply=supply,
         customer_tax=customer_tax,
         inventory_seed=inventory_seed,
+        dc_inventory_seed=dc_inventory_seed,
+        incidents=incidents,
         anchor_date=anchor_date,
         annual_volume_growth=annual_volume_growth,
         journey_rate=journey_rate,
@@ -1540,6 +1628,21 @@ def order_demand(orders: DataFrame) -> list[StockDemand]:
     )
 
 
+def dc_order_demand(orders: DataFrame) -> list[DcStockDemand]:
+    """DC demand of ship-from-DC orders placed in this batch (taken when placed)."""
+    placed = orders.where(F.col("_is_new") & (F.col("node_type") == "DC") & ~F.col("cancelled"))
+    return [
+        DcStockDemand(
+            int(row["at_ms"]),
+            int(row["store_id"]),
+            int(row["product_id"]),
+            int(row["quantity"]),
+            f"{row['owner']}#{int(row['line_num'])}",
+        )
+        for row in _demand_rows(placed, "order_id", "start_ms", "node_id")
+    ]
+
+
 def online_events(
     ctx: StreamContext, orders: DataFrame, previous_ms: int | None, clock_ms: int
 ) -> DataFrame:
@@ -1867,14 +1970,65 @@ def inventory_seed_frame(
     )
 
 
+def dc_inventory_seed_frame(
+    ledger: DataFrame, as_of: datetime, lookback_days: int = INVENTORY_SEED_LOOKBACK_DAYS
+) -> DataFrame:
+    """DC stock as of ``as_of`` from the Silver DC ledger (``fact_dc_inventory_txn``).
+
+    One row per DC and product: the latest balance at or before ``as_of``
+    (never below zero) and ``rate``, the mean daily units it shipped (truck
+    loads and online lines) over the last ``lookback_days``.
+    """
+    cutoff = F.lit(as_of.astimezone(timezone.utc).replace(tzinfo=None)).cast("timestamp")
+    rows = ledger.where(F.col("event_ts") <= cutoff)
+    keys = ["dc_id", "product_id"]
+    latest = (
+        rows.where(F.col("balance").isNotNull())
+        .groupBy(*keys)
+        .agg(F.max_by("balance", F.struct("event_ts", "trace_id")).alias("on_hand"))
+    )
+    since = cutoff - F.expr(f"INTERVAL {int(lookback_days)} DAYS")
+    shipped = (
+        rows.where(
+            (F.col("event_ts") > since)
+            & F.col("txn_type").isin("OUTBOUND_SHIPMENT", "ONLINE_SHIPMENT")
+        )
+        .groupBy(*keys)
+        .agg((F.sum(-F.col("quantity")) / F.lit(float(lookback_days))).alias("rate"))
+    )
+    return latest.join(shipped, keys, "left").select(
+        F.col("dc_id").cast("long").alias("dc_id"),
+        F.col("product_id").cast("long").alias("product_id"),
+        F.greatest(F.lit(0), F.col("on_hand")).cast("long").alias("on_hand"),
+        F.coalesce(F.col("rate"), F.lit(0.0)).cast("double").alias("rate"),
+    )
+
+
 def seed_inventory_entries(ctx: StreamContext, spark: SparkSession, keys: set[str]) -> SupplyState:
     """Inventory entries for ``keys`` the stream has not touched yet.
 
-    From the incarnation's Silver seed when it has the store and product,
-    else history's opening stock with the demand prior.
+    From the incarnation's Silver seed when it has the store (or DC) and
+    product, else history's opening stock with the demand prior.
     """
-    pairs = sorted(parse_inventory_key(key) for key in keys)
     seeded: SupplyState = {}
+    dc_pairs = sorted(parse_inventory_key(key) for key in keys if key.startswith("dc:"))
+    if ctx.dc_inventory_seed is not None and dc_pairs:
+        wanted = spark.createDataFrame(dc_pairs, "dc_id long, product_id long")
+        for row in ctx.dc_inventory_seed.join(
+            F.broadcast(wanted), ["dc_id", "product_id"]
+        ).collect():
+            seeded[dc_key(row["dc_id"], row["product_id"])] = dc_entry(row["on_hand"], row["rate"])
+    for dc_id, product_id in dc_pairs:
+        key = dc_key(dc_id, product_id)
+        if key not in seeded:
+            seeded[key] = default_dc_entry(
+                ctx.seed,
+                dc_id,
+                product_id,
+                ctx.supply.dc_prior(dc_id),
+                ctx.supply.dc_stores(dc_id),
+            )
+    pairs = sorted(parse_inventory_key(key) for key in keys if key.startswith("inv:"))
     if ctx.inventory_seed is not None and pairs:
         wanted = spark.createDataFrame(pairs, "store_id long, product_id long")
         for row in ctx.inventory_seed.join(
@@ -1954,6 +2108,7 @@ def _supply_rows(output: SupplyOutput) -> list[tuple]:
                 delay_minutes=arrival.delay_minutes,
                 delay_reason=arrival.delay_reason,
                 estimated_unload=arrival.estimated_unload_minutes,
+                load_units=arrival.units,
             )
         )
     for departure in output.departures:
@@ -1981,8 +2136,9 @@ def supply_events(ctx: StreamContext, spark: SparkSession, output: SupplyOutput)
     kind = F.col("event_type")
     ts = _ms_ts(F.col("at_ms"))
     seed = F.col("seed")
-    store = _store_key(F.col("store_id"))
     dc = F.concat(F.lit("dc_"), F.col("dc_id").cast("string"))
+    # A DC's own stock rows (no store) are keyed by the DC.
+    store = F.coalesce(_store_key(F.col("store_id")), dc)
     truck_id = F.concat(F.lit("TRK"), F.lpad(F.col("truck_id").cast("string"), 4, "0"))
     shipment = F.col("shipment_id")
     events = F.array(
@@ -2049,6 +2205,7 @@ def supply_events(ctx: StreamContext, spark: SparkSession, output: SupplyOutput)
                 iso(_ms_ts(F.col("planned_ms"))).alias("planned_arrival_time"),
                 F.col("delay_minutes"),
                 F.col("delay_reason"),
+                F.col("load_units"),
             ),
             ts,
             dc,
@@ -2071,6 +2228,92 @@ def supply_events(ctx: StreamContext, spark: SparkSession, output: SupplyOutput)
             dc,
             seed,
             session=shipment,
+        ),
+    )
+    return collect_events(frame, events)
+
+
+def incident_events(
+    ctx: StreamContext, spark: SparkSession, started: list[Incident], resolved: list[Incident]
+) -> DataFrame:
+    """``logistics_incident_started`` / ``_resolved`` events of a batch's transitions."""
+
+    def ms(at: datetime) -> int:
+        return round(at.timestamp() * 1000)
+
+    rows = [
+        (
+            "logistics_incident_started",
+            ms(incident.started_at),
+            incident.incident_id,
+            incident.incident_type,
+            incident.dc_id,
+            incident.store_id,
+            incident.severity,
+            len(incident.affected_stores),
+            incident.description,
+            [int(store) for store in incident.affected_stores],
+        )
+        for incident in started
+    ] + [
+        (
+            "logistics_incident_resolved",
+            ms(incident.resolved_at),
+            incident.incident_id,
+            incident.incident_type,
+            incident.dc_id,
+            incident.store_id,
+            None,
+            None,
+            None,
+            None,
+        )
+        for incident in resolved
+    ]
+    if not rows:
+        return _empty_events(spark)
+    frame = spark.createDataFrame(rows, INCIDENT_SCHEMA)
+    kind = F.col("event_type")
+    ts = _ms_ts(F.col("at_ms"))
+    dc = F.concat(F.lit("dc_"), F.col("dc_id").cast("string"))
+    seed = F.concat(kind, F.lit("-"), F.col("incident_id"))
+    incident = F.col("incident_id")
+    events = F.array(
+        slot(
+            ctx,
+            kind == "logistics_incident_started",
+            "logistics_incident_started",
+            F.struct(
+                incident.alias("incident_id"),
+                F.col("incident_type"),
+                F.col("dc_id"),
+                F.col("store_id"),
+                iso(ts).alias("started_at"),
+                F.col("severity"),
+                F.col("affected_store_count"),
+                F.col("description"),
+                F.col("affected_store_ids"),
+            ),
+            ts,
+            dc,
+            seed,
+            session=incident,
+        ),
+        slot(
+            ctx,
+            kind == "logistics_incident_resolved",
+            "logistics_incident_resolved",
+            F.struct(
+                incident.alias("incident_id"),
+                F.col("incident_type"),
+                F.col("dc_id"),
+                F.col("store_id"),
+                iso(ts).alias("resolved_at"),
+            ),
+            ts,
+            dc,
+            seed,
+            session=incident,
         ),
     )
     return collect_events(frame, events)
@@ -2226,12 +2469,21 @@ def generate_stream_batch(
     ).persist()
 
     demand = tuple(purchase_demand(buyers) + order_demand(orders))
+    incidents = () if ctx.incidents is None else ctx.incidents.window(previous_ms, clock_ms)
     supply, supply_changes = run_supply_batch(
         state,
         batch_id,
-        SupplyBatch(ctx.supply, clock_ms, previous_ms, demand),
+        SupplyBatch(
+            ctx.supply,
+            clock_ms,
+            previous_ms,
+            demand,
+            incidents=incidents,
+            dc_demand=tuple(dc_order_demand(orders)),
+        ),
         lambda keys: seed_inventory_entries(ctx, spark, keys),
     )
+    incidents_started, incidents_resolved = incident_transitions(incidents, previous_ms, clock_ms)
     lost = lost_lines(supply)
     lost_frame = _lost_frame(spark, lost)
     buyers = _with_lost(buyers, lost_frame, "receipt_id")
@@ -2255,6 +2507,7 @@ def generate_stream_batch(
         .unionByName(online_events(ctx, orders, previous_ms, clock_ms))
         .unionByName(marketing_events(ctx, lanes))
         .unionByName(supply_events(ctx, spark, supply))
+        .unionByName(incident_events(ctx, spark, incidents_started, incidents_resolved))
     )
     changes: dict[str, Changes] = {
         "stores": state_changes(store_state, new_store_state),

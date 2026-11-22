@@ -122,15 +122,21 @@
     },
     {
       "table": "dim_trucks",
-      "name": "Twin Truck Delay Scenario ETA",
+      "name": "Twin Truck Planned ETA",
       "data_type": "DateTime",
-      "description": "What-if ETA equal to recorded ETA plus 60 minutes; actual recorded ETA is not overwritten."
+      "description": "Planned arrival recorded at scheduling on the latest observed truck move; compare with Twin Truck Recorded ETA for the actual arrival."
     },
     {
       "table": "dim_trucks",
       "name": "Twin Truck Delay Minutes",
       "data_type": "Int64",
-      "description": "What-if delay amount. Returns 60 only when source evidence includes a recorded ETA."
+      "description": "Recorded delay against the planned arrival on the latest observed truck move: 0 until arrival, then actual minus planned minutes."
+    },
+    {
+      "table": "dim_trucks",
+      "name": "Twin Truck Delay Reason",
+      "data_type": "String",
+      "description": "Recorded cause of the latest observed truck move's delay; blank when on time."
     }
   ]
 }

@@ -226,6 +226,7 @@ def test_setup_pipeline_never_outgrows_the_sized_session_concurrency() -> None:
         size for size in range(1, len(parents) + 1)
         if any(independent(group) for group in combinations(parents, size))
     )
-    # setup-02 validation can overlap 04-08, so up to six sessions run at once.
-    assert width == 6
+    # setup-02 validation can overlap 04-08 (setup-03 waits for 04's online
+    # lines, which draw DC stock), so up to five sessions run at once.
+    assert width == 5
     assert width <= required_ml_producer_count(REPO_ROOT)

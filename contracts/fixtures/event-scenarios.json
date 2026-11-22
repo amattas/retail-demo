@@ -273,7 +273,8 @@
             "estimated_unload_duration": 60,
             "planned_arrival_time": "2026-07-20T15:00:00.000Z",
             "delay_minutes": 0,
-            "delay_reason": null
+            "delay_reason": null,
+            "load_units": 480
           }
         },
         {
@@ -313,7 +314,14 @@
             "started_at": "2026-07-21T08:00:00.000Z",
             "severity": "HIGH",
             "affected_store_count": 5,
-            "description": "Power outage at DC 2"
+            "description": "Power outage at DC 2",
+            "affected_store_ids": [
+              3,
+              4,
+              5,
+              6,
+              7
+            ]
           }
         },
         {

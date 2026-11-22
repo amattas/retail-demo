@@ -50,8 +50,9 @@ EXPECTED_METRICS: dict[str, list[tuple[str, str]]] = {
         ("Twin Truck Recorded ETD", "DateTime"),
         ("Twin Truck Cargo Balance", "Int64"),
         ("Twin Truck Cargo As Of", "DateTime"),
-        ("Twin Truck Delay Scenario ETA", "DateTime"),
+        ("Twin Truck Planned ETA", "DateTime"),
         ("Twin Truck Delay Minutes", "Int64"),
+        ("Twin Truck Delay Reason", "String"),
     ],
 }
 
@@ -434,15 +435,18 @@ def test_truck_cargo_uses_source_load_unload_semantics_and_latest_shipment() -> 
     assert _cargo_balance([]) is None
 
 
-def test_truck_delay_scenario_is_what_if_only_with_source_eta() -> None:
-    scenario = _measure_block("dim_trucks", "Twin Truck Delay Scenario ETA")
-    minutes = _measure_block("dim_trucks", "Twin Truck Delay Minutes")
-
-    assert "[Twin Truck Recorded ETA]" in scenario
-    assert "_RecordedETA + TIME(1, 0, 0)" in scenario
-    assert "[Twin Truck Recorded ETA]" in minutes
-    assert "ISBLANK(_RecordedETA)" in minutes
-    assert "60" in minutes
+def test_truck_delay_measures_read_the_recorded_plan_and_delay() -> None:
+    columns = {
+        "Twin Truck Planned ETA": "'fact_truck_moves'[Planned Arrival Time]",
+        "Twin Truck Delay Minutes": "'fact_truck_moves'[Delay Minutes]",
+        "Twin Truck Delay Reason": "'fact_truck_moves'[Delay Reason]",
+    }
+    for measure, column in columns.items():
+        block = _measure_block("dim_trucks", measure)
+        # The latest observed move of the selected truck, never a fixed what-if.
+        assert f"MAXX(_LatestRows, {column})" in block
+        assert "[Twin Truck State As Of]" in block
+        assert "TIME(1, 0, 0)" not in block
 
 
 def test_twin_changes_do_not_add_native_planning_or_operations_dependencies() -> None:

@@ -46,7 +46,7 @@
         "type": "TridentNotebook",
         "dependsOn": [
           {
-            "activity": "setup-01-seed-dictionaries",
+            "activity": "setup-04-generate-online-orders",
             "dependencyConditions": [
               "Succeeded"
             ]

@@ -338,6 +338,12 @@ except Exception:  # noqa: BLE001 - no ledger yet; stock starts from opening sto
     _ledger = None
 INVENTORY_SEED = (None if _ledger is None
                   else inventory_seed_frame(_ledger, INVENTORY_SEED_AS_OF).persist())
+try:
+    _dc_ledger = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.fact_dc_inventory_txn")
+except Exception:  # noqa: BLE001 - no DC ledger yet; DC stock starts from opening stock
+    _dc_ledger = None
+DC_INVENTORY_SEED = (None if _dc_ledger is None
+                     else dc_inventory_seed_frame(_dc_ledger, INVENTORY_SEED_AS_OF).persist())
 
 # Stores route to their DC, ship at their route's daily delivery slot (store
 # local time) and trucks serve their DC's fleet, exactly as in the historical
@@ -359,6 +365,18 @@ STREAM_SUPPLY = SupplyNetwork(
     / max(1, spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_products").count()),
     slots={store: route.slot_minute for store, route in _routes.items()},
     zones={int(r["ID"]): r["TimeZone"] for r in DIM_STORES.select("ID", "TimeZone").collect()},
+    closed_class=store_class(STREAM_PROFILE),
+)
+# Logistics incidents (DC outages, lane delays, weather, holiday capacity,
+# supplier short-ships) follow the same plan as history: the same seed opens
+# the same incidents on the same days.
+_incident_network = incident_network(DIM_STORES, DIM_GEOGRAPHIES, _DIM_DCS)
+STREAM_INCIDENTS = IncidentPlanner(
+    SEED,
+    _incident_network,
+    lambda first, last: severe_weather_days(
+        spark, SEED, _incident_network.store_geo.values(), first, last
+    ),
 )
 print(f"supply: {len(_store_dc)} stores on {len(_fleets)} DC fleets "
       f"({sum(len(f) for f in _fleets.values())} trucks); stock seeded as of "
@@ -391,6 +409,8 @@ STREAM_CONTEXT = build_stream_context(
     annual_volume_growth=ANNUAL_VOLUME_GROWTH,
     dim_geographies=DIM_GEOGRAPHIES,
     tax_rules=STREAM_TAX_RULES,
+    dc_inventory_seed=DC_INVENTORY_SEED,
+    incidents=STREAM_INCIDENTS,
 )
 print(f"live volume: {RATE_ROWS_PER_SECOND} source rows/s; lane shares "
       + ", ".join(f"{lane}={share:.3f}" for lane, share in LANE_PLAN.shares.items()))
@@ -443,7 +463,7 @@ _SPARK_TYPE = {
     "long": LongType(), "int": IntegerType(), "real": DoubleType(),
     "string": StringType(),
     "datetime": StringType(),     # parsed from the ISO string, then cast below
-    "dynamic": ArrayType(LongType()),  # only product_ids (array<long>)
+    "dynamic": ArrayType(LongType()),  # product_ids and affected_store_ids (array<long>)
 }
 
 # Envelope fields ($.<field>) — identical for every event table.
@@ -467,7 +487,7 @@ EVENT_PAYLOADS = {
     "customer_entered": [("store_id", "store_id", "long"), ("sensor_id", "sensor_id", "string"), ("zone", "zone", "string"), ("customer_count", "customer_count", "long"), ("dwell_time", "dwell_time", "long")],
     "customer_zone_changed": [("store_id", "store_id", "long"), ("customer_ble_id", "customer_ble_id", "string"), ("from_zone", "from_zone", "string"), ("to_zone", "to_zone", "string"), ("timestamp", "timestamp", "datetime")],
     "ble_ping_detected": [("store_id", "store_id", "long"), ("beacon_id", "beacon_id", "string"), ("customer_ble_id", "customer_ble_id", "string"), ("rssi", "rssi", "long"), ("zone", "zone", "string")],
-    "truck_arrived": [("truck_id", "truck_id", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("shipment_id", "shipment_id", "string"), ("arrival_time", "arrival_time", "datetime"), ("estimated_unload_duration", "estimated_unload_duration", "long"), ("planned_arrival_time", "planned_arrival_time", "datetime"), ("delay_minutes", "delay_minutes", "long"), ("delay_reason", "delay_reason", "string")],
+    "truck_arrived": [("truck_id", "truck_id", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("shipment_id", "shipment_id", "string"), ("arrival_time", "arrival_time", "datetime"), ("estimated_unload_duration", "estimated_unload_duration", "long"), ("planned_arrival_time", "planned_arrival_time", "datetime"), ("delay_minutes", "delay_minutes", "long"), ("delay_reason", "delay_reason", "string"), ("load_units", "load_units", "long")],
     "truck_departed": [("truck_id", "truck_id", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("shipment_id", "shipment_id", "string"), ("departure_time", "departure_time", "datetime"), ("actual_unload_duration", "actual_unload_duration", "long")],
     "store_opened": [("store_id", "store_id", "long"), ("operation_time", "operation_time", "datetime"), ("operation_type", "operation_type", "string")],
     "store_closed": [("store_id", "store_id", "long"), ("operation_time", "operation_time", "datetime"), ("operation_type", "operation_type", "string")],
@@ -476,9 +496,7 @@ EVENT_PAYLOADS = {
     "online_order_created": [("order_id", "order_id", "string"), ("customer_id", "customer_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("item_count", "item_count", "long"), ("subtotal", "subtotal", "real"), ("tax", "tax", "real"), ("total", "total", "real"), ("tender_type", "tender_type", "string"), ("campaign_id", "campaign_id", "string"), ("impression_id", "impression_id", "string"), ("gross_subtotal_cents", "gross_subtotal_cents", "long"), ("discount_cents", "discount_cents", "long"), ("subtotal_cents", "subtotal_cents", "long"), ("tax_cents", "tax_cents", "long"), ("total_cents", "total_cents", "long")],
     "online_order_picked": [("order_id", "order_id", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("picked_time", "picked_time", "datetime")],
     "online_order_shipped": [("order_id", "order_id", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("shipped_time", "shipped_time", "datetime")],
-    # Declared for the logistics incident model; the stream does not emit
-    # these yet.
-    "logistics_incident_started": [("incident_id", "incident_id", "string"), ("incident_type", "incident_type", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("started_at", "started_at", "datetime"), ("severity", "severity", "string"), ("affected_store_count", "affected_store_count", "long"), ("description", "description", "string")],
+    "logistics_incident_started": [("incident_id", "incident_id", "string"), ("incident_type", "incident_type", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("started_at", "started_at", "datetime"), ("severity", "severity", "string"), ("affected_store_count", "affected_store_count", "long"), ("description", "description", "string"), ("affected_store_ids", "affected_store_ids", "dynamic")],
     "logistics_incident_resolved": [("incident_id", "incident_id", "string"), ("incident_type", "incident_type", "string"), ("dc_id", "dc_id", "long"), ("store_id", "store_id", "long"), ("resolved_at", "resolved_at", "datetime")],
     "online_order_line_added": [("order_id", "order_id", "string"), ("line_number", "line_number", "long"), ("product_id", "product_id", "long"), ("quantity", "quantity", "long"), ("unit_price", "unit_price", "real"), ("extended_price", "extended_price", "real"), ("promo_code", "promo_code", "string"), ("fulfillment_mode", "fulfillment_mode", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long")],
     "online_order_delivered": [("order_id", "order_id", "string"), ("node_type", "node_type", "string"), ("node_id", "node_id", "long"), ("fulfillment_mode", "fulfillment_mode", "string"), ("delivered_time", "delivered_time", "datetime")],

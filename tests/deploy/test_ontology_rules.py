@@ -69,6 +69,14 @@ def test_replenishment_rule_matches_inventory_policy():
     assert '"URGENT" if on_hand == 0' in source
 
 
+def test_incident_rule_matches_calibration():
+    assert rules.TRUCK_LATE_MINUTES == _module_constant(
+        "utility/src/retail_setup/generation/calibration.py", "TRUCK_LATE_MINUTES"
+    )
+    incident = next(rule for rule in rules.RULES if rule.name == "LogisticsIncidentImpact")
+    assert f"{rules.TRUCK_LATE_MINUTES} or more minutes" in incident.statement
+
+
 def test_churn_rule_matches_churn_notebook():
     source = _notebook("09-ml-churn-prediction.ipynb")
     assert f'"CHURN_WINDOW_DAYS", default="{rules.CHURN_WINDOW_DAYS}"' in source
@@ -76,7 +84,7 @@ def test_churn_rule_matches_churn_notebook():
 
 def test_rendered_rules_follow_the_tmdl_shape():
     names = [rule.name for rule in rules.RULES]
-    assert len(names) == len(set(names)) == 9
+    assert len(names) == len(set(names)) == 10
     text = rules.render_rule(rules.RULES[0], "tag")
     assert text.startswith(f"rule {rules.RULES[0].name}\n\tstatement: ")
     assert "\t\tpropertyScope: specific\n" in text

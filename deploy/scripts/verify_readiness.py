@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol
 from retail_setup.generation.stream_control import (
     INGEST_TAG_PREFIX,
     PENDING_EVENT_TYPES,
+    SPORADIC_EVENT_TYPES,
     event_table_max_age,
     parse_ingest_tag,
 )
@@ -2676,9 +2677,9 @@ def _stream_event_tables(manifest: SolutionManifest) -> frozenset[str]:
 
 
 def _live_stream_tables(manifest: SolutionManifest) -> frozenset[str]:
-    """Event tables the stream emits today (declared types minus pending ones)."""
+    """Event tables expected to stay fresh: declared types minus pending and sporadic ones."""
 
-    return _stream_event_tables(manifest) - PENDING_EVENT_TYPES
+    return _stream_event_tables(manifest) - PENDING_EVENT_TYPES - SPORADIC_EVENT_TYPES
 
 
 def _row_ingest_tags(row: dict[str, Any]) -> list[dict[str, Any]]:

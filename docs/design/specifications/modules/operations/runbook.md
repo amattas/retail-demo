@@ -138,7 +138,9 @@ reorder, truck and online-order tables (stores close overnight, loads wait to
 consolidate, small fleets have few orders per hour); 24 hours for stockouts;
 36 hours for online deliveries, which come a day or more after the order; and
 6 hours for ad impressions. The Silver watermark check adds the same quiet time. Event types declared but not yet emitted
-(`stream_control.PENDING_EVENT_TYPES`) are not expected. Silver watermark
+(`stream_control.PENDING_EVENT_TYPES`) and the logistics incident events, which
+happen only a few times a year per DC (`stream_control.SPORADIC_EVENT_TYPES`),
+are not expected to be fresh. Silver watermark
 evidence uses the stalest live table's `last_processed_ts` (the event time
 Silver has processed), not `updated_at`, which the daily deep reconciliation
 refreshes without new rows. Its maximum age is two `streaming-data-load`

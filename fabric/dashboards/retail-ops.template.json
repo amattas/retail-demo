@@ -66,6 +66,24 @@
       "type": "kql",
       "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
       "query": "fn_truck_sla() | where departure_ingest_timestamp > ago(24h) | where departure_ingest_timestamp <= now() | where departure_time <= now() | summarize avg_dwell_min=avg(dwell_minutes) by site | top 10 by avg_dwell_min desc"
+    },
+    {
+      "title": "Active Logistics Incidents",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "fn_active_incidents() | project started_at, incident_type, severity, dc_id, lane_store_id = store_id, affected_store_count, description | order by started_at desc"
+    },
+    {
+      "title": "Stores Impacted by Open Incidents",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "fn_incident_impacted_stores() | summarize incidents=dcount(incident_id), types=make_set(incident_type) by dc_id, store_id | order by incidents desc, dc_id asc, store_id asc"
+    },
+    {
+      "title": "Late Trucks by Lane (24h)",
+      "type": "kql",
+      "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
+      "query": "mv_truck_delay_hourly | where ts > ago(24h) | summarize trucks=sum(trucks), late_trucks=sum(late_trucks), max_delay_minutes=max(max_delay_minutes) by dc_id, store_id | extend late_share=todouble(late_trucks)/todouble(trucks) | top 10 by late_trucks desc"
     }
   ]
 }

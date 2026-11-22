@@ -104,9 +104,18 @@ def _build_candidates(ctx: GenerationContext) -> StageOutputs:
     return receipts_mod.generate_receipts_group(ctx.spark, ctx.dims, ctx.dicts.profile, ctx.cfg)
 
 
-def _build_plan(ctx: GenerationContext, candidates: StageOutputs) -> StageOutputs:
-    # Inventory-constrained fulfillment precedes every receipt consumer.
-    plan = resolve_fulfillment(candidates, ctx.dims, ctx.cfg, profile=ctx.dicts.profile)
+def _build_plan(
+    ctx: GenerationContext, candidates: StageOutputs, online: StageOutputs
+) -> StageOutputs:
+    # Inventory-constrained fulfillment precedes every receipt consumer. Its DC
+    # stock also serves the ship-from-DC online lines.
+    plan = resolve_fulfillment(
+        candidates,
+        ctx.dims,
+        ctx.cfg,
+        profile=ctx.dicts.profile,
+        online_lines=online["fact_online_order_lines"],
+    )
     return {"return_headers": plan.return_headers, "events": plan.events, **plan.sales}
 
 
@@ -226,6 +235,7 @@ _LEDGERS = (
     "fact_reorders",
     "fact_stockouts",
     "fact_logistics_incidents",
+    "fact_logistics_incident_stores",
 )
 
 STAGES: tuple[Stage, ...] = (
@@ -240,7 +250,7 @@ STAGES: tuple[Stage, ...] = (
     Stage(
         "plan",
         "setup-03-generate-sales",
-        ("candidates",),
+        ("candidates", "online"),
         ("return_headers", "events", *_RECEIPT_GROUP),
         _build_plan,
     ),

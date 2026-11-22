@@ -7,11 +7,14 @@ Inventory position includes outstanding deliveries and accepted restock returns.
 Deliveries follow the store's delivery slot, as in the live stream: every SKU a
 store reorders when a day closes ships on that store's next consolidated load,
 which leaves the DC at the store's daily slot (``network.plan_routes``), drives
-the lane and is unloaded on arrival. The SKU simulation only needs the slot and
-the lane time, so it stays independent of other SKUs; ``inventory.py``
-consolidates the reorders into capacity-bounded shipments and puts them on
-trucks. The DC is an unlimited just-in-time supplier. This is a stock/service
-simulation, not a vehicle-routing or supplier-capacity model.
+the lane and is unloaded on arrival. ``StoreSku`` holds one store-SKU's state;
+``dc_supply.simulate_dc_sku`` runs every store of a DC for one SKU against the
+DC's own stock (supplier lead times, short-ships, incidents), and
+:func:`simulate_sku` runs one store against an unlimited DC with loads on plan.
+``inventory.py`` consolidates the shipments into capacity-bounded legs and puts
+them on trucks. The DC replenishment policy (lead time, reorder levels,
+allocation) is shared with the live stream. This is a stock/service
+simulation, not a vehicle-routing model.
 """
 
 from dataclasses import dataclass
@@ -23,6 +26,11 @@ from math import ceil
 from typing import Iterable, Iterator
 
 from retail_setup.generation.calibration import (
+    DC_DEMAND_SMOOTHING,
+    DC_OPENING_DAYS,
+    DC_ORDER_UP_TO_DAYS,
+    DC_SAFETY_DAYS,
+    DC_SUPPLIER_LEAD_DAYS,
     TRUCK_CHECKIN_MINUTES,
     TRUCK_LOAD_MINUTES,
     TRUCK_TRANSIT_MINUTES_MAX,
@@ -108,7 +116,8 @@ class Demand:
 
 @dataclass
 class InventoryEvent:
-    store_id: int
+    # NULL for the DC's own rows (``kind`` DC_*), which carry ``dc_id``.
+    store_id: int | None
     product_id: int
     event_ts: datetime
     trace_id: str
@@ -130,6 +139,11 @@ class InventoryEvent:
     eta: datetime | None = None
     unloading_ts: datetime | None = None
     etd: datetime | None = None
+    dc_id: int | None = None
+    # Planned arrival and the delay (minutes, reason) of a shipment's load.
+    planned_eta: datetime | None = None
+    delay_minutes: int = 0
+    delay_reason: str | None = None
 
 
 def shipment_base_id(dispatch: datetime, store_id: int) -> str:
@@ -175,7 +189,161 @@ def shipment_event(
         depart_ts=departure,
         eta=arrival,
         unloading_ts=arrival + timedelta(minutes=TRUCK_CHECKIN_MINUTES),
+        planned_eta=arrival,
     )
+
+
+class StoreSku:
+    """One store-SKU's stock, demand estimate and pending receipts (the store policy).
+
+    Shared by the single-store simulation (:func:`simulate_sku`) and the DC
+    simulation (``dc_supply``), which decides how much of each reorder ships.
+    """
+
+    def __init__(
+        self, *, store_id: int, product_id: int, seed: int, start_date: date, prior: float
+    ) -> None:
+        self.store_id = int(store_id)
+        self.product_id = int(product_id)
+        self.on_hand = opening_stock(seed, store_id, product_id, prior)
+        self.rate = prior
+        self.inbound = 0
+        self.expected_returns = 0
+        self.attempted = 0
+        self.start_date = start_date
+        self.pending: list[tuple[datetime, str, InventoryEvent]] = []
+        self.previous: tuple[datetime, str] | None = None
+
+    def opening(self) -> InventoryEvent:
+        return InventoryEvent(
+            self.store_id,
+            self.product_id,
+            datetime.combine(self.start_date, inventory_time()),
+            f"TRC-INIT-ST-{self.store_id}-{self.product_id}",
+            "INITIAL",
+            self.on_hand,
+            "SEED",
+            balance=self.on_hand,
+        )
+
+    def _receive(self) -> InventoryEvent:
+        _, _, event = heappop(self.pending)
+        self.on_hand += event.quantity
+        if event.kind == "RETURN":
+            self.expected_returns -= event.quantity
+        else:
+            self.inbound -= event.quantity
+        event.balance = self.on_hand
+        return event
+
+    def consume(self, candidate: Demand) -> Iterator[InventoryEvent]:
+        """Receipts due before the demand line, then the sale or lost sale."""
+        key = (candidate.event_ts, candidate.trace_id)
+        if candidate.event_ts.date() < self.start_date or (self.previous and key <= self.previous):
+            raise ValueError("demand must have unique, chronological line keys")
+        if candidate.quantity <= 0:
+            raise ValueError("candidate demand quantity must be positive")
+        self.previous = key
+        while self.pending and self.pending[0][:2] <= key:
+            yield self._receive()
+        self.attempted += candidate.quantity
+        fulfilled = candidate.quantity <= self.on_hand
+        if fulfilled:
+            self.on_hand -= candidate.quantity
+        yield InventoryEvent(
+            self.store_id,
+            self.product_id,
+            candidate.event_ts,
+            candidate.trace_id,
+            "SALE" if fulfilled else "LOST_SALE",
+            -candidate.quantity if fulfilled else 0,
+            "CUSTOMER_PURCHASE",
+            balance=self.on_hand,
+            receipt_id=candidate.receipt_id,
+            line_num=candidate.line_num,
+            requested_quantity=candidate.quantity,
+            unfulfilled_quantity=0 if fulfilled else candidate.quantity,
+        )
+        if fulfilled and candidate.return_ts is not None:
+            if candidate.return_ts <= candidate.event_ts or not candidate.return_id:
+                raise ValueError("restock returns must identify a later return")
+            returned = InventoryEvent(
+                self.store_id,
+                self.product_id,
+                candidate.return_ts,
+                f"TRC-INV-{candidate.return_id}-{candidate.line_num}",
+                "RETURN",
+                min(candidate.quantity, candidate.return_quantity or candidate.quantity),
+                candidate.return_id,
+            )
+            heappush(self.pending, (returned.event_ts, returned.trace_id, returned))
+            self.expected_returns += returned.quantity
+
+    def release(self, closing: datetime) -> Iterator[InventoryEvent]:
+        """Receipts and returns due by ``closing``."""
+        while self.pending and self.pending[0][0] <= closing:
+            yield self._receive()
+
+    def close_day(self, closing: datetime) -> tuple[int, int, str] | None:
+        """Fold the day's demand into the rate; ``(quantity, point, priority)`` to reorder."""
+        self.rate = smooth_demand(self.rate, self.attempted)
+        self.attempted = 0
+        point, target = reorder_levels(self.rate)
+        # Only near-term returns reduce the order. A distant return cannot
+        # cover demand before the service lead time has elapsed.
+        near_returns = (
+            sum(
+                event.quantity
+                for ts, _, event in self.pending
+                if event.kind == "RETURN" and ts <= closing + timedelta(days=4)
+            )
+            if self.expected_returns
+            else 0
+        )
+        position = self.on_hand + self.inbound + near_returns
+        if position > point:
+            return None
+        return (
+            reorder_quantity(target, position),
+            point,
+            reorder_priority(self.on_hand, self.rate),
+        )
+
+    def reorder_event(self, day: date, quantity: int, point: int, priority: str) -> InventoryEvent:
+        return InventoryEvent(
+            self.store_id,
+            self.product_id,
+            datetime.combine(day, inventory_time(23, 59, 59)),
+            f"TRC-RO-{self.store_id}-{day}-{self.product_id}",
+            "REORDER",
+            quantity,
+            "POLICY",
+            balance=self.on_hand,
+            reorder_point=point,
+            priority=priority,
+        )
+
+    def expect(self, shipment: InventoryEvent) -> InventoryEvent:
+        """Book a shipment's receipt (when its unloading starts); returns the receipt."""
+        if shipment.unloading_ts is None:
+            raise RuntimeError(f"shipment {shipment.source} has no unloading time")
+        delivery = InventoryEvent(
+            self.store_id,
+            self.product_id,
+            shipment.unloading_ts,
+            f"TRC-SI-{shipment.source}-{self.product_id}",
+            "INBOUND_SHIPMENT",
+            shipment.quantity,
+            shipment.source,
+        )
+        heappush(self.pending, (delivery.event_ts, delivery.trace_id, delivery))
+        self.inbound += delivery.quantity
+        return delivery
+
+    def add_to(self, delivery: InventoryEvent, quantity: int) -> None:
+        """Add units to a receipt already booked (a load that took a later reorder)."""
+        delivery.quantity += quantity
+        self.inbound += quantity
 
 
 def simulate_sku(
@@ -190,12 +358,14 @@ def simulate_sku(
     slot_minute: int | None = None,
     transit_minutes: int | None = None,
 ) -> Iterator[InventoryEvent]:
-    """Consume sorted demand with O(one SKU + pending deliveries/returns) state.
+    """One store-SKU supplied by an unlimited DC, with loads always on plan.
 
+    Consumes sorted demand with O(one SKU + pending deliveries/returns) state.
     ``daily_prior`` is the SKU's expected daily demand: it sizes the opening
     stock and starts the demand estimate, so history has no start-up stockout
     wave. ``slot_minute`` and ``transit_minutes`` are the store's delivery slot
     and lane (``network.plan_routes``); they default to the stable fallbacks.
+    History runs the DC-limited, incident-aware ``dc_supply.simulate_dc_sku``.
     """
     if daily_prior < 0 or end_date < start_date:
         raise ValueError("invalid inventory simulation bounds")
@@ -203,115 +373,27 @@ def simulate_sku(
         slot_minute = delivery_slot_minute(seed, store_id)
     if transit_minutes is None:
         transit_minutes = lane_transit_minutes(seed, 0, store_id)
-    on_hand = opening_stock(seed, store_id, product_id, daily_prior)
-    yield InventoryEvent(
-        store_id,
-        product_id,
-        datetime.combine(start_date, inventory_time()),
-        f"TRC-INIT-ST-{store_id}-{product_id}",
-        "INITIAL",
-        on_hand,
-        "SEED",
-        balance=on_hand,
+    sku = StoreSku(
+        store_id=store_id,
+        product_id=product_id,
+        seed=seed,
+        start_date=start_date,
+        prior=daily_prior,
     )
-    pending: list[tuple[datetime, str, InventoryEvent]] = []
-    inbound = 0
-    expected_returns = 0
-    rate = daily_prior
+    yield sku.opening()
     iterator = iter(demand)
     candidate = next(iterator, None)
-    previous: tuple[datetime, str] | None = None
     day = start_date
     while day <= end_date:
         closing = datetime.combine(day, inventory_time(23, 59, 59))
-        attempted = 0
         while candidate is not None and candidate.event_ts <= closing:
-            key = (candidate.event_ts, candidate.trace_id)
-            if candidate.event_ts.date() < start_date or (previous and key <= previous):
-                raise ValueError("demand must have unique, chronological line keys")
-            if candidate.quantity <= 0:
-                raise ValueError("candidate demand quantity must be positive")
-            previous = key
-            while pending and pending[0][:2] <= key:
-                _, _, event = heappop(pending)
-                on_hand += event.quantity
-                if event.kind == "RETURN":
-                    expected_returns -= event.quantity
-                else:
-                    inbound -= event.quantity
-                event.balance = on_hand
-                yield event
-            attempted += candidate.quantity
-            fulfilled = candidate.quantity <= on_hand
-            if fulfilled:
-                on_hand -= candidate.quantity
-            yield InventoryEvent(
-                store_id,
-                product_id,
-                candidate.event_ts,
-                candidate.trace_id,
-                "SALE" if fulfilled else "LOST_SALE",
-                -candidate.quantity if fulfilled else 0,
-                "CUSTOMER_PURCHASE",
-                balance=on_hand,
-                receipt_id=candidate.receipt_id,
-                line_num=candidate.line_num,
-                requested_quantity=candidate.quantity,
-                unfulfilled_quantity=0 if fulfilled else candidate.quantity,
-            )
-            if fulfilled and candidate.return_ts is not None:
-                if candidate.return_ts <= candidate.event_ts or not candidate.return_id:
-                    raise ValueError("restock returns must identify a later return")
-                returned = InventoryEvent(
-                    store_id,
-                    product_id,
-                    candidate.return_ts,
-                    f"TRC-INV-{candidate.return_id}-{candidate.line_num}",
-                    "RETURN",
-                    min(candidate.quantity, candidate.return_quantity or candidate.quantity),
-                    candidate.return_id,
-                )
-                heappush(pending, (returned.event_ts, returned.trace_id, returned))
-                expected_returns += returned.quantity
+            yield from sku.consume(candidate)
             candidate = next(iterator, None)
-        while pending and pending[0][0] <= closing:
-            _, _, event = heappop(pending)
-            on_hand += event.quantity
-            if event.kind == "RETURN":
-                expected_returns -= event.quantity
-            else:
-                inbound -= event.quantity
-            event.balance = on_hand
-            yield event
-        rate = smooth_demand(rate, attempted)
-        point, target = reorder_levels(rate)
-        # Only near-term returns reduce the order. A distant return cannot
-        # cover demand before the service lead time has elapsed.
-        near_returns = (
-            sum(
-                event.quantity
-                for ts, _, event in pending
-                if event.kind == "RETURN" and ts <= closing + timedelta(days=4)
-            )
-            if expected_returns
-            else 0
-        )
-        position = on_hand + inbound + near_returns
-        if position <= point:
-            quantity = reorder_quantity(target, position)
-            priority = reorder_priority(on_hand, rate)
-            yield InventoryEvent(
-                store_id,
-                product_id,
-                closing,
-                f"TRC-RO-{store_id}-{day}-{product_id}",
-                "REORDER",
-                quantity,
-                "POLICY",
-                balance=on_hand,
-                reorder_point=point,
-                priority=priority,
-            )
+        yield from sku.release(closing)
+        order = sku.close_day(closing)
+        if order is not None:
+            quantity, point, priority = order
+            yield sku.reorder_event(day, quantity, point, priority)
             shipment = shipment_event(
                 store_id,
                 product_id,
@@ -321,19 +403,71 @@ def simulate_sku(
                 transit_minutes=transit_minutes,
             )
             yield shipment
-            if shipment.unloading_ts is None:
-                raise RuntimeError(f"shipment {shipment.source} has no unloading time")
-            delivery = InventoryEvent(
-                store_id,
-                product_id,
-                shipment.unloading_ts,
-                f"TRC-SI-{shipment.source}-{product_id}",
-                "INBOUND_SHIPMENT",
-                shipment.quantity,
-                shipment.source,
-            )
-            heappush(pending, (delivery.event_ts, delivery.trace_id, delivery))
-            inbound += delivery.quantity
+            sku.expect(shipment)
         day += timedelta(days=1)
     if candidate is not None:
         raise ValueError("candidate demand falls outside the simulation history")
+
+
+# ---------------------------------------------------------------------------
+# DC replenishment (shared by dc_supply and stream_supply)
+# ---------------------------------------------------------------------------
+
+
+def dc_lead_days(seed: int, dc_id: int, product_id: int) -> int:
+    """Supplier lead time (days) of a DC's product (a stable draw)."""
+    low, high = DC_SUPPLIER_LEAD_DAYS
+    return low + stable_int(seed, int(dc_id), int(product_id), "lead") % (high - low + 1)
+
+
+def dc_case_floor(stores: int) -> int:
+    """Smallest useful DC stock: a store reorders whole cases, so a case per store."""
+    return max(1, int(stores)) * CASE_PACK
+
+
+def dc_opening_stock(
+    seed: int, dc_id: int, product_id: int, rate: float, floor: int = CASE_PACK
+) -> int:
+    """A DC's opening stock: a stable 10-16 days of its expected daily demand, in cases.
+
+    At least two of ``floor`` (``dc_case_floor``): a slow mover still covers a
+    first case to each store and the next.
+    """
+    low, high = DC_OPENING_DAYS
+    days = low + stable_int(seed, int(dc_id), int(product_id), "dc-opening") % (high - low + 1)
+    return max(2 * floor, ceil(rate * days / CASE_PACK) * CASE_PACK)
+
+
+def smooth_dc_demand(rate: float, outbound: int) -> float:
+    """Close a DC day: fold its requested units into the smoothed daily demand."""
+    return (1.0 - DC_DEMAND_SMOOTHING) * rate + DC_DEMAND_SMOOTHING * outbound
+
+
+def dc_reorder_levels(rate: float, lead_days: int, floor: int = CASE_PACK) -> tuple[int, int]:
+    """(reorder point, order-up-to target) of a DC product with ``lead_days`` supply.
+
+    ``floor`` (``dc_case_floor``) keeps a case per store in reserve for slow movers.
+    """
+    point = max(floor, ceil(rate * (lead_days + 1 + DC_SAFETY_DAYS)))
+    target = max(point + floor, ceil(rate * (lead_days + DC_ORDER_UP_TO_DAYS)))
+    return point, target
+
+
+def supplier_receipt(ordered: int, fill_rate: float) -> int:
+    """Units of a supplier order that arrive (whole cases) at a fill rate."""
+    if fill_rate >= 1.0:
+        return ordered
+    return int(ordered * fill_rate) // CASE_PACK * CASE_PACK
+
+
+def allocate(available: int, requests: Iterable[tuple[object, int]]) -> list[tuple[object, int]]:
+    """Ship requests in order from ``available`` units: ``[(key, shipped)]``."""
+    shipped = []
+    for key, quantity in requests:
+        ship = max(0, min(int(quantity), available))
+        available -= ship
+        shipped.append((key, ship))
+    return shipped
+
+
+PRIORITY_ORDER = {"URGENT": 0, "HIGH": 1, "NORMAL": 2}

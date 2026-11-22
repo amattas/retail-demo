@@ -18,7 +18,7 @@ NOTEBOOK = (
 )
 
 
-def _notebook_functions(spark, existing):
+def _notebook_functions(spark, existing, name="transform_inventory_updated", exists=True):
     notebook = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
     source = "\n".join(
         "".join(cell["source"]) for cell in notebook["cells"] if cell["cell_type"] == "code"
@@ -31,6 +31,7 @@ def _notebook_functions(spark, existing):
         "_inventory_recompute_boundaries",
         "_prior_inventory_balances",
         "transform_inventory_updated",
+        "transform_dc_inventory_updated",
     }
     nodes = [
         node
@@ -45,11 +46,11 @@ def _notebook_functions(spark, existing):
         "EVENT_TIME_FIELDS": {"inventory_updated": ("ingest_timestamp",)},
         "INVENTORY_ORDER_FIELDS": ("event_ts", "trace_id"),
         "STREAM_DEDUPE_KEYS": {"inventory_updated": ["trace_id"]},
-        "target_table_exists": lambda _: True,
+        "target_table_exists": lambda _: exists,
         "spark": SimpleNamespace(table=lambda _: existing),
     }
     exec(compile(ast.Module(body=nodes, type_ignores=[]), str(NOTEBOOK), "exec"), namespace)
-    return namespace["transform_inventory_updated"]
+    return namespace[name]
 
 
 def test_real_inventory_windows_repair_legacy_nulls_and_replay_idempotently(spark):
@@ -135,3 +136,27 @@ def test_live_lost_sales_carry_their_requested_quantity(spark):
     assert (rows["sale"].requested_quantity, rows["sale"].unfulfilled_quantity) == (2, 0)
     assert (rows["sale"].balance, rows["unload"].balance) == (0, 24)
     assert rows["unload"].requested_quantity == 0
+
+
+def test_dc_stock_moves_route_to_the_dc_ledger_with_running_balances(spark):
+    events = spark.sql("""
+        SELECT timestamp'2026-09-01 04:00:00' AS ingest_timestamp, 'sup' AS trace_id,
+               CAST(NULL AS BIGINT) AS store_id, 2L AS dc_id, 7L AS product_id,
+               120L AS quantity_delta, 'INBOUND_SHIPMENT' AS reason,
+               'SUPPLIER-2-7-1' AS payload_source, 120L AS requested_quantity
+        UNION ALL SELECT timestamp'2026-09-01 10:00:00', 'load', NULL, 2L, 7L, -24L,
+               'OUTBOUND_SHIPMENT', 'SHP-ns-5-1', 36L
+        UNION ALL SELECT timestamp'2026-09-01 11:00:00', 'sale', 5L, 2L, 7L, -1L,
+               'SALE', 'CUSTOMER_PURCHASE', 1L
+    """)
+    dc = _notebook_functions(spark, None, "transform_dc_inventory_updated", exists=False)
+    rows = [
+        (row.trace_id, row.dc_id, row.txn_type, row.quantity, row.balance, row.Source)
+        for row in dc(events).orderBy("event_ts").collect()
+    ]
+    assert rows == [
+        ("sup", 2, "INBOUND_SHIPMENT", 120, 120, "SUPPLIER-2-7-1"),
+        ("load", 2, "OUTBOUND_SHIPMENT", -24, 96, "SHP-ns-5-1"),
+    ]
+    store = _notebook_functions(spark, None, exists=False)
+    assert [row.trace_id for row in store(events).collect()] == ["sale"]

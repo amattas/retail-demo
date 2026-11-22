@@ -354,9 +354,14 @@ def _validate_physical_event_contract(
         if mapping_paths != expected_paths:
             raise ManifestSourceError(f"{event_type!r} KQL mapping paths differ")
 
-        target = snapshot.silver.routes[event_type]
-        target_schema = snapshot.historical_tables.get(target)
-        if target_schema is not None:
+        targets = (
+            snapshot.silver.routes[event_type],
+            *snapshot.silver.split_routes.get(event_type, ()),
+        )
+        for target in targets:
+            target_schema = snapshot.historical_tables.get(target)
+            if target_schema is None:
+                continue
             target_fields = {field.name for field in target_schema}
             missing_dedupe = set(declaration.dedupe_keys) - target_fields
             if missing_dedupe:
@@ -423,9 +428,10 @@ def _validate_paths(
         if kql_targets != (declaration.event_type,):
             raise ManifestSourceError(f"{path.id!r} has the wrong Eventhouse target")
         expected_silver = path_sources.silver.routes[declaration.event_type]
-        if silver_targets != (expected_silver,):
+        split = path_sources.silver.split_routes.get(declaration.event_type, ())
+        if silver_targets != (expected_silver, *split):
             raise ManifestSourceError(f"{path.id!r} has the wrong Silver target")
-        _validate_downstream_targets(path, path_sources, expected_silver)
+        _validate_downstream_targets(path, path_sources, expected_silver, split)
 
     if len(derived) != len(snapshot.silver.derived_routes):
         raise ManifestSourceError("derived path inventory differs from Silver")
@@ -458,6 +464,7 @@ def _validate_downstream_targets(
     path: EventPath,
     sources: EventPathSources,
     silver_target: str,
+    split_targets: tuple[str, ...] = (),
 ) -> None:
     gold_targets = _targets(path, "gold")
     for target in gold_targets:
@@ -469,7 +476,7 @@ def _validate_downstream_targets(
     semantic_targets = _targets(path, "semantic")
     if any(target not in sources.semantic_tables for target in semantic_targets):
         raise ManifestSourceError(f"{path.id!r} references an inactive semantic table")
-    lakehouse_targets = {silver_target, *gold_targets}
+    lakehouse_targets = {silver_target, *split_targets, *gold_targets}
     if any(target not in lakehouse_targets for target in semantic_targets):
         raise ManifestSourceError(f"{path.id!r} semantic terminal is not on its Lakehouse route")
 
@@ -601,6 +608,7 @@ def _validate_boundaries(
     operational = set(snapshot.kql_tables) - set(snapshot.driver.payloads)
     streaming_only = (
         set(snapshot.silver.routes.values())
+        | {target for split in snapshot.silver.split_routes.values() for target in split}
         | {route.target_table for route in snapshot.silver.derived_routes.values()}
     ) - set(snapshot.historical_tables)
     live_lakehouse_targets = {

@@ -107,6 +107,14 @@
       "type": "ontology.entity",
       "description": "store_id,product_id,inventory_as_of,current_inventory,demand_velocity_daily,days_of_inventory,demand_trend,stockout_probability,stockout_predicted,risk,ranking,risk_level,predicted_at,generated_at,forecast_horizon_days,department,category,subcategory,model_run_id,schema_version",
       "children": []
+    },
+    {
+      "id": "Incident",
+      "is_selected": true,
+      "display_name": "Incident",
+      "type": "ontology.entity",
+      "description": "incident_id,incident_type,dc_id,store_id,started_at,resolved_at,severity,affected_store_count,description,trace_id,event_date",
+      "children": []
     }
   ],
   "entitiesWithUserAuthoredDescriptions": [
@@ -122,6 +130,7 @@
     "Payment",
     "CustomerSegment",
     "ChurnPrediction",
-    "StockoutRisk"
+    "StockoutRisk",
+    "Incident"
   ]
 }

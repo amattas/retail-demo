@@ -43,7 +43,8 @@ in: July 2025 to June 2026 is fiscal year 2025, and July is `fiscal_quarter` 1.
 `fact_promo_lines`,
 `fact_online_order_headers`, `fact_online_order_lines`, `fact_reorders`,
 `fact_truck_moves`, `fact_truck_inventory`, `fact_dc_inventory_txn`,
-`fact_store_inventory_txn`, `fact_stockouts`, and `fact_logistics_incidents`.
+`fact_store_inventory_txn`, `fact_stockouts`, `fact_logistics_incidents`, and
+`fact_logistics_incident_stores`.
 
 Each store is served by a DC in its own state, else its region, else any DC;
 among those the store goes to the DC serving the fewest stores so far, so DCs
@@ -82,13 +83,14 @@ are local, like the live stream (`stream_events.plan_orders`):
   the end of history. The live stream does not continue these orders.
 
 `fact_logistics_incidents` holds one row per logistics disruption
-(`incident_type` is `DC_OUTAGE`, `LANE_DELAY`, `WEATHER`, `HOLIDAY`, or
-`SUPPLIER_SHORT_SHIP`), with `resolved_at` null while the incident is open and
-`store_id` null for DC- or network-wide incidents. History publishes it empty
-until the incident model lands; the live stream fills it from incident events.
-`fact_truck_moves` carries `planned_arrival_time`, `delay_minutes`, and
-`delay_reason`; historical trucks arrive as planned (`planned_arrival_time =
-eta`, zero delay, no reason) for now.
+(`incident_type` is `DC_OUTAGE`, `LANE_DELAY`, `WEATHER`, `HOLIDAY_CAPACITY`,
+or `SUPPLIER_SHORT_SHIP`), with `resolved_at` null while the incident is open
+at the end of history and `store_id` set only for a lane delay's store.
+`fact_logistics_incident_stores` lists every store each incident affects (the
+DC's stores, the lane's store, or a geography's stores), one row per incident
+and store. History and the live stream plan incidents with the same model
+(see [Logistics incidents](#logistics-incidents)). `fact_truck_moves` carries
+`planned_arrival_time`, `delay_minutes`, `delay_reason`, and `load_units`.
 
 ### Time convention
 
@@ -200,8 +202,10 @@ ML output tables are not part of this base contract.
 The source-derived live-route check compares this inventory with declared
 event paths. Seven dimensions, `fact_promo_lines`, `fact_truck_inventory`,
 `fact_dc_inventory_txn`, and `dc_inventory_position_current` are the named
-historical-only boundary. `fact_online_order_lines` and
-`fact_logistics_incidents` have declared live routes. The manifest records those targets and rationale;
+historical-only boundary (the stream also appends DC stock moves to
+`fact_dc_inventory_txn`). `fact_online_order_lines`,
+`fact_logistics_incidents` and `fact_logistics_incident_stores` have declared
+live routes. The manifest records those targets and rationale;
 `schemas.py` continues to own their fields, types, nullability behavior, and
 mixed-case compatibility.
 
@@ -222,7 +226,7 @@ setup notebook that runs it:
 
 | Notebook | Stages | Waits for |
 | --- | --- | --- |
-| `setup-03-generate-sales` | candidate receipts, fulfillment plan | setup-01 |
+| `setup-03-generate-sales` | candidate receipts, fulfillment plan | setup-04 |
 | `setup-04-generate-online-orders` | online orders | setup-01 |
 | `setup-05-generate-marketing` | background impressions | setup-01 |
 | `setup-06-generate-returns-and-promotions` | returns, promotions | setup-03 |
@@ -233,7 +237,7 @@ setup notebook that runs it:
 
 `setup-pipeline` follows the same dependency graph at notebook level; a test
 checks that the two graphs agree. Independent notebooks run in separate
-Spark sessions. At most six run at once, within the session concurrency that
+Spark sessions. At most five run at once, within the session concurrency that
 capacity sizing reserves for required ML.
 Setup-10 runs its invariant checks and per-table staging, validation, and
 promotion concurrently; every phase still completes for all tables before the
@@ -300,8 +304,8 @@ weather (`generation/stream_calendar.py`, shared with the live stream):
   persists for days (lag-1 autocorrelation about 0.7). Its effect on traffic
   depends on the state's climate and the month (snow-belt winters, southern
   storm summers), within 0.4-1.2x and about 1 on average. An index of 2 or
-  more marks a severe-weather day (`severe_weather_column`), which the
-  logistics incident model can use for `WEATHER` incidents.
+  more marks a severe-weather day (`severe_weather_column`); the logistics
+  incident model opens `WEATHER` incidents on those days.
 
 Customer selection has persistent, long-tailed visit propensities and
 geography affinity. Continuous customer spending propensity and quick,
@@ -358,18 +362,25 @@ point and the order-up-to target (4-8 days of cover). It never looks at
 generated demand, and it removes the start-of-history stockout wave a flat
 opening stock caused.
 
-Every SKU a store reorders when a day closes ships on its next delivery slot
-as one load, which drives the lane and is received when unloading starts, 15
-minutes after arrival. `inventory.py` packs each load into shipments of at most
+Each DC simulates one product for all of its stores at once
+(`dc_supply.simulate_dc_sku`), so DC stock is shared. Every SKU a store
+reorders when a day closes ships on its next open delivery slot as one load,
+which drives the lane and is received when unloading starts, 15 minutes after
+arrival. The DC ships the day's reorders from the stock it has, most urgent
+first; a reorder it cannot cover is short-shipped, so the store reorders again
+the next day and runs out if the DC stays empty. `inventory.py` packs each load into shipments of at most
 `truck_capacity` units in product order (`_split_reorders_by_capacity`; IDs
 `SHP-<dispatch yyyyMMdd>-<store>-<leg>`), splitting a SKU's receipt across legs
 when needed. Shipments go, in loading order, to a truck that is free for the
 whole trip (loading until it is back at the DC): the store's route truck for
 the first leg, the shared pool and then the DC's other trucks for overflow legs.
 Dwell is the unload model shared with the live stream (`network.unload_minutes`:
-base minutes plus units at the site's rate, 30-180 minutes).
-`planned_arrival_time` equals the arrival, `delay_minutes` is 0 and
-`delay_reason` NULL until the logistics incident model adds delays.
+base minutes plus units at the site's rate, slower in the store's busy hours and
+quicker at night, plus a door wait for a truck 30 or more minutes late; 30-180
+minutes). Each load has a planned and an actual schedule
+(`incidents.plan_delivery`): moves before arrival show the plan in `eta`/`etd`
+with `delay_minutes` 0; from `ARRIVED` on they show the actual arrival,
+`delay_minutes` (actual minus `planned_arrival_time`) and `delay_reason`.
 
 A candidate line is fulfilled in full only when its stock is available.
 Rejected lines are omitted from realized receipts; empty receipts disappear.
@@ -418,12 +429,39 @@ migrate the target before resuming streaming against an older table.
 Live deltas have zero unfulfilled demand; this is
 not evidence of measured lost demand in the live scenario generator.
 
-The current baseline assumes unlimited just-in-time supply at the DC. It does
-not optimize fleet routing or simulate supplier capacity constraints. Overflow
-legs can only overlap a truck's earlier trip when they outnumber the shared
-pool. Historical online orders retain their separate
-synthetic fulfillment model; do not interpret its statuses as reservations
-against the store policy.
+DCs keep their own stock (`fact_dc_inventory_txn`): an opening stock of
+10-16 days of their stores' expected demand, supplier orders when the position
+(on hand plus open orders) falls to the reorder point (lead time + 1 + 4
+safety days of smoothed demand, at least a case per store), received a stable
+3-7 day lead time later at 04:00 DC time (`INBOUND_SHIPMENT`, short during a
+supplier short-ship), truck loads (`OUTBOUND_SHIPMENT`), and ship-from-DC
+online lines when they ship (`ONLINE_SHIPMENT`; units the DC lacks are
+`EXPEDITED_RECEIPT` just before). A DC stockout is a `fact_stockouts` row with
+`DCID`. The model does not optimize fleet routing. Overflow legs can only
+overlap a truck's earlier trip when they outnumber the shared pool. Historical
+online orders keep their own fulfillment statuses; do not read them as
+reservations against the store policy.
+
+### Logistics incidents
+
+`incidents.plan_incidents` lays out every disruption from the seed and the
+dates, the same way for history and the live stream:
+
+| Type | Frequency | Effect |
+| --- | --- | --- |
+| `DC_OUTAGE` | 1.5 per DC and year, 6-36 hours | no dispatches; loads leave at each store's next slot after it |
+| `LANE_DELAY` | 4 per DC and year, 2-12 hours, one store | trucks on the lane arrive 45-180 minutes late |
+| `WEATHER` | severe-weather days, more often in the climate's rough season, 1-4 days | lanes into the geography's stores run 60-240 minutes late |
+| `HOLIDAY_CAPACITY` | Black Friday weekend and the days after Christmas, 70% of DCs | loading starts 60-240 minutes late |
+| `SUPPLIER_SHORT_SHIP` | 2 per DC and year, 3-10 days, one supplier group (a sixth of products) | 20-60% of supplier orders arrive |
+
+Severity follows the delay (90/150 minutes), outage length (12/24 hours) or
+lost supply share (50/65%). Loads never arrive on a store's closure day, and
+traffic delays some runs (5-20% by lane length, more on Fridays) by 15-50% of
+the lane time. `delay_reason` names the largest cause of a delay (DC_OUTAGE,
+HOLIDAY_CAPACITY, LANE_DELAY, WEATHER, TRAFFIC); the live stream adds
+`TRUCK_AVAILABILITY` when a load waited for a free truck. Frequencies and
+ranges live in `generation/calibration.py`.
 
 ### Historical/live boundary
 

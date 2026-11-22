@@ -68,7 +68,7 @@ REQUIRED_TWIN_MEASURES: dict[str, set[str]] = {
         "Twin Truck Recorded ETD",
         "Twin Truck Cargo Balance",
         "Twin Truck Cargo As Of",
-        "Twin Truck Delay Scenario ETA",
+        "Twin Truck Planned ETA",
     },
 }
 

@@ -106,13 +106,13 @@ children remain with their parents. See the
 
 The source defines these counts:
 
-- Historical Lakehouse: **37 tables**, comprising **7 dimensions**, **20 facts**,
+- Historical Lakehouse: **38 tables**, comprising **7 dimensions**, **21 facts**,
   and **10 Gold aggregates**.
 - Live events: **22 declared business event types** and **23 KQL event tables**.
-  The stream emits 18 of them today; the logistics-incident and online
-  order-line/delivery events are declared for the models that will emit them.
+  The stream emits all of them; logistics incidents are sporadic (a few a year
+  per DC), so their tables can be empty for weeks.
   The extra table, `unknown_event`, is a non-emitted operational catch-all.
-- Active Direct Lake semantic model: **43 tables**, comprising the 37
+- Active Direct Lake semantic model: **44 tables**, comprising the 38
   historical tables and 6 required ML outputs.
 - Data/event registry: 3 data contracts, 23 declared paths, and 4 intentional
   exceptions.

@@ -335,35 +335,116 @@ table dim_trucks
 		displayFolder: Connected Twins\Truck\Cargo
 		lineageTag: c2200003-0000-0000-0000-000000000009
 
-	/// What-if ETA scenario equal to the recorded ETA plus 60 minutes; it never overwrites the actual recorded ETA.
-	measure 'Twin Truck Delay Scenario ETA' = ```
-			VAR _RecordedETA =
-				[Twin Truck Recorded ETA]
+	/// Planned arrival recorded at scheduling on the single latest observed truck-move row for one selected truck (fact_truck_moves.planned_arrival_time). Ties or no evidence return BLANK.
+	measure 'Twin Truck Planned ETA' = ```
+			VAR _SelectedTruckId =
+				SELECTEDVALUE('dim_trucks'[ID])
+			VAR _AsOf =
+				[Twin Truck State As Of]
+			VAR _VisibleStoreIds =
+				VALUES('dim_stores'[ID])
+			VAR _VisibleDCIds =
+				VALUES('dim_distribution_centers'[ID])
+			VAR _LatestRows =
+				CALCULATETABLE(
+					SUMMARIZE(
+						'fact_truck_moves',
+						'fact_truck_moves'[Planned Arrival Time],
+						'fact_truck_moves'[Status],
+						'fact_truck_moves'[Shipment ID],
+						'fact_truck_moves'[Store ID],
+						'fact_truck_moves'[DC ID]
+					),
+					KEEPFILTERS(TREATAS(_VisibleStoreIds, 'fact_truck_moves'[Store ID])),
+					KEEPFILTERS(TREATAS(_VisibleDCIds, 'fact_truck_moves'[DC ID])),
+					KEEPFILTERS('fact_truck_moves'[Event Timestamp] = _AsOf)
+				)
 			RETURN
-				IF(
-					ISBLANK(_RecordedETA),
-					BLANK(),
-					_RecordedETA + TIME(1, 0, 0)
+				SWITCH(
+					TRUE(),
+					ISBLANK(_SelectedTruckId), BLANK(),
+					ISBLANK(_AsOf), BLANK(),
+					COUNTROWS(_LatestRows) = 1, MAXX(_LatestRows, 'fact_truck_moves'[Planned Arrival Time]),
+					BLANK()
 				)
 			```
 		formatString: General Date
-		displayFolder: Connected Twins\Truck\Delay Scenario
+		displayFolder: Connected Twins\Truck\Delay
 		lineageTag: c2200003-0000-0000-0000-00000000000a
 
-	/// What-if delay minutes used by the delay scenario. Returns 60 only when a recorded ETA exists in source evidence.
+	/// Recorded delay against the planned arrival on the single latest observed truck-move row for one selected truck: 0 until the truck arrives, then actual minus planned arrival (fact_truck_moves.delay_minutes). Ties or no evidence return BLANK.
 	measure 'Twin Truck Delay Minutes' = ```
-			VAR _RecordedETA =
-				[Twin Truck Recorded ETA]
+			VAR _SelectedTruckId =
+				SELECTEDVALUE('dim_trucks'[ID])
+			VAR _AsOf =
+				[Twin Truck State As Of]
+			VAR _VisibleStoreIds =
+				VALUES('dim_stores'[ID])
+			VAR _VisibleDCIds =
+				VALUES('dim_distribution_centers'[ID])
+			VAR _LatestRows =
+				CALCULATETABLE(
+					SUMMARIZE(
+						'fact_truck_moves',
+						'fact_truck_moves'[Delay Minutes],
+						'fact_truck_moves'[Status],
+						'fact_truck_moves'[Shipment ID],
+						'fact_truck_moves'[Store ID],
+						'fact_truck_moves'[DC ID]
+					),
+					KEEPFILTERS(TREATAS(_VisibleStoreIds, 'fact_truck_moves'[Store ID])),
+					KEEPFILTERS(TREATAS(_VisibleDCIds, 'fact_truck_moves'[DC ID])),
+					KEEPFILTERS('fact_truck_moves'[Event Timestamp] = _AsOf)
+				)
 			RETURN
-				IF(
-					ISBLANK(_RecordedETA),
-					BLANK(),
-					60
+				SWITCH(
+					TRUE(),
+					ISBLANK(_SelectedTruckId), BLANK(),
+					ISBLANK(_AsOf), BLANK(),
+					COUNTROWS(_LatestRows) = 1, MAXX(_LatestRows, 'fact_truck_moves'[Delay Minutes]),
+					BLANK()
 				)
 			```
 		formatString: 0
-		displayFolder: Connected Twins\Truck\Delay Scenario
+		displayFolder: Connected Twins\Truck\Delay
 		lineageTag: c2200003-0000-0000-0000-00000000000b
+
+	/// Recorded cause of the delay on the single latest observed truck-move row for one selected truck (DC_OUTAGE, HOLIDAY_CAPACITY, LANE_DELAY, WEATHER, TRAFFIC, TRUCK_AVAILABILITY); BLANK when on time, tied or unobserved.
+	measure 'Twin Truck Delay Reason' = ```
+			VAR _SelectedTruckId =
+				SELECTEDVALUE('dim_trucks'[ID])
+			VAR _AsOf =
+				[Twin Truck State As Of]
+			VAR _VisibleStoreIds =
+				VALUES('dim_stores'[ID])
+			VAR _VisibleDCIds =
+				VALUES('dim_distribution_centers'[ID])
+			VAR _LatestRows =
+				CALCULATETABLE(
+					SUMMARIZE(
+						'fact_truck_moves',
+						'fact_truck_moves'[Delay Reason],
+						'fact_truck_moves'[Status],
+						'fact_truck_moves'[Shipment ID],
+						'fact_truck_moves'[Store ID],
+						'fact_truck_moves'[DC ID]
+					),
+					KEEPFILTERS(TREATAS(_VisibleStoreIds, 'fact_truck_moves'[Store ID])),
+					KEEPFILTERS(TREATAS(_VisibleDCIds, 'fact_truck_moves'[DC ID])),
+					KEEPFILTERS('fact_truck_moves'[Event Timestamp] = _AsOf)
+				)
+			RETURN
+				SWITCH(
+					TRUE(),
+					ISBLANK(_SelectedTruckId), BLANK(),
+					ISBLANK(_AsOf), BLANK(),
+					COUNTROWS(_LatestRows) = 1, MAXX(_LatestRows, 'fact_truck_moves'[Delay Reason]),
+					BLANK()
+				)
+			```
+		formatString: General
+		displayFolder: Connected Twins\Truck\Delay
+		lineageTag: c2200003-0000-0000-0000-00000000000c
 
 	column ID
 		dataType: int64
