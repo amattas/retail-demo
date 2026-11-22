@@ -2,8 +2,14 @@ table fact_foot_traffic
 	lineageTag: c999b61a-43db-4db3-9783-626a4618f864
 	sourceLineageTag: [ag].[fact_foot_traffic]
 
-	/// Total observed in-store foot traffic count.
-	measure 'Foot Traffic Count' = SUM('fact_foot_traffic'[Count])
+	/// Visitors: sensors count zone passages and every visitor passes the entrance, so without a zone filter this counts entrance passages; with a zone filter it counts that zone's passages.
+	measure 'Foot Traffic Count' = ```
+			IF(
+				ISFILTERED('fact_foot_traffic'[Zone]),
+				SUM('fact_foot_traffic'[Count]),
+				CALCULATE(SUM('fact_foot_traffic'[Count]), 'fact_foot_traffic'[Zone] = "ENTRANCE")
+			)
+			```
 		formatString: #,0
 		displayFolder: Store Operations\Traffic
 		lineageTag: 01a1a1cb-0001-0001-0001-000000000001

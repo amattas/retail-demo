@@ -40,7 +40,13 @@ from pyspark.sql import Column, DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 
 from retail_setup.dictionaries.models import StoreTypeProfile
-from retail_setup.generation.attribution import SELECTION_RATE, with_journey_plan
+from retail_setup.generation.attribution import (
+    FLASH_SALE_DAY_SHARE,
+    JOURNEY_MAX_TOUCHES,
+    archetype_share,
+    live_journey_rate,
+    with_journey_plan,
+)
 from retail_setup.generation.baskets import (
     COMPLEMENT_RATE,
     merge_lines,
@@ -62,11 +68,11 @@ from retail_setup.generation.marketing import (
 )
 from retail_setup.generation.pricing import volume_growth_column
 from retail_setup.generation.runtime import case_when, seeded_draws
-from retail_setup.generation.store_activity import FORMAT_ZONE_SHARES
 from retail_setup.generation.stream_baskets import BasketCatalog, attach_baskets
 from retail_setup.generation.stream_calendar import (
     LanePlan,
     STREAM_LANES,
+    VISIT_CONVERSION_CALIBRATION,
     StoreHours,
     closed_date_column,
     daily_factor_column,
@@ -105,10 +111,9 @@ from retail_setup.generation.stream_supply import (
     run_supply_batch,
 )
 from retail_setup.generation.vocabulary import (
+    BLE_DETECTED_SHARE,
     BLE_KNOWN_SHARE,
     CAMPAIGN_ARCHETYPES,
-    FOOT_TRAFFIC_ZONE_DWELL,
-    FOOT_TRAFFIC_ZONES,
     ONLINE_BACKORDER_RATE,
     ONLINE_CANCEL_RATE,
     ONLINE_DELIVER_SECONDS,
@@ -123,13 +128,25 @@ from retail_setup.generation.vocabulary import (
     anonymous_ble_id_column,
     beacon_id_column,
     ble_id_column,
+    RSSI_FLOOR,
+    RSSI_SPAN,
     ble_layout,
     campaign_id_column,
+    checkout_index,
+    creative_id_column,
+    RETRIED,
+    VOIDED,
     decline_reason_column,
-    payment_status_column,
+    outcome_shares,
+    payment_outcome_column,
     processing_ms_column,
+    retry_tender_column,
     sensor_id_column,
     tender_column,
+    visit_ping_counts,
+    visit_zone_dwell,
+    visit_zone_path,
+    visit_zone_starts,
 )
 
 ISO_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
@@ -138,13 +155,6 @@ VISIT_SCHEMA = "v long, start_ms long, store_id long, customer_id long, rejected
 ORDER_SCHEMA = "v long, start_ms long, rejected array<int>"
 STORE_OP_SCHEMA = "store_id long, event_ms long, operation_type string"
 LOST_SCHEMA = "_owner string, _lost array<int>"
-# A shopper browses 1-3 of the store type's department zones between the
-# entrance and checkout.
-BLE_MAX_MIDDLE_ZONES = 3
-BLE_PINGS_PER_ZONE = (2, 5)
-# Pings carry an RSSI uniform in [-80, -29] dBm, as in history.
-RSSI_FLOOR = -80
-RSSI_SPAN = 52
 # Days of Silver ledger demand that seed a store-product's smoothed daily rate.
 INVENTORY_SEED_LOOKBACK_DAYS = 7
 # One row per supply record: inventory moves, stockouts, reorders and trucks.
@@ -180,6 +190,8 @@ class StreamContext:
     # Year-over-year volume trend, as history (pricing.volume_growth).
     anchor_date: date | None = None
     annual_volume_growth: float = 0.0
+    # Share of eligible purchases with an attributed journey (attribution.live_journey_rate).
+    journey_rate: float = 0.0
 
     def growth(self, day: Column) -> Column:
         """Volume trend multiplier on a date column (1 at the anchor date)."""
@@ -331,6 +343,30 @@ def build_stream_context(
         .select("customer_id", F.coalesce("_geo_bps", F.lit(mean_bps)).alias("customer_bps"))
         .persist()
     )
+
+    # Live journeys at the rate that returns TARGET_ROAS on the live spend:
+    # mean lane volumes (flash sales run one day in seven), purchases by
+    # identified shoppers that were not voided, and the pre-tax ticket.
+    def per_day(lane: str) -> float:
+        return lanes.rows_per_second * lanes.shares[lane] * lanes.factors[lane] * 86400.0
+
+    flash_share = archetype_share("flash_sale")
+    impressions = per_day("marketing") * (1.0 - flash_share * (1.0 - FLASH_SALE_DAY_SHARE))
+    store_buyers = (
+        per_day("visits")
+        * VISIT_CONVERSION_CALIBRATION
+        * lifecycle.identify_probability
+        * (1.0 - outcome_shares()[VOIDED])
+    )
+    online_buyers = (
+        per_day("online")
+        * (1.0 - ONLINE_CANCEL_RATE)
+        * (1.0 - outcome_shares(ONLINE_TENDERS)[VOIDED])
+    )
+    mean_tax = sum(row["_tax_rate"] for row in rows) / len(rows)
+    journey_rate = live_journey_rate(
+        impressions, store_buyers + online_buyers, profile.avg_ticket_target / (1.0 + mean_tax)
+    )
     return StreamContext(
         seed=seed,
         namespace=namespace,
@@ -355,6 +391,7 @@ def build_stream_context(
         inventory_seed=inventory_seed,
         anchor_date=anchor_date,
         annual_volume_growth=annual_volume_growth,
+        journey_rate=journey_rate,
     )
 
 
@@ -528,29 +565,12 @@ def new_visits(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
     )
 
 
-def _zone_bound(zone: Column, dwell: dict[str, tuple[int, int]], index: int) -> Column:
-    return case_when((zone == name, F.lit(bounds[index])) for name, bounds in dwell.items())
-
-
-def _format_zone(draw: Column) -> Column:
-    """Foot-traffic sensor zone picked by the store format's zone shares."""
-    branches = []
-    for store_format, shares in FORMAT_ZONE_SHARES.items():
-        bound, pick = 0.0, []
-        for zone, share in zip(FOOT_TRAFFIC_ZONES, shares):
-            bound += share
-            pick.append((draw < F.lit(bound), F.lit(zone)))
-        branches.append(
-            (F.col("store_format") == store_format, case_when(pick).otherwise(F.lit(zone)))
-        )
-    return case_when(branches).otherwise(F.lit(FOOT_TRAFFIC_ZONES[0]))
-
-
 def plan_visits(ctx: StreamContext, visits: DataFrame) -> DataFrame:
     """Lay out each visit's events in time.
 
-    Adds the visit's IDs, conversion, BLE identity, sensor zone, the ordered
-    zone path with dwell times, ping and zone-change offsets, purchase and
+    Adds the visit's IDs, conversion, BLE identity and detection, the ordered
+    zone path with dwell times (``vocabulary.visit_zone_path``, as history),
+    zone entry, ping and zone-change offsets, purchase and
     payment offsets (buyers), and ``end_ms``. All draws are keyed on the
     visit's rate row, so the plan is identical in every batch that sees it.
     Visits that would run past closing time are compressed to end before it.
@@ -565,10 +585,27 @@ def plan_visits(ctx: StreamContext, visits: DataFrame) -> DataFrame:
         .withColumn("_local_hour", F.hour(local_start))
         .withColumn("receipt_id", _prefixed(ctx, "RCP", v))
         .withColumn("session_id", _prefixed(ctx, "SES", v))
+        # Decline model shared with history: a declined buyer retries on
+        # another tender or walks away (a voided sale never happens).
+        .withColumn("_first_tender", tender_column(d, [F.col("receipt_id")]))
+        .withColumn(
+            "_outcome",
+            payment_outcome_column(d, [F.col("receipt_id")], F.col("_first_tender")),
+        )
+        .withColumn(
+            "tender",
+            F.when(
+                F.col("_outcome") == F.lit(RETRIED),
+                retry_tender_column(d, [F.col("receipt_id")], F.col("_first_tender")),
+            ).otherwise(F.col("_first_tender")),
+        )
         .withColumn(
             "converts",
-            d.u([v], "visit-conversion")
-            < visit_conversion(d, F.col("store_id"), F.col("_local_day"), F.col("_local_hour")),
+            (
+                d.u([v], "visit-conversion")
+                < visit_conversion(d, F.col("store_id"), F.col("_local_day"), F.col("_local_hour"))
+            )
+            & (F.col("_outcome") != F.lit(VOIDED)),
         )
         .withColumn(
             "ble_id",
@@ -577,63 +614,17 @@ def plan_visits(ctx: StreamContext, visits: DataFrame) -> DataFrame:
                 ble_id_column(F.col("customer_id")),
             ).otherwise(anonymous_ble_id_column(F.col("store_id"), d.h64([v], "anon_id"))),
         )
-        .withColumn("sensor_zone", _format_zone(d.u([v], "sensor-zone")))
-    )
-    sensor_lo = _zone_bound(F.col("sensor_zone"), FOOT_TRAFFIC_ZONE_DWELL, 0)
-    sensor_hi = _zone_bound(F.col("sensor_zone"), FOOT_TRAFFIC_ZONE_DWELL, 1)
-    frame = frame.withColumn(
-        "sensor_dwell",
-        (sensor_lo + F.floor(d.u([v], "sensor-dwell") * (sensor_hi - sensor_lo + 1))).cast("long"),
+        .withColumn("ble_detected", d.u([v], "ble-detected") < F.lit(BLE_DETECTED_SHARE))
     )
 
-    # Ordered path: entrance, 1-3 department zones in random order, checkout (buyers).
+    # Ordered path shared with history: entrance, 1-3 department zones in
+    # random order, checkout (buyers), exit.
     layout = ble_layout(ctx.profile)
-    shuffled = F.array_sort(
-        F.array(
-            *[
-                F.struct(
-                    d.u([v, F.lit(zone)], "zone-order").alias("draw"), F.lit(zone).alias("zone")
-                )
-                for zone in layout.middle
-            ]
-        )
+    frame = frame.withColumn("zones", visit_zone_path(d, [v], F.col("converts"), layout))
+    frame = frame.withColumn("dwell", visit_zone_dwell(d, [v], F.col("zones"), layout))
+    frame = frame.withColumn("starts", visit_zone_starts(F.col("dwell"))).withColumn(
+        "_duration_s", F.aggregate("dwell", F.lit(0).cast("long"), lambda acc, x: acc + x)
     )
-    browse = min(BLE_MAX_MIDDLE_ZONES, len(layout.middle))
-    middle_count = (F.floor(d.u([v], "zone-count") * browse) + 1).cast("int")
-    middle = F.transform(F.slice(shuffled, 1, middle_count), lambda entry: entry["zone"])
-    no_zone = F.array().cast("array<string>")
-    checkout = (
-        F.when(F.col("converts"), F.array(F.lit(layout.checkout))).otherwise(no_zone)
-        if layout.checkout is not None
-        else no_zone
-    )
-    exit_zone = F.array(F.lit(layout.exit)) if layout.exit is not None else no_zone
-    frame = frame.withColumn(
-        "zones",
-        F.concat(F.array(F.lit(layout.entry)), middle, checkout, exit_zone),
-    )
-    frame = frame.withColumn(
-        "dwell",
-        F.transform(
-            "zones",
-            lambda zone, i: (
-                _zone_bound(zone, layout.dwell, 0)
-                + F.floor(
-                    d.u([v, i], "zone-dwell")
-                    * (_zone_bound(zone, layout.dwell, 1) - _zone_bound(zone, layout.dwell, 0) + 1)
-                )
-            ).cast("long"),
-        ),
-    )
-    frame = frame.withColumn(
-        "starts",
-        F.transform(
-            "zones",
-            lambda _zone, i: F.aggregate(
-                F.slice(F.col("dwell"), 1, i), F.lit(0).cast("long"), lambda acc, x: acc + x
-            ),
-        ),
-    ).withColumn("_duration_s", F.aggregate("dwell", F.lit(0).cast("long"), lambda acc, x: acc + x))
     # Compress a visit that would run past a closing store's closing time.
     close_local = F.make_timestamp(
         F.year("_local_day"),
@@ -658,54 +649,59 @@ def plan_visits(ctx: StreamContext, visits: DataFrame) -> DataFrame:
     def offset(seconds: Column) -> Column:
         return F.floor(seconds * 1000 * F.col("_scale")).cast("long")
 
-    pings_low, pings_high = BLE_PINGS_PER_ZONE
-    frame = frame.withColumn(
-        "pings",
-        F.flatten(
+    frame = frame.withColumn("_ping_counts", visit_ping_counts(d, [v], F.col("zones")))
+    frame = (
+        frame.withColumn(
+            "pings",
+            F.flatten(
+                F.transform(
+                    "zones",
+                    lambda zone, i: F.transform(
+                        F.sequence(F.lit(1), F.element_at("_ping_counts", i + 1)),
+                        lambda k: F.struct(
+                            (i + 1).alias("zone_index"),
+                            k.alias("seq"),
+                            zone.alias("zone"),
+                            offset(
+                                F.element_at("starts", i + 1)
+                                + F.element_at("dwell", i + 1)
+                                * k
+                                / (F.element_at("_ping_counts", i + 1) + 1)
+                            ).alias("offset_ms"),
+                        ),
+                    ),
+                )
+            ),
+        )
+        .withColumn(
+            "entries",
             F.transform(
                 "zones",
-                lambda zone, i: F.transform(
-                    F.sequence(
-                        F.lit(1),
-                        (
-                            F.floor(d.u([v, i], "pings") * (pings_high - pings_low + 1)) + pings_low
-                        ).cast("int"),
-                    ),
-                    lambda k: F.struct(
-                        (i + 1).alias("zone_index"),
-                        k.alias("seq"),
-                        zone.alias("zone"),
-                        offset(
-                            F.element_at("starts", i + 1)
-                            + F.element_at("dwell", i + 1)
-                            * k
-                            / (
-                                F.floor(d.u([v, i], "pings") * (pings_high - pings_low + 1))
-                                + pings_low
-                                + 1
-                            )
-                        ).alias("offset_ms"),
-                    ),
+                lambda zone, i: F.struct(
+                    (i + 1).alias("zone_index"),
+                    zone.alias("zone"),
+                    offset(F.element_at("starts", i + 1)).alias("offset_ms"),
+                    F.element_at("dwell", i + 1).alias("dwell"),
                 ),
-            )
-        ),
-    ).withColumn(
-        "changes",
-        F.transform(
-            F.sequence(F.lit(1), F.size("zones") - 1),
-            lambda i: F.struct(
-                i.alias("seq"),
-                F.element_at("zones", i).alias("from_zone"),
-                F.element_at("zones", i + 1).alias("to_zone"),
-                offset(F.element_at("starts", i + 1)).alias("offset_ms"),
             ),
-        ),
+        )
+        .withColumn(
+            "changes",
+            F.transform(
+                F.sequence(F.lit(1), F.size("zones") - 1),
+                lambda i: F.struct(
+                    i.alias("seq"),
+                    F.element_at("zones", i).alias("from_zone"),
+                    F.element_at("zones", i + 1).alias("to_zone"),
+                    offset(F.element_at("starts", i + 1)).alias("offset_ms"),
+                ),
+            ),
+        )
     )
     # Buyers pay in the checkout zone, the last zone before any exit.
-    last = F.size("zones") - (1 if layout.exit is not None else 0)
+    last = checkout_index(F.col("zones"), layout)
     frame = (
-        frame.withColumn("tender", tender_column(d, [F.col("receipt_id")]))
-        .withColumn(
+        frame.withColumn(
             "processing_ms", processing_ms_column(d, [F.col("receipt_id")], F.col("tender"))
         )
         .withColumn(
@@ -743,22 +739,27 @@ def visit_events(
     v = F.col("v")
     store = _store_key(F.col("store_id"))
     session = F.col("session_id")
-    entered = slot(
-        ctx,
-        _due(F.col("start_ms"), previous_ms, clock_ms),
-        "customer_entered",
-        F.struct(
-            F.col("store_id"),
-            sensor_id_column(F.col("store_id"), F.col("sensor_zone")).alias("sensor_id"),
-            F.col("sensor_zone").alias("zone"),
-            F.lit(1).cast("long").alias("customer_count"),
-            F.col("sensor_dwell").alias("dwell_time"),
-        ),
-        _ms_ts(F.col("start_ms")),
-        store,
-        v,
-        session=session,
-    )
+
+    # Foot-traffic sensors count every zone the visitor passes, as it enters it.
+    def entered(entry: Column) -> Column:
+        ms = F.col("start_ms") + entry["offset_ms"]
+        zone = entry["zone"]
+        return slot(
+            ctx,
+            _due(ms, previous_ms, clock_ms),
+            "customer_entered",
+            F.struct(
+                F.col("store_id"),
+                sensor_id_column(F.col("store_id"), zone).alias("sensor_id"),
+                zone.alias("zone"),
+                F.lit(1).cast("long").alias("customer_count"),
+                entry["dwell"].alias("dwell_time"),
+            ),
+            _ms_ts(ms),
+            store,
+            F.concat(v, F.lit("-e"), entry["zone_index"]),
+            session=session,
+        )
 
     def ping(entry: Column) -> Column:
         ms = F.col("start_ms") + entry["offset_ms"]
@@ -801,7 +802,11 @@ def visit_events(
             session=session,
         )
 
-    events = F.concat(F.array(entered), F.transform("pings", ping), F.transform("changes", change))
+    events = F.concat(
+        F.transform("entries", entered),
+        F.transform(F.filter("pings", lambda _entry: F.col("ble_detected")), ping),
+        F.transform(F.filter("changes", lambda _entry: F.col("ble_detected")), change),
+    )
     return collect_events(plan, events)
 
 
@@ -818,8 +823,18 @@ def _cents_to_dollars(cents: Column) -> Column:
     return F.round(cents.cast("double") / F.lit(100.0), 2)
 
 
+# Live journey touch IDs share the background impressions' format; their
+# sequence numbers start here, far above any rate-source row.
+JOURNEY_IMPRESSION_OFFSET = 10**15
+
+
 def _journey(ctx: StreamContext, frame: DataFrame, key: str, purchase_ms: str) -> DataFrame:
-    """Select ~5% of approved purchases for a 2-touch journey, like history."""
+    """Select approved purchases for a journey at the calibrated live rate.
+
+    ``ctx.journey_rate`` makes the attributed revenue about ``TARGET_ROAS``
+    times the live impression spend, as in history. ``journey_impression`` is
+    the last touch's impression ID, which the purchase carries.
+    """
     d = ctx.draws
     planned = with_journey_plan(
         frame.withColumn("match_key", F.col(key)).withColumn(
@@ -831,52 +846,79 @@ def _journey(ctx: StreamContext, frame: DataFrame, key: str, purchase_ms: str) -
     selected = (
         (F.col("status") == "APPROVED")
         & F.col("customer_id").isNotNull()
-        & (d.u([F.col(key)], "attr_select") < F.lit(SELECTION_RATE))
+        & (d.u([F.col(key)], "attr_select") < F.lit(ctx.journey_rate))
     )
-    return planned.withColumn("_attributed", selected).withColumn(
-        "journey_id", F.when(F.col("_attributed"), F.col("attribution_journey_id"))
+    return (
+        planned.withColumn("_attributed", selected)
+        .withColumn("journey_id", F.when(F.col("_attributed"), F.col("attribution_journey_id")))
+        .withColumn(
+            "journey_impression",
+            _journey_impression_id(ctx, F.element_at(F.col("journey_touches"), -1)),
+        )
+    )
+
+
+def _journey_impression_id(ctx: StreamContext, touch: Column) -> Column:
+    """A journey touch's impression ID, in the background impressions' format."""
+    return F.concat(
+        F.lit("IMP"),
+        F.date_format(touch["touch_ts"], "yyyyMMdd"),
+        F.lpad(touch["archetype"].cast("string"), 2, "0"),
+        F.lit(f"-{ctx.namespace}-"),
+        (
+            F.lit(JOURNEY_IMPRESSION_OFFSET)
+            + F.col("v").cast("long") * JOURNEY_MAX_TOUCHES
+            + touch["seq"]
+        ).cast("string"),
     )
 
 
 def journey_touch_events(ctx: StreamContext, frame: DataFrame, due: Column) -> DataFrame:
-    """The two ad-impression touches of each selected journey, arriving with the purchase."""
-    touches = []
-    for suffix, ts_col in (("older", "touch_ts_older"), ("newer", "touch_ts_newer")):
-        impression_id = F.concat(F.lit("IMPJRN"), F.col("_jhash"), F.lit(suffix[0].upper()))
-        device, cost = impression_device_cost(
-            ctx.draws,
-            [impression_id],
-            F.col("channel"),
-            f"attr_device_{suffix}",
-            f"attr_cost_{suffix}",
-        )
-        touches.append(
-            slot(
-                ctx,
-                due & F.col("_attributed"),
-                "ad_impression",
-                F.struct(
-                    F.col("channel"),
-                    F.col("campaign_id"),
-                    F.concat(F.col("creative_id"), F.lit(f"-{suffix.upper()}")).alias(
-                        "creative_id"
-                    ),
-                    ad_id_column(F.col("customer_id")).alias("customer_ad_id"),
-                    impression_id.alias("impression_id"),
-                    F.round(cost, 2).alias("cost"),
-                    device.alias("device_type"),
-                    F.col("customer_id"),
-                    iso(F.col(ts_col)).alias("impression_time"),
+    """The ad-impression touches of each selected journey, arriving with the purchase.
+
+    A touch looks like a background impression (ID format, small creative
+    pool, CPM cost, device, CRM-matched customer at the same rate); only its
+    correlation ID links it to the purchase.
+    """
+    d = ctx.draws
+
+    def touch_event(touch: Column) -> Column:
+        impression_id = _journey_impression_id(ctx, touch)
+        key = [impression_id]
+        device, cost = impression_device_cost(d, key, touch["channel"], "mk_device", "mk_cost")
+        day = F.to_date(touch["touch_ts"])
+        return slot(
+            ctx,
+            due & F.col("_attributed"),
+            "ad_impression",
+            F.struct(
+                touch["channel"].alias("channel"),
+                touch["campaign_id"].alias("campaign_id"),
+                creative_id_column(d, key, touch["campaign_id"], touch["channel"]).alias(
+                    "creative_id"
                 ),
-                F.col(ts_col),
-                F.concat(F.lit("camp_"), F.col("campaign_id")),
-                F.concat(F.col("match_key"), F.lit(f"-attr{suffix}")),
-                session=F.col("_journey_session"),
-                correlation=F.col("journey_id"),
-                arrival=F.col("purchase_ts"),
-            )
+                ad_id_column(F.col("customer_id")).alias("customer_ad_id"),
+                impression_id.alias("impression_id"),
+                F.round(cost, 4).alias("cost"),
+                device.alias("device_type"),
+                F.when(
+                    (d.u(key, "mk_crm") < F.lit(CRM_MATCH_RATE))
+                    & (activity_column(ctx.lifecycle, F.col("customer_id"), day) > 0),
+                    F.col("customer_id"),
+                )
+                .cast("long")
+                .alias("customer_id"),
+                iso(touch["touch_ts"]).alias("impression_time"),
+            ),
+            touch["touch_ts"],
+            F.concat(F.lit("camp_"), touch["campaign_id"]),
+            F.concat(F.col("match_key"), F.lit("-attr"), touch["seq"]),
+            session=F.col("_journey_session"),
+            correlation=F.col("journey_id"),
+            arrival=F.col("purchase_ts"),
         )
-    return collect_events(frame, F.array(*touches))
+
+    return collect_events(frame, F.transform("journey_touches", touch_event))
 
 
 def purchase_baskets(
@@ -900,6 +942,8 @@ def purchase_baskets(
         "receipt_id",
         "session_id",
         "tender",
+        "_first_tender",
+        "_outcome",
         "processing_ms",
         "purchase_ms",
         "payment_ms",
@@ -1015,7 +1059,8 @@ def purchase_events(ctx: StreamContext, buyers: DataFrame) -> DataFrame:
         .withColumn("subtotal_cents", gross - discount)
         .withColumn("tax_cents", tax)
         .withColumn("total_cents", gross - discount + tax)
-        .withColumn("status", payment_status_column(d, [F.col("receipt_id")], F.col("tender")))
+        # The sale's final payment is approved (voided sales never happen).
+        .withColumn("status", F.lit("APPROVED"))
         .withColumn("_journey_session", F.col("session_id"))
     )
     buyers = _journey(ctx, buyers, "receipt_id", "purchase_ms")
@@ -1023,7 +1068,6 @@ def purchase_events(ctx: StreamContext, buyers: DataFrame) -> DataFrame:
     store = _store_key(F.col("store_id"))
     session = F.col("session_id")
     journey = F.col("journey_id")
-    newer_impression = F.concat(F.lit("IMPJRN"), F.col("_jhash"), F.lit("N"))
     total = _cents_to_dollars(F.col("total_cents"))
 
     receipt = slot(
@@ -1040,7 +1084,7 @@ def purchase_events(ctx: StreamContext, buyers: DataFrame) -> DataFrame:
             F.col("tender").alias("tender_type"),
             F.size("priced_lines").cast("long").alias("item_count"),
             F.when(F.col("_attributed"), F.col("campaign_id")).alias("campaign_id"),
-            F.when(F.col("_attributed"), newer_impression).alias("impression_id"),
+            F.when(F.col("_attributed"), F.col("journey_impression")).alias("impression_id"),
             F.col("gross_cents").alias("gross_subtotal_cents"),
             F.col("discount_cents").alias("discount_cents"),
             F.col("subtotal_cents").alias("subtotal_cents"),
@@ -1077,6 +1121,37 @@ def purchase_events(ctx: StreamContext, buyers: DataFrame) -> DataFrame:
         payment_ts,
         store,
         F.col("v"),
+        session=session,
+        parent=F.col("receipt_id"),
+        correlation=journey,
+    )
+
+    # A retried sale: the first tender is declined at checkout, at the purchase.
+    declined = slot(
+        ctx,
+        purchase_due & (F.col("_outcome") == F.lit(RETRIED)),
+        "payment_processed",
+        F.struct(
+            F.col("receipt_id"),
+            F.lit(None).cast("string").alias("order_id"),
+            F.col("_first_tender").alias("payment_method"),
+            total.alias("amount"),
+            F.col("total_cents").alias("amount_cents"),
+            _prefixed(ctx, "TXN-D", F.col("v")).alias("transaction_id"),
+            iso(purchase_ts).alias("processing_time"),
+            processing_ms_column(d, [F.col("receipt_id"), F.lit(1)], F.col("_first_tender"))
+            .cast("int")
+            .alias("processing_time_ms"),
+            F.lit("DECLINED").alias("status"),
+            decline_reason_column(d, [F.col("receipt_id")], F.lit("DECLINED")).alias(
+                "decline_reason"
+            ),
+            F.col("store_id"),
+            F.col("customer_id"),
+        ),
+        purchase_ts,
+        store,
+        F.concat(F.col("v"), F.lit("-declined")),
         session=session,
         parent=F.col("receipt_id"),
         correlation=journey,
@@ -1137,7 +1212,7 @@ def purchase_events(ctx: StreamContext, buyers: DataFrame) -> DataFrame:
 
     codes = F.array_sort(F.array_distinct(F.transform(discounted, lambda line: line["promo_code"])))
     events = F.concat(
-        F.array(receipt, payment),
+        F.array(receipt, declined, payment),
         F.transform("priced_lines", line_event),
         F.transform(codes, promotion_event),
     )
@@ -1268,11 +1343,22 @@ def plan_orders(ctx: StreamContext, orders: DataFrame) -> DataFrame:
         .join(ctx.customer_tax, "customer_id", "left")
         .withColumn("order_id", _prefixed(ctx, "ONL", v))
         .withColumn("receipt_id", F.col("order_id"))
-        .withColumn("tender", tender_column(d, key, ONLINE_TENDERS, "online-tender"))
+        .withColumn("_first_tender", tender_column(d, key, ONLINE_TENDERS, "online-tender"))
         .withColumn(
-            "status",
-            payment_status_column(d, key, F.col("tender"), ONLINE_TENDERS, "online-decline"),
+            "_outcome",
+            payment_outcome_column(
+                d, key, F.col("_first_tender"), ONLINE_TENDERS, "online-decline"
+            ),
         )
+        .withColumn(
+            "tender",
+            F.when(
+                F.col("_outcome") == F.lit(RETRIED),
+                retry_tender_column(d, key, F.col("_first_tender"), ONLINE_TENDERS, "online-retry"),
+            ).otherwise(F.col("_first_tender")),
+        )
+        # The final payment is approved; a voided order is cancelled.
+        .withColumn("status", F.lit("APPROVED"))
         .withColumn(
             "processing_ms",
             processing_ms_column(d, key, F.col("tender"), ONLINE_TENDERS, "online-proc"),
@@ -1293,7 +1379,11 @@ def plan_orders(ctx: StreamContext, orders: DataFrame) -> DataFrame:
                 F.coalesce(F.col("customer_bps"), F.col("store_bps"))
             ),
         )
-        .withColumn("cancelled", d.u(key, "online-cancel") < F.lit(ONLINE_CANCEL_RATE))
+        .withColumn(
+            "cancelled",
+            (d.u(key, "online-cancel") < F.lit(ONLINE_CANCEL_RATE))
+            | (F.col("_outcome") == F.lit(VOIDED)),
+        )
         .withColumn(
             "backordered",
             ~bopis
@@ -1321,6 +1411,11 @@ def plan_orders(ctx: StreamContext, orders: DataFrame) -> DataFrame:
     )
     orders = (
         orders.withColumn("payment_ms", F.when(live, F.col("start_ms") + F.col("processing_ms")))
+        # A retried order's first tender is declined a second after it is placed.
+        .withColumn(
+            "decline_ms",
+            F.when(live & (F.col("_outcome") == F.lit(RETRIED)), F.col("start_ms") + 1000),
+        )
         .withColumn("picked_ms", F.when(live, F.col("start_ms") + pick_s * 1000))
         .withColumn(
             "shipped_ms",
@@ -1466,10 +1561,9 @@ def online_events(
                     total.alias("total"),
                     F.col("tender").alias("tender_type"),
                     F.when(F.col("_attributed"), F.col("campaign_id")).alias("campaign_id"),
-                    F.when(
-                        F.col("_attributed"),
-                        F.concat(F.lit("IMPJRN"), F.col("_jhash"), F.lit("N")),
-                    ).alias("impression_id"),
+                    F.when(F.col("_attributed"), F.col("journey_impression")).alias(
+                        "impression_id"
+                    ),
                     F.col("gross_cents").alias("gross_subtotal_cents"),
                     F.col("discount_cents"),
                     F.col("subtotal_cents"),
@@ -1480,6 +1574,33 @@ def online_events(
                 pkey,
                 v,
                 session=session,
+                correlation=journey,
+            ),
+            slot(
+                ctx,
+                F.col("decline_ms").isNotNull() & _due(F.col("decline_ms"), previous_ms, clock_ms),
+                "payment_processed",
+                F.struct(
+                    F.lit(None).cast("string").alias("receipt_id"),
+                    F.col("order_id"),
+                    F.col("_first_tender").alias("payment_method"),
+                    total.alias("amount"),
+                    F.col("total_cents").alias("amount_cents"),
+                    _prefixed(ctx, "TXN-ONL-D", v).alias("transaction_id"),
+                    iso(_ms_ts(F.col("decline_ms"))).alias("processing_time"),
+                    F.lit(1000).cast("int").alias("processing_time_ms"),
+                    F.lit("DECLINED").alias("status"),
+                    decline_reason_column(
+                        ctx.draws, [F.col("order_id")], F.lit("DECLINED"), "online-reason"
+                    ).alias("decline_reason"),
+                    F.lit(None).cast("long").alias("store_id"),
+                    F.col("customer_id"),
+                ),
+                _ms_ts(F.col("decline_ms")),
+                pkey,
+                F.concat(v, F.lit("-declined")),
+                session=session,
+                parent=F.col("order_id"),
                 correlation=journey,
             ),
             slot(
@@ -1590,10 +1711,10 @@ def marketing_events(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
     payload = F.struct(
         F.col("channel"),
         F.col("campaign_id"),
-        F.concat(F.lit("CREAT"), F.substring(F.col("impression_id"), 4, 200)).alias("creative_id"),
+        creative_id_column(d, key, F.col("campaign_id"), F.col("channel")).alias("creative_id"),
         ad_id_column(F.col("customer_pick")).alias("customer_ad_id"),
         F.col("impression_id"),
-        F.round(cost, 2).alias("cost"),
+        F.round(cost, 4).alias("cost"),
         device.alias("device_type"),
         # A CRM match needs a customer who is signed up and not churned, as in history.
         F.when(

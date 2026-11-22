@@ -124,3 +124,13 @@ def test_cancellations_zeroed_no_payment(setup):
     # payments basics
     assert pay.filter(F.col("receipt_id_ext").isNotNull()).count() == 0
     assert pay.filter(F.col("store_id").isNotNull()).count() == 0
+    # A declined order is retried on another tender (approved) or voided as a
+    # cancellation: no fulfilled order has only a declined payment.
+    live = h.join(cancelled.select("order_id_ext"), "order_id_ext", "left_anti")
+    approved = pay.filter("status = 'APPROVED'").groupBy("order_id_ext").count()
+    assert approved.filter(F.col("count") != 1).count() == 0
+    assert live.join(approved, "order_id_ext", "left_anti").count() == 0
+    assert (
+        pay.filter("status = 'DECLINED'").join(approved, "order_id_ext", "left_anti").count() == 0
+    )
+    assert pay.select("transaction_id").distinct().count() == pay.count()

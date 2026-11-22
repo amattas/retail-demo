@@ -28,26 +28,51 @@ def setup(spark):
     )
     dicts = load_dictionaries(default_dictionary_root(), "grocery")
     dims = generate_dimensions(spark, dicts, cfg)
-    sales = generate_receipts_group(spark, dims, dicts.profile, cfg)
-    rets = generate_returns(spark, sales, dims, cfg)
-    return cfg, sales, rets
+    # Eager checkpoints keep every assertion from regenerating the sales.
+    dims = {name: frame.localCheckpoint() for name, frame in dims.items()}
+    sales = {
+        name: frame.localCheckpoint()
+        for name, frame in generate_receipts_group(spark, dims, dicts.profile, cfg).items()
+    }
+    rets = {
+        name: frame.localCheckpoint()
+        for name, frame in generate_returns(spark, sales, dims, cfg).items()
+    }
+    return cfg, sales, rets, dims
 
 
 def test_contract_columns(setup):
-    _, _, rets = setup
+    _, _, rets, _ = setup
     for t in ["fact_receipts", "fact_receipt_lines", "fact_payments"]:
         assert rets[t].columns == column_names(t)
 
 
 def test_return_semantics(setup):
-    _, sales, rets = setup
+    _, sales, rets, _ = setup
     r = rets["fact_receipts"]
     assert r.count() > 0
     assert r.filter(F.col("receipt_type") != "RETURN").count() == 0
     assert r.filter(~F.col("receipt_id_ext").startswith("RET")).count() == 0
     assert r.filter(F.col("total_cents") >= 0).count() == 0  # strictly negative
-    assert r.filter(F.col("customer_id").isNotNull()).count() == 0
-    assert r.filter(F.col("tender_type") != "CREDIT_CARD").count() == 0
+    # A return keeps the sale's customer, refunds to the sale's tender and links it.
+    sold = sales["fact_receipts"].select(
+        F.col("receipt_id_ext").alias("original_receipt_id_ext"),
+        F.col("customer_id").alias("_customer"),
+        F.col("payment_method").alias("_tender"),
+        F.col("event_ts").alias("_sold_at"),
+        F.col("total_cents").alias("_sold_total"),
+    )
+    linked = r.join(sold, "original_receipt_id_ext")
+    assert linked.count() == r.count()
+    assert linked.filter(~F.col("customer_id").eqNullSafe(F.col("_customer"))).count() == 0
+    assert r.filter(F.col("customer_id").isNotNull()).count() > 0
+    assert linked.filter(F.col("tender_type") != F.col("_tender")).count() == 0
+    assert linked.filter(F.col("payment_method") != F.col("_tender")).count() == 0
+    assert len({row.tender_type for row in r.select("tender_type").distinct().collect()}) > 1
+    assert linked.filter(F.col("event_ts") <= F.col("_sold_at")).count() == 0
+    # Partial: never more than the sale, and some returns take only part of it.
+    assert linked.filter(-F.col("total_cents") > F.col("_sold_total")).count() == 0
+    assert linked.filter(-F.col("total_cents") < F.col("_sold_total")).count() > 0
     # return ids unique and disjoint from sales ids
     n = r.count()
     assert r.select("receipt_id_ext").distinct().count() == n
@@ -56,12 +81,12 @@ def test_return_semantics(setup):
 
 
 def test_returns_skip_christmas(setup):
-    _, _, rets = setup
+    _, _, rets, _ = setup
     assert rets["fact_receipts"].filter(F.col("event_date") == date(2025, 12, 25)).count() == 0
 
 
 def test_return_discount_amount_matches_cents(setup):
-    _, _, rets = setup
+    _, _, rets, _ = setup
     headers = rets["fact_receipts"]
     assert headers.filter(F.col("discount_cents") != 0).count() > 0
     expected = F.format_string("%.2f", F.col("discount_cents") / F.lit(100.0))
@@ -69,16 +94,17 @@ def test_return_discount_amount_matches_cents(setup):
 
 
 def test_return_lines_negative_and_linked(setup):
-    _, _, rets = setup
+    _, _, rets, _ = setup
     lines = rets["fact_receipt_lines"]
     assert lines.filter(F.col("quantity") >= 0).count() == 0
-    assert lines.filter(F.col("promo_code") != "RETURN").count() == 0
+    # Lines keep their own promo code; receipt_type marks the return.
+    assert lines.filter(F.col("promo_code") == "RETURN").count() == 0
     orphans = lines.join(rets["fact_receipts"], "receipt_id_ext", "left_anti")
     assert orphans.count() == 0
 
 
 def test_return_rate_and_dec26_spike(setup):
-    cfg, sales, rets = setup
+    cfg, sales, rets, _ = setup
     by_day_sales = {
         r["event_date"]: r["count"]
         for r in sales["fact_receipts"].groupBy("event_date").count().collect()
@@ -101,7 +127,7 @@ def test_return_rate_and_dec26_spike(setup):
 
 
 def test_returns_posted_strictly_after_sale(setup):
-    cfg, sales, _ = setup
+    cfg, sales, _, _ = setup
     hdr = build_return_headers(sales, cfg)
     # No return may post on or before its originating sale's day (IMP-010).
     assert hdr.filter(F.col("event_date") <= F.col("orig_event_date")).count() == 0
@@ -109,11 +135,57 @@ def test_returns_posted_strictly_after_sale(setup):
 
 
 def test_return_payment_negative_approved(setup):
-    _, _, rets = setup
+    _, sales, rets, _ = setup
     pay = rets["fact_payments"]
     assert pay.count() == rets["fact_receipts"].count()
     assert pay.filter(F.col("amount_cents") >= 0).count() == 0
     assert pay.filter(F.col("status") != "APPROVED").count() == 0
+    # Transaction IDs derive from purchase IDs, so sales and refunds never collide.
+    every = pay.unionByName(sales["fact_payments"])
+    assert every.select("transaction_id").distinct().count() == every.count()
+
+
+def test_returns_fall_inside_store_hours(setup):
+    _, _, rets, dims = setup
+    hours = {r.ID: r.operating_hours for r in dims["dim_stores"].collect()}
+    # local_hour is the hour of the (still store-local) event_ts in the session zone.
+    rows = rets["fact_receipts"].collect()
+    for row in rows:
+        opening = hours[row.store_id]
+        open_h, close_h = (0, 24) if opening == "24h" else map(int, opening.split("-"))
+        assert open_h <= row.local_hour < close_h, (row.receipt_id_ext, row.local_hour)
+    assert len({row.local_hour for row in rows}) > 3
+
+
+def test_returned_lines_follow_category_return_rates(spark):
+    from retail_setup.generation.returns import return_weight, returned_lines_column
+    from retail_setup.generation.runtime import seeded_draws
+
+    lines = F.array(
+        F.struct(
+            F.lit(1).alias("line_num"),
+            F.lit(3).alias("quantity"),
+            return_weight(F.lit("Apparel")).alias("weight"),
+        ),
+        F.struct(
+            F.lit(2).alias("line_num"),
+            F.lit(1).alias("quantity"),
+            return_weight(F.lit("Fresh")).alias("weight"),
+        ),
+    )
+    rows = (
+        spark.range(4000)
+        .select(
+            returned_lines_column(seeded_draws(3), F.col("id").cast("string"), lines).alias("r")
+        )
+        .collect()
+    )
+    apparel = sum(any(x.line_num == 1 for x in row.r) for row in rows) / len(rows)
+    fresh = sum(any(x.line_num == 2 for x in row.r) for row in rows) / len(rows)
+    assert all(row.r for row in rows)  # never an empty return
+    assert apparel > 0.85 and fresh < 0.3, (apparel, fresh)
+    units = [x.quantity for row in rows for x in row.r if x.line_num == 1]
+    assert set(units) == {1, 2, 3}
 
 
 def test_low_volume_returns_accumulate_fractional_daily_rates(spark):

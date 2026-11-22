@@ -36,6 +36,7 @@ from retail_setup.generation.receipts import (
     _fmt,
     _with_seasonal_department,
     customer_pools,
+    payment_attempts,
 )
 from retail_setup.generation.pricing import PriceSchedule, volume_growth_column
 from retail_setup.generation.runtime import (
@@ -46,8 +47,6 @@ from retail_setup.generation.runtime import (
 )
 from retail_setup.generation.schemas import column_names
 from retail_setup.generation.vocabulary import (
-    BASE_DECLINE,
-    DECLINE_REASONS,
     ONLINE_BACKORDER_RATE,
     ONLINE_CANCEL_RATE,
     ONLINE_DELIVER_SECONDS,
@@ -59,6 +58,10 @@ from retail_setup.generation.vocabulary import (
     ONLINE_PROMOS,
     ONLINE_SHIP_SECONDS,
     ONLINE_TENDERS,
+    RETRIED,
+    VOIDED,
+    payment_outcome_column,
+    retry_tender_column,
 )
 
 # Cancellation, backorder, promo and stage-delay parameters are shared with the
@@ -174,12 +177,33 @@ def generate_online_orders(
             ),
         )
         .withColumn(
-            "tender_type",
+            "_first_tender",
             d.pick_by_weights(
                 ["order_id_ext"], "onl_tender", [(n, w) for n, w, _, _, _ in ONLINE_TENDERS]
             ),
         )
-        .withColumn("is_cancelled", d.u(["order_id_ext"], "onl_cancel") < F.lit(ONLINE_CANCEL_RATE))
+        # Decline model shared with store sales: a declined order is retried on
+        # another tender, or voided, which cancels it (zero totals, no payment).
+        .withColumn(
+            "_outcome",
+            payment_outcome_column(
+                d, ["order_id_ext"], F.col("_first_tender"), ONLINE_TENDERS, "onl_decline"
+            ),
+        )
+        .withColumn(
+            "tender_type",
+            F.when(
+                F.col("_outcome") == F.lit(RETRIED),
+                retry_tender_column(
+                    d, ["order_id_ext"], F.col("_first_tender"), ONLINE_TENDERS, "onl_retry"
+                ),
+            ).otherwise(F.col("_first_tender")),
+        )
+        .withColumn(
+            "is_cancelled",
+            (d.u(["order_id_ext"], "onl_cancel") < F.lit(ONLINE_CANCEL_RATE))
+            | (F.col("_outcome") == F.lit(VOIDED)),
+        )
         # per-order promo intensity: the share of its lines that carry a promo
         .withColumn(
             "promo_rate",
@@ -417,7 +441,7 @@ def generate_online_orders(
         .withColumn("payment_method", F.col("tender_type"))
         # IMP-007: subtotal_cents stays net (existing behavior); gross recovers
         # the pre-discount total. Attribution fields default NULL; enriched for
-        # the ~5% of orders selected for attribution (attribution.py).
+        # the orders an impression converts (attribution.py).
         .withColumn("gross_subtotal_cents", F.col("subtotal_cents") + F.col("discount_cents"))
         .withColumn("attribution_journey_id", F.lit(None).cast("string"))
         .withColumn("campaign_id", F.lit(None).cast("string"))
@@ -442,51 +466,23 @@ def generate_online_orders(
         "impression_id_ext",
     ).select(*column_names("fact_online_order_headers"))
 
-    # --- payments: one per NON-cancelled order; receipt_id_ext/store_id NULL
-    u_dec = d.u(["order_id_ext"], "onl_decline")
-    decline_p: Column = F.lit(0.0)
-    for name, _, mult, _, _ in ONLINE_TENDERS:
-        decline_p = F.when(F.col("payment_method") == name, F.lit(BASE_DECLINE * mult)).otherwise(
-            decline_p
-        )
-    proc_lo: Column = F.lit(ONLINE_TENDERS[-1][3])
-    proc_hi: Column = F.lit(ONLINE_TENDERS[-1][4])
-    for name, _, _, lo, hi in ONLINE_TENDERS[:-1]:
-        proc_lo = F.when(F.col("payment_method") == name, F.lit(lo)).otherwise(proc_lo)
-        proc_hi = F.when(F.col("payment_method") == name, F.lit(hi)).otherwise(proc_hi)
-    reason_idx = (d.h64(["order_id_ext"], "onl_reason") % len(DECLINE_REASONS)).cast("int")
-    payments = (
-        headers_base.filter(~F.col("is_cancelled"))
-        .withColumn("receipt_id_ext", F.lit(None).cast("string"))
-        .withColumn("store_id", F.lit(None).cast("long"))
-        .withColumn("amount_cents", F.col("total_cents"))
-        .withColumn(
-            "transaction_id",
-            F.concat(
-                F.lit("TXN_"),
-                F.unix_timestamp("event_ts").cast("string"),
-                F.lit("_"),
-                fixed_width_decimal(
-                    d.h64(["order_id_ext"], "onl_txn") % 1_000_000,
-                    6,
-                    "online transaction suffix",
-                ),
-            ),
-        )
-        .withColumn("status", F.when(u_dec < decline_p, "DECLINED").otherwise("APPROVED"))
-        .withColumn(
-            "decline_reason",
-            F.when(
-                F.col("status") == "DECLINED",
-                F.element_at(F.array(*[F.lit(r) for r in DECLINE_REASONS]), reason_idx + 1),
-            ),
-        )
-        .withColumn(
-            "processing_time_ms",
-            (proc_lo + d.u(["order_id_ext"], "onl_proc") * (proc_hi - proc_lo)).cast("long"),
-        )
-        .withColumn("amount", _fmt(F.col("amount_cents")))
-        .select(*column_names("fact_payments"))
+    # --- payments: per NON-cancelled order, the first attempt and, for a
+    # retried order, the approved second tender (receipt_id_ext/store_id NULL)
+    payments = payment_attempts(
+        d,
+        headers_base.filter(~F.col("is_cancelled")).select(
+            "order_id_ext",
+            "event_ts",
+            F.lit(None).cast("long").alias("store_id"),
+            "customer_id",
+            "total_cents",
+            "_first_tender",
+            "tender_type",
+            "_outcome",
+        ),
+        "order_id_ext",
+        ONLINE_TENDERS,
+        "onl_",
     )
 
     return {

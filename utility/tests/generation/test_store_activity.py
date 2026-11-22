@@ -9,8 +9,8 @@ from retail_setup.generation.dims import generate_dimensions
 from retail_setup.generation.receipts import generate_receipts_group
 from retail_setup.generation.store_activity import generate_foot_traffic, generate_store_ops
 from retail_setup.generation.schemas import column_names
-
-ZONES = ["ENTRANCE_MAIN", "ENTRANCE_SIDE", "AISLES_A", "AISLES_B", "CHECKOUT"]
+from retail_setup.generation.traffic import generate_hourly_visits
+from retail_setup.generation.vocabulary import ble_layout
 
 
 @pytest.fixture(scope="module")
@@ -51,23 +51,44 @@ def test_receipts_skip_christmas(setup):
     assert sales["fact_receipts"].filter(F.col("event_date") == date(2025, 12, 25)).count() == 0
 
 
-def test_foot_traffic(spark, setup):
+def test_foot_traffic_counts_zone_passages(spark, setup):
     cfg, dims, sales = setup
+    profile = load_dictionaries(default_dictionary_root(), "grocery").profile
+    layout = ble_layout(profile)
     ft = generate_foot_traffic(spark, sales["fact_receipts"], dims, cfg)
     assert ft.columns == column_names("fact_foot_traffic")
-    assert {r.zone for r in ft.select("zone").distinct().collect()} <= set(ZONES)
-    assert ft.filter(F.col("count") < 0).count() == 0
-    assert ft.filter((F.col("dwell_seconds") < 30) | (F.col("dwell_seconds") > 420)).count() == 0
-    # traffic exceeds receipts for matching store-hours
-    rc = (
+    rows = ft.collect()
+    # The store type's own zones, every one counted each open store-hour.
+    assert {r.zone for r in rows} == set(layout.zones)
+    assert all(r["count"] >= 0 for r in rows)
+    assert all(layout.dwell[r.zone][0] <= r.dwell_seconds <= layout.dwell[r.zone][1] for r in rows)
+    counts = {}
+    for r in rows:
+        counts.setdefault((r.store_id, r.event_ts), {})[r.zone] = r["count"]
+    visits = {
+        (r.store_id, r.hour_ts): r
+        for r in generate_hourly_visits(spark, dims["dim_stores"], profile, cfg).collect()
+    }
+    assert set(counts) == set(visits)
+    for key, zones in counts.items():
+        # Passages, not shares: every visitor passes the entrance and the exit,
+        # checkout counts the hour's buyers, departments at most every visitor.
+        assert zones["ENTRANCE"] == zones["EXIT"] == visits[key].visitors
+        assert zones["CHECKOUT"] == visits[key].n_receipts
+        assert all(zones[zone] <= visits[key].visitors for zone in layout.middle)
+    browsed = sum(sum(zones[z] for z in layout.middle) for zones in counts.values())
+    entered = sum(zones["ENTRANCE"] for zones in counts.values())
+    # Each visitor browses 1-3 department zones (2 on average).
+    assert 1.6 <= browsed / entered <= 2.4, browsed / entered
+    # Checkout covers every purchase of the store-hour.
+    receipts = (
         sales["fact_receipts"]
         .groupBy("store_id", F.date_trunc("hour", "event_ts").alias("hr"))
         .count()
+        .collect()
     )
-    tt = ft.groupBy("store_id", F.col("event_ts").alias("hr")).agg(F.sum("count").alias("traffic"))
-    j = rc.join(tt, ["store_id", "hr"])
-    assert j.count() > 0
-    assert j.filter(F.col("traffic") < F.col("count")).count() == 0
+    assert receipts
+    assert all(counts[(r.store_id, r.hr)]["CHECKOUT"] >= r["count"] for r in receipts)
 
 
 def test_foot_traffic_covers_open_hours_without_receipts(spark, setup):
@@ -78,7 +99,9 @@ def test_foot_traffic_covers_open_hours_without_receipts(spark, setup):
         .groupBy("store_id", F.date_trunc("hour", "event_ts").alias("hr"))
         .count()
     )
-    tt = ft.groupBy("store_id", F.col("event_ts").alias("hr")).agg(F.sum("count").alias("traffic"))
+    tt = ft.filter(F.col("zone") == "ENTRANCE").select(
+        "store_id", F.col("event_ts").alias("hr"), F.col("count").alias("traffic")
+    )
     # every receipt store-hour still has a foot-traffic row (coverage preserved)
     assert rc.join(tt, ["store_id", "hr"], "left_anti").count() == 0
     # and open store-hours with no receipts now emit browsing traffic

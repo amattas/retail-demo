@@ -15,7 +15,13 @@ from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.loader import DictionarySet
 from retail_setup.dictionaries.models import STORE_FORMATS
 from retail_setup.generation.customers import store_picker, with_home_store
-from retail_setup.generation.network import fleet_sizes, nearest_dc, pool_size
+from retail_setup.generation.network import (
+    assign_dcs,
+    fleet_sizes,
+    plan_routes,
+    pool_size,
+    routes_per_dc,
+)
 from retail_setup.generation.runtime import (
     date_grid,
     derive_seed,
@@ -120,6 +126,38 @@ def compute_pricing(base_price: float, rng: np.random.Generator) -> tuple[float,
     return float(cost), float(msrp), float(sale)
 
 
+def balanced_geography_sample(
+    states: list[str], size: int, rng: np.random.Generator, *, replace: bool = False
+) -> list[int]:
+    """Indices of ``size`` geographies spread evenly over their states.
+
+    States are visited in a shuffled order, one city each per round, so a
+    dictionary with most of its cities in a few states still yields a sample
+    covering every state about equally. With ``replace`` a round may revisit a
+    state's cities once all are used.
+    """
+    by_state: dict[str, list[int]] = {}
+    for index, state in enumerate(states):
+        by_state.setdefault(state, []).append(index)
+    remaining = {state: list(rng.permutation(cities)) for state, cities in sorted(by_state.items())}
+    order = [str(state) for state in rng.permutation(sorted(remaining))]
+    picked: list[int] = []
+    while len(picked) < size:
+        progressed = False
+        for state in order:
+            if len(picked) == size:
+                break
+            if not remaining[state]:
+                if not replace:
+                    continue
+                remaining[state] = list(rng.permutation(by_state[state]))
+            picked.append(int(remaining[state].pop()))
+            progressed = True
+        if not progressed:
+            raise ValueError(f"cannot sample {size} distinct geographies from {len(states)}")
+    return picked
+
+
 def _addr(rng: np.random.Generator) -> str:
     return (
         f"{int(rng.integers(100, 9999))} "
@@ -134,9 +172,14 @@ def generate_dimensions(
     rng = np.random.default_rng(derive_seed(cfg.seed, "dims", 0, DIMENSION_SEED_DAY))
     out: dict[str, DataFrame] = {}
 
-    # --- geographies: sample from dictionary, sequential IDs
+    # --- geographies: sample from dictionary, sequential IDs. The shared
+    #     dictionary is skewed (most cities sit in five states), so the sample
+    #     takes one city per state in turn (geo_rng); the main generator still
+    #     makes its legacy draw so products and prices stay unchanged.
     n_geo = min(len(dicts.geographies), max(cfg.store_count * 2, cfg.dc_count * 2, 20))
-    geo_idx = rng.choice(len(dicts.geographies), size=n_geo, replace=False)
+    rng.choice(len(dicts.geographies), size=n_geo, replace=False)
+    geo_rng = np.random.default_rng(derive_seed(cfg.seed, "geographies", 0, DIMENSION_SEED_DAY))
+    geo_idx = balanced_geography_sample([g.State for g in dicts.geographies], n_geo, geo_rng)
     geos = [dicts.geographies[i] for i in geo_idx]
     geo_rows = [(i + 1, g.City, g.State, g.Zip, g.District, g.Region) for i, g in enumerate(geos)]
     out["dim_geographies"] = spark.createDataFrame(geo_rows, spark_schema("dim_geographies"))
@@ -168,8 +211,11 @@ def generate_dimensions(
             return float(np.mean(state_rates[state]))
         return DEFAULT_TAX_RATE
 
-    # --- DCs first (datagen: stores constrained to DC states)
-    dc_geo_idx = rng.choice(n_geo, size=cfg.dc_count, replace=cfg.dc_count > n_geo)
+    # --- DCs first (datagen: stores constrained to DC states), spread over states
+    rng.choice(n_geo, size=cfg.dc_count, replace=cfg.dc_count > n_geo)
+    dc_geo_idx = balanced_geography_sample(
+        [g.State for g in geos], cfg.dc_count, geo_rng, replace=cfg.dc_count > n_geo
+    )
     dc_rows = [
         (i + 1, f"DC{i + 1:03d}", _addr(rng), int(dc_geo_idx[i]) + 1) for i in range(cfg.dc_count)
     ]
@@ -178,14 +224,25 @@ def generate_dimensions(
     )
 
     # --- stores in DC states; formats and hours come from the store type
-    dc_states = {geos[int(g)].State for g in dc_geo_idx}
-    eligible = [i for i, g in enumerate(geos) if g.State in dc_states] or list(range(n_geo))
+    # A store picks a DC (so its state) uniformly, then a city in that state:
+    # each DC gets a similar number of nearby stores.
+    dc_state_list = [geos[int(g)].State for g in dc_geo_idx]
+    eligible = [i for i, g in enumerate(geos) if g.State in set(dc_state_list)] or list(
+        range(n_geo)
+    )
+    cities_by_state: dict[str, list[int]] = {}
+    for i in eligible:
+        cities_by_state.setdefault(geos[i].State, []).append(i)
     profile_formats = [f for f in STORE_FORMATS if f in dicts.profile.resolved_store_formats()]
     profile_hours = dicts.profile.resolved_operating_hours()
     store_rows = []
     store_geo_indices: list[int] = []
     for sid in range(1, cfg.store_count + 1):
-        gi = int(rng.choice(eligible))
+        rng.choice(eligible)
+        state_cities = cities_by_state.get(
+            dc_state_list[int(geo_rng.integers(len(dc_state_list)))], eligible
+        )
+        gi = int(state_cities[int(geo_rng.integers(len(state_cities)))])
         store_geo_indices.append(gi)
         g = geos[gi]
         classes, probs = zip(*[(c, p) for c, p, _ in VOLUME_CLASSES])
@@ -210,18 +267,24 @@ def generate_dimensions(
         )
     out["dim_stores"] = spark.createDataFrame(store_rows, spark_schema("dim_stores"))
 
-    # --- trucks: each DC's fleet is sized to the stores it serves (its nearest
-    #     stores by geography, the routing network.store_dc_map uses), plus a
-    #     shared pool with no DC (DCID NULL); 40% are refrigerated.
+    # --- trucks: each DC runs one truck per daily delivery route over the
+    #     stores it serves (network.assign_dcs / plan_routes, the routing the
+    #     inventory chain and the live stream use), plus a shared pool with no
+    #     DC (DCID NULL) for overflow loads; 40% are refrigerated.
     dc_sites = [
         (i + 1, geos[int(dc_geo_idx[i])].State, geos[int(dc_geo_idx[i])].Region)
         for i in range(cfg.dc_count)
     ]
-    served: dict[int, int] = {}
-    for gi in store_geo_indices:
-        dc = nearest_dc(geos[gi].State, geos[gi].Region, dc_sites)
-        served[dc] = served.get(dc, 0) + 1
-    fleets = fleet_sizes(served, range(1, cfg.dc_count + 1))
+    store_dc = assign_dcs(
+        [(sid, geos[gi].State, geos[gi].Region) for sid, gi in enumerate(store_geo_indices, 1)],
+        dc_sites,
+    )
+    routes = plan_routes(
+        cfg.seed,
+        store_dc,
+        {row[0]: row[9] for row in store_rows},
+    )
+    fleets = fleet_sizes(routes_per_dc(routes), range(1, cfg.dc_count + 1))
     truck_dcs: list[float | None] = [float(dc) for dc, size in fleets.items() for _ in range(size)]
     truck_dcs += [None] * pool_size(len(truck_dcs))
     # The first trucks consume the main generator exactly as the earlier fixed

@@ -1,11 +1,23 @@
 """Inventory/logistics ledgers derived from the causal fulfillment plan.
 
 Store stock, reorders and delivery times come from inventory_policy, never
-from a second independent draw. DC supply is an explicit unlimited supplier
-baseline: every outbound load is replenished one second before loading.
-Truck moves retain the six-stage schedule (including future scheduled legs);
-stock-changing ledgers contain only events inside the requested history.
+from a second independent draw. Each store's reorders of one day leave on its
+next delivery slot as one load (``network.plan_routes``); the load is split
+into truck-capacity shipments (``_split_reorders_by_capacity``), and each
+shipment is put on a truck that is free for the whole trip: the store's route
+truck first, then the DC's other trucks, then the shared pool. Trucks carry one
+shipment at a time. Dwell follows the load size (``network.unload_minutes``,
+shared with the live stream); trucks arrive as planned until the incident
+model adds delays.
+
+DC supply is an explicit unlimited supplier baseline: every outbound load is
+replenished one second before loading. Truck moves retain the six-stage
+schedule (including future scheduled legs); stock-changing ledgers contain
+only events inside the requested history.
 """
+
+from functools import partial
+from typing import Any, Iterator
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
@@ -18,8 +30,16 @@ from retail_setup.generation.inventory_balances import (
     stockouts,
     with_balances,
 )
-from retail_setup.generation.network import dc_fleets, store_dc_map
+from retail_setup.generation.network import (
+    DeliveryRoute,
+    dc_fleets,
+    route_truck,
+    store_dc_map,
+    store_routes,
+    unload_minutes,
+)
 from retail_setup.generation.runtime import (
+    fixed_width_decimal,
     legacy_index,
     seeded_draws,
 )
@@ -102,45 +122,157 @@ def _split_reorders_by_capacity(
 
 
 # ---------------------------------------------------------------------------
-# Stage 3: shipments (one per store-day with reorders) + truck assignment
+# Stage 3: consolidated shipments + truck assignment
 # ---------------------------------------------------------------------------
 
+_LOAD_TIMES = ["scheduled_ts", "loading_ts", "depart_ts", "eta", "unloading_ts"]
 
-def _truck_lookup(
-    spark: SparkSession, dims: dict[str, DataFrame], cfg: GenerationConfig
-) -> DataFrame:
-    """(dc_id, slot, truck_id, n_trucks) rows for round-robin-by-day joins."""
-    trucks = dims["dim_trucks"].select("ID", "DCID").collect()
-    # A DC with no assigned trucks falls back to the pool trucks (documented).
-    fleets = dc_fleets(((r.ID, r.DCID) for r in trucks), range(1, cfg.dc_count + 1))
-    rows: list[tuple[int, int, int, int]] = []
-    for dc, fleet in fleets.items():
-        rows.extend((dc, slot, tid, len(fleet)) for slot, tid in enumerate(fleet))
-    return spark.createDataFrame(rows, "dc_id long, slot long, truck_id long, n_trucks long")
+
+def delivery_routes(dims: dict[str, DataFrame], cfg: GenerationConfig) -> dict[int, DeliveryRoute]:
+    """Each store's DC, route, local delivery slot and lane (shared with fulfillment)."""
+    return store_routes(
+        cfg.seed, dims["dim_stores"], dims["dim_geographies"], dims["dim_distribution_centers"]
+    )
+
+
+def _fleets(dims: dict[str, DataFrame]) -> tuple[dict[int, tuple[int, ...]], tuple[int, ...]]:
+    """(DC fleets, shared pool) from ``dim_trucks``."""
+    trucks = [(int(r.ID), r.DCID) for r in dims["dim_trucks"].select("ID", "DCID").collect()]
+    dc_ids = [int(r.ID) for r in dims["dim_distribution_centers"].select("ID").collect()]
+    pool = tuple(sorted(truck for truck, dc in trucks if dc is None))
+    return dc_fleets(trucks, dc_ids), pool
+
+
+def _shipment_lines(events: DataFrame, capacity: int) -> DataFrame:
+    """The policy's reorder lines packed into capacity-bounded shipments.
+
+    Every SKU a store reorders on one day shares that day's dispatch
+    (``inventory_policy.shipment_event``), so the lines of one (store, day)
+    form one load, split into legs of at most ``capacity`` units in product
+    order. ``shipment_id`` is the load ID plus the 3-digit leg.
+    """
+    planned = events.filter(F.col("kind") == "SHIPMENT").select(
+        "store_id",
+        "product_id",
+        "event_date",
+        F.col("quantity").alias("reorder_quantity"),
+        F.col("source").alias("load_id"),
+        *_LOAD_TIMES,
+    )
+    return (
+        _split_reorders_by_capacity(planned, capacity)
+        .withColumn(
+            "shipment_id",
+            F.concat(
+                F.col("load_id"),
+                F.lit("-"),
+                fixed_width_decimal(F.col("leg"), 3, "shipment leg"),
+            ),
+        )
+        .withColumnRenamed("reorder_quantity", "quantity")
+    )
+
+
+def _assign_partition(
+    batches: Iterator[Any],
+    *,
+    seed: int,
+    fleets: dict[int, tuple[int, ...]],
+    pool: tuple[int, ...],
+) -> Iterator[Any]:
+    """Put shipments, in loading order, on trucks that are free for the whole trip.
+
+    A trip runs from loading until the truck is back at its DC (the dwell from
+    ``network.unload_minutes`` plus the lane home). The first leg of a load
+    takes the store's route truck, which the route plan keeps free; other legs
+    prefer the shared pool. When every candidate is busy the truck that frees
+    up first takes it (only possible when overflow outgrows the pool).
+    """
+    import pyarrow as pa
+
+    free_at: dict[int, int] = {}
+    minute_us = 60_000_000
+    schema = pa.schema(
+        [("shipment_id", pa.string()), ("truck_id", pa.int64()), ("unload_minutes", pa.int64())]
+    )
+    for batch in batches:
+        rows = batch.to_pylist()
+        out_ids, out_trucks, out_minutes = [], [], []
+        for row in rows:
+            dwell = unload_minutes(seed, row["store_id"], row["units"], row["shipment_id"])
+            busy_from = row["loading_us"]
+            busy_to = row["eta_us"] + (dwell + row["transit_minutes"]) * minute_us
+            fleet = fleets.get(row["dc_id"], ())
+            if row["leg"] == 0:
+                order = [row["route_truck"], *fleet, *pool]
+            else:
+                order = [*pool, *fleet]
+            candidates = list(dict.fromkeys(order)) or [row["route_truck"]]
+            truck = next((t for t in candidates if free_at.get(t, 0) <= busy_from), None)
+            if truck is None:
+                truck = min(candidates, key=lambda t: (free_at.get(t, 0), t))
+            free_at[truck] = busy_to
+            out_ids.append(row["shipment_id"])
+            out_trucks.append(truck)
+            out_minutes.append(dwell)
+        yield pa.RecordBatch.from_arrays(
+            [
+                pa.array(out_ids, pa.string()),
+                pa.array(out_trucks, pa.int64()),
+                pa.array(out_minutes, pa.int64()),
+            ],
+            schema=schema,
+        )
 
 
 def _shipments(
-    spark: SparkSession, planned: DataFrame, dims: dict[str, DataFrame], cfg: GenerationConfig
+    lines: DataFrame,
+    dims: dict[str, DataFrame],
+    cfg: GenerationConfig,
+    routes: dict[int, DeliveryRoute],
 ) -> DataFrame:
-    """Assign trucks without redrawing the policy's delivery times or quantities."""
-    base = planned.withColumn(
-        "_day_num",
-        F.datediff(F.col("event_date"), F.lit(cfg.start_date)),
+    """One row per shipment (leg) with its truck, in UTC; local dates kept for filters."""
+    fleets, pool = _fleets(dims)
+    spark = lines.sparkSession
+    plan = spark.createDataFrame(
+        [
+            (store, route.dc_id, route_truck(route, fleets), route.transit_minutes)
+            for store, route in sorted(routes.items())
+        ],
+        "store_id long, dc_id long, route_truck long, transit_minutes long",
     )
-    lookup = _truck_lookup(spark, dims, cfg)
-    sizes = lookup.select("dc_id", "n_trucks").distinct()
-    return (
-        base.join(sizes, "dc_id")
-        .withColumn(
-            "slot",
-            F.pmod(
-                F.col("_day_num") + F.col("product_id") + F.col("leg"),
-                F.col("n_trucks"),
-            ),
+    loads = (
+        lines.groupBy("shipment_id", "store_id", "leg", *_LOAD_TIMES)
+        .agg(F.sum("quantity").cast("long").alias("units"))
+        .join(F.broadcast(plan), "store_id")
+        .withColumn("_load_date", F.to_date("loading_ts"))
+        .withColumn("_unload_date", F.to_date("unloading_ts"))
+    )
+    loads = localize_by_store(loads, dims, _LOAD_TIMES)
+    micros = 1_000_000
+    worker = partial(_assign_partition, seed=cfg.seed, fleets=fleets, pool=pool)
+    assigned = (
+        loads.select(
+            "shipment_id",
+            "store_id",
+            "dc_id",
+            "leg",
+            "route_truck",
+            "units",
+            "transit_minutes",
+            (F.unix_timestamp("loading_ts") * micros).alias("loading_us"),
+            (F.unix_timestamp("eta") * micros).alias("eta_us"),
         )
-        .join(lookup, ["dc_id", "slot", "n_trucks"])
-        .withColumn("unload_minutes", (F.unix_timestamp("etd") - F.unix_timestamp("eta")) / 60.0)
-        .drop("_day_num", "slot", "n_trucks")
+        .repartition(1)
+        .sortWithinPartitions("loading_us", "shipment_id")
+        .mapInArrow(worker, "shipment_id string, truck_id long, unload_minutes long")
+    )
+    return (
+        loads.join(assigned, "shipment_id")
+        .withColumn(
+            "etd", F.timestamp_seconds(F.unix_timestamp("eta") + F.col("unload_minutes") * 60)
+        )
+        .withColumn("unload_minutes", F.col("unload_minutes").cast("double"))
     )
 
 
@@ -188,23 +320,43 @@ def _truck_moves(shipments: DataFrame) -> DataFrame:
     )
 
 
-def _truck_inventory(shipments: DataFrame) -> DataFrame:
+def _truck_inventory(shipments: DataFrame, lines: DataFrame, end_date: Any) -> DataFrame:
+    """LOAD at the DC and UNLOAD at the store per shipment and product, inside history.
+
+    History ends at ``end_date`` in store-local time, as the policy's ledger does.
+    """
+    timed = lines.select("shipment_id", "product_id", "quantity").join(
+        shipments.select(
+            "shipment_id",
+            "truck_id",
+            "dc_id",
+            "store_id",
+            "loading_ts",
+            "unloading_ts",
+            "_load_date",
+            "_unload_date",
+        ),
+        "shipment_id",
+    )
     actions = F.array(
         F.struct(
             F.lit("LOAD").alias("action"),
             F.col("loading_ts").alias("event_ts"),
+            F.col("_load_date").alias("local_date"),
             F.col("dc_id").alias("location_id"),
             F.lit("DC").alias("location_type"),
         ),
         F.struct(
             F.lit("UNLOAD").alias("action"),
             F.col("unloading_ts").alias("event_ts"),
+            F.col("_unload_date").alias("local_date"),
             F.col("store_id").alias("location_id"),
             F.lit("STORE").alias("location_type"),
         ),
     )
     return (
-        shipments.withColumn("_a", F.explode(actions))
+        timed.withColumn("_a", F.explode(actions))
+        .filter(F.col("_a.local_date") <= F.lit(end_date))
         .select(
             F.col("_a.event_ts").alias("event_ts"),
             "truck_id",
@@ -229,6 +381,47 @@ def _truck_inventory(shipments: DataFrame) -> DataFrame:
             ),
         )
         .withColumn("event_date", F.to_date("event_ts"))
+    )
+
+
+def _store_inbound_by_leg(events: DataFrame, lines: DataFrame) -> DataFrame:
+    """The policy's store receipts, one row per shipment leg that carried the SKU.
+
+    The policy receives a SKU's whole reorder at once; when the load is split,
+    the receipt becomes one row per leg at the same time, with the running
+    balance before each later leg, so the ledger still conserves stock.
+    """
+    received = events.filter(F.col("kind") == "INBOUND_SHIPMENT")
+    legs = lines.select(
+        "store_id",
+        "product_id",
+        F.col("load_id").alias("source"),
+        F.col("shipment_id").alias("_shipment_id"),
+        F.col("leg").alias("_leg"),
+        F.col("quantity").alias("_quantity"),
+    )
+    later = (
+        Window.partitionBy("store_id", "product_id", "source")
+        .orderBy(F.desc("_leg"))
+        .rowsBetween(Window.unboundedPreceding, -1)
+    )
+    return (
+        received.join(legs, ["store_id", "product_id", "source"])
+        .withColumn(
+            "balance", F.col("balance") - F.coalesce(F.sum("_quantity").over(later), F.lit(0))
+        )
+        .withColumn("quantity", F.col("_quantity"))
+        .withColumn("source", F.col("_shipment_id"))
+        .withColumn(
+            "trace_id",
+            F.concat(
+                F.lit("TRC-SI-"),
+                F.col("_shipment_id"),
+                F.lit("-"),
+                F.col("product_id").cast("string"),
+            ),
+        )
+        .select(*received.columns)
     )
 
 
@@ -304,24 +497,18 @@ def generate_inventory_chain(
     store_dc = _store_dc_map(dims)
     # The policy runs in store-local time. Outputs are converted to UTC with
     # the store's zone; a shipment's whole lifecycle (and the DC rows that
-    # mirror its loads) uses its destination store's zone, and DC balances are
-    # computed after conversion so they follow UTC order.
+    # mirror its loads) uses its destination store's zone and is converted
+    # before trucks are assigned, so trips never overlap in real time. DC
+    # balances are computed after conversion so they follow UTC order.
     reorders = localize_by_store(_reorders(events, store_dc), dims, ["event_ts"])
-    planned = events.filter(F.col("kind") == "SHIPMENT").join(store_dc, "store_id")
-    shipments = _shipments(spark, planned, dims, cfg)
-    truck_moves = localize_by_store(
-        _truck_moves(shipments),
-        dims,
-        ["event_ts", "eta", "etd", "departure_time", "planned_arrival_time"],
-    )
-    truck_inv = localize_by_store(
-        _truck_inventory(shipments).filter(F.col("event_date") <= F.lit(cfg.end_date)),
-        dims,
-        ["event_ts"],
-    )
+    lines = _shipment_lines(events, cfg.truck_capacity)
+    shipments = _shipments(lines, dims, cfg, delivery_routes(dims, cfg))
+    truck_moves = _truck_moves(shipments)
+    truck_inv = _truck_inventory(shipments, lines, cfg.end_date)
     dc_raw = _dc_txns(truck_inv)
     store_bal = localize_by_store(
-        events.filter(~F.col("kind").isin("REORDER", "SHIPMENT"))
+        events.filter(~F.col("kind").isin("REORDER", "SHIPMENT", "INBOUND_SHIPMENT"))
+        .unionByName(_store_inbound_by_leg(events, lines))
         .withColumnRenamed("store_id", "node_id")
         .withColumnRenamed("kind", "txn_type"),
         dims,

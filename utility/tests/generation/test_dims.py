@@ -1,12 +1,23 @@
 from collections import Counter
-from datetime import date
+from datetime import date, datetime, timezone
 
 import pytest
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.loader import default_dictionary_root, load_dictionaries
 from retail_setup.generation.dims import generate_dim_date, generate_dimensions
-from retail_setup.generation.network import fleet_sizes, nearest_dc, pool_size, store_dc_map
+from retail_setup.generation.dims import balanced_geography_sample
+from retail_setup.generation.network import (
+    assign_dcs,
+    fleet_sizes,
+    next_slot_ms,
+    plan_routes,
+    pool_size,
+    route_budget_minutes,
+    routes_per_dc,
+    store_dc_map,
+    store_routes,
+)
 from retail_setup.generation.schemas import column_names
 
 
@@ -104,20 +115,115 @@ def test_trucks_dc_assignment(dims):
     assert {r.DCID for r in assigned} <= dc_ids
 
 
-def test_dc_fleets_are_sized_to_the_stores_each_dc_serves(dims):
-    served = Counter(
+def test_dc_fleets_run_one_truck_per_delivery_route(dims, small_cfg):
+    routes = store_routes(
+        small_cfg.seed,
+        dims["dim_stores"],
+        dims["dim_geographies"],
+        dims["dim_distribution_centers"],
+    )
+    served = {
+        row.store_id: row.dc_id
+        for row in store_dc_map(
+            dims["dim_stores"], dims["dim_geographies"], dims["dim_distribution_centers"]
+        ).collect()
+    }
+    assert served == {store: route.dc_id for store, route in routes.items()}
+    rows = dims["dim_trucks"].collect()
+    assigned = Counter(int(r.DCID) for r in rows if r.DCID is not None)
+    dc_ids = [r.ID for r in dims["dim_distribution_centers"].collect()]
+    # dims plans routes in Python exactly as the inventory chain and stream do.
+    assert dict(assigned) == fleet_sizes(routes_per_dc(routes), dc_ids)
+    assert sum(r.DCID is None for r in rows) == pool_size(sum(assigned.values()))
+    assert [r.ID for r in rows] == list(range(1, len(rows) + 1))
+
+
+def test_geographies_and_dc_load_are_spread_over_states(spark, dicts):
+    cfg = GenerationConfig(
+        store_type="grocery",
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 1, 7),
+        store_count=200,
+        dc_count=20,
+        customer_count=200,
+        seed=42,
+    )
+    dims = generate_dimensions(spark, dicts, cfg)
+    state_of = {r.ID: r.State for r in dims["dim_geographies"].collect()}
+    # The shared dictionary has 85% of its cities in five states; stores and
+    # DCs are spread over the states instead.
+    dc_states = Counter(state_of[r.GeographyID] for r in dims["dim_distribution_centers"].collect())
+    assert len(dc_states) >= 15 and max(dc_states.values()) <= 2, dc_states
+    stores = Counter(state_of[r.GeographyID] for r in dims["dim_stores"].collect())
+    top_five = sum(count for _, count in stores.most_common(5)) / cfg.store_count
+    assert top_five < 0.5, stores
+    load = Counter(
         row.dc_id
         for row in store_dc_map(
             dims["dim_stores"], dims["dim_geographies"], dims["dim_distribution_centers"]
         ).collect()
     )
-    rows = dims["dim_trucks"].collect()
-    assigned = Counter(int(r.DCID) for r in rows if r.DCID is not None)
-    dc_ids = [r.ID for r in dims["dim_distribution_centers"].collect()]
-    # dims routes stores in Python exactly as the Spark store_dc_map does.
-    assert dict(assigned) == fleet_sizes(dict(served), dc_ids)
-    assert sum(r.DCID is None for r in rows) == pool_size(sum(assigned.values()))
-    assert [r.ID for r in rows] == list(range(1, len(rows) + 1))
+    assert len(load) == cfg.dc_count, "every DC serves stores"
+    assert max(load.values()) <= 3 * cfg.store_count / cfg.dc_count, load
+
+
+def test_assign_dcs_balances_dcs_in_one_state_then_falls_back_to_region():
+    dcs = [(3, "TX", "South"), (1, "CA", "West"), (2, "CA", "West"), (4, "NY", "Northeast")]
+    stores = [(s, "CA", "West") for s in range(1, 8)] + [(8, "OR", "West"), (9, "FL", "South")]
+    assigned = assign_dcs(stores, dcs)
+    california = Counter(assigned[s] for s in range(1, 8))
+    assert set(california) == {1, 2} and abs(california[1] - california[2]) <= 1
+    assert assigned[8] in {1, 2} and assigned[9] == 3
+    assert assign_dcs([(1, "WA", "Pacific")], dcs) == {1: 1}
+
+
+def test_routes_never_overbook_a_truck_day_and_fleets_cover_routes():
+    store_dc = {store: 1 + store % 2 for store in range(1, 41)}
+    zones = {store: ("America/Chicago" if store % 3 else "America/Denver") for store in store_dc}
+    routes = plan_routes(7, store_dc, zones)
+    assert set(routes) == set(store_dc)
+    by_truck = {}
+    for store, route in routes.items():
+        assert route.dc_id == store_dc[store] and 0 <= route.slot_minute < 1440
+        by_truck.setdefault((route.dc_id, route.route), []).append((store, route))
+    for members in by_truck.values():
+        assert len({zones[store] for store, _ in members}) == 1
+        assert sum(route_budget_minutes(r.transit_minutes) for _, r in members) <= 1440
+        # Slots follow each other by the previous store's whole budget.
+        slots = sorted(r.slot_minute for _, r in members)
+        gaps = [b - a for a, b in zip(slots, slots[1:])] + [slots[0] + 1440 - slots[-1]]
+        assert min(gaps) >= min(route_budget_minutes(r.transit_minutes) for _, r in members)
+    assert fleet_sizes(routes_per_dc(routes), [1, 2, 3]) == {
+        1: routes_per_dc(routes)[1],
+        2: routes_per_dc(routes)[2],
+        3: 2,
+    }
+    assert pool_size(14) == 2 and pool_size(1) == 1
+
+
+def test_delivery_slots_are_local_wall_clock_times():
+    since = int(datetime(2025, 3, 8, 12, tzinfo=timezone.utc).timestamp() * 1000)
+    # 22:30 in New York is 03:30 UTC in winter and 02:30 UTC after the spring change.
+    first = next_slot_ms(since, 22 * 60 + 30, "America/New_York")
+    second = next_slot_ms(first + 1, 22 * 60 + 30, "America/New_York")
+    assert datetime.fromtimestamp(first / 1000, timezone.utc) == datetime(
+        2025, 3, 9, 3, 30, tzinfo=timezone.utc
+    )
+    assert datetime.fromtimestamp(second / 1000, timezone.utc) == datetime(
+        2025, 3, 10, 2, 30, tzinfo=timezone.utc
+    )
+    assert next_slot_ms(since, 12 * 60) == since
+
+
+def test_balanced_geography_sample_spreads_a_skewed_dictionary():
+    import numpy as np
+
+    states = ["CA"] * 100 + ["CT"] * 100 + ["TX"] * 5 + ["VT"]
+    picked = balanced_geography_sample(states, 16, np.random.default_rng(1))
+    counts = Counter(states[i] for i in picked)
+    assert len(set(picked)) == 16
+    assert counts["VT"] == 1 and counts["TX"] == 5 and counts["CA"] + counts["CT"] == 10
+    assert picked == balanced_geography_sample(states, 16, np.random.default_rng(1))
 
 
 def test_determinism(spark, small_cfg, dicts):
@@ -197,12 +303,3 @@ def test_explicit_product_attributes_override_name_rules(spark, small_cfg, dicts
 
     assert row is not None
     assert (row.taxability, row.RequiresRefrigeration) == ("TAXABLE", False)
-
-
-def test_nearest_dc_prefers_state_then_region_then_lowest_id():
-    dcs = [(3, "TX", "South"), (1, "CA", "West"), (2, "OR", "West")]
-    assert nearest_dc("TX", "South", dcs) == 3
-    assert nearest_dc("WA", "West", dcs) == 1
-    assert nearest_dc("NY", "Northeast", dcs) == 1
-    assert fleet_sizes({1: 25, 2: 4}, [1, 2, 3]) == {1: 10, 2: 2, 3: 2}
-    assert pool_size(14) == 2 and pool_size(1) == 1

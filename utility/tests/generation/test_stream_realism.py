@@ -92,7 +92,7 @@ def _simulate(spark):
     from retail_setup.generation.baskets import basket_products
     from retail_setup.generation.customers import lifecycle_for
     from retail_setup.generation.dims import generate_dimensions
-    from retail_setup.generation.network import dc_fleets, store_dc_map
+    from retail_setup.generation.network import dc_fleets, store_routes
     from retail_setup.generation.receipts import generate_receipts_group
     from retail_setup.generation.sensors import generate_ble
     from retail_setup.generation.stream_baskets import prepare_basket_catalog
@@ -148,12 +148,10 @@ def _simulate(spark):
     rate = sum(plan.peaks.values())
     shares = {lane: share * plan.rows_per_second / rate for lane, share in plan.shares.items()}
     lanes = replace(plan, rows_per_second=rate, shares=shares)
-    store_dc = {
-        row["store_id"]: row["dc_id"]
-        for row in store_dc_map(
-            dims["dim_stores"], dims["dim_geographies"], dims["dim_distribution_centers"]
-        ).collect()
-    }
+    routes = store_routes(
+        cfg.seed, dims["dim_stores"], dims["dim_geographies"], dims["dim_distribution_centers"]
+    )
+    store_dc = {store: route.dc_id for store, route in routes.items()}
     trucks = dims["dim_trucks"].select("ID", "DCID").collect()
     fleets = dc_fleets(
         ((row["ID"], row["DCID"]) for row in trucks),
@@ -165,6 +163,8 @@ def _simulate(spark):
         store_dc=store_dc,
         fleets=fleets,
         daily_prior=TRANSACTIONS * 10.0 / dims["dim_products"].count(),
+        slots={store: route.slot_minute for store, route in routes.items()},
+        zones={row["ID"]: row["TimeZone"] for row in store_rows},
     )
     stock = (
         dims["dim_stores"]
@@ -198,6 +198,11 @@ def _simulate(spark):
         anchor_date=cfg.anchor_date,
         annual_volume_growth=cfg.annual_volume_growth,
     )
+    # The calibrated live rate returns about TARGET_ROAS on the live spend, a
+    # fraction of a percent of purchases; these few simulated days would see
+    # almost no journeys, so the simulation raises it to exercise them.
+    calibrated_journey_rate = ctx.journey_rate
+    ctx = replace(ctx, journey_rate=max(ctx.journey_rate, 0.05))
 
     state = MemoryStateStore(NAMESPACE)
     begin = datetime(START.year, START.month, START.day, tzinfo=timezone.utc) - timedelta(hours=12)
@@ -238,6 +243,7 @@ def _simulate(spark):
         "truck_dc": {row["ID"]: row["DCID"] for row in trucks},
         "store_bps": {row["ID"]: round(row["tax_rate"] * 10000) for row in store_rows},
         "batch_count": batch_id,
+        "journey_rate": calibrated_journey_rate,
     }
 
 
@@ -299,10 +305,13 @@ def test_foot_traffic_converts_like_history(world) -> None:
     history = sum(int(r["n_receipts"]) for r in world["visits"]) / sum(
         int(r["visitors"]) for r in world["visits"]
     )
+    # Sensors count zone passages; every visitor passes the entrance once.
+    entrance = vocab.ble_layout(world["profile"]).entry
     entered = sum(
         e["payload"]["customer_count"]
         for e in _of(world, "customer_entered")
-        if _in_history(world, e["payload"]["store_id"], e["ingest_timestamp"])
+        if e["payload"]["zone"] == entrance
+        and _in_history(world, e["payload"]["store_id"], e["ingest_timestamp"])
     )
     receipts = sum(
         1
@@ -337,7 +346,7 @@ def test_live_vocabularies_equal_history(world) -> None:
     profile_zones = set(vocab.ble_zones_for_profile(world["profile"]))
     assert ble_zones == {row["zone"] for row in world["pings"]} == profile_zones
     sensor_zones = {e["payload"]["zone"] for e in _of(world, "customer_entered")}
-    assert sensor_zones <= set(vocab.FOOT_TRAFFIC_ZONES)
+    assert sensor_zones == profile_zones
     for event in _of(world, "ble_ping_detected"):
         payload = event["payload"]
         assert payload["beacon_id"] == vocab.beacon_id(payload["store_id"], payload["zone"])
@@ -362,18 +371,27 @@ def test_store_payments_decline_at_the_historical_rate(world) -> None:
     payments = [
         e["payload"] for e in _of(world, "payment_processed") if e["payload"].get("receipt_id")
     ]
-    expected = sum(
-        weight * vocab.decline_probability(name) for name, weight, *_ in vocab.TENDERS
-    ) / sum(weight for _, weight, *_ in vocab.TENDERS)
+    # A declined first tender is retried (approved) or the sale is voided, so a
+    # declined payment is always followed by an approved one for the receipt.
+    shares = vocab.outcome_shares()
+    retried = shares[vocab.RETRIED] / (shares[vocab.APPROVED] + shares[vocab.RETRIED])
+    expected = retried / (1 + retried)
     declined = sum(p["status"] == "DECLINED" for p in payments) / len(payments)
     history = sum(row["status"] == "DECLINED" for row in world["payments"]) / len(world["payments"])
     print(f"STAT declines live={declined:.4f} expected={expected:.4f} history={history:.4f}")
     assert abs(declined - expected) <= 0.012, (declined, expected, history)
+    assert abs(history - expected) <= 0.012, (history, expected)
     assert all(
         p["decline_reason"] in vocab.DECLINE_REASONS for p in payments if p["status"] == "DECLINED"
     )
     receipts = {e["payload"].get("receipt_id") for e in _of(world, "receipt_created")}
     assert {p["receipt_id"] for p in payments} <= receipts
+    approved = {p["receipt_id"]: p for p in payments if p["status"] == "APPROVED"}
+    for p in payments:
+        if p["status"] == "DECLINED" and p["receipt_id"] in approved:
+            assert approved[p["receipt_id"]]["payment_method"] != p["payment_method"]
+    ids = [p["transaction_id"] for p in payments]
+    assert len(ids) == len(set(ids))
 
 
 def test_purchase_money_reconciles_across_events(world) -> None:
@@ -381,7 +399,7 @@ def test_purchase_money_reconciles_across_events(world) -> None:
     payments = {
         e["payload"]["receipt_id"]: e["payload"]
         for e in _of(world, "payment_processed")
-        if e["payload"].get("receipt_id")
+        if e["payload"].get("receipt_id") and e["payload"]["status"] == "APPROVED"
     }
     promotions: dict[str, int] = {}
     for event in _of(world, "promotion_applied"):
@@ -413,6 +431,11 @@ def test_purchase_money_reconciles_across_events(world) -> None:
     for receipt_id, payment in payments.items():
         if receipt_id in times:
             assert payment["processing_time"] > times[receipt_id]
+
+
+def test_live_journey_rate_is_a_small_calibrated_share(world) -> None:
+    print(f"STAT live journey rate={world['journey_rate']:.4f}")
+    assert 0.0 < world["journey_rate"] < 0.02
 
 
 def test_journey_touches_arrive_inside_the_silver_replay_window(world) -> None:
@@ -658,7 +681,7 @@ def test_online_orders_follow_a_staged_lifecycle(world) -> None:
     payments = {
         e["payload"]["order_id"]: e["payload"]
         for e in _of(world, "payment_processed")
-        if e["payload"].get("order_id")
+        if e["payload"].get("order_id") and e["payload"]["status"] == "APPROVED"
     }
     stages = {
         name: {e["payload"]["order_id"]: _ms(e["payload"][field]) for e in _of(world, name)}

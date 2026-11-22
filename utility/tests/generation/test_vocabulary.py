@@ -150,7 +150,10 @@ def test_known_stream_vocabulary_gaps_still_exist(gap: str) -> None:
 def test_stream_uses_the_shared_definitions() -> None:
     for usage in (
         'tender_column(d, [F.col("receipt_id")])',
-        'payment_status_column(d, [F.col("receipt_id")], F.col("tender"))',
+        "visit_zone_path(d, [v]",
+        # The decline model: retry on another tender, or void the sale.
+        'payment_outcome_column(d, [F.col("receipt_id")], F.col("_first_tender"))',
+        'retry_tender_column(d, [F.col("receipt_id")], F.col("_first_tender"))',
         "price_basket(",
         'ble_id_column(F.col("customer_id"))',
         "anonymous_ble_id_column(",
@@ -163,7 +166,8 @@ def test_stream_uses_the_shared_definitions() -> None:
         "ble_layout(ctx.profile)",
         # Online orders: the historical fulfillment mix and the decline model.
         'd.pick_by_weights(key, "online-mode", ONLINE_FULFILLMENT_MIX)',
-        'payment_status_column(d, key, F.col("tender"), ONLINE_TENDERS, "online-decline")',
+        'd, key, F.col("_first_tender"), ONLINE_TENDERS, "online-decline"',
+        'retry_tender_column(d, key, F.col("_first_tender"), ONLINE_TENDERS, "online-retry")',
         "ONLINE_CANCEL_RATE",
         "ONLINE_BACKORDER_RATE",
         "ONLINE_PROMOS",
@@ -192,3 +196,12 @@ def test_column_formats_equal_python_formats(spark) -> None:
         assert row.ble == vocab.ble_id(row.id)
         assert row.ad == vocab.ad_id(row.id)
         assert row.campaign == vocab.campaign_id(date(2025, 1, 7), 3)
+
+
+def test_decline_outcomes_split_declines_into_retries_and_voids() -> None:
+    shares = vocab.outcome_shares()
+    assert abs(sum(shares.values()) - 1.0) < 1e-12
+    declined = shares[vocab.RETRIED] + shares[vocab.VOIDED]
+    assert shares[vocab.RETRIED] == pytest.approx(declined * vocab.DECLINE_RETRY_SHARE)
+    # 0.4 x 2.5% + 0.3 x 2.0% + 0.2 x 0% + 0.1 x 3.0%
+    assert declined == pytest.approx(0.019)

@@ -24,10 +24,18 @@ outputs, and `gold.py` builds the ten aggregates.
 `fact_truck_moves`, `fact_truck_inventory`, `fact_dc_inventory_txn`,
 `fact_store_inventory_txn`, `fact_stockouts`, and `fact_logistics_incidents`.
 
-`dim_trucks` gives each DC a fleet sized to the stores it serves (its nearest
-stores by geography, the routing `network.store_dc_map` uses): 0.4 trucks per
-store and at least two, plus a shared pool of about 15% of the fleet with a
-NULL `DCID`. The live stream runs these trucks one shipment at a time.
+Each store is served by a DC in its own state, else its region, else any DC;
+among those the store goes to the DC serving the fewest stores so far, so DCs
+in one state share the load (`network.assign_dcs`). Geographies are sampled one
+city per state in turn, so the shared dictionary's skew (most cities in five
+states) does not concentrate stores and DCs. `dim_trucks` gives each DC one
+truck per daily delivery route (`network.plan_routes`, at least two trucks),
+plus a shared pool of about 15% of the fleet with a NULL `DCID`. A route is a
+set of the DC's stores in one time zone, each with a daily delivery slot in
+store-local time; slots on a route are spaced by the longest possible trip
+(load, the lane both ways, the maximum unload, a turnaround), so a truck on its
+route is never in two places at once. History and the live stream use the same
+routes and slots.
 
 Online orders follow `vocabulary.ONLINE_HOURLY_WEIGHTS` over the UTC day
 (peaking in the US evening), and a BOPIS order is collected 1-24 hours after it
@@ -65,7 +73,7 @@ Silver stores true UTC, the same convention as the live stream:
   reporting. Notebook 03 sets it for streamed receipts from
   `dim_stores.TimeZone`.
 
-Invariants that depend on the local clock (operating hours, returns at noon)
+Invariants that depend on the local clock (operating hours)
 convert back with the store's zone. Existing environments must re-run setup
 after this change; Silver written before it has local timestamps and no
 `TimeZone` or `local_hour`.
@@ -263,9 +271,26 @@ regardless of how Spark delivers rows.
 The replenishment policy covers every selling store/SKU. It learns from past
 attempted demand, considers on-hand and pending deliveries/accepted restocks,
 and orders case-pack quantities against coverage and safety-stock targets.
-Opening stock is seeded independently of future transactions. Deterministic
-delivery delays allow depletion and recovery rather than permanent negative
-balances or a blanket zero floor.
+Each SKU starts from a prior of its expected daily demand at the first history
+day (store volume and multiplier, lines per basket, seasonal department weight,
+the SKU's popularity share of its launched department, units per line): the
+prior starts the demand estimate and sizes opening stock between the reorder
+point and the order-up-to target (4-8 days of cover). It never looks at
+generated demand, and it removes the start-of-history stockout wave a flat
+opening stock caused.
+
+Every SKU a store reorders when a day closes ships on its next delivery slot
+as one load, which drives the lane and is received when unloading starts, 15
+minutes after arrival. `inventory.py` packs each load into shipments of at most
+`truck_capacity` units in product order (`_split_reorders_by_capacity`; IDs
+`SHP-<dispatch yyyyMMdd>-<store>-<leg>`), splitting a SKU's receipt across legs
+when needed. Shipments go, in loading order, to a truck that is free for the
+whole trip (loading until it is back at the DC): the store's route truck for
+the first leg, the shared pool and then the DC's other trucks for overflow legs.
+Dwell is the unload model shared with the live stream (`network.unload_minutes`:
+base minutes plus units at the site's rate, 30-180 minutes).
+`planned_arrival_time` equals the arrival, `delay_minutes` is 0 and
+`delay_reason` NULL until the logistics incident model adds delays.
 
 A candidate line is fulfilled in full only when its stock is available.
 Rejected lines are omitted from realized receipts; empty receipts disappear.
@@ -273,6 +298,29 @@ Receipt totals, discounts, tax, payments, and refunds are reconciled against
 fulfilled lines. The return plan preserves sampled dates and identities while
 only actual fulfilled/refunded units can be restocked. Dependent promotions
 and attribution consume realized sales, not attempted demand.
+
+### Returns and payments
+
+About `return_rate` of sales are returned 1-14 days later, at a random time
+inside the store's hours (store-local), favouring baskets whose categories
+customers return more (`returns.RETURN_CATEGORY_WEIGHTS`: apparel and
+electronics far more than fresh food). A return is partial: each line of the
+receipt is returned with a probability that follows its category (at least one
+line), and a multi-unit line returns some or all of its units. The refund keeps
+the sale's `customer_id`, goes back to the tender that paid for the sale, and
+links it in `fact_receipts.original_receipt_id_ext` (NULL on sales). Refund
+cents are the returned share of each line's net with integer basis-point tax;
+return lines keep their own `promo_code` (`receipt_type = RETURN` marks them).
+Only returned units the store filled can be restocked.
+
+Payments follow the shared decline model (`vocabulary.payment_outcome_column`):
+the first tender declines with its probability; 80% of declined shoppers retry
+on another tender (a DECLINED then an APPROVED payment), the rest walk away and
+the sale is voided, so it never becomes a receipt and takes no stock. A voided
+online order is cancelled (zero totals, no payment). Every receipt and placed
+order therefore has exactly one APPROVED payment, and its header tender is the
+approved one. Transaction IDs derive from the purchase ID and attempt
+(`TXN-<receipt or order>-<attempt>`), so they are unique.
 
 `fact_store_inventory_txn` appends two `long` audit columns after the existing
 schema: `requested_quantity` and `unfulfilled_quantity`. `LOST_SALE` rows
@@ -291,9 +339,10 @@ migrate the target before resuming streaming against an older table.
 Live deltas have zero unfulfilled demand; this is
 not evidence of measured lost demand in the live scenario generator.
 
-The current baseline assumes unlimited just-in-time supply at the DC and
-SKU-specific shipments. It does not optimize fleet routing or simulate
-supplier capacity constraints. Historical online orders retain their separate
+The current baseline assumes unlimited just-in-time supply at the DC. It does
+not optimize fleet routing or simulate supplier capacity constraints. Overflow
+legs can only overlap a truck's earlier trip when they outnumber the shared
+pool. Historical online orders retain their separate
 synthetic fulfillment model; do not interpret its statuses as reservations
 against the store policy.
 
@@ -322,6 +371,26 @@ notebook 03 lower-cases rows written by earlier stream versions. Live
 (`impression_time`), not when they arrived, and live `fact_promotions.product_ids`
 is the same comma-separated, numerically sorted list as history.
 
+### Marketing and attribution
+
+Background impressions cost real CPMs: $0.002-$0.03 an impression by channel
+and device (`vocabulary.CHANNEL_COSTS`), with `cost` to four decimals and
+`cost_cents` rounded at random so summed spend is unbiased. Each campaign
+rotates a small creative pool per channel (`CRT<campaign>-<channel>-<n>`, four
+creatives). Conversion follows exposure (`attribution.py`): an impression
+reaches the customer of its ad ID and converts with a small probability
+weighted by channel (search and email best, display worst) when that customer
+makes an eligible purchase within seven days; the probability is calibrated
+per run so the campaigns return about `TARGET_ROAS` (4x) their spend, which
+keeps conversions well under 1% of impressions. A journey is the converting
+impressions themselves, so its touches look like every other impression
+(same ID and creative formats, CRM-matched `customer_id` at the same rate)
+except for `attribution_journey_id`; every campaign family can convert, and
+each touch sits in its own campaign window. Last touch decides the campaign.
+The live stream attributes the share of eligible purchases that returns the
+same ROAS on its spend (`attribution.live_journey_rate`), with one to three
+touches built like background impressions.
+
 ### Statistical acceptance
 
 Use multiple seeds and short and multi-year windows. Check ticket and basket
@@ -347,7 +416,10 @@ Current invariant checks include:
 - truck timing and inventory relationships;
 - sales only within each store's operating hours, evaluated in store-local
   time, and `local_hour` equal to the store-local hour of `event_ts`;
-- returns posted at local noon;
+- returns linked to their sale (same store and customer), posted after it
+  (on a later store-local day, by construction), refunding no more than the
+  sale;
+- exactly one approved payment per receipt and order, unique transaction IDs;
 - logistics incidents reference known DCs and stores and resolve after they
   start;
 - no receipt line sold before its product's launch date;
@@ -409,9 +481,21 @@ layouts derive them:
 
 A store's format is drawn from those its volume class suits among the store
 type's formats. Every store follows its store type's `operating_hours`
-patterns ("24h" or "open-close"). BLE pings and zone changes use the store
-type's `zones` (upper-cased), in history and in the live stream; a live visit
-walks entrance, one to three department zones, checkout (buyers) and exit.
+patterns ("24h" or "open-close"). Foot traffic, BLE pings and zone changes
+use the store type's `zones` (upper-cased), in history and in the live stream,
+and the same visit path (`vocabulary.visit_zone_path`): entrance, one to three
+department zones in random order, checkout (buyers) and exit.
+
+`fact_foot_traffic` counts zone passages per store-hour, not shares of the
+visitors: the entrance and exit count every visitor of the hour, checkout
+counts the hour's buyers (so it is never below the receipts), and each
+department zone the visitors who browse it (on average two zones a visitor).
+Visitor totals and conversion use the entrance count; the semantic model's
+`Foot Traffic Count` does so unless a zone is filtered. Beacons detect a quarter
+of visits (`BLE_DETECTED_SHARE`), buyers and non-buyers alike. A detected
+buyer's pings run entrance, departments, checkout and exit, with the purchase
+in the middle of its checkout dwell; a non-buyer starts inside the hour and
+never passes checkout. Pings and zone changes stay inside store hours.
 
 ## Customers and churn
 

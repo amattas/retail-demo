@@ -6,9 +6,11 @@ scaled by `cfg.store_count / 86` — 86 is the legacy datagen fleet size, so a
 fleet of 86 stores reproduces datagen's nominal volumes. `flash_sale` runs
 only ~1 day in 7 (a per-day uniform gate, u < 1/7).
 
-Per impression: channel uniform over the archetype's channels; device
+Per impression: channel uniform over the archetype's channels; a creative from
+the campaign's small pool (``CREATIVES_PER_CAMPAIGN`` per channel); device
 MOBILE/DESKTOP/TABLET at 60/30/10 with cost multipliers 1.2/0.8/0.9; cost a
-uniform draw within the channel's dollar band times the device multiplier;
+uniform draw within the channel's CPM band ($0.002-$0.03 an impression) times
+the device multiplier, kept to four decimals (``cost_cents`` rounds at random);
 a uniformly-assigned customer supplies `customer_ad_id` (dim_customers.AdId),
 with `customer_id` populated for ~5% of impressions (CRM match) else NULL. A
 CRM match needs the customer to be signed up and not yet churned that day
@@ -45,6 +47,8 @@ from retail_setup.generation.vocabulary import (
     DEVICE_MULTIPLIERS,
     DEVICE_WEIGHTS,
     campaign_id_column,
+    creative_id_column,
+    impression_cost_cents,
 )
 
 ARCHETYPES = CAMPAIGN_ARCHETYPES
@@ -152,26 +156,26 @@ def generate_marketing(
                 fixed_width_decimal(F.col("seq"), 7, "daily impression sequence"),
             ),
         )
-        # drops the 'IMP' prefix: CREAT + day + archetype + seq
-        .withColumn(
-            "creative_id",
-            F.concat(F.lit("CREAT"), F.substring("impression_id_ext", 4, 30)),
-        )
     )
 
     key = [F.col("impression_id_ext")]
 
     # --- channel uniform over the archetype's channels
     ch_idx = F.floor(d.u(key, "mk_channel") * F.size("channels")).cast("int")
-    imps = imps.withColumn("channel", F.element_at("channels", ch_idx + 1))
+    imps = imps.withColumn("channel", F.element_at("channels", ch_idx + 1)).withColumn(
+        "creative_id",
+        creative_id_column(d, key, F.col("campaign_id"), F.col("channel")),
+    )
 
     # --- device pick (60/30/10); cost uniform in the channel band times the
     # device multiplier
     device, cost = impression_device_cost(d, key, F.col("channel"), "mk_device", "mk_cost")
     imps = imps.withColumn("device", device).withColumn("_cost_dollars", cost)
     cost_dollars = F.col("_cost_dollars")
-    imps = imps.withColumn("cost_cents", F.round(cost_dollars * 100).cast("long")).withColumn(
-        "cost", F.format_string("%.2f", cost_dollars)
+    # Costs are fractions of a cent at real CPMs: cost keeps four decimals and
+    # cost_cents is rounded at random, so summed spend stays unbiased.
+    imps = imps.withColumn("cost_cents", impression_cost_cents(d, key, cost_dollars)).withColumn(
+        "cost", F.format_string("%.4f", cost_dollars)
     )
 
     # --- uniform customer per impression; ~5% CRM-matched (customer_id set).
@@ -220,9 +224,8 @@ def generate_marketing(
             legacy_index("impression_id_ext"),
         )
         .withColumn(
-            # IMP-007: NULL for organic/background impressions. attribution.py
-            # unions in the two synthetic per-journey touches, which carry a
-            # non-NULL attribution_journey_id.
+            # IMP-007: attribution.py sets it on the impressions that make up a
+            # converting journey.
             "attribution_journey_id",
             F.lit(None).cast("string"),
         )

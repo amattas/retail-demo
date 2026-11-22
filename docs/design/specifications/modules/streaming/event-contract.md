@@ -91,14 +91,18 @@ history:
   churn continues from the history's lifecycle (rendered start, end, churn
   rate and anonymous share). Online orders take the first of four tries that
   is active that day.
-- **Visit path.** A visit enters (`customer_entered`, sensor zone by store
-  format), walks from the store type's entrance zone through one to three of its
-  department zones (`profile.zones`, upper-cased) in random order, passes
-  `CHECKOUT` when it buys and leaves through `EXIT` when the store type has
-  one. Each zone has a dwell time
-  in its foot-traffic range, two to five BLE pings, and a zone change on
-  arrival. 30% of visits carry the customer's `dim_customers.BLEId`; the rest
-  are `ANON-<store>-<n>`, as in history. The receipt, lines and promotions are
+- **Visit path.** A visit walks from the store type's entrance zone through
+  one to three of its department zones (`profile.zones`, upper-cased) in
+  random order, passes `CHECKOUT` when it buys and leaves through `EXIT` when
+  the store type has one (`vocabulary.visit_zone_path`, the path history
+  uses). Each zone has a dwell time in its range and a `customer_entered`
+  event as the visitor enters it: foot-traffic sensors count zone passages, so
+  the entrance zone counts visitors and checkout counts buyers
+  (`customer_count` is 1, `dwell_time` the zone's dwell). Beacons detect the
+  phone of a quarter of visits (`BLE_DETECTED_SHARE`, buyers and non-buyers):
+  those emit two to five BLE pings per zone and a zone change on arrival. 30%
+  of detected visits carry the customer's `dim_customers.BLEId`; the rest are
+  `ANON-<store>-<n>`, as in history. The receipt, lines and promotions are
   emitted halfway through checkout and the payment after the tender's
   processing time. A visit that would run past closing time is compressed to
   end before it.
@@ -107,8 +111,10 @@ history:
   (`generation/pricing.py`, the same price schedule as history), one
   basket-level promotion priced over the lines the store could fill, the
   40/30/20/10 tender mix and the 2.5% base decline
-  model are the batch helpers. A declined payment keeps its `SALE` receipt,
-  as in history, and is never attributed. One `promotion_applied` is emitted per
+  model are the batch helpers. As in history, a declined first tender is
+  retried on another tender 80% of the time (a `DECLINED` payment at the
+  purchase, then the `APPROVED` one; the receipt carries the approved tender);
+  otherwise the sale is voided and the visit leaves without buying. One `promotion_applied` is emitted per
   receipt and promo code, so at most one per receipt. Visit and online volume
   follow history's year-over-year trend (`annual_volume_growth` from the
   anchor date).
@@ -149,8 +155,8 @@ replays, in time order, everything that changes it in a micro-batch:
   `reason = INBOUND_SHIPMENT`, `source` = the shipment ID.
 
 Every inventory, stockout and reorder event carries the store's DC (`dc_id`),
-the nearest DC by geography, as in the historical inventory chain
-(`network.store_dc_map`). A store and product the stream has not touched yet
+assigned as in the historical inventory chain (`network.assign_dcs`: same
+state, else region, least loaded). A store and product the stream has not touched yet
 starts from its latest Silver `fact_store_inventory_txn` balance as of the
 incarnation start (never below zero) and the mean daily demand of the 7 days
 before it; one Silver has never seen starts from history's opening stock. The
@@ -161,19 +167,20 @@ the policy reorders that stock.
 ## Trucks
 
 A reorder joins its store's pending load at the DC. Each store takes one
-consolidated delivery a day: at the store's daily delivery slot (a stable
-minute of the UTC day, so the slots spread over the day), the next free truck
-of the DC's fleet (`dim_trucks.DCID`; pool trucks only for a DC with none)
-loads the whole pending load for `TRUCK_LOAD_MINUTES`, drives the lane (a
-stable 1-4 hour draw per DC and store), and arrives. Each DC's fleet is sized
-to the stores it serves (`network.TRUCKS_PER_STORE`, at least two trucks), so
-a typical fleet is busy about 70% of the day. `planned_arrival_time` is set at
+consolidated delivery a day: at the store's daily delivery slot (the minute of
+the store-local day its delivery route gives it, `network.plan_routes`, the
+same slot history uses), the next free truck of the DC's fleet
+(`dim_trucks.DCID`; pool trucks only for a DC with none) loads the whole pending
+load for `TRUCK_LOAD_MINUTES`, drives the lane (a stable 1-4 hour draw per DC
+and store), and arrives. Each DC's fleet has one truck per delivery route, so
+its routes never need more trucks than it has. `planned_arrival_time` is set at
 dispatch; the actual arrival is the planned time plus `delay_minutes`, which
 stays 0 with no `delay_reason` until the logistics incident model adds delays
 (`SupplyBatch.held_dcs` already lets an incident stop a DC dispatching). The
 unload takes `TRUCK_UNLOAD_BASE_MINUTES` plus the load at
 `TRUCK_UNLOAD_UNITS_PER_MINUTE`, scaled by a per-store dock factor, with a few
-minutes of noise (`estimated_unload_duration` is the plan, the departure's
+minutes of noise, capped at `TRUCK_UNLOAD_MINUTES_MAX` (`network.unload_minutes`,
+shared with history; `estimated_unload_duration` is the plan, the departure's
 `actual_unload_duration` the outcome). A typical load unloads inside the
 normal 30-75 minute range; an unusually large one can breach the 90-minute SLA.
 The truck departs when the unload is done, which restocks the store, and drives
@@ -200,8 +207,9 @@ one fulfillment mode and node, drawn by the historical mix (60% ship from a DC,
 
 2% of orders are cancelled at once: zero totals, no payment and no fulfillment.
 8% of shippable orders are backordered: shipped but not delivered. Payments use
-the online tenders (no cash) and decline like history; a declined order is
-still fulfilled, as in history. Lines carry history's online promo codes, and
+the online tenders (no cash) and the shared decline model: a declined order is
+retried on another tender (a `DECLINED` payment a second after the order, then
+the `APPROVED` one) or voided, which cancels it, as in history. Lines carry history's online promo codes, and
 tax is the fulfilling store's rate for store-fulfilled orders and the
 customer's destination rate (mean store rate of their geography) for DC
 shipments. Orders still in progress live in the order state.
@@ -475,10 +483,18 @@ deployment verification gate.
 
 ## Marketing attribution
 
-About 5% of approved store and online purchases with a customer are selected
-for a journey with the batch helper (`attribution.with_journey_plan`): one
-journey ID, a product-launch or loyalty campaign, and two `ad_impression`
-touches 3-7 days and 1 minute-2 days before the purchase. The existing envelope
+Approved store and online purchases with a customer are selected for a
+journey at the rate that makes the attributed net revenue about
+`attribution.TARGET_ROAS` (4x) the live impression spend
+(`attribution.live_journey_rate`, from the lane volumes, identified buyers and
+the pre-tax ticket), as history converts impressions. A journey
+(`attribution.with_journey_plan`) has one journey ID and one to three
+`ad_impression` touches 1 minute to 7 days before the purchase, each on an
+archetype drawn by impression volume, in the campaign window of its own time,
+with a creative from the campaign's pool, a CPM cost, a device and a
+CRM-matched `customer_id` exactly like background impressions; their impression
+IDs have the background format. The purchase carries the last touch's
+`campaign_id` and `impression_id`. The existing envelope
 `correlation_id` carries `attribution_journey_id` through impressions,
 receipt/order creation, promotion, payment, and online status events.
 
