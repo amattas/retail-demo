@@ -11,13 +11,16 @@ from pyspark.sql import DataFrame, Window
 from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
-from retail_setup.dictionaries.loader import load_dictionaries
+from retail_setup.dictionaries.loader import load_dictionaries, load_tax_rules
 from retail_setup.dictionaries.models import StoreTypeProfile
 from retail_setup.generation.baskets import (
     COMPLEMENT_RATE,
+    TaxRules,
     price_basket,
     receipt_offer,
+    store_tax_rules,
     sum_lines,
+    tax_rules_by_state,
 )
 from retail_setup.generation.behavior import repeat_purchase_probability
 from retail_setup.generation.inventory_policy import Demand, InventoryEvent, simulate_sku
@@ -189,6 +192,7 @@ def _fulfilled_finances(
     dims: dict[str, DataFrame],
     profile: StoreTypeProfile,
     seed: int,
+    tax_rules: TaxRules | None = None,
 ) -> dict[str, DataFrame]:
     """Receipts, lines and payments of the lines the policy could fill.
 
@@ -234,6 +238,10 @@ def _fulfilled_finances(
         .select("receipt_id_ext", "store_id", "event_ts", "event_date")
         .join(lines, "receipt_id_ext")
         .join(dims["dim_stores"].select(F.col("ID").alias("store_id"), "tax_rate"), "store_id")
+        .join(
+            store_tax_rules(dims["dim_stores"], dims.get("dim_geographies"), tax_rules or {}),
+            "store_id",
+        )
         .withColumn(
             "_lines",
             price_basket(
@@ -244,6 +252,7 @@ def _fulfilled_finances(
                 receipt_offer(draws, key, profile.promo_rate),
                 F.round(F.col("tax_rate") * 10000).cast("long"),
                 profile,
+                F.col("tax_rule"),
             ),
         )
     )
@@ -405,8 +414,12 @@ def resolve_fulfillment(
     into Python lists. ``events`` is cached because all output ledgers and the
     fulfilled receipt filter must consume the exact same policy execution.
     """
+    if profile is None:
+        profile = load_dictionaries(cfg.resolved_dictionary_root, cfg.store_type).profile
     headers = (
-        build_return_headers(sales_group, cfg, dims) if return_headers is None else return_headers
+        build_return_headers(sales_group, cfg, dims, profile)
+        if return_headers is None
+        else return_headers
     ).cache()
     # The lines (and units) each return takes back; a plan without
     # returned_lines returns the whole receipt.
@@ -455,8 +468,6 @@ def resolve_fulfillment(
     n_products = dims["dim_products"].count()
     if n_products < 1:
         raise ValueError("fulfillment requires a nonempty product catalog")
-    if profile is None:
-        profile = load_dictionaries(cfg.resolved_dictionary_root, cfg.store_type).profile
     # A uniform basket prior covers SKUs the demand model cannot price.
     uniform_prior = cfg.transactions_per_store_day * 10.0 / n_products
     # Seed every catalog SKU, not only products that happen to sell in this
@@ -515,5 +526,14 @@ def resolve_fulfillment(
         .cache()
     )
     return FulfillmentResult(
-        _fulfilled_finances(sales_group, events, dims, profile, cfg.seed), headers, events
+        _fulfilled_finances(
+            sales_group,
+            events,
+            dims,
+            profile,
+            cfg.seed,
+            tax_rules_by_state(load_tax_rules(cfg.resolved_dictionary_root)),
+        ),
+        headers,
+        events,
     )

@@ -11,6 +11,9 @@ the live stream:
   phase) the regular price is reset within ``REGULAR_PRICE_SPREAD`` of trend.
 - **Markdowns.** ``MARKDOWN_PROBABILITY`` of review periods carry a one-to-three
   week markdown of 10-35%.
+- **Price endings.** Regular prices end in .49 or .99 (9 cents below $1,
+  :func:`charm_cents`); markdown prices end in 9 cents and always undercut the
+  regular price (:func:`markdown_cents`).
 
 Volume also trends: store traffic and online orders compound
 ``annual_volume_growth`` a year from the anchor date (:func:`volume_growth`).
@@ -26,6 +29,7 @@ the same SKU has the same price on the same day in every run.
 
 from dataclasses import dataclass
 from datetime import date
+from math import floor
 
 from pyspark.sql import Column
 from pyspark.sql import functions as F
@@ -73,6 +77,76 @@ DEPARTMENT_PRICING: list[tuple[str, float, float]] = [
 ]
 DEFAULT_INFLATION = 0.025
 DEFAULT_ELASTICITY = -1.5
+
+# (department-name token, gross margin low, high): the share of the sale price
+# above cost, drawn per SKU (dims.compute_pricing). First token found applies.
+DEPARTMENT_MARGINS: list[tuple[str, float, float]] = [
+    ("electronic", 0.10, 0.25),
+    ("jewel", 0.45, 0.65),
+    ("watch", 0.40, 0.55),
+    ("fragrance", 0.40, 0.60),
+    ("toy", 0.30, 0.45),
+    ("seasonal", 0.35, 0.55),
+    ("footwear", 0.40, 0.55),
+    ("apparel", 0.45, 0.60),
+    ("clothing", 0.40, 0.55),
+    ("accessor", 0.45, 0.60),
+    ("sport", 0.30, 0.45),
+    ("garden", 0.30, 0.45),
+    ("home", 0.30, 0.50),
+    ("automotive", 0.25, 0.40),
+    ("office", 0.30, 0.50),
+    ("tool", 0.30, 0.45),
+    ("building", 0.20, 0.35),
+    ("electrical", 0.30, 0.45),
+    ("plumbing", 0.30, 0.45),
+    ("paint", 0.40, 0.55),
+    ("hardware", 0.35, 0.50),
+    ("pet", 0.25, 0.40),
+    ("baby", 0.20, 0.35),
+    ("health", 0.25, 0.40),
+    ("beauty", 0.35, 0.55),
+    ("household", 0.20, 0.35),
+    ("fresh", 0.25, 0.40),
+    ("grocery", 0.15, 0.30),
+]
+DEFAULT_MARGIN = (0.25, 0.45)
+
+
+def margin_band(department: str) -> tuple[float, float]:
+    """(low, high) gross margin of a department name."""
+    name = department.lower()
+    for token, low, high in DEPARTMENT_MARGINS:
+        if token in name:
+            return low, high
+    return DEFAULT_MARGIN
+
+
+def charm_cents(cents: float) -> int:
+    """The nearest charm price: .49 or .99 from $1, a 9-cent ending below it."""
+    if cents >= 100:
+        return max(99, int(floor((cents + 1) / 50 + 0.5)) * 50 - 1)
+    return max(9, int(floor((cents + 1) / 10 + 0.5)) * 10 - 1)
+
+
+def markdown_cents(cents: float, regular_cents: int) -> int:
+    """A markdown price: the nearest 9-cent ending, below the regular price."""
+    return max(1, min(regular_cents - 1, int(floor((cents + 1) / 10 + 0.5)) * 10 - 1))
+
+
+def charm_cents_column(cents: Column) -> Column:
+    """Column form of :func:`charm_cents` (long)."""
+    return (
+        F.when(
+            cents >= 100, F.greatest(F.lit(99), F.floor((cents + 1) / 50 + 0.5) * 50 - 1)
+        ).otherwise(F.greatest(F.lit(9), F.floor((cents + 1) / 10 + 0.5) * 10 - 1))
+    ).cast("long")
+
+
+def markdown_cents_column(cents: Column, regular_cents: Column) -> Column:
+    """Column form of :func:`markdown_cents` (long)."""
+    dime = F.floor((cents + 1) / 10 + 0.5) * 10 - 1
+    return F.greatest(F.lit(1), F.least(regular_cents - 1, dime)).cast("long")
 
 
 def department_pricing(department: str) -> tuple[float, float]:
@@ -145,10 +219,12 @@ def shelf_price(
     marked = window is not None and window[0] <= week - period_start < window[1]
     low, high = MARKDOWN_DEPTH
     depth = low + markdown_draws[3] * (high - low) if marked else 0.0
-    regular_cents = max(1, int(regular + 0.5))
+    regular_cents = charm_cents(regular)
     return ShelfPrice(
         regular_cents=regular_cents,
-        price_cents=max(1, int(regular * (1 - depth) + 0.5)),
+        price_cents=markdown_cents(regular * (1 - depth), regular_cents)
+        if marked
+        else regular_cents,
         trend_cents=base_cents * (1 + inflation) ** trend_years,
         markdown=marked,
     )
@@ -234,10 +310,14 @@ def shelf_price_struct(
 
     def shelf(r: Column) -> Column:
         trend_years = F.datediff(day, F.lit(schedule.anchor_date)) / DAYS_PER_YEAR
+        regular_cents = charm_cents_column(r["regular"])
         return F.struct(
-            F.greatest(F.lit(1), F.floor(r["regular"] + 0.5)).cast("long").alias("regular_cents"),
-            F.greatest(F.lit(1), F.floor(r["regular"] * (1 - r["depth"]) + 0.5))
-            .cast("long")
+            regular_cents.alias("regular_cents"),
+            F.when(
+                r["markdown"],
+                markdown_cents_column(r["regular"] * (1 - r["depth"]), regular_cents),
+            )
+            .otherwise(regular_cents)
             .alias("price_cents"),
             (base_cents * F.pow(growth, trend_years)).alias("trend_cents"),
             r["markdown"].alias("markdown"),

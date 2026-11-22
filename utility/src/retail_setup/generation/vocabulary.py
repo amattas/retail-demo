@@ -625,18 +625,21 @@ ONLINE_FULFILLMENT_MIX: list[tuple[str, float]] = [
 FULFILLMENT_MODES = [mode for mode, _ in ONLINE_FULFILLMENT_MIX]
 
 # Order-level outcomes and stage delays shared by history (online_orders.py)
-# and the live stream. Cancelled orders have zero totals, no payment and no
-# fulfillment; backordered (never BOPIS) orders ship but are not delivered yet.
+# and the live stream. Cancelled orders have zero totals and zero line
+# amounts, no payment and no fulfillment; backordered (never BOPIS) orders
+# wait ONLINE_BACKORDER_SECONDS for stock between picking and shipping, then
+# ship and deliver like any other order.
 ONLINE_CANCEL_RATE = 0.02
 ONLINE_BACKORDER_RATE = 0.08
+ONLINE_BACKORDER_SECONDS = (3 * 86400, 14 * 86400)
 # Promo codes with their percentage discount; each order puts a promo on a
 # share of its lines drawn uniformly from ONLINE_PROMO_LINE_SHARE.
 ONLINE_PROMOS: list[tuple[str, int]] = [("PROMO05", 5), ("PROMO10", 10), ("PROMO20", 20)]
 ONLINE_PROMO_LINE_SHARE = (0.10, 0.30)
 # Stage delays in seconds, uniform in [low, high): picking after the order
 # (BOPIS orders are picked for the pickup counter, ship orders for the
-# carrier), shipping after picking, delivery after shipping, and the BOPIS
-# customer pickup after the order is ready.
+# carrier), shipping after picking (plus the backorder wait), delivery after
+# shipping, and the BOPIS customer pickup after the order is ready.
 ONLINE_PICK_SECONDS = {"BOPIS": (4 * 3600, 24 * 3600), "SHIP": (30 * 60, 240 * 60)}
 ONLINE_SHIP_SECONDS = (2 * 3600, 4 * 3600)
 ONLINE_DELIVER_SECONDS = (86400, 3 * 86400)

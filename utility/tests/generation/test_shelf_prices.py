@@ -39,13 +39,13 @@ def test_shelf_price_follows_reviews_markdowns_and_trend() -> None:
     no_markdown = (0.9, 0.0, 0.0, 0.0)
 
     def price(day: date, review: float = 0.5, markdown=no_markdown, inflation: float = 0.0):
-        return pricing.shelf_price(1000, inflation, anchor, day, 0, review, markdown)
+        return pricing.shelf_price(999, inflation, anchor, day, 0, review, markdown)
 
     # A mid-spread review at the anchor reproduces the list price.
-    assert price(anchor).price_cents == 1000 and not price(anchor).markdown
-    # A review sets the regular price within +/-6% of trend.
-    assert price(anchor, review=0.0).regular_cents == 940
-    assert price(anchor, review=1.0).regular_cents == 1060
+    assert price(anchor).price_cents == 999 and not price(anchor).markdown
+    # A review sets the regular price within +/-6% of trend, at a charm price.
+    assert price(anchor, review=0.0).regular_cents == pricing.charm_cents(999 * 0.94) == 949
+    assert price(anchor, review=1.0).regular_cents == pricing.charm_cents(999 * 1.06) == 1049
     # Inflation compounds from the anchor, stepping at review periods.
     week = pricing.week_index(anchor)
     period_start = pricing.PRICE_EPOCH + timedelta(
@@ -54,17 +54,39 @@ def test_shelf_price_follows_reviews_markdowns_and_trend() -> None:
     a_year_later = period_start + timedelta(weeks=4 * pricing.PRICE_REVIEW_WEEKS)
     later = price(a_year_later, inflation=0.03)
     years = (a_year_later - anchor).days / 365.25
-    assert later.regular_cents == round(1000 * 1.03**years)
-    assert later.trend_cents == pytest.approx(1000 * 1.03**years)
+    assert later.regular_cents == pricing.charm_cents(999 * 1.03**years)
+    assert later.trend_cents == pytest.approx(999 * 1.03**years)
     same_period = price(a_year_later + timedelta(weeks=5), inflation=0.03)
     assert same_period.regular_cents == later.regular_cents
-    # A two-week markdown starting in the period's first week: 0.10 + 0.5 * 0.25 off.
+    # A two-week markdown starting in the period's first week: 0.10 + 0.5 * 0.25 off,
+    # at a 9-cent ending below the regular price.
     markdown = (0.0, 0.5, 0.0, 0.5)
     on = price(period_start + timedelta(days=3), markdown=markdown)
     off = price(period_start + timedelta(weeks=2, days=3), markdown=markdown)
     assert on.markdown and not off.markdown
     assert on.regular_cents == off.regular_cents
-    assert on.price_cents == round(on.regular_cents * (1 - 0.225))
+    assert on.price_cents == pricing.markdown_cents(999 * (1 - 0.225), on.regular_cents) == 779
+
+
+def test_prices_take_charm_endings() -> None:
+    assert [pricing.charm_cents(c) for c in (5, 37, 99.5, 100, 123, 125.1, 380, 101_420)] == [
+        9,
+        39,
+        99,
+        99,
+        99,
+        149,
+        399,
+        101_399,
+    ]
+    # Markdowns end in 9 cents and always undercut the regular price.
+    assert pricing.markdown_cents(134.1, 149) == 139
+    assert pricing.markdown_cents(148.0, 149) == 148
+    assert pricing.markdown_cents(8.1, 9) == 8
+    assert pricing.margin_band("Fresh") == (0.25, 0.40)
+    assert pricing.margin_band("Home & Fragrance") == (0.40, 0.60)
+    assert pricing.margin_band("Mystery Goods") == pricing.DEFAULT_MARGIN
+    assert all(0 < low < high < 1 for _, low, high in pricing.DEPARTMENT_MARGINS)
 
 
 def test_volume_growth_compounds_from_the_anchor() -> None:
@@ -158,7 +180,9 @@ def test_store_traffic_grows_year_over_year(spark) -> None:
             annual_volume_growth=growth,
         )
         dims = generate_dimensions(spark, dicts, cfg)
-        visits = generate_hourly_visits(spark, dims["dim_stores"], dicts.profile, cfg)
+        visits = generate_hourly_visits(
+            spark, dims["dim_stores"], dicts.profile, cfg, dims["dim_geographies"]
+        )
         return visits.agg(F.sum("n_receipts")).first()[0]
 
     def year_over_year(growth: float) -> float:

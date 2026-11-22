@@ -66,7 +66,9 @@ def _dictionary_paths(store_type: str, custom: bool = False) -> tuple[list[str],
         f"{store_type}/products.json",
         f"{store_type}/brands.json",
     ]
-    return required, [] if custom else [f"{store_type}/tags.json"]
+    # Taxability rules arrived after the first dictionaries; older refs lack them.
+    optional = ["_shared/tax_rules.json"]
+    return required, optional if custom else [*optional, f"{store_type}/tags.json"]
 
 
 def parse_custom_files(value: str, store_type: str) -> dict[str, str]:

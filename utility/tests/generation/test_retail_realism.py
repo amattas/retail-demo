@@ -103,7 +103,9 @@ def test_conversion_is_visit_first_not_four_fixed_bands(spark, seed):
     )
     dictionaries = load_dictionaries(cfg.resolved_dictionary_root, cfg.store_type)
     dims = generate_dimensions(spark, dictionaries, cfg)
-    visits = generate_hourly_visits(spark, dims["dim_stores"], dictionaries.profile, cfg)
+    visits = generate_hourly_visits(
+        spark, dims["dim_stores"], dictionaries.profile, cfg, dims["dim_geographies"]
+    )
     row = visits.agg(
         F.sum((F.col("n_receipts") > F.col("visitors")).cast("int")).alias("oversold"),
         F.countDistinct(

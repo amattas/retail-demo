@@ -26,6 +26,9 @@ DEFAULT_CUSTOMER_VISITS_PER_YEAR = 8.0
 # Expected store daily_traffic_multiplier: the mean of generation.dims
 # VOLUME_CLASSES (a test keeps the two in step).
 MEAN_TRAFFIC_MULTIPLIER = 1.0525
+# Upper bound on online orders per day. Order IDs widen past 99,999 orders a
+# day, so this bounds volume (generation time, table size), not ID width.
+MAX_ONLINE_ORDERS_PER_DAY = 1_000_000
 # Share of all customers active on a typical day of an 18-month history at the
 # default churn rate (generation.customers turns the base over by churn and
 # acquisition); sizes the default customer count.
@@ -123,7 +126,7 @@ class GenerationConfig(BaseModel):
     return_rate: float = Field(default=0.01, ge=0.0, le=0.10)
     # network-wide online orders per day at multiplier 1.0; omitted -> derived so
     # online orders are the profile's online_order_share of all orders
-    online_orders_per_day: int = Field(gt=0)
+    online_orders_per_day: int = Field(gt=0, le=MAX_ONLINE_ORDERS_PER_DAY)
     # number of category-matched branded SKUs generated per base catalog product
     # (datagen combinatorial SKUs); 1 = one SKU per dictionary row
     brands_per_product: int = Field(default=3, ge=1, le=10)

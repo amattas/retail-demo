@@ -30,7 +30,13 @@ from retail_setup.dictionaries.loader import default_dictionary_root, load_dicti
 
 SPEC_FILE = "customization.json"
 SPEC_HASH_FILE = ".spec-sha256"
-SHARED_FILES = ("first_names.json", "last_names.json", "geographies.json", "tax_rates.json")
+SHARED_FILES = (
+    "first_names.json",
+    "last_names.json",
+    "geographies.json",
+    "tax_rates.json",
+    "tax_rules.json",
+)
 CUSTOM_FILES = ("profile.json", "products.json", "brands.json")
 
 

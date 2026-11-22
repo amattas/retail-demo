@@ -245,6 +245,18 @@ STREAM_PROFILE = StoreTypeProfile.model_validate(json.loads(
 STREAM_PRODUCTS = basket_products(spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_products"), SEED)
 DIM_STORES = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_stores")
 DIM_CUSTOMERS = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_customers")
+DIM_GEOGRAPHIES = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_geographies")
+# State taxability rules, as history taxes groceries and clothing; dictionaries
+# seeded before the rules existed tax with the defaults.
+_TAX_RULES_PATH = "Files/setup/dictionaries/_shared/tax_rules.json"
+STREAM_TAX_RULES = (
+    tax_rules_by_state(
+        TaxRuleEntry.model_validate(row)
+        for row in json.loads(mssparkutils.fs.head(_TAX_RULES_PATH, 1048576))
+    )
+    if mssparkutils.fs.exists(_TAX_RULES_PATH)
+    else {}
+)
 
 # History-to-stream handoff: history should end within a day before now. A new
 # stream refuses a gap or overlap unless allow_history_gap is set; a resumed
@@ -331,9 +343,7 @@ INVENTORY_SEED = (None if _ledger is None
 # local time) and trucks serve their DC's fleet, exactly as in the historical
 # inventory chain; the demand prior is history's.
 _DIM_DCS = spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_distribution_centers")
-_routes = store_routes(
-    SEED, DIM_STORES, spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.dim_geographies"), _DIM_DCS,
-)
+_routes = store_routes(SEED, DIM_STORES, DIM_GEOGRAPHIES, _DIM_DCS)
 _store_dc = {store: route.dc_id for store, route in _routes.items()}
 _fleets = dc_fleets(
     ((r["ID"], r["DCID"]) for r in spark.table(
@@ -379,6 +389,8 @@ STREAM_CONTEXT = build_stream_context(
     inventory_seed=INVENTORY_SEED,
     anchor_date=ANCHOR,
     annual_volume_growth=ANNUAL_VOLUME_GROWTH,
+    dim_geographies=DIM_GEOGRAPHIES,
+    tax_rules=STREAM_TAX_RULES,
 )
 print(f"live volume: {RATE_ROWS_PER_SECOND} source rows/s; lane shares "
       + ", ".join(f"{lane}={share:.3f}" for lane, share in LANE_PLAN.shares.items()))

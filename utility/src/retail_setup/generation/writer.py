@@ -21,7 +21,9 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
+from retail_setup.generation.handoff import HandoffStore
 from retail_setup.generation.publication import (
+    COMPLETED,
     COMPLETED_CLEANUP_FAILED,
     PublicationBackend,
     PublicationCoordinator,
@@ -252,6 +254,93 @@ class _FilesystemBackend:
             shutil.rmtree(backup)
 
 
+def _run_log(
+    spark: SparkSession,
+    cfg: GenerationConfig,
+    lakehouse: str | None,
+    base_path: str | None,
+    fmt: str,
+) -> DataFrame | None:
+    if lakehouse is not None:
+        name = f"{lakehouse}.{cfg.silver_db}.setup_run_log"
+        return spark.table(name) if spark.catalog.tableExists(name) else None
+    path = Path(str(base_path)) / cfg.silver_db / "setup_run_log"
+    return spark.read.format(fmt).load(str(path)) if path.exists() else None
+
+
+def completed_publication(
+    spark: SparkSession,
+    cfg: GenerationConfig,
+    fingerprint: str,
+    *,
+    lakehouse: str | None = None,
+    base_path: str | None = None,
+    fmt: str = "delta",
+) -> str | None:
+    """The run_id of the latest Silver publication, when it holds this generation.
+
+    The latest completed run with a logged fingerprint (Silver publications)
+    counts only if its fingerprint matches and every table it promoted still
+    exists; otherwise None.
+    """
+    if (lakehouse is None) == (base_path is None):
+        raise ValueError("Provide exactly one of lakehouse= or base_path=")
+    log = _run_log(spark, cfg, lakehouse, base_path, fmt)
+    if log is None or "generation_fingerprint" not in log.columns:
+        return None
+    done = F.col("status").isin(COMPLETED, COMPLETED_CLEANUP_FAILED)
+    latest = (
+        log.filter(
+            (F.col("table_name") == "__run__") & done & F.col("generation_fingerprint").isNotNull()
+        )
+        .orderBy(F.col("generated_at").desc(), F.col("run_id").desc())
+        .select("run_id", "generation_fingerprint")
+        .first()
+    )
+    if latest is None or latest["generation_fingerprint"] != fingerprint:
+        return None
+    run_id = latest["run_id"]
+    promoted = [
+        row["table_name"]
+        for row in log.filter(
+            (F.col("run_id") == run_id) & done & (F.col("table_name") != "__run__")
+        )
+        .select("table_name")
+        .distinct()
+        .collect()
+    ]
+    for table in promoted:
+        if lakehouse is not None:
+            exists = spark.catalog.tableExists(f"{lakehouse}.{cfg.silver_db}.{table}")
+        else:
+            exists = (Path(str(base_path)) / cfg.silver_db / table).exists()
+        if not exists:
+            return None
+    return run_id if promoted else None
+
+
+def already_published(
+    spark: SparkSession,
+    cfg: GenerationConfig,
+    store: HandoffStore,
+    *,
+    lakehouse: str | None = None,
+    base_path: str | None = None,
+    fmt: str = "delta",
+) -> str | None:
+    """The run that already published this generation when a retry has nothing to do.
+
+    Setup-10 drops the handoffs once Silver is published. A retry that finds
+    no handoffs and Silver holding this generation (:func:`completed_publication`)
+    succeeds without publishing again; with handoffs present it publishes them.
+    """
+    if store.has_handoffs():
+        return None
+    return completed_publication(
+        spark, cfg, store.fingerprint, lakehouse=lakehouse, base_path=base_path, fmt=fmt
+    )
+
+
 def write_all(
     tables: dict[str, DataFrame],
     gold: dict[str, DataFrame],
@@ -262,6 +351,7 @@ def write_all(
     base_path: str | None = None,
     fmt: str = "delta",
     prestaged: dict[str, str] | None = None,
+    fingerprint: str | None = None,
 ) -> list[str]:
     """Publish dims+facts to silver, gold to gold, then setup_run_log.
 
@@ -283,6 +373,10 @@ def write_all(
     ``RuntimeError`` is raised — this function never returns after a partial
     or rolled-back publish; a return only happens once every candidate has
     been promoted.
+
+    ``fingerprint`` (``handoff.generation_fingerprint``) is logged with every
+    row of a Silver publication, so a retry can tell that Silver already holds
+    this generation (:func:`completed_publication`).
 
     Returns the list of written table names (silver + gold); the
     setup_run_log table itself is not included in the returned list.
@@ -339,6 +433,7 @@ def write_all(
             "end_date date, table_name string, row_count long, status string, "
             "error string",
         ).withColumn("generated_at", F.current_timestamp())
+        log_df = log_df.withColumn("generation_fingerprint", F.lit(fingerprint).cast("string"))
         writer = log_df.write.format("delta" if log_table is not None else fmt)
         writer = writer.mode("append").option("mergeSchema", "true")
         if log_table is not None:

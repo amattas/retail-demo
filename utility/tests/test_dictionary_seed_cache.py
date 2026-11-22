@@ -49,6 +49,7 @@ def _payloads(revision: str, include_optional: bool = True) -> dict[str, bytes]:
         "_shared/last_names.json",
         "_shared/geographies.json",
         "_shared/tax_rates.json",
+        "_shared/tax_rules.json",
         "grocery/profile.json",
         "grocery/products.json",
         "grocery/brands.json",

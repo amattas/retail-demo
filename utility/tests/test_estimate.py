@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import date
 
+import pytest
+
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.generation.estimate import calibrated_basket_mean, estimate_record_counts
 
@@ -53,3 +55,40 @@ def test_every_shipped_store_type_calibrates_to_multi_item_baskets():
         for store_type in ("luxury", "hardware", "grocery", "supercenter")
     }
     assert all(mean is not None and mean >= 1.5 for mean in means.values()), means
+
+
+def test_estimate_mirrors_the_visit_beacon_and_fulfillment_models():
+    from retail_setup.generation import estimate, vocabulary
+    from retail_setup.generation.stream_calendar import VISIT_CONVERSION_CALIBRATION
+
+    assert estimate._VISIT_CONVERSION == VISIT_CONVERSION_CALIBRATION
+    assert estimate._BLE_DETECTED_SHARE == vocabulary.BLE_DETECTED_SHARE
+    assert estimate._BLE_MAX_MIDDLE_ZONES == vocabulary.BLE_MAX_MIDDLE_ZONES
+    assert estimate._BLE_PINGS_PER_ZONE == vocabulary.BLE_PINGS_PER_ZONE
+    assert estimate._STORE_FULFILLED_ONLINE_SHARE == pytest.approx(
+        sum(w for mode, w in vocabulary.ONLINE_FULFILLMENT_MIX if mode != "SHIP_FROM_DC")
+    )
+
+
+def test_estimate_counts_beacon_pings_inventory_series_and_direct_lake_capacity():
+    from retail_setup.generation.estimate import (
+        DIRECT_LAKE_ROW_LIMITS,
+        catalog_expectations,
+        direct_lake_capacity,
+        direct_lake_summary,
+        inventory_series,
+    )
+
+    cfg = _cfg(store_type="grocery")
+    counts = estimate_record_counts(cfg)
+    # Grocery: 2,154 base products under three brands each.
+    assert catalog_expectations(cfg).sku_count == 2154 * 3
+    assert inventory_series(cfg) == 50 * 2154 * 3
+    # A quarter of all visits ping beacons a dozen-plus times: more rows than lines.
+    assert counts["BLE pings"] > counts["Receipt lines"]
+    assert counts["Store inventory moves"] > counts["Receipt lines"]
+    assert direct_lake_capacity(DIRECT_LAKE_ROW_LIMITS[0][1]) == "F2-F32"
+    assert direct_lake_capacity(DIRECT_LAKE_ROW_LIMITS[0][1] + 1) == "F64"
+    assert direct_lake_capacity(3_000_000_001) == "F256"
+    assert direct_lake_capacity(DIRECT_LAKE_ROW_LIMITS[-1][1] + 1) is None
+    assert direct_lake_summary(cfg).startswith("Direct Lake: largest table fact_ble_pings")

@@ -201,8 +201,10 @@ The active non-interactive inputs include:
 - history `months`, store count, and deterministic seed.
 
 When a value is missing on an interactive terminal, `configure` prompts for it.
-After the generation values, it shows a record-count estimate and asks
-`Use these settings?`. `--yes` accepts the generation settings without that
+After the generation values, it shows a record-count estimate (receipts and
+lines, online orders and lines, payments, beacon pings, and store inventory
+moves), the largest semantic-model table with the smallest capacity whose
+Direct Lake guardrail holds it, and asks `Use these settings?`. `--yes` accepts the generation settings without that
 question; the setup interface passes it because its configuration page has
 already shown the estimate. Prompts go through `retail_setup.interaction`, so
 under the setup interface they open as dialog boxes.
@@ -231,15 +233,30 @@ generator's catalog popularity, pricing, and ticket calibration, from
 | Best store/product sells under 0.5 units a day | Profiles with required ML | Error | Demand forecasting (`MIN_DAILY_SALES`) has no eligible store/product |
 | Receipt lines above twice what a 16-node pool generates in 12 hours | All profiles | Error | Exceeds the 12-hour notebook activity limit on any capacity |
 | Receipt lines above what an F64 (2-node) pool generates in 12 hours | All profiles | Warning | May time out on a small capacity |
+| Store-SKU days of the inventory simulation above twice what a 16-node pool steps in 12 hours | All profiles | Error | The Python inventory policy steps every store-SKU series through every day |
+| Store-SKU days above what an F64 (2-node) pool steps in 12 hours | All profiles | Warning | May time out on a small capacity |
+| Largest semantic-model table above 24 billion rows | All profiles | Error | Above the Direct Lake guardrail of every capacity; Direct Lake on OneLake has no DirectQuery fallback |
+| Largest semantic-model table above 300 million rows | All profiles | Warning | Above the F2-F32 Direct Lake guardrail; names the smallest capacity that holds it |
 
 Throughput uses a measured 3.5 million receipt lines per Spark node-hour, from
-a live full-demo run. Some failure modes aren't checked:
+a live full-demo run, and a conservative planning figure of one billion
+store-SKU days per node-hour for the inventory simulation (store count x
+dictionary products x brands per product x days). Table sizes come from
+`estimate.largest_tables`: beacon pings (`fact_ble_pings`, usually the largest:
+a quarter of visits ping a dozen or more times), receipt lines, and the store
+inventory ledger. Direct Lake row guardrails per table are 300 million rows on
+F2-F32, 1.5 billion on F64, 3 billion on F128, 6 billion on F256, 12 billion
+on F512 and 24 billion on F1024 and above. The capacity is not known at
+configure time, so the warning names the capacity the configuration needs.
+Some failure modes aren't checked:
 
 - Segmentation and churn class balance are guaranteed by the generator's
   floor of 5,000 customers.
 - Stockout label balance depends on the simulated inventory.
 - Fixed-width IDs can't overflow within the allowed ranges (`store_count` ≤
-  2,000 and `months` ≤ 120).
+  2,000, `months` ≤ 120, `transactions_per_store_day` ≤ 5,000). Online order
+  IDs widen past 99,999 orders a day, and `online_orders_per_day` is at most
+  1,000,000.
 
 `utility/tests/test_feasibility.py` checks that the smallest required-ML
 configuration of every shipped store type passes, and covers each check.

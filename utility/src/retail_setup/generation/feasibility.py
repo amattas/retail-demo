@@ -13,7 +13,13 @@ Covered failure modes:
   receipts, and too few multi-item baskets leave no repeated product pairs;
 - required demand forecasting needs at least one store/product selling
   ``MIN_DAILY_SALES`` units a day;
-- very large volumes exceed the 12-hour Fabric notebook activity limit.
+- very large volumes exceed the 12-hour Fabric notebook activity limit, both
+  in receipt lines and in the inventory simulation, which steps every
+  store-SKU series through every day of history in Python;
+- the largest semantic-model table exceeds the Direct Lake on OneLake row
+  guardrail of small capacities (a warning naming the capacity it needs) or of
+  every capacity (an error): Direct Lake on OneLake has no DirectQuery
+  fallback.
 
 Not covered, because they can't be predicted without running the simulation or
 are already guaranteed by the generator: customer segmentation and churn (the
@@ -28,7 +34,12 @@ from dataclasses import dataclass
 from typing import Literal
 
 from retail_setup.config.generation import GenerationConfig
-from retail_setup.generation.estimate import catalog_expectations
+from retail_setup.generation.estimate import (
+    DIRECT_LAKE_ROW_LIMITS,
+    catalog_expectations,
+    direct_lake_capacity,
+    largest_tables,
+)
 
 MIN_REQUIRED_ML_HISTORY_DAYS = 540
 # Average items beyond the first; below this baskets are effectively single-item.
@@ -46,6 +57,10 @@ LINES_PER_NODE_HOUR = 3_500_000
 _ACTIVITY_HOURS = 12
 _LARGEST_POOL_NODES = 16
 _SMALLEST_POOL_NODES = 2  # F64
+# Inventory simulation throughput: store-SKU days stepped per node-hour by the
+# Python policy (mapInArrow workers, one series at a time). A conservative
+# planning figure, not a measured limit.
+INVENTORY_SKU_DAYS_PER_NODE_HOUR = 1_000_000_000
 
 
 @dataclass(frozen=True)
@@ -110,6 +125,59 @@ def assess(cfg: GenerationConfig, *, ml_required: bool, profile_name: str) -> li
                     f"no product would sell {MIN_DAILY_SALES} units a day in a store (best "
                     f"is about {top_units:.2f}), so demand forecasting (required ML) has no "
                     "eligible store/product. Choose a store type with a smaller catalog.",
+                )
+            )
+
+    if expectations is not None and expectations.sku_count:
+        series = cfg.store_count * expectations.sku_count
+        sku_days = series * days
+        largest = INVENTORY_SKU_DAYS_PER_NODE_HOUR * _LARGEST_POOL_NODES * _ACTIVITY_HOURS
+        smallest = INVENTORY_SKU_DAYS_PER_NODE_HOUR * _SMALLEST_POOL_NODES * _ACTIVITY_HOURS
+        if sku_days > 2 * largest:
+            findings.append(
+                Finding(
+                    "error",
+                    f"the inventory simulation would step {series:,} store-SKU series through "
+                    f"{days:,} days (about {sku_days / 1e9:,.0f} billion steps), more than "
+                    f"Fabric can run within its {_ACTIVITY_HOURS}-hour notebook limit. Reduce "
+                    "stores, months, or brands per product.",
+                )
+            )
+        elif sku_days > smallest:
+            findings.append(
+                Finding(
+                    "warning",
+                    f"the inventory simulation steps {series:,} store-SKU series through "
+                    f"{days:,} days (about {sku_days / 1e9:,.1f} billion steps); it can take "
+                    "several hours on an F64 capacity. Use a larger capacity or fewer stores, "
+                    "months, or brands per product.",
+                )
+            )
+
+    if expectations is not None:
+        name, rows = max(largest_tables(cfg).items(), key=lambda item: item[1])
+        capacity = direct_lake_capacity(rows)
+        smallest_tier, smallest_limit = DIRECT_LAKE_ROW_LIMITS[0]
+        largest_limit = DIRECT_LAKE_ROW_LIMITS[-1][1]
+        if capacity is None:
+            findings.append(
+                Finding(
+                    "error",
+                    f"{name} would hold about {rows / 1e9:,.1f} billion rows, above the Direct "
+                    f"Lake row guardrail of every capacity ({largest_limit / 1e9:,.0f} billion "
+                    "rows per table), so the semantic model could not load it. Reduce stores "
+                    "or months.",
+                )
+            )
+        elif rows > smallest_limit:
+            findings.append(
+                Finding(
+                    "warning",
+                    f"{name} would hold about {rows / 1e6:,.0f} million rows, above the Direct "
+                    f"Lake row guardrail of {smallest_tier} capacities "
+                    f"({smallest_limit / 1e6:,.0f} million rows per table). Reports need a "
+                    f"capacity of {capacity} or larger (Direct Lake on OneLake has no "
+                    "DirectQuery fallback); otherwise reduce stores or months.",
                 )
             )
 

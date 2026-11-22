@@ -196,8 +196,9 @@ def test_spark_fulfillment_finances_returns_and_all_ledgers(spark, candidate_cas
     assert len(codes) <= 1 and "TEST" not in codes
     minimums = {code: minimum for code, _, _, minimum, _ in PROMO_CATALOG}
     assert all(partial.gross_subtotal_cents >= minimums[code] for code in codes)
+    # Washington has no taxability rule: clothing (REDUCED_RATE) pays the full rate.
     assert partial.tax_cents == sum(
-        (row.ext_cents * 825 * {1: 100, 3: 0, 5: 50}[row.product_id] + 500_000) // 1_000_000
+        (row.ext_cents * 825 * {1: 100, 3: 0, 5: 100}[row.product_id] + 500_000) // 1_000_000
         for row in retained
     )
     assert partial.total_cents == partial.subtotal_cents + partial.tax_cents

@@ -15,6 +15,7 @@ from retail_setup.dictionaries.models import (
     ProductTagEntry,
     StoreTypeProfile,
     TaxJurisdictionEntry,
+    TaxRuleEntry,
 )
 
 
@@ -26,6 +27,7 @@ class DictionarySet:
     last_names: list[NameEntry] = field(default_factory=list)
     geographies: list[GeographyEntry] = field(default_factory=list)
     tax_rates: list[TaxJurisdictionEntry] = field(default_factory=list)
+    tax_rules: list[TaxRuleEntry] = field(default_factory=list)
     products: list[ProductEntry] = field(default_factory=list)
     brands: list[ProductBrandEntry] = field(default_factory=list)
     tags: list[ProductTagEntry] = field(default_factory=list)
@@ -79,6 +81,12 @@ def load_list(path: Path, model: type[BaseModel]) -> list:
 _load_list = load_list
 
 
+def load_tax_rules(root: Path) -> list[TaxRuleEntry]:
+    """State taxability rules (``_shared/tax_rules.json``); none when the file is absent."""
+    path = root / "_shared" / "tax_rules.json"
+    return load_list(path, TaxRuleEntry) if path.exists() else []
+
+
 def load_dictionaries(root: Path, store_type: str) -> DictionarySet:
     type_dir = root / store_type
     if not (type_dir / "profile.json").exists():
@@ -106,6 +114,7 @@ def load_dictionaries(root: Path, store_type: str) -> DictionarySet:
         last_names=load_list(shared / "last_names.json", NameEntry),
         geographies=load_list(shared / "geographies.json", GeographyEntry),
         tax_rates=load_list(shared / "tax_rates.json", TaxJurisdictionEntry),
+        tax_rules=load_tax_rules(root),
         products=load_list(type_dir / "products.json", ProductEntry),
         brands=load_list(type_dir / "brands.json", ProductBrandEntry),
         tags=load_list(tags_path, ProductTagEntry) if tags_path.exists() else [],

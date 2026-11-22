@@ -1,0 +1,98 @@
+[
+ {
+  "GroceryTaxPct": 75,
+  "StateCode": "AL"
+ },
+ {
+  "GroceryTaxPct": 30,
+  "StateCode": "AR"
+ },
+ {
+  "GroceryTaxPct": 40,
+  "StateCode": "CO"
+ },
+ {
+  "GroceryTaxPct": 45,
+  "StateCode": "GA"
+ },
+ {
+  "GroceryTaxPct": 100,
+  "StateCode": "HI"
+ },
+ {
+  "GroceryTaxPct": 100,
+  "StateCode": "ID"
+ },
+ {
+  "GroceryTaxPct": 15,
+  "StateCode": "IL"
+ },
+ {
+  "GroceryTaxPct": 25,
+  "StateCode": "KS"
+ },
+ {
+  "GroceryTaxPct": 50,
+  "StateCode": "LA"
+ },
+ {
+  "ClothingExemptUnder": "175.00",
+  "StateCode": "MA"
+ },
+ {
+  "ClothingTaxPct": 0,
+  "StateCode": "MN"
+ },
+ {
+  "GroceryTaxPct": 50,
+  "StateCode": "MO"
+ },
+ {
+  "GroceryTaxPct": 75,
+  "StateCode": "MS"
+ },
+ {
+  "ClothingTaxPct": 0,
+  "StateCode": "NJ"
+ },
+ {
+  "ClothingExemptUnder": "110.00",
+  "StateCode": "NY"
+ },
+ {
+  "GroceryTaxPct": 45,
+  "StateCode": "OK"
+ },
+ {
+  "ClothingTaxPct": 0,
+  "StateCode": "PA"
+ },
+ {
+  "ClothingExemptUnder": "250.00",
+  "StateCode": "RI"
+ },
+ {
+  "GroceryTaxPct": 25,
+  "StateCode": "SC"
+ },
+ {
+  "GroceryTaxPct": 100,
+  "StateCode": "SD"
+ },
+ {
+  "GroceryTaxPct": 70,
+  "StateCode": "TN"
+ },
+ {
+  "GroceryTaxPct": 40,
+  "StateCode": "UT"
+ },
+ {
+  "GroceryTaxPct": 20,
+  "StateCode": "VA"
+ },
+ {
+  "ClothingTaxPct": 0,
+  "StateCode": "VT"
+ }
+]

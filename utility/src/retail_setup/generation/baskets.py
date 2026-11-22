@@ -20,15 +20,15 @@ Line structs carry ``line_num``, ``product_id``, ``quantity``, ``unit_cents``,
 launched).
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
-from retail_setup.dictionaries.models import StoreTypeProfile
+from retail_setup.dictionaries.models import StoreTypeProfile, TaxRuleEntry
 from retail_setup.generation.pricing import elasticity_column, inflation_column
-from retail_setup.generation.runtime import bind, seeded_draws
+from retail_setup.generation.runtime import bind, case_when, seeded_draws
 from retail_setup.generation.vocabulary import PROMO_CATALOG
 
 # Share of lines that bring their complementary product along.
@@ -248,12 +248,97 @@ def basket_products(dim_products: DataFrame, seed: int) -> DataFrame:
     )
 
 
-def line_tax_cents(net_cents: Column, taxability: Column, bps: Column) -> Column:
-    """Integer basis-point tax of a line's net cents (datagen ``_tax_cents``)."""
+# Product taxability classes: TAXABLE pays the full combined rate everywhere;
+# NON_TAXABLE (grocery staples) and REDUCED_RATE (clothing) pay the share of
+# the rate their state's rule sets (``_shared/tax_rules.json``).
+GROCERY_TAXABILITY = "NON_TAXABLE"
+CLOTHING_TAXABILITY = "REDUCED_RATE"
+# (grocery %, clothing %, clothing exempt under cents) of a state without a rule.
+DEFAULT_TAX_RULE: tuple[int, int, int | None] = (0, 100, None)
+TaxRules = dict[str, tuple[int, int, int | None]]
+
+
+def tax_rules_by_state(entries: Iterable[TaxRuleEntry]) -> TaxRules:
+    """``{state: (grocery %, clothing %, clothing exempt under cents)}`` of rule entries."""
+    return {
+        entry.StateCode: (
+            entry.GroceryTaxPct,
+            entry.ClothingTaxPct,
+            None if entry.ClothingExemptUnder is None else int(entry.ClothingExemptUnder * 100),
+        )
+        for entry in entries
+    }
+
+
+def tax_percent(
+    taxability: str, unit_cents: int, rule: tuple[int, int, int | None] = DEFAULT_TAX_RULE
+) -> int:
+    """Share (percent) of the combined rate a line pays under a state rule."""
+    grocery, clothing, exempt_under = rule
+    if taxability == GROCERY_TAXABILITY:
+        return grocery
+    if taxability == CLOTHING_TAXABILITY:
+        return 0 if exempt_under is not None and unit_cents < exempt_under else clothing
+    return 100 if taxability == "TAXABLE" else 0
+
+
+def _rule_struct(rule: tuple[int, int, int | None]) -> Column:
+    grocery, clothing, exempt_under = rule
+    return F.struct(
+        F.lit(grocery).cast("int").alias("grocery_pct"),
+        F.lit(clothing).cast("int").alias("clothing_pct"),
+        F.lit(exempt_under).cast("long").alias("clothing_exempt_under_cents"),
+    )
+
+
+def tax_rule_column(rules: TaxRules, state: Column) -> Column:
+    """The state rule of a state-code column as a struct (the default when none)."""
+    default = _rule_struct(DEFAULT_TAX_RULE)
+    if not rules:
+        return default
+    return case_when(
+        (state == F.lit(code), _rule_struct(rule)) for code, rule in sorted(rules.items())
+    ).otherwise(default)
+
+
+def line_tax_cents(
+    net_cents: Column,
+    taxability: Column,
+    bps: Column,
+    rule: Column | None = None,
+    unit_cents: Column | None = None,
+) -> Column:
+    """Integer basis-point tax of a line's net cents (datagen ``_tax_cents``).
+
+    ``rule`` is the selling (or destination) state's :func:`tax_rule_column`;
+    without it groceries are exempt and clothing pays the full rate. Clothing
+    priced (``unit_cents``) below the rule's threshold is exempt.
+    """
+    rule = _rule_struct(DEFAULT_TAX_RULE) if rule is None else rule
+    exempt = rule["clothing_exempt_under_cents"]
+    clothing = rule["clothing_pct"]
+    if unit_cents is not None:
+        clothing = F.when(exempt.isNotNull() & (unit_cents < exempt), F.lit(0)).otherwise(clothing)
     multiplier = (
-        F.when(taxability == "TAXABLE", 100).when(taxability == "REDUCED_RATE", 50).otherwise(0)
+        F.when(taxability == "TAXABLE", F.lit(100))
+        .when(taxability == GROCERY_TAXABILITY, rule["grocery_pct"])
+        .when(taxability == CLOTHING_TAXABILITY, clothing)
+        .otherwise(F.lit(0))
     ).cast("long")
     return F.floor((net_cents * bps * multiplier + F.lit(500_000)) / F.lit(1_000_000)).cast("long")
+
+
+def store_tax_rules(
+    dim_stores: DataFrame, dim_geographies: DataFrame | None, rules: TaxRules
+) -> DataFrame:
+    """``store_id, tax_rule``: each store's state rule (the default without geographies)."""
+    stores = dim_stores.select(F.col("ID").cast("long").alias("store_id"), "GeographyID")
+    if dim_geographies is None:
+        return stores.select("store_id", _rule_struct(DEFAULT_TAX_RULE).alias("tax_rule"))
+    states = dim_geographies.select(F.col("ID").alias("GeographyID"), "State")
+    return stores.join(states, "GeographyID", "left").select(
+        "store_id", tax_rule_column(rules, F.col("State")).alias("tax_rule")
+    )
 
 
 def price_basket(
@@ -264,15 +349,19 @@ def price_basket(
     offer: Column,
     bps: Column,
     profile: StoreTypeProfile,
+    rule: Column | None = None,
 ) -> Column:
-    """Lines with the basket promotion, ``ext_cents`` (net) and ``tax_cents``."""
+    """Lines with the basket promotion, ``ext_cents`` (net) and ``tax_cents``.
+
+    ``rule`` is the store's state taxability rule (:func:`tax_rule_column`).
+    """
     promoted = basket_promotion(draws, key, lines, month, offer, profile)
 
     def finish(line: Column) -> Column:
         gross = line["unit_cents"] * line["quantity"]
         net = F.greatest(F.lit(0).cast("long"), gross - line["discount_cents"])
         return line.withField("ext_cents", net).withField(
-            "tax_cents", line_tax_cents(net, line["taxability"], bps)
+            "tax_cents", line_tax_cents(net, line["taxability"], bps, rule, line["unit_cents"])
         )
 
     return F.transform(promoted, finish)

@@ -144,7 +144,7 @@ def _build_promos(ctx: GenerationContext, plan: StageOutputs) -> StageOutputs:
 
 
 def _build_store_ops(ctx: GenerationContext) -> StageOutputs:
-    ops = store_activity.generate_store_ops(ctx.spark, ctx.dims, ctx.cfg)
+    ops = store_activity.generate_store_ops(ctx.spark, ctx.dims, ctx.cfg, ctx.dicts.profile)
     return {"fact_store_ops": localize_by_store(ops, ctx.dims, ["event_ts"])}
 
 

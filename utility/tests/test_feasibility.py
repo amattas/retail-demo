@@ -66,3 +66,33 @@ def test_volume_warns_beyond_small_capacity_and_blocks_beyond_any_capacity():
 
     huge = _levels(GenerationConfig(store_type="supercenter", months=120, store_count=2000))
     assert any("even on the largest Spark pool" in error for error in huge["error"])
+
+
+def test_extreme_volumes_warn_or_block_at_direct_lake_guardrails():
+    # 200 supercenters for three years: about 1.4 billion beacon pings in one
+    # table, above the F2-F32 guardrail (a warning that names the capacity).
+    large = _levels(GenerationConfig(store_type="supercenter", months=36, store_count=200))
+    direct_lake = [w for w in large["warning"] if "Direct Lake" in w]
+    assert direct_lake and "fact_ble_pings" in direct_lake[0] and "F64 or larger" in direct_lake[0]
+    # Beyond every capacity's guardrail, the semantic model could not load it.
+    huge = _levels(GenerationConfig(store_type="grocery", months=120, store_count=2000))
+    assert any("guardrail of every capacity" in e for e in huge["error"])
+
+
+def test_inventory_simulation_is_bounded_by_store_sku_days(monkeypatch):
+    def with_skus(skus: int):
+        monkeypatch.setattr(
+            feasibility,
+            "catalog_expectations",
+            lambda _cfg: CatalogExpectations(
+                basket_mean=1.6, top_sku_unit_share=0.05, sku_count=skus
+            ),
+        )
+        monkeypatch.setattr(feasibility, "largest_tables", lambda _cfg: {"fact_ble_pings": 1})
+        return _levels(GenerationConfig(store_type="grocery", months=24, store_count=2000))
+
+    # 2,000 stores x 18,000 SKUs (a 6,000-product custom catalog under three
+    # brands) x 2 years: about 26 billion simulation steps.
+    assert any("inventory simulation" in w for w in with_skus(18_000)["warning"])
+    assert any("inventory simulation" in e for e in with_skus(300_000)["error"])
+    assert not any("inventory simulation" in w for w in with_skus(100)["warning"])

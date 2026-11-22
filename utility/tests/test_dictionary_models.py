@@ -207,3 +207,8 @@ def test_profile_store_knobs_override_and_validate():
     night_only = [1.0] * 6 + [0.0] * 18
     with pytest.raises(ValidationError, match="no hourly traffic"):
         StoreTypeProfile(**_profile_kwargs(hourly_weights=night_only, operating_hours=["9-17"]))
+    # Every window is checked: one busy window does not excuse an empty one.
+    with pytest.raises(ValidationError, match="'9-17' have no hourly traffic"):
+        StoreTypeProfile(
+            **_profile_kwargs(hourly_weights=night_only, operating_hours=["0-6", "9-17"])
+        )

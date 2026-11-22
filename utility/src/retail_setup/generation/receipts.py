@@ -16,9 +16,11 @@ receipts are anonymous.
 
 Money is integer cents end-to-end; tax replicates datagen's basis-point
 integer formula exactly:
-    rate_bps = round(rate * 10000); mult = 100/50/0 by taxability;
+    rate_bps = round(rate * 10000); mult = percent of the rate the line pays;
     tax = (ext_cents * rate_bps * mult + 500_000) // 1_000_000
-implemented with Spark integer `DIV` so no float rounding is involved.
+implemented with Spark integer `DIV` so no float rounding is involved. The
+percent is 100 for taxable goods; groceries and clothing follow the store's
+state rule (``baskets.line_tax_cents``, ``_shared/tax_rules.json``).
 """
 
 from pyspark.sql import Column, DataFrame, SparkSession
@@ -27,13 +29,16 @@ from pyspark.sql.window import Window
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.models import StoreTypeProfile
+from retail_setup.dictionaries.loader import load_tax_rules
 from retail_setup.generation.baskets import (
     COMPLEMENT_RATE,
     basket_products,
     merge_lines,
     price_basket,
     receipt_offer,
+    store_tax_rules,
     sum_lines,
+    tax_rules_by_state,
     with_complements,
 )
 from retail_setup.generation.behavior import (
@@ -92,51 +97,6 @@ SEASONAL_LIFT: dict[str, list[float]] = {
     "beauty": [1.2, 1.05, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.05, 1.2, 1.5],
     "automotive": [1.0, 1.0, 1.05, 1.1, 1.2, 1.2, 1.2, 1.1, 1.0, 1.0, 1.0, 1.0],
 }
-
-
-# Weather simulation (datagen EventPatterns): a per-store-day weather state
-# scales foot traffic. Seasonal odds make winter snow/storm and summer sun more
-# likely. Only the traffic multiplier surfaces (there is no weather column).
-WEATHER_MULTS = [1.1, 1.0, 0.7, 0.6, 0.5]  # sunny, cloudy, rainy, snowy, stormy
-WEATHER_P_WINTER = [0.25, 0.30, 0.15, 0.20, 0.10]
-WEATHER_P_SUMMER = [0.55, 0.25, 0.15, 0.00, 0.05]
-WEATHER_P_SHOULDER = [0.40, 0.30, 0.20, 0.05, 0.05]
-
-# Shopping trip archetypes (datagen ShoppingBehaviorType): each trip is a quick
-# run / normal run / family shop / bulk stock-up, giving multi-modal basket
-# sizes. Multipliers scale the store-type basket_lambda; weighted mean ~1.0 so
-# overall item volume is preserved.
-TRIP_TYPES: list[tuple[str, float, float]] = [  # (name, weight, basket multiplier)
-    ("QUICK_TRIP", 0.30, 0.30),
-    ("GROCERY_RUN", 0.40, 0.90),
-    ("FAMILY_SHOPPING", 0.20, 1.60),
-    ("BULK_SHOPPING", 0.10, 2.50),
-]
-
-
-def _cdf_pick_lit(u: Column, probs: list[float], values: list[float]) -> Column:
-    """Inverse-CDF pick returning the chosen literal value."""
-    acc = 0.0
-    expr: Column | None = None
-    for p, v in list(zip(probs, values))[:-1]:
-        acc += p
-        cond = u < F.lit(acc)
-        expr = F.when(cond, F.lit(v)) if expr is None else expr.when(cond, F.lit(v))
-    return expr.otherwise(F.lit(values[-1])) if expr is not None else F.lit(values[0])
-
-
-def _weather_mult(u: Column, month: Column) -> Column:
-    """Per-store-day weather traffic multiplier with seasonal weather odds."""
-    return (
-        F.when(month.isin(12, 1, 2), _cdf_pick_lit(u, WEATHER_P_WINTER, WEATHER_MULTS))
-        .when(month.isin(6, 7, 8), _cdf_pick_lit(u, WEATHER_P_SUMMER, WEATHER_MULTS))
-        .otherwise(_cdf_pick_lit(u, WEATHER_P_SHOULDER, WEATHER_MULTS))
-    )
-
-
-def _trip_basket_mult(u: Column) -> Column:
-    """Pick a shopping-trip archetype's basket-size multiplier (inverse-CDF)."""
-    return _cdf_pick_lit(u, [w for _, w, _ in TRIP_TYPES], [m for _, _, m in TRIP_TYPES])
 
 
 def _seasonal_factor(dept_name: str, month_col: Column) -> Column:
@@ -244,46 +204,6 @@ def _open_close_cols(operating_hours: Column) -> tuple[Column, Column]:
     return open_h, close_h
 
 
-def _pick_hour_static(u: Column, hourly_weights: list[float], open_h: int, close_h: int) -> Column:
-    """Inverse-CDF hour pick for a single, statically known operating window.
-
-    Weights outside ``[open_h, close_h)`` are zeroed and the CDF renormalised
-    over the open hours, so the pick can never land on a closed hour. The
-    cumulative fractions are Python floats (not column arithmetic), keeping the
-    generated expression small.
-    """
-    masked = [w if open_h <= h < close_h else 0.0 for h, w in enumerate(hourly_weights)]
-    total = sum(masked) or 1.0
-    chain: Column | None = None
-    acc = 0.0
-    for h in range(close_h - 1):
-        acc += masked[h]
-        cond = u < F.lit(acc / total)
-        chain = F.when(cond, F.lit(h)) if chain is None else chain.when(cond, F.lit(h))
-    last_open = close_h - 1
-    return F.lit(last_open) if chain is None else chain.otherwise(F.lit(last_open))
-
-
-def _pick_hour(
-    u: Column, hourly_weights: list[float], operating_hours: Column, patterns: list[str]
-) -> Column:
-    """Masked inverse-CDF hour pick that respects each store's operating window.
-
-    Operating hours come from a small fixed set of patterns, so the per-pattern
-    static CDF (cheap Python-float chain) is selected by the store's
-    ``operating_hours`` string — avoiding a per-row column CDF that would
-    explode the Catalyst expression tree.
-    """
-    expr: Column | None = None
-    for pat in patterns:
-        open_h, close_h = _open_close(pat)
-        branch = _pick_hour_static(u, hourly_weights, open_h, close_h)
-        cond = operating_hours == F.lit(pat)
-        expr = F.when(cond, branch) if expr is None else expr.when(cond, branch)
-    # Every store carries one of ``patterns``; the fallback only guards nulls.
-    return F.lit(12) if expr is None else expr.otherwise(F.lit(12))
-
-
 def payment_attempts(
     draws: seeded_draws,
     purchases: DataFrame,
@@ -340,6 +260,91 @@ def payment_attempts(
     return rows.withColumn(other, F.lit(None).cast("string")).select(*column_names("fact_payments"))
 
 
+def basket_calibration(catalog: DataFrame, profile: StoreTypeProfile) -> DataFrame:
+    """``event_date, _line_value, _taxable_value``: expected line values of a day's baskets.
+
+    The department-weighted (seasonal) average of ``behavior.retail_catalog``'s
+    expected line and taxable values, which ``calibrated_basket_mean`` turns
+    into the basket size that meets the profile's ticket target.
+    """
+    department_weight = sum(
+        (
+            F.when(
+                F.col("department") == name,
+                F.lit(weight) * _seasonal_factor(name, F.month("event_date")),
+            ).otherwise(0.0)
+            for name, weight in profile.department_weights.items()
+        ),
+        F.lit(0.0),
+    )
+    return (
+        catalog.withColumn("_weight", department_weight)
+        .groupBy("event_date")
+        .agg(
+            (F.sum(F.col("_weight") * F.col("_expected_line_value")) / F.sum("_weight")).alias(
+                "_line_value"
+            ),
+            (F.sum(F.col("_weight") * F.col("_expected_taxable_value")) / F.sum("_weight")).alias(
+                "_taxable_value"
+            ),
+        )
+    )
+
+
+def draw_basket_lines(
+    purchases: DataFrame,
+    key: str,
+    catalog: DataFrame,
+    d: seeded_draws,
+    profile: StoreTypeProfile,
+    carry: list[str] | None = None,
+) -> DataFrame:
+    """``key, *carry, _lines``: each purchase's drawn lines, before complements and merging.
+
+    ``purchases`` has ``key``, ``event_date``, ``basket_n``, ``_shopper`` and
+    the ``carry`` columns, which are passed through (one value per purchase).
+    Lines follow shopping missions (a favorite or mission department for most
+    lines), then a price- and promo-elastic product within the department and
+    a category quantity. Receipts and online orders draw lines the same way.
+    """
+    carry = carry or []
+    exploded = purchases.withColumn("line_num", F.explode(F.sequence(F.lit(1), F.col("basket_n"))))
+    exploded = _with_seasonal_department(
+        exploded,
+        F.when(
+            d.u([key, "line_num"], "mission-coherence") < 0.60,
+            F.when(
+                d.u([key], "favorite-mission") < 0.50,
+                d.u(["_shopper"], "favorite-department"),
+            ).otherwise(d.u([key], "mission-department")),
+        ).otherwise(d.u([key, "line_num"], "dept")),
+        profile.department_weights,
+    )
+    line_key = [key, "line_num"]
+    return (
+        exploded.join(catalog, ["event_date", "department"])
+        .withColumn("_product", pick_retail_product(F.col("_catalog"), d.u(line_key, "prod")))
+        .select(
+            key,
+            *carry,
+            F.struct(
+                F.col("line_num").cast("int").alias("line_num"),
+                F.col("_product.product_id").alias("product_id"),
+                retail_quantity(d, line_key, F.col("department")).alias("quantity"),
+                F.col("_product.unit_cents").alias("unit_cents"),
+                F.col("_product.taxability").alias("taxability"),
+                F.col("department"),
+                F.col("_product.partner_id").alias("partner_id"),
+                F.col("_product.partner_cents").alias("partner_cents"),
+                F.col("_product.partner_taxability").alias("partner_taxability"),
+                F.col("_product.partner_ok").alias("partner_ok"),
+            ).alias("_line"),
+        )
+        .groupBy(key, *carry)
+        .agg(F.array_sort(F.collect_list("_line")).alias("_lines"))
+    )
+
+
 def generate_receipts_group(
     spark: SparkSession,
     dims: dict[str, DataFrame],
@@ -350,14 +355,21 @@ def generate_receipts_group(
 
     d = seeded_draws(cfg.seed)
 
-    stores = dims["dim_stores"].select(
-        F.col("ID").alias("store_id"),
-        "tax_rate",
-        "daily_traffic_multiplier",
-        "operating_hours",
-        F.col("GeographyID").alias("store_geo_id"),
+    rules = tax_rules_by_state(load_tax_rules(cfg.resolved_dictionary_root))
+    stores = (
+        dims["dim_stores"]
+        .select(
+            F.col("ID").alias("store_id"),
+            "tax_rate",
+            "daily_traffic_multiplier",
+            "operating_hours",
+            F.col("GeographyID").alias("store_geo_id"),
+        )
+        .join(store_tax_rules(dims["dim_stores"], dims.get("dim_geographies"), rules), "store_id")
     )
-    grid = generate_hourly_visits(spark, dims["dim_stores"], profile, cfg).join(stores, "store_id")
+    grid = generate_hourly_visits(
+        spark, dims["dim_stores"], profile, cfg, dims.get("dim_geographies")
+    ).join(stores, "store_id")
     earlier_hours = (
         Window.partitionBy("store_id", "day")
         .orderBy("hour")
@@ -439,28 +451,7 @@ def generate_receipts_group(
     # traffic grid and copy its large expressions into the plan.
     sale_dates = date_grid(spark, cfg.start_date, cfg.end_date, "event_date")
     catalog = retail_catalog(products, sale_dates, d, PriceSchedule(cfg.seed, cfg.anchor_date))
-    department_weight = sum(
-        (
-            F.when(
-                F.col("department") == name,
-                F.lit(weight) * _seasonal_factor(name, F.month("event_date")),
-            ).otherwise(0.0)
-            for name, weight in profile.department_weights.items()
-        ),
-        F.lit(0.0),
-    )
-    calibration = (
-        catalog.withColumn("_weight", department_weight)
-        .groupBy("event_date")
-        .agg(
-            (F.sum(F.col("_weight") * F.col("_expected_line_value")) / F.sum("_weight")).alias(
-                "_line_value"
-            ),
-            (F.sum(F.col("_weight") * F.col("_expected_taxable_value")) / F.sum("_weight")).alias(
-                "_taxable_value"
-            ),
-        )
-    )
+    calibration = basket_calibration(catalog, profile)
     receipts = (
         receipts.join(calibration, "event_date")
         .withColumn(
@@ -488,49 +479,12 @@ def generate_receipts_group(
         )
     )
 
-    exploded = receipts.select(
+    drawn = draw_basket_lines(
+        receipts.select("receipt_id_ext", "event_date", "basket_n", "_shopper"),
         "receipt_id_ext",
-        "event_ts",
-        "event_date",
-        "store_id",
-        "tax_rate",
-        "basket_n",
-        "_offer",
-        "_shopper",
-    ).withColumn("line_num", F.explode(F.sequence(F.lit(1), F.col("basket_n"))))
-    exploded = _with_seasonal_department(
-        exploded,
-        F.when(
-            d.u(["receipt_id_ext", "line_num"], "mission-coherence") < 0.60,
-            F.when(
-                d.u(["receipt_id_ext"], "favorite-mission") < 0.50,
-                d.u(["_shopper"], "favorite-department"),
-            ).otherwise(d.u(["receipt_id_ext"], "mission-department")),
-        ).otherwise(d.u(["receipt_id_ext", "line_num"], "dept")),
-        profile.department_weights,
-    )
-
-    key = ["receipt_id_ext", "line_num"]
-    drawn = (
-        exploded.join(catalog, ["event_date", "department"])
-        .withColumn("_product", pick_retail_product(F.col("_catalog"), d.u(key, "prod")))
-        .select(
-            "receipt_id_ext",
-            F.struct(
-                F.col("line_num").cast("int").alias("line_num"),
-                F.col("_product.product_id").alias("product_id"),
-                retail_quantity(d, key, F.col("department")).alias("quantity"),
-                F.col("_product.unit_cents").alias("unit_cents"),
-                F.col("_product.taxability").alias("taxability"),
-                F.col("department"),
-                F.col("_product.partner_id").alias("partner_id"),
-                F.col("_product.partner_cents").alias("partner_cents"),
-                F.col("_product.partner_taxability").alias("partner_taxability"),
-                F.col("_product.partner_ok").alias("partner_ok"),
-            ).alias("_line"),
-        )
-        .groupBy("receipt_id_ext")
-        .agg(F.array_sort(F.collect_list("_line")).alias("_lines"))
+        catalog,
+        d,
+        profile,
     )
     # Basket-level steps shared with the live stream: complementary products,
     # repeated SKUs merged into one line, and at most one promotion code whose
@@ -552,6 +506,7 @@ def generate_receipts_group(
                 F.col("_offer"),
                 F.round(F.col("tax_rate") * 10000).cast("long"),
                 profile,
+                F.col("tax_rule"),
             ),
         )
     )

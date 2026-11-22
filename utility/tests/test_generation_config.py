@@ -189,3 +189,21 @@ def test_unknown_type_in_explicit_root_rejected(tmp_path):
             store_type="grocery",
             dictionary_root=str(tmp_path),
         )
+
+
+def test_online_orders_per_day_is_bounded():
+    from datetime import date
+
+    from pydantic import ValidationError
+
+    from retail_setup.config.generation import MAX_ONLINE_ORDERS_PER_DAY, GenerationConfig
+
+    window = {"start_date": date(2025, 1, 1), "end_date": date(2025, 1, 2)}
+    assert (
+        GenerationConfig(
+            **window, online_orders_per_day=MAX_ONLINE_ORDERS_PER_DAY
+        ).online_orders_per_day
+        == MAX_ONLINE_ORDERS_PER_DAY
+    )
+    with pytest.raises(ValidationError, match="online_orders_per_day"):
+        GenerationConfig(**window, online_orders_per_day=MAX_ONLINE_ORDERS_PER_DAY + 1)

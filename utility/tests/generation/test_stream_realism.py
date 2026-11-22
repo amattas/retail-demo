@@ -89,7 +89,8 @@ def world(spark):
 def _simulate(spark):
     from pyspark.sql import functions as F
 
-    from retail_setup.generation.baskets import basket_products
+    from retail_setup.dictionaries.loader import load_tax_rules
+    from retail_setup.generation.baskets import basket_products, tax_rules_by_state
     from retail_setup.generation.customers import lifecycle_for
     from retail_setup.generation.dims import generate_dimensions
     from retail_setup.generation.network import dc_fleets, store_routes
@@ -120,7 +121,9 @@ def _simulate(spark):
         name: frame.cache() for name, frame in generate_dimensions(spark, dictionaries, cfg).items()
     }
 
-    visits = generate_hourly_visits(spark, dims["dim_stores"], profile, cfg).collect()
+    visits = generate_hourly_visits(
+        spark, dims["dim_stores"], profile, cfg, dims["dim_geographies"]
+    ).collect()
     sales = generate_receipts_group(spark, dims, profile, cfg)
     payments = sales["fact_payments"].select("payment_method", "status").collect()
     pings, _changes = generate_ble(spark, sales["fact_receipts"], dims, cfg)
@@ -143,6 +146,9 @@ def _simulate(spark):
         transactions_per_store_day=TRANSACTIONS,
         online_orders_per_day=cfg.online_orders_per_day,
         marketing_impressions_per_day=sum(entry[2] for entry in vocab.CAMPAIGN_ARCHETYPES),
+        # The simulated days have no holiday; sizing for Black Friday and the
+        # best weather would only add idle rows.
+        calendar_peaks=False,
     )
     # Keep the simulation small: run at the peak rate.
     rate = sum(plan.peaks.values())
@@ -197,6 +203,8 @@ def _simulate(spark):
         inventory_seed=stock,
         anchor_date=cfg.anchor_date,
         annual_volume_growth=cfg.annual_volume_growth,
+        dim_geographies=dims["dim_geographies"],
+        tax_rules=tax_rules_by_state(load_tax_rules(cfg.resolved_dictionary_root)),
     )
     # The calibrated live rate returns about TARGET_ROAS on the live spend, a
     # fraction of a percent of purchases; these few simulated days would see
@@ -242,6 +250,10 @@ def _simulate(spark):
         "network": network,
         "truck_dc": {row["ID"]: row["DCID"] for row in trucks},
         "store_bps": {row["ID"]: round(row["tax_rate"] * 10000) for row in store_rows},
+        "home_store": {
+            row["ID"]: row["HomeStoreID"]
+            for row in dims["dim_customers"].select("ID", "HomeStoreID").collect()
+        },
         "batch_count": batch_id,
         "journey_rate": calibrated_journey_rate,
     }
@@ -702,7 +714,18 @@ def test_online_orders_follow_a_staged_lifecycle(world) -> None:
         assert {line["fulfillment_mode"] for line in order_lines} == {order["fulfillment_mode"]}
         assert order["gross_subtotal_cents"] - order["discount_cents"] == order["subtotal_cents"]
         assert order["subtotal_cents"] + order["tax_cents"] == order["total_cents"]
+        # One node per order: the customer's home store, or the DC supplying it.
+        home = world["home_store"][order["customer_id"]]
+        if order["node_type"] == "STORE":
+            assert order["node_id"] == home
+        else:
+            assert order["node_id"] == world["network"].dc_of(home)
+        assert len({product for product in (line["product_id"] for line in order_lines)}) == len(
+            order_lines
+        )
         if order["total_cents"] == 0:
+            # Cancelled: zero line amounts, like the header.
+            assert all(line["extended_price"] == 0 for line in order_lines)
             assert order_id not in payments and order_id not in picked
             continue
         assert (

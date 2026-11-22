@@ -20,8 +20,9 @@ Tree schema (see utility/scripts/catalogs/*.py and customization.spec.CatalogTre
 }
 
 Products are "{modifier} {noun}" (optionally "{brand} {modifier} {noun}");
-price drawn uniformly in the subcategory band, rounded to .x9. The same tree and
-seed always produce byte-identical output.
+price drawn uniformly in the subcategory band, rounded to the nearest .49 or
+.99 ending (a 9-cent ending below $1) inside the band. The same tree and seed
+always produce byte-identical output.
 """
 
 from __future__ import annotations
@@ -35,11 +36,25 @@ from typing import Any
 DEFAULT_SEED = 2026
 
 
+def _charm_prices(lo: float, hi: float) -> list[int]:
+    """Prices (cents) in ``[lo, hi]`` with a charm ending: .49/.99, or x9 cents below $1."""
+    low, high = round(lo * 100), round(hi * 100)
+    endings = [c for c in range(low, high + 1) if c % 50 == 49 and c >= 99]
+    endings += [c for c in range(low, min(high, 98) + 1) if c % 10 == 9]
+    return sorted(endings)
+
+
 def _price(rng: random.Random, lo: float, hi: float) -> str:
-    # Strategy: round to nearest dollar then subtract 1 cent → .x9 price;
-    # max(lo, ...) guards against band-floor underflow when round(raw) == 0.
+    """A price drawn uniformly in the band, moved to the nearest charm price inside it.
+
+    A band too narrow for a charm price keeps the raw draw, rounded to cents.
+    """
     raw = rng.uniform(lo, hi)
-    return f"{max(lo, round(raw) - 0.01):.2f}"
+    candidates = _charm_prices(lo, hi)
+    if not candidates:
+        return f"{raw:.2f}"
+    cents = min(candidates, key=lambda c: (abs(c - raw * 100), c))
+    return f"{cents / 100:.2f}"
 
 
 def build_catalog(tree: dict[str, Any], seed: int) -> dict[str, list[dict[str, Any]]]:

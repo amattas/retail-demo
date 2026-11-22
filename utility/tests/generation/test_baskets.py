@@ -122,6 +122,56 @@ def test_one_code_per_basket_within_scope_season_and_threshold(spark, month) -> 
     assert seen["SAVE25"] > 0
 
 
+def test_state_taxability_rules() -> None:
+    from retail_setup.dictionaries.loader import load_tax_rules
+
+    rules = baskets.tax_rules_by_state(load_tax_rules(default_dictionary_root()))
+    # Alabama taxes groceries, Pennsylvania exempts clothing, New York exempts
+    # clothing under $110 an item; other states exempt groceries only.
+    assert baskets.tax_percent("NON_TAXABLE", 500, rules["AL"]) > 0
+    assert baskets.tax_percent("NON_TAXABLE", 500, rules.get("CA", baskets.DEFAULT_TAX_RULE)) == 0
+    assert baskets.tax_percent("REDUCED_RATE", 500_000, rules["PA"]) == 0
+    assert baskets.tax_percent("REDUCED_RATE", 10_999, rules["NY"]) == 0
+    assert baskets.tax_percent("REDUCED_RATE", 11_000, rules["NY"]) == 100
+    # A $5,000 coat in a state without a rule pays the full rate, not half.
+    assert baskets.tax_percent("REDUCED_RATE", 500_000) == 100
+    assert baskets.tax_percent("TAXABLE", 100, rules["PA"]) == 100
+
+
+def test_line_tax_applies_the_state_rule(spark) -> None:
+    from pyspark.sql import functions as F
+
+    from retail_setup.dictionaries.loader import load_tax_rules
+
+    rules = baskets.tax_rules_by_state(load_tax_rules(default_dictionary_root()))
+    cases = [
+        (state, taxability, unit)
+        for state in ("AL", "CA", "NY", "PA", "TN", None)
+        for taxability in ("TAXABLE", "NON_TAXABLE", "REDUCED_RATE")
+        for unit in (999, 25_000)
+    ]
+    rows = (
+        spark.createDataFrame(cases, "state string, taxability string, unit long")
+        .select(
+            "state",
+            "taxability",
+            "unit",
+            baskets.line_tax_cents(
+                F.col("unit") * 2,
+                F.col("taxability"),
+                F.lit(900).cast("long"),
+                baskets.tax_rule_column(rules, F.col("state")),
+                F.col("unit"),
+            ).alias("tax"),
+        )
+        .collect()
+    )
+    for row in rows:
+        rule = rules.get(row.state, baskets.DEFAULT_TAX_RULE)
+        percent = baskets.tax_percent(row.taxability, row.unit, rule)
+        assert row.tax == (row.unit * 2 * 900 * percent + 500_000) // 1_000_000, row
+
+
 def test_baskets_without_an_offer_get_no_code(spark) -> None:
     from pyspark.sql import functions as F
 

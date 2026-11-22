@@ -26,10 +26,13 @@ from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
 from retail_setup.config.generation import GenerationConfig
-from retail_setup.generation.baskets import line_tax_cents
+from retail_setup.dictionaries.loader import load_dictionaries, load_tax_rules
+from retail_setup.dictionaries.models import StoreTypeProfile
+from retail_setup.generation.baskets import line_tax_cents, store_tax_rules, tax_rules_by_state
 from retail_setup.generation.receipts import _fmt, _open_close_cols
 from retail_setup.generation.runtime import case_when, fixed_width_decimal, seeded_draws
 from retail_setup.generation.schemas import column_names
+from retail_setup.generation.stream_calendar import closed_date_column, store_class
 from retail_setup.generation.vocabulary import processing_ms_column, transaction_id_column
 
 # Returns post 1..RETURN_WINDOW_DAYS days after the originating sale.
@@ -147,6 +150,7 @@ def build_return_headers(
     sales_group: dict[str, DataFrame],
     cfg: GenerationConfig,
     dims: dict[str, DataFrame] | None = None,
+    profile: StoreTypeProfile | None = None,
 ) -> DataFrame:
     """Sample SALE receipts for return and date each strictly after its sale.
 
@@ -159,11 +163,14 @@ def build_return_headers(
     (config, seed).
     """
     d = seeded_draws(cfg.seed)
+    if profile is None:
+        profile = load_dictionaries(cfg.resolved_dictionary_root, cfg.store_type).profile
+    klass = store_class(profile)
 
     sales = sales_group["fact_receipts"].filter(
         (F.col("receipt_type") == "SALE")
         & (F.col("event_date") < F.lit(cfg.end_date))
-        & ~((F.month("event_date") == 12) & (F.dayofmonth("event_date") == 25))
+        & ~closed_date_column(F.col("event_date"), klass)
     )
     receipt_lines = _receipt_lines(sales_group, dims)
     if receipt_lines is not None:
@@ -261,8 +268,9 @@ def build_return_headers(
         )
         .withColumn(
             "event_date",
+            # Returns move off a closed day (stores never close two days running).
             F.when(
-                (F.month("_candidate_date") == 12) & (F.dayofmonth("_candidate_date") == 25),
+                closed_date_column(F.col("_candidate_date"), klass),
                 F.when(
                     F.date_add("_candidate_date", 1) <= F.col("_latest_return_date"),
                     F.date_add("_candidate_date", 1),
@@ -374,9 +382,20 @@ def generate_returns(
         "promo_code",
     )
     taxability = dims["dim_products"].select(F.col("ID").alias("product_id"), "taxability")
-    store_bps = dims["dim_stores"].select(
-        F.col("ID").alias("store_id"),
-        F.round(F.col("tax_rate") * 10000).cast("long").alias("_bps"),
+    store_bps = (
+        dims["dim_stores"]
+        .select(
+            F.col("ID").alias("store_id"),
+            F.round(F.col("tax_rate") * 10000).cast("long").alias("_bps"),
+        )
+        .join(
+            store_tax_rules(
+                dims["dim_stores"],
+                dims.get("dim_geographies"),
+                tax_rules_by_state(load_tax_rules(cfg.resolved_dictionary_root)),
+            ),
+            "store_id",
+        )
     )
     units = F.col("_units").cast("long")
     sold_units = F.col("_sold").cast("long")
@@ -402,7 +421,16 @@ def generate_returns(
             F.floor((F.col("_sold_ext") * units * 2 + sold_units) / (sold_units * 2)).cast("long"),
         )
         .withColumn("_gross", F.col("unit_cents") * units)
-        .withColumn("_tax", line_tax_cents(F.col("_net"), F.col("taxability"), F.col("_bps")))
+        .withColumn(
+            "_tax",
+            line_tax_cents(
+                F.col("_net"),
+                F.col("taxability"),
+                F.col("_bps"),
+                F.col("tax_rule"),
+                F.col("unit_cents"),
+            ),
+        )
     )
     totals = lines.groupBy("receipt_id_ext").agg(
         (-F.sum("_net")).cast("long").alias("subtotal_cents"),

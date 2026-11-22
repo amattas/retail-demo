@@ -102,7 +102,9 @@ def _browser_visits(
     d: seeded_draws,
 ) -> DataFrame:
     """Detected non-buying visits: the hour's visitors who did not buy."""
-    grid = generate_hourly_visits(spark, dims["dim_stores"], profile, cfg)
+    grid = generate_hourly_visits(
+        spark, dims["dim_stores"], profile, cfg, dims.get("dim_geographies")
+    )
     hour = [F.col("store_id"), F.col("day"), F.col("hour")]
     browsers = F.greatest(F.lit(0), F.col("visitors") - F.col("n_receipts"))
     detected = F.floor(browsers * F.lit(BLE_DETECTED_SHARE) + d.u(hour, "ble-browsers")).cast("int")

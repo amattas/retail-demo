@@ -1,4 +1,10 @@
-"""Visit-first store traffic shared by receipt generation and footfall facts."""
+"""Visit-first store traffic shared by receipt generation and footfall facts.
+
+Visitors per store, local day and local hour follow the profile's hourly,
+daily and monthly weights, the holiday calendar of the store type's class
+(closed days have no hours), the geography's weather, the volume trend and the
+store's traffic multiplier (``stream_calendar``, shared with the live stream).
+"""
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
@@ -11,8 +17,11 @@ from retail_setup.generation.runtime import date_grid, seeded_draws
 from retail_setup.generation.stream_calendar import (
     VISIT_CONVERSION_CALIBRATION,
     daily_factor_column,
+    holiday_factor_column,
     monthly_factor_column,
+    store_class,
     visit_conversion,
+    weather_factor_column,
 )
 
 
@@ -21,11 +30,22 @@ def generate_hourly_visits(
     stores: DataFrame,
     profile: StoreTypeProfile,
     cfg: GenerationConfig,
+    geographies: DataFrame | None = None,
 ) -> DataFrame:
+    """``store_id, day, hour, hour_ts, visitors, n_receipts`` per open store-hour.
+
+    ``geographies`` (``dim_geographies``) gives each store's state for its
+    weather climate; without it every store has the temperate climate.
+    """
     draws = seeded_draws(cfg.seed)
+    if geographies is None:
+        stores = stores.withColumn("State", F.lit(None).cast("string"))
+    else:
+        stores = stores.join(
+            geographies.select(F.col("ID").alias("GeographyID"), "State"), "GeographyID", "left"
+        )
     hours = stores.select(
         F.col("ID").alias("store_id"),
-        "GeographyID",
         "daily_traffic_multiplier",
         "operating_hours",
     )
@@ -47,22 +67,38 @@ def generate_hourly_visits(
         "_hour_share",
         F.col("_hour_weight") / F.sum("_hour_weight").over(Window.partitionBy("store_id")),
     )
-    days = date_grid(spark, cfg.start_date, cfg.end_date).filter(
-        ~((F.month("day") == 12) & (F.dayofmonth("day") == 25))
+    # Calendar and weather factors are evaluated once per day and store-day,
+    # not per hour; closed days have no hours at all.
+    days = (
+        date_grid(spark, cfg.start_date, cfg.end_date)
+        .withColumn("_holiday", holiday_factor_column(F.col("day"), store_class(profile)))
+        .filter(F.col("_holiday") > 0)
+        .withColumn(
+            "_day_factor",
+            F.col("_holiday")
+            * daily_factor_column(profile, F.col("day"))
+            * monthly_factor_column(profile, F.col("day"))
+            * volume_growth_column(cfg.annual_volume_growth, cfg.anchor_date, F.col("day")),
+        )
+        .drop("_holiday")
     )
-    grid = hours.crossJoin(days)
-    daily = daily_factor_column(profile, F.col("day"))
-    monthly = monthly_factor_column(profile, F.col("day"))
-    # Nearby stores share weather; store/hour conversion remains heterogeneous.
-    weather = F.exp(0.15 * draws.gauss(["GeographyID", "day"], "weather") - 0.15**2 / 2)
+    # Nearby stores (one geography) share weather; store/hour conversion
+    # remains heterogeneous.
+    store_days = (
+        stores.select(F.col("ID").alias("store_id"), "GeographyID", "State")
+        .crossJoin(days)
+        .withColumn(
+            "_weather",
+            weather_factor_column(draws, F.col("GeographyID"), F.col("State"), F.col("day")),
+        )
+        .select("store_id", "day", (F.col("_day_factor") * F.col("_weather")).alias("_factor"))
+    )
+    grid = hours.join(store_days, "store_id")
     conversion = visit_conversion(draws, F.col("store_id"), F.col("day"), F.col("hour"))
     grid = grid.withColumn(
         "_visits_mean",
         F.lit(cfg.transactions_per_store_day / VISIT_CONVERSION_CALIBRATION)
-        * daily
-        * monthly
-        * weather
-        * volume_growth_column(cfg.annual_volume_growth, cfg.anchor_date, F.col("day"))
+        * F.col("_factor")
         * F.col("daily_traffic_multiplier")
         * F.col("_hour_share"),
     ).withColumn("_conversion", conversion)

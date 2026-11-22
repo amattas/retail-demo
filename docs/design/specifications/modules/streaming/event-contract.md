@@ -79,9 +79,11 @@ history:
   truck events have no lane: they follow from the purchases (below).
 - **Store visits.** A visit picks a store weighted by `daily_traffic_multiplier`
   and is kept with the profile's hourly, daily and monthly weights evaluated in
-  the store's local time (`dim_stores.TimeZone`, daylight saving included). The
-  hourly weight is zero while the store is closed and on Christmas Day, so no
-  live receipt is outside opening hours. Visits are drawn at
+  the store's local time (`dim_stores.TimeZone`, daylight saving included),
+  history's holiday factor for the store type's class and the geography's
+  weather on the local day (`stream_calendar`). The weight is zero while the
+  store is closed, on Christmas Day and, except for grocers, on Thanksgiving,
+  so no live receipt is outside opening hours. Visits are drawn at
   `transactions_per_store_day / 0.225` per store-day and convert with the same
   store/day/hour conversion as history (about 22%).
 - **Customers.** As in history (`generation/customers.py`), about 45% of
@@ -120,7 +122,8 @@ history:
   anchor date).
 - **Store operations.** `store_opened` and `store_closed` (lower-case
   `opened`/`closed`, like history) are emitted exactly at each store's local
-  opening and closing time, one pair per open day. A 24-hour store closes at
+  opening and closing time, one pair per open day (none on the store type's
+  closed holidays). A 24-hour store closes at
   23:59 and reopens at midnight.
 - **Marketing.** Background impressions follow the historical campaigns
   (archetype channels, `CAMP` IDs on the same campaign windows, flash sales on
@@ -192,21 +195,26 @@ has passed.
 
 Online orders arrive at `online_orders_per_day` (by default derived so online
 orders are the profile's `online_order_share` of all orders), shaped by the profile's
-monthly weights and the online hourly curve (`vocabulary.ONLINE_HOURLY_WEIGHTS`,
-UTC, peaking in the US evening; history uses the same curve). Each order has
-one fulfillment mode and node, drawn by the historical mix (60% ship from a DC,
-30% ship from a store, 10% BOPIS). Its lifecycle runs over hours and days:
+monthly weights, the online holiday factors (Cyber Monday, Black Friday, ...)
+and the online hourly curve (`vocabulary.ONLINE_HOURLY_WEIGHTS`,
+UTC, peaking in the US evening; history uses the same curve). The customer
+comes from a home-store pool, as in history. Each order has one fulfillment
+mode and node, drawn by the historical mix (60% ship from a DC, 30% ship from
+a store, 10% BOPIS): the customer's home store for ship-from-store and BOPIS,
+the DC that supplies that store for ship-from-DC. Repeated SKUs merge into one
+line. Its lifecycle runs over hours and days:
 
 | Event | When |
 | --- | --- |
 | `online_order_created` and one `online_order_line_added` per line | order time |
 | `payment_processed` (`order_id`, no store) | after the online tender's processing time |
 | `online_order_picked` | 30-240 minutes later (BOPIS: 4-24 hours, ready for pickup) |
-| `online_order_shipped` | 2-4 hours after picking; never for BOPIS |
+| `online_order_shipped` | 2-4 hours after picking (backorders: 3-14 days more); never for BOPIS |
 | `online_order_delivered` | 1-3 days after shipping; BOPIS: 1-24 hours after picking, when the customer collects it |
 
-2% of orders are cancelled at once: zero totals, no payment and no fulfillment.
-8% of shippable orders are backordered: shipped but not delivered. Payments use
+2% of orders are cancelled at once: zero totals, zero line amounts, no payment
+and no fulfillment. 8% of shippable orders are backordered: they wait 3-14 days
+for stock before they ship, then deliver as usual. Payments use
 the online tenders (no cash) and the shared decline model: a declined order is
 retried on another tender (a `DECLINED` payment a second after the order, then
 the `APPROVED` one) or voided, which cancels it, as in history. Lines carry history's online promo codes, and
