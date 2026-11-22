@@ -198,6 +198,11 @@ def _simulate(spark):
         anchor_date=cfg.anchor_date,
         annual_volume_growth=cfg.annual_volume_growth,
     )
+    # The calibrated live rate returns about TARGET_ROAS on the live spend, a
+    # fraction of a percent of purchases; these few simulated days would see
+    # almost no journeys, so the simulation raises it to exercise them.
+    calibrated_journey_rate = ctx.journey_rate
+    ctx = replace(ctx, journey_rate=max(ctx.journey_rate, 0.05))
 
     state = MemoryStateStore(NAMESPACE)
     begin = datetime(START.year, START.month, START.day, tzinfo=timezone.utc) - timedelta(hours=12)
@@ -238,6 +243,7 @@ def _simulate(spark):
         "truck_dc": {row["ID"]: row["DCID"] for row in trucks},
         "store_bps": {row["ID"]: round(row["tax_rate"] * 10000) for row in store_rows},
         "batch_count": batch_id,
+        "journey_rate": calibrated_journey_rate,
     }
 
 
@@ -425,6 +431,11 @@ def test_purchase_money_reconciles_across_events(world) -> None:
     for receipt_id, payment in payments.items():
         if receipt_id in times:
             assert payment["processing_time"] > times[receipt_id]
+
+
+def test_live_journey_rate_is_a_small_calibrated_share(world) -> None:
+    print(f"STAT live journey rate={world['journey_rate']:.4f}")
+    assert 0.0 < world["journey_rate"] < 0.02
 
 
 def test_journey_touches_arrive_inside_the_silver_replay_window(world) -> None:
