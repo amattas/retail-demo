@@ -318,13 +318,14 @@ def _configure_custom_layout(
 
 
 def _record_estimate_lines(generation: GenerationConfig) -> list[str]:
-    from retail_setup.generation.estimate import estimate_record_counts
+    from retail_setup.generation.estimate import direct_lake_summary, estimate_record_counts
 
     counts = estimate_record_counts(generation)
     return [
         f"  Estimated records for {generation.start_date} to {generation.end_date} "
         f"({generation.store_count} stores):",
-        *(f"    {name:<20} ~ {value:>15,}" for name, value in counts.items()),
+        *(f"    {name:<22} ~ {value:>15,}" for name, value in counts.items()),
+        f"  {direct_lake_summary(generation)}",
     ]
 
 

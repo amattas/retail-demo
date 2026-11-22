@@ -144,6 +144,23 @@ run-scoped `<schema>_stage` schema, validates schema and row counts, captures
 existing Delta versions, then promotes. An attempted promotion failure restores
 pre-existing targets and drops newly created targets in reverse order.
 
+Each Silver run's `setup_run_log` rows carry the `generation_fingerprint` of
+the configuration and dictionaries it published. Setup-10 drops the handoffs
+after a successful publication, so a retry (for example a pipeline activity
+retry after a timeout) finds none. When the latest completed Silver
+publication carries the same fingerprint and its tables still exist, the
+retry succeeds without publishing again; otherwise it fails on the missing
+handoffs and the generation notebooks must run first.
+
+Publication is atomic for writers, not for readers. The Silver tables are
+promoted concurrently, each with its own `CREATE OR REPLACE TABLE`, so a
+query running during promotion can read some tables from the new generation
+and others from the old one. A failed promotion rolls every table back.
+Gold is built afterwards by setup-11 (`setup-11-build-gold`, in the
+`ml-required` pipeline); until it finishes, or if it fails, Gold describes the
+previous Silver. Consumers should not read during setup and should treat Gold
+as current only once setup-11 has completed for the same run.
+
 Terminal publication states distinguish data recovery from staging cleanup:
 `COMPLETED`, `FAILED`, `ROLLED_BACK`, `ROLLBACK_FAILED`,
 `COMPLETED_CLEANUP_FAILED`, and `ROLLED_BACK_CLEANUP_FAILED`.

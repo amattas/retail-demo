@@ -126,6 +126,17 @@ class HandoffStore:
             return self.spark.table(name)
         return self.spark.read.parquet(name)
 
+    def has_handoffs(self) -> bool:
+        """Whether any handoff (of any generation) exists."""
+        if self.base_path is not None:
+            root = self.base_path / self.schema
+            return root.exists() and any(root.glob(f"{HANDOFF_PREFIX}*"))
+        self.ensure_schema()
+        return any(
+            row.tableName.startswith(HANDOFF_PREFIX)
+            for row in self.spark.sql(f"SHOW TABLES IN {self.lakehouse}.{self.schema}").collect()
+        )
+
     def drop_all(self) -> None:
         """Remove every handoff, including leftovers from failed runs."""
         if self.base_path is not None:

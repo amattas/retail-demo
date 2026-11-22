@@ -40,6 +40,35 @@ _EXPECTED_SALE_TO_BASE = 0.92
 _CONSUMABLE = re.compile("grocery|fresh|food|household|personal|health|beauty|pet|baby")
 
 
+# Mirrors of the visit and beacon model (stream_calendar.VISIT_CONVERSION_CALIBRATION,
+# vocabulary.BLE_DETECTED_SHARE, BLE_MAX_MIDDLE_ZONES, BLE_PINGS_PER_ZONE): a
+# detected visit passes the entrance, one to three departments, checkout when
+# it buys and the exit, with two to five pings a zone.
+_VISIT_CONVERSION = 0.225
+_BLE_DETECTED_SHARE = 0.25
+_BLE_MAX_MIDDLE_ZONES = 3
+_BLE_PINGS_PER_ZONE = (2, 5)
+_BLE_ZONES_PER_VISIT = 2 + (_BLE_MAX_MIDDLE_ZONES + 1) / 2 + _VISIT_CONVERSION
+BLE_PINGS_PER_RECEIPT = (
+    _BLE_DETECTED_SHARE / _VISIT_CONVERSION * _BLE_ZONES_PER_VISIT * sum(_BLE_PINGS_PER_ZONE) / 2
+)
+# Share of online lines a store fulfils (ship-from-store and BOPIS,
+# vocabulary.ONLINE_FULFILLMENT_MIX); they post to the store ledger.
+_STORE_FULFILLED_ONLINE_SHARE = 0.40
+
+# Direct Lake on OneLake row guardrails per table, by Fabric capacity SKU.
+# Above a table's guardrail the semantic model cannot load it, and Direct
+# Lake on OneLake has no DirectQuery fallback.
+DIRECT_LAKE_ROW_LIMITS: tuple[tuple[str, int], ...] = (
+    ("F2-F32", 300_000_000),
+    ("F64", 1_500_000_000),
+    ("F128", 3_000_000_000),
+    ("F256", 6_000_000_000),
+    ("F512", 12_000_000_000),
+    ("F1024", 24_000_000_000),
+)
+
+
 @dataclass(frozen=True)
 class CatalogExpectations:
     """Generator-faithful expectations derived from one store type's dictionaries."""
@@ -47,6 +76,8 @@ class CatalogExpectations:
     basket_mean: float
     # Expected share of all units sold that go to the single most popular SKU.
     top_sku_unit_share: float
+    # SKUs in dim_products: each base product under up to brands_per_product brands.
+    sku_count: int = 0
 
 
 @lru_cache(maxsize=32)
@@ -85,6 +116,8 @@ def _catalog_expectations(
                 top_share,
                 department_weight * max(weights) / total / (1.0 - repeat) / brands_per_product,
             )
+        brands = json.loads((base / store_type / "brands.json").read_text("utf-8"))
+        brands = brands if isinstance(brands, list) else next(iter(brands.values()))
         line, taxable = line / total_weight, taxable / total_weight
         affordable = float(profile["avg_ticket_target"]) / (
             (line + taxable * tax_rate) * (1.0 - float(profile["promo_rate"]) * 0.20)
@@ -92,6 +125,7 @@ def _catalog_expectations(
         return CatalogExpectations(
             basket_mean=min(affordable, float(profile["basket_lambda"])),
             top_sku_unit_share=top_share / total_weight,
+            sku_count=len(products) * max(1, min(brands_per_product, len(brands))),
         )
     except (OSError, ValueError, KeyError, TypeError, ZeroDivisionError, StopIteration):
         return None
@@ -119,13 +153,50 @@ def calibrated_basket_mean(cfg: GenerationConfig) -> float | None:
     return None if expectations is None else expectations.basket_mean
 
 
+def inventory_series(cfg: GenerationConfig) -> int | None:
+    """Store-SKU series the inventory simulation steps through every day."""
+    expectations = catalog_expectations(cfg)
+    return None if expectations is None else cfg.store_count * expectations.sku_count
+
+
+def largest_tables(cfg: GenerationConfig) -> dict[str, int]:
+    """Approximate rows of the biggest semantic-model tables."""
+    counts = estimate_record_counts(cfg)
+    return {
+        "fact_ble_pings": counts["BLE pings"],
+        "fact_receipt_lines": counts["Receipt lines"],
+        "fact_store_inventory_txn": counts["Store inventory moves"],
+    }
+
+
+def direct_lake_capacity(rows: int) -> str | None:
+    """The smallest capacity whose Direct Lake guardrail holds ``rows`` in one table."""
+    for capacity, limit in DIRECT_LAKE_ROW_LIMITS:
+        if rows <= limit:
+            return capacity
+    return None
+
+
+def direct_lake_summary(cfg: GenerationConfig) -> str:
+    """One line naming the largest table and the capacity Direct Lake needs for it."""
+    name, rows = max(largest_tables(cfg).items(), key=lambda item: item[1])
+    capacity = direct_lake_capacity(rows)
+    if capacity == DIRECT_LAKE_ROW_LIMITS[0][0]:
+        needs = "fits every capacity"
+    elif capacity is not None:
+        needs = f"needs {capacity} or larger"
+    else:
+        needs = "exceeds every capacity's guardrail"
+    return f"Direct Lake: largest table {name} ~ {rows:,} rows; {needs}"
+
+
 def estimate_record_counts(cfg: GenerationConfig) -> dict[str, int]:
     """Approximate per-group record counts for a generation config.
 
     Returns an ordered mapping of group name -> estimated row count, ending with a
     ``"Total (approx)"`` entry. Covers the dominant tables; smaller fact tables
-    (sensors, store ops, marketing, inventory) are omitted, so the real total is
-    somewhat higher.
+    (foot traffic, zone changes, store ops, marketing, DC and truck ledgers) are
+    omitted, so the real total is somewhat higher.
     """
 
     days = (cfg.end_date - cfg.start_date).days + 1
@@ -139,6 +210,12 @@ def estimate_record_counts(cfg: GenerationConfig) -> dict[str, int]:
     # Online baskets are sized to the same ticket target as store baskets.
     online_lines = round(online_headers * basket)
     payments = receipts + returns + online_headers
+    # Beacon pings of detected visits (buyers and browsers) outgrow receipt lines.
+    ble_pings = round(receipts * BLE_PINGS_PER_RECEIPT)
+    # The store ledger: one move per sold or store-fulfilled line plus each
+    # store-SKU's opening stock (deliveries and returns add a few more).
+    series = inventory_series(cfg) or 0
+    store_moves = round(receipt_lines + online_lines * _STORE_FULFILLED_ONLINE_SHARE + series)
 
     groups = {
         "Customers (dim)": cfg.customer_count,
@@ -147,6 +224,8 @@ def estimate_record_counts(cfg: GenerationConfig) -> dict[str, int]:
         "Online orders": online_headers,
         "Online order lines": online_lines,
         "Payments": payments,
+        "BLE pings": ble_pings,
+        "Store inventory moves": store_moves,
     }
     groups["Total (approx)"] = sum(groups.values())
     return groups

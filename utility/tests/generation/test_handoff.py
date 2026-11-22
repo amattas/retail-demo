@@ -54,3 +54,13 @@ def test_drop_all_removes_only_handoffs(spark, tmp_path):
     store.drop_all()
     assert not any(path.name.startswith("gen__") for path in (tmp_path / "ag_stage").iterdir())
     assert unrelated.exists()
+
+
+def test_has_handoffs_sees_any_generation(spark, tmp_path):
+    store = HandoffStore(spark, CFG, base_path=str(tmp_path))
+    assert not store.has_handoffs()
+    other = HandoffStore(spark, CFG.model_copy(update={"seed": 100}), base_path=str(tmp_path))
+    other.save("plan", "events", spark.range(1))
+    assert store.has_handoffs()
+    store.drop_all()
+    assert not store.has_handoffs()

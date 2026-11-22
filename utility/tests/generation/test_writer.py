@@ -163,3 +163,63 @@ def test_write_all_lakehouse_mode_signature():
 
     params = inspect.signature(write_all).parameters
     assert "lakehouse" in params  # catalog mode for notebooks
+
+
+def test_publish_retry_after_handoffs_are_dropped_is_a_no_op(spark, tmp_path):
+    from retail_setup.config.generation import GenerationConfig
+    from retail_setup.generation.handoff import HandoffStore, generation_fingerprint
+    from retail_setup.generation.writer import (
+        already_published,
+        completed_publication,
+        write_all,
+    )
+
+    cfg = GenerationConfig(
+        store_type="grocery",
+        start_date=date(2025, 11, 3),
+        end_date=date(2025, 11, 3),
+        store_count=1,
+        seed=7,
+    )
+    lake = str(tmp_path / "lake")
+    store = HandoffStore(spark, cfg, base_path=str(tmp_path / "handoffs"))
+    handoff = store.save("ble", "fact_ble_pings", spark.range(3))
+    tables = {"fact_ble_pings": handoff, "dim_example": spark.range(2)}
+    target = {"base_path": lake, "fmt": "parquet"}
+
+    # Nothing is published yet, so setup-10 publishes the handoffs.
+    assert already_published(spark, cfg, store, **target) is None
+    write_all(
+        tables,
+        {},
+        cfg,
+        run_id="run-a",
+        prestaged={"fact_ble_pings": store.name("ble", "fact_ble_pings")},
+        fingerprint=store.fingerprint,
+        **target,
+    )
+    # While handoffs remain, a retry publishes them again (idempotent).
+    assert already_published(spark, cfg, store, **target) is None
+    store.drop_all()
+    # After drop_all a retry finds Silver already holding this generation.
+    assert already_published(spark, cfg, store, **target) == "run-a"
+    # A Gold run (no fingerprint) does not hide the Silver publication.
+    write_all({}, {"gold_example": spark.range(1)}, cfg, run_id="gold-a", **target)
+    assert already_published(spark, cfg, store, **target) == "run-a"
+    # Another generation published since, or a dropped Silver table, means
+    # there is nothing to reuse: the retry fails on the missing handoffs.
+    other = cfg.model_copy(update={"seed": 8})
+    write_all(
+        {"dim_example": spark.range(2)},
+        {},
+        other,
+        run_id="run-b",
+        fingerprint=generation_fingerprint(other),
+        **target,
+    )
+    assert completed_publication(spark, cfg, store.fingerprint, **target) is None
+    assert completed_publication(spark, other, generation_fingerprint(other), **target) == "run-b"
+    import shutil
+
+    shutil.rmtree(tmp_path / "lake" / "ag" / "dim_example")
+    assert completed_publication(spark, other, generation_fingerprint(other), **target) is None
