@@ -14,11 +14,14 @@ from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Protocol
 
-# Event types declared end to end (KQL, mappings, EVENT_PAYLOADS, Silver) for
-# the logistics incident model, which the live stream does not emit yet.
-# Readiness doesn't expect fresh rows for them. Shrink this set as the model
-# lands; tests/test_notebook_build.py checks it against the slots.
-PENDING_EVENT_TYPES = frozenset({"logistics_incident_started", "logistics_incident_resolved"})
+# Event types declared end to end (KQL, mappings, EVENT_PAYLOADS, Silver)
+# ahead of a model that emits them; tests/test_notebook_build.py checks the
+# set against the stream's slots. Readiness doesn't expect fresh rows for them.
+PENDING_EVENT_TYPES: frozenset[str] = frozenset()
+# Event types the stream emits only occasionally: logistics incidents happen a
+# few times a year per DC (incidents.py), so a healthy stream can go weeks
+# without one. Readiness doesn't expect fresh rows for them either.
+SPORADIC_EVENT_TYPES = frozenset({"logistics_incident_started", "logistics_incident_resolved"})
 
 # Live tables that are quiet by design. Live volume follows the store hours and
 # the historical configuration, so a healthy stream can leave these tables

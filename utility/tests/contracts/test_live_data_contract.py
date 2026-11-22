@@ -138,7 +138,11 @@ def test_all_event_wire_route_and_terminal_contracts(event_type: str) -> None:
 
     assert [target.name for target in path.targets if target.layer == "eventhouse"] == [event_type]
     silver_target = SNAPSHOT.silver.routes[event_type]
-    assert [target.name for target in path.targets if target.layer == "silver"] == [silver_target]
+    split_targets = list(SNAPSHOT.silver.split_routes.get(event_type, ()))
+    assert [target.name for target in path.targets if target.layer == "silver"] == [
+        silver_target,
+        *split_targets,
+    ]
     for gold_target in (target.name for target in path.targets if target.layer == "gold"):
         assert silver_target in SNAPSHOT.gold[gold_target].source_tables
 
@@ -213,7 +217,6 @@ def test_named_boundaries_match_only_source_derived_differences() -> None:
         "dim_products",
         "dim_stores",
         "dim_trucks",
-        "fact_dc_inventory_txn",
         "fact_promo_lines",
         "fact_truck_inventory",
     }
@@ -284,7 +287,7 @@ def test_nullable_and_unknown_fixtures_cover_intentional_boundaries() -> None:
 
 
 def test_active_tmdl_types_and_legacy_names_are_source_derived() -> None:
-    assert len(SNAPSHOT.semantic_tables) == 43
+    assert len(SNAPSHOT.semantic_tables) == 44
     assert (
         next(
             field
@@ -540,3 +543,11 @@ def test_contract_check_command_is_non_mutating() -> None:
 
 def _digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_split_streaming_routes_feed_the_dc_ledger_and_incident_bridge() -> None:
+    assert SNAPSHOT.silver.split_routes == {
+        "inventory_updated": ("fact_dc_inventory_txn",),
+        "logistics_incident_started": ("fact_logistics_incident_stores",),
+        "logistics_incident_resolved": ("fact_logistics_incident_stores",),
+    }

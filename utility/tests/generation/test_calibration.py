@@ -25,6 +25,24 @@ TRUCK_DWELL_TMDL = (
     / "tables"
     / "truck_dwell_daily.tmdl"
 ).read_text(encoding="utf-8")
+KQL_FUNCTIONS = (REPO / "fabric" / "kql_database" / "03-create-functions.kql").read_text(
+    encoding="utf-8"
+)
+KQL_VIEWS = (REPO / "fabric" / "kql_database" / "04-create-materialized-views.kql").read_text(
+    encoding="utf-8"
+)
+TRUCK_MOVES_TMDL = (
+    REPO
+    / "fabric"
+    / "powerbi"
+    / "retail_model.SemanticModel"
+    / "definition"
+    / "tables"
+    / "fact_truck_moves.tmdl"
+).read_text(encoding="utf-8")
+DELIVERY_NOTEBOOK = (REPO / "fabric" / "lakehouse" / "13-ml-delivery-prediction.ipynb").read_text(
+    encoding="utf-8"
+)
 STREAM_TEMPLATE = (REPO / "utility" / "notebooks" / "templates" / "driver-05-stream.py").read_text(
     encoding="utf-8"
 )
@@ -91,6 +109,43 @@ def test_inventory_rules_use_calibrated_windows() -> None:
     assert _window_minutes(urgent) == cal.URGENT_REORDER_RULE_WINDOW_MINUTES
     # A stockout is a store's balance reaching zero, as in history's fact_stockouts.
     assert cal.STOCKOUT_QUANTITY_THRESHOLD == 1
+
+
+def test_logistics_rules_use_calibrated_thresholds() -> None:
+    late = _rule("Late truck")
+    assert _window_minutes(late) == cal.TRUCK_LATE_RULE_WINDOW_MINUTES
+    match = re.search(r"where delay_minutes >= (\d+)", late)
+    assert match is not None and int(match.group(1)) == cal.TRUCK_LATE_MINUTES
+
+    lane = _rule("Lane delay over threshold")
+    assert _window_minutes(lane) == cal.LANE_DELAY_RULE_WINDOW_MINUTES
+    match = re.search(r"where avg_delay_minutes >= ([0-9.]+)", lane)
+    assert match is not None and float(match.group(1)) == cal.LANE_DELAY_RULE_MINUTES
+    assert "by dc_id, store_id" in lane
+
+    outage = _rule("DC outage started")
+    assert _window_minutes(outage) == cal.INCIDENT_RULE_WINDOW_MINUTES
+    assert "incident_type == 'DC_OUTAGE'" in outage and "by incident_id" in outage
+
+    stockouts = _rule("Incident stockouts")
+    assert _window_minutes(stockouts) == cal.INCIDENT_STOCKOUT_RULE_WINDOW_MINUTES
+    match = re.search(r"where stockouts >= (\d+)", stockouts)
+    assert match is not None and int(match.group(1)) == cal.INCIDENT_STOCKOUT_RULE_MIN_STOCKOUTS
+    # Deduped per stockout event and aggregated per incident.
+    assert "dcount(trace_id)" in stockouts and "by incident_id" in stockouts
+
+
+def test_late_truck_threshold_is_one_value_everywhere() -> None:
+    # KQL lane summaries and the hourly delay view count late trucks alike.
+    for source in (KQL_FUNCTIONS, KQL_VIEWS):
+        literals = {int(v) for v in re.findall(r"countif\(delay_minutes >= (\d+)\)", source)}
+        assert literals == {cal.TRUCK_LATE_MINUTES}
+    measure = re.search(
+        r"measure 'Late Truck Arrivals' = .*\[Delay Minutes\] >= (\d+)\)", TRUCK_MOVES_TMDL
+    )
+    assert measure is not None and int(measure.group(1)) == cal.TRUCK_LATE_MINUTES
+    match = re.search(r"TRUCK_LATE_MINUTES = (\d+)", DELIVERY_NOTEBOOK)
+    assert match is not None and int(match.group(1)) == cal.TRUCK_LATE_MINUTES
 
 
 def test_zone_surge_rule_uses_calibrated_thresholds() -> None:

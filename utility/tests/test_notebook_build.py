@@ -112,8 +112,8 @@ def test_stream_template_emits_declared_eventhouse_event_types():
     kql = (UTILITY.parent / "fabric" / "kql_database" / "01-create-tables.kql").read_text()
     kql_tables = set(re.findall(r"^\.create-merge table ([a-z_]+) \(", kql, re.MULTILINE))
 
-    # Declared (KQL, mappings, Silver routes) ahead of the incident and online
-    # lifecycle models that will emit them; readiness reads the same set.
+    # Every declared event type is emitted (PENDING_EVENT_TYPES is empty now
+    # that the incident model emits logistics incidents).
     assert len(declared_events) == 22
     assert stream_events == declared_events - PENDING_EVENT_TYPES
     assert declared_events <= kql_tables

@@ -22,6 +22,7 @@ def _namespace() -> dict:
     tree = ast.parse(source)
     functions = {
         "transform_logistics_incidents",
+        "transform_logistics_incident_stores",
         "transform_online_order_line_added",
         "transform_online_order_delivered",
         "_event_time_expr",
@@ -87,6 +88,29 @@ def test_incidents_open_on_start_and_close_on_resolution(spark):
     # A resolution whose start aged out of Bronze carries no start; the MERGE
     # only updates an existing incident with it and never inserts it.
     assert rows["INC-0"].started is None and rows["INC-0"].resolved == "23:00"
+
+
+def test_incident_starts_list_every_affected_store_in_the_bridge(spark):
+    transform = _namespace()["transform_logistics_incident_stores"]
+    started = spark.sql("""
+        SELECT 'INC-1' AS incident_id, 'DC_OUTAGE' AS incident_type, 2L AS dc_id,
+               timestamp'2026-07-21 08:00:00' AS started_at,
+               array(3L, 4L, 5L) AS affected_store_ids,
+               timestamp'2026-07-21 08:00:05' AS ingest_timestamp
+    """)
+    resolved = spark.sql("""
+        SELECT 'INC-1' AS incident_id, timestamp'2026-07-21 11:30:00' AS resolved_at,
+               timestamp'2026-07-21 11:30:05' AS ingest_timestamp
+    """)
+    rows = sorted(
+        (row.store_id, row.dc_id, row.incident_type, row.resolved, row.trace_id)
+        for row in transform(started.unionByName(started), resolved)
+        .withColumn("resolved", F.date_format("resolved_at", "HH:mm"))
+        .collect()
+    )
+    assert rows == [
+        (store, 2, "DC_OUTAGE", "11:30", f"TRC-INCS-INC-1-{store}") for store in (3, 4, 5)
+    ]
 
 
 def test_online_lines_and_delivery_map_to_silver_columns(spark):

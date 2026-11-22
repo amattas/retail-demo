@@ -7,6 +7,7 @@ import json
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from pathlib import Path
 from typing import Any, TypeGuard
 
@@ -57,11 +58,17 @@ class DerivedSilverRoute:
 
 @dataclass(frozen=True)
 class StreamingSilverContract:
-    """Source-derived direct routes, derived routes, and dedupe keys."""
+    """Source-derived direct routes, derived routes, and dedupe keys.
+
+    ``routes`` holds each event's primary Silver table; ``split_routes`` holds
+    the further tables an event also feeds (for example DC stock moves of
+    ``inventory_updated`` or the incident-store bridge).
+    """
 
     routes: dict[str, str]
     dedupe_keys: dict[str, tuple[str, ...]]
     derived_routes: dict[str, DerivedSilverRoute]
+    split_routes: dict[str, tuple[str, ...]] = dataclass_field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -684,9 +691,15 @@ def notebook_python_source(path: Path) -> str:
     return "\n".join(code)
 
 
+# (writer, dedupe keys symbol, context, writer of a further split table or None)
 _PAIRED_STREAMING_ROUTES = (
-    ("process_truck_lifecycles", "TRUCK_LIFECYCLE_KEYS", "truck lifecycle"),
-    ("process_logistics_incidents", "LOGISTICS_INCIDENT_KEYS", "logistics incidents"),
+    ("process_truck_lifecycles", "TRUCK_LIFECYCLE_KEYS", "truck lifecycle", None),
+    (
+        "process_logistics_incidents",
+        "LOGISTICS_INCIDENT_KEYS",
+        "logistics incidents",
+        "process_logistics_incident_stores",
+    ),
 )
 
 
@@ -695,20 +708,42 @@ def streaming_silver_contract(path: Path) -> StreamingSilverContract:
 
     tree = ast.parse(notebook_python_source(path), filename=str(path))
     routes: dict[str, str] = {}
-    for node in ast.walk(tree):
-        if not _named_call(node, "process_events"):
-            continue
+    split: dict[str, list[str]] = {}
+    filtered: dict[str, list[bool]] = {}
+    calls = sorted(
+        (node for node in ast.walk(tree) if _named_call(node, "process_events")),
+        key=lambda node: (node.lineno, node.col_offset),
+    )
+    for node in calls:
         if len(node.args) < 2:
             raise ValueError("process_events call is missing route arguments")
         event_type = _string_constant(node.args[0], "process_events source")
         target_table = _string_constant(node.args[1], "process_events target")
-        _add_unique(routes, event_type, target_table, "streaming routes")
+        filtered.setdefault(event_type, []).append(
+            any(
+                keyword.arg == "filters_source"
+                and isinstance(keyword.value, ast.Constant)
+                and keyword.value.value is True
+                for keyword in node.keywords
+            )
+        )
+        if event_type not in routes:
+            routes[event_type] = target_table
+            continue
+        # An event split across tables: every route takes its own subset.
+        targets = split.setdefault(event_type, [])
+        if target_table == routes[event_type] or target_table in targets:
+            raise ValueError(f"duplicate {event_type!r} in streaming routes")
+        targets.append(target_table)
+    for event_type in split:
+        if not all(filtered[event_type]):
+            raise ValueError(f"split route {event_type!r} must set filters_source=True")
 
     raw_dedupe = _python_symbol_from_tree(tree, "STREAM_DEDUPE_KEYS")
     dedupe_keys = _string_sequence_mapping(raw_dedupe, "STREAM_DEDUPE_KEYS")
 
     # Paired routes combine two event tables into one keyed Silver row.
-    for function_name, keys_symbol, context in _PAIRED_STREAMING_ROUTES:
+    for function_name, keys_symbol, context, split_writer in _PAIRED_STREAMING_ROUTES:
         function = _function_node(tree, function_name)
         sources = {
             _string_constant(call.args[0], f"{context} source")
@@ -717,9 +752,18 @@ def streaming_silver_contract(path: Path) -> StreamingSilverContract:
         }
         target = _single_qualified_table(function, "fact_", context)
         keys = _string_sequence(_python_symbol_from_tree(tree, keys_symbol), keys_symbol)
+        split_target = None
+        if split_writer is not None:
+            if not any(_named_call(call, split_writer) for call in ast.walk(function)):
+                raise ValueError(f"{context} does not call {split_writer}")
+            split_target = _single_qualified_table(
+                _function_node(tree, split_writer), "fact_", f"{context} split"
+            )
         for event_type in sorted(sources):
             _add_unique(routes, event_type, target, "streaming routes")
             _add_unique(dedupe_keys, event_type, keys, "streaming dedupe keys")
+            if split_target is not None:
+                split.setdefault(event_type, []).append(split_target)
 
     derived_function = _function_node(tree, "process_marketing_attribution")
     required = _local_literal(derived_function, "required")
@@ -748,6 +792,7 @@ def streaming_silver_contract(path: Path) -> StreamingSilverContract:
         routes=routes,
         dedupe_keys=dedupe_keys,
         derived_routes={route_name: derived},
+        split_routes={event_type: tuple(targets) for event_type, targets in split.items()},
     )
 
 

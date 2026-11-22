@@ -46,11 +46,13 @@ ENGINE_MODULES = [
     "generation/customers.py",
     "generation/baskets.py",
     "generation/traffic.py",
+    "generation/inventory_policy.py",
+    "generation/incidents.py",
     "generation/network.py",
     "generation/dims.py",
     "generation/receipts.py",
     "generation/returns.py",
-    "generation/inventory_policy.py",
+    "generation/dc_supply.py",
     "generation/fulfillment.py",
     "generation/store_activity.py",
     "generation/online_orders.py",
@@ -91,13 +93,14 @@ STAGE_NOTEBOOK_TEXT = {
     "setup-03-generate-sales": (
         "Setup 03 — Generate sales",
         "Builds candidate in-store receipts and resolves them against the causal "
-        "inventory policy (fulfillment). Every receipt-dependent notebook waits for "
-        "this one.",
+        "inventory policy (fulfillment), with each DC's stock, supplier lead times and "
+        "logistics incidents; ship-from-DC online lines from setup-04 draw on DC stock. "
+        "Every receipt-dependent notebook waits for this one.",
     ),
     "setup-04-generate-online-orders": (
         "Setup 04 — Generate online orders",
-        "Builds online order headers, lines, and payments. Needs only dimensions, so "
-        "it runs alongside setup-03.",
+        "Builds online order headers, lines, and payments. Needs only dimensions; "
+        "setup-03 waits for it because ship-from-DC lines draw on DC stock.",
     ),
     "setup-05-generate-marketing": (
         "Setup 05 — Generate marketing",
@@ -114,8 +117,9 @@ STAGE_NOTEBOOK_TEXT = {
     ),
     "setup-08-generate-inventory": (
         "Setup 08 — Generate inventory",
-        "Builds store and DC inventory ledgers, truck moves and loads, reorders, and "
-        "stockouts from the fulfillment plan (after setup-03).",
+        "Builds store and DC inventory ledgers, truck moves and loads (planned and "
+        "actual arrivals), reorders, stockouts and logistics incidents from the "
+        "fulfillment plan (after setup-03).",
     ),
     "setup-09-attribute-marketing": (
         "Setup 09 — Attribute marketing",
@@ -154,6 +158,7 @@ STREAM_MODULES = [
     "generation/marketing.py",
     "generation/attribution.py",
     "generation/inventory_policy.py",
+    "generation/incidents.py",
     "generation/network.py",
     "generation/stream_baskets.py",
     "generation/stream_control.py",

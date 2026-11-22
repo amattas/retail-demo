@@ -1353,7 +1353,7 @@ def test_streaming_driver_does_not_swallow_individual_source_failures() -> None:
         and isinstance(node.func, ast.Name)
         and node.func.id
         in {"process_events", "process_truck_lifecycles", "process_logistics_incidents"}
-    ) == 20
+    ) == 21
 
 
 def test_merges_project_explicit_contracts_without_schema_auto_merge() -> None:

@@ -517,6 +517,8 @@ def _ledger(world) -> dict[tuple[int, int], list[tuple[int, int, int]]]:
         deltas: dict[tuple[int, int], dict[int, int]] = {}
         for event in _of(world, "inventory_updated"):
             payload = event["payload"]
+            if payload.get("store_id") is None:
+                continue  # the DC's own stock (no store)
             key = (payload["store_id"], payload["product_id"])
             at = _ms(event["ingest_timestamp"])
             deltas.setdefault(key, {})[at] = (
@@ -544,14 +546,28 @@ def test_store_stock_never_goes_negative_and_reconciles_with_sales_and_unloads(w
     assert all(after >= 0 for steps in ledger.values() for _at, _before, after in steps)
     inventory = world["state"].read("inventory", world["batch_count"])
     for key, entry in inventory.items():
-        _, store, product = key.split(":")
+        kind, store, product = key.split(":")
+        if kind != "inv":
+            continue
         steps = ledger.get((int(store), int(product)))
         expected = steps[-1][2] if steps else _seed_stock(int(store), int(product))
         assert entry["on_hand"] == expected, key
 
-    moves = [e["payload"] for e in _of(world, "inventory_updated")]
+    all_moves = [e["payload"] for e in _of(world, "inventory_updated")]
+    moves = [m for m in all_moves if m.get("store_id") is not None]
     network = world["network"]
     assert all(m["dc_id"] == network.dc_of(m["store_id"]) for m in moves)
+    # The DCs' own stock: loads, online ship-from-DC lines and supplier
+    # receipts, never below zero (the DC simulation's balance).
+    dc_moves = [m for m in all_moves if m.get("store_id") is None]
+    assert {m["reason"] for m in dc_moves} >= {"OUTBOUND_SHIPMENT", "ONLINE_SHIPMENT"}
+    assert {m["reason"] for m in dc_moves} <= {
+        "OUTBOUND_SHIPMENT",
+        "ONLINE_SHIPMENT",
+        "INBOUND_SHIPMENT",
+        "EXPEDITED_RECEIPT",
+    }
+    assert all(m["dc_id"] in network.fleets for m in dc_moves)
     lost = [m for m in moves if m["reason"] == "LOST_SALE"]
     assert lost and all(m["quantity_delta"] == 0 and m["requested_quantity"] > 0 for m in lost)
 
@@ -589,7 +605,11 @@ def test_store_stock_never_goes_negative_and_reconciles_with_sales_and_unloads(w
 
 def test_stockouts_fire_only_when_a_sale_empties_the_shelf(world) -> None:
     ledger = _ledger(world)
-    stockouts = [e["payload"] for e in _of(world, "stockout_detected")]
+    stockouts = [
+        e["payload"]
+        for e in _of(world, "stockout_detected")
+        if e["payload"].get("store_id") is not None
+    ]
     assert stockouts
     seen = set()
     for payload in stockouts:
@@ -628,8 +648,17 @@ def test_reorders_ship_on_the_dc_fleet_and_unload_into_stock(world) -> None:
     departures = {e["payload"]["shipment_id"]: e["payload"] for e in _of(world, "truck_departed")}
     assert departures and set(departures) <= set(arrivals)
     received: dict[tuple[int, int], int] = {}
+    short: dict[tuple[int, int], int] = {}
     for e in _of(world, "inventory_updated"):
         payload = e["payload"]
+        if payload.get("store_id") is None:
+            # A DC load that short-shipped leaves part of the reorder unfilled.
+            if payload["reason"] == "OUTBOUND_SHIPMENT":
+                store = int(payload["source"].split("-")[-2])
+                key = (store, payload["product_id"])
+                unfilled = payload["requested_quantity"] + payload["quantity_delta"]
+                short[key] = short.get(key, 0) + unfilled
+            continue
         if payload["reason"] == "INBOUND_SHIPMENT":
             departure = departures[payload["source"]]
             assert _ms(e["ingest_timestamp"]) == _ms(departure["departure_time"])
@@ -645,7 +674,7 @@ def test_reorders_ship_on_the_dc_fleet_and_unload_into_stock(world) -> None:
                     in_flight.get((store, int(product)), 0) + quantity
                 )
     for key, quantity in ordered.items():
-        assert quantity == received.get(key, 0) + in_flight.get(key, 0), key
+        assert quantity == received.get(key, 0) + in_flight.get(key, 0) + short.get(key, 0), key
 
     by_truck: dict[str, list[dict]] = {}
     dwell = []
@@ -655,9 +684,12 @@ def test_reorders_ship_on_the_dc_fleet_and_unload_into_stock(world) -> None:
         assert home is None or int(home) == arrival["dc_id"]
         assert truck in network.fleets[arrival["dc_id"]]
         assert arrival["dc_id"] == network.dc_of(arrival["store_id"])
-        assert arrival["planned_arrival_time"] == arrival["arrival_time"]
-        # On time until the incident model adds delays: no reason (JSON omits nulls).
-        assert arrival["delay_minutes"] == 0 and arrival.get("delay_reason") is None
+        # Actual arrival is the plan plus the delay; a delay always has a
+        # reason and an on-time truck none (JSON omits nulls).
+        late = _ms(arrival["arrival_time"]) - _ms(arrival["planned_arrival_time"])
+        assert abs(late - arrival["delay_minutes"] * MINUTE_MS) < MINUTE_MS
+        assert (arrival["delay_minutes"] > 0) == (arrival.get("delay_reason") is not None)
+        assert arrival["load_units"] > 0
         departure = departures.get(shipment_id)
         if departure is not None:
             minutes = (_ms(departure["departure_time"]) - _ms(arrival["arrival_time"])) / MINUTE_MS

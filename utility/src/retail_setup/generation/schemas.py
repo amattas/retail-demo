@@ -491,11 +491,16 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("actual_unload_duration", "double"),
         ("event_date", "date"),
         ("__index_level_0__", "long"),
-        # Planned vs actual arrival. Historical moves arrive as planned (delay
-        # 0, no reason) until the logistics incident model populates delays.
+        # Planned vs actual arrival (incidents.plan_delivery). Moves before
+        # the truck arrives show the plan in eta/etd with delay 0; moves from
+        # ARRIVED on show the actual arrival, delay_minutes (actual minus
+        # planned arrival) and delay_reason (DC_OUTAGE, HOLIDAY_CAPACITY,
+        # LANE_DELAY, WEATHER, TRAFFIC; NULL when on time).
         ("planned_arrival_time", "timestamp"),
         ("delay_minutes", "double"),
         ("delay_reason", "string"),
+        # Units on the shipment (drives the unload time).
+        ("load_units", "long"),
     ],
     "fact_truck_inventory": [
         # TMDL-bound: truck_id (int64→long), shipment_id, product_id (int64→long),
@@ -569,11 +574,11 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("event_date", "date"),
         ("__index_level_0__", "long"),
     ],
-    # Logistics disruptions (DC outages, lane delays, weather, holidays,
-    # supplier short-ships): one row per incident, resolved_at NULL while open.
-    # store_id is NULL for network- or DC-wide incidents. Historical
-    # generation publishes an empty table until the incident model lands; the
-    # live stream fills it from logistics_incident_started/_resolved.
+    # Logistics disruptions (incidents.INCIDENT_TYPES: DC_OUTAGE, LANE_DELAY,
+    # WEATHER, HOLIDAY_CAPACITY, SUPPLIER_SHORT_SHIP): one row per incident,
+    # resolved_at NULL while open. store_id is set for a lane incident and NULL
+    # for DC-wide ones. History and the live stream (logistics_incident_started
+    # / _resolved) plan incidents with the same model.
     "fact_logistics_incidents": [
         ("incident_id", "string"),
         ("incident_type", "string"),
@@ -584,6 +589,18 @@ TABLES: dict[str, list[tuple[str, str]]] = {
         ("severity", "string"),
         ("affected_store_count", "long"),
         ("description", "string"),
+        ("trace_id", "string"),
+        ("event_date", "date"),
+    ],
+    # Bridge: one row per incident and store it affects (every store the DC
+    # serves, the lane's store, or the geography's stores).
+    "fact_logistics_incident_stores": [
+        ("incident_id", "string"),
+        ("store_id", "long"),
+        ("dc_id", "long"),
+        ("incident_type", "string"),
+        ("started_at", "timestamp"),
+        ("resolved_at", "timestamp"),
         ("trace_id", "string"),
         ("event_date", "date"),
     ],
