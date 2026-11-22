@@ -561,18 +561,15 @@ def run_invariants(
             ).count(),
         )
 
-        # fact_marketing: each journey's touches are exactly the two rows
-        # created for it (older + newer), never orphaned or duplicated.
+        # fact_marketing: a journey is the converting impressions that reached
+        # its purchase (attribution.py), one touch or more. Journeys and
+        # attributed purchases pair 1:1, so no journey is orphaned and no
+        # attributed purchase lacks a touch.
         mk = t["fact_marketing"]
         journey_touch_counts = (
             mk.filter(F.col("attribution_journey_id").isNotNull())
             .groupBy("attribution_journey_id")
             .agg(F.count("*").alias("n"))
-        )
-        _check(
-            r,
-            "fact_marketing journeys have exactly 2 touches",
-            lambda: journey_touch_counts.filter(F.col("n") != 2).count(),
         )
         _check(
             r,
