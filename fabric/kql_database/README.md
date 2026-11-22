@@ -34,15 +34,22 @@ Producers for the derived tables:
   events still come from a future approval UI or a manual process.
 
 Core KPI materialized views use deterministic aggregation queries plus
-seven-day materialized-view retention policies. Current pending pricing state
+seven-day materialized-view retention policies. `mv_truck_delay_hourly`
+aggregates planned vs actual arrivals per lane and hour.
+`fn_active_incidents()` lists open incidents, `fn_incident_impacted_stores()`
+expands them to one row per affected store, and `fn_lane_delays(lookback)`
+summarizes late trucks per lane. The late threshold (30 minutes) equals
+`calibration.TRUCK_LATE_MINUTES`. Current pending pricing state
 is exposed by `fn_pending_recommendations()` because it must reconcile creation,
 approval, and rejection event tables at query time.
 
-The live stream declares twenty-two typed business event tables and emits
-twenty of them today. `logistics_incident_started` and
-`logistics_incident_resolved` are declared for the logistics incident model;
-they follow the same retention and extent-tag retention policies as their
-operational peers. `inventory_updated.requested_quantity` carries the demand of
+The live stream declares and emits twenty-two typed business event tables.
+`logistics_incident_started` and `logistics_incident_resolved` carry the
+logistics incident model's incidents (DC outages, lane delays, weather,
+holiday capacity, supplier short-ships); a start lists every affected store in
+`affected_store_ids`. Incidents happen a few times a year per DC, so these
+tables are often empty for weeks. `truck_arrived` carries the planned arrival,
+the delay against it, its reason and the load's units (`load_units`). `inventory_updated.requested_quantity` carries the demand of
 a sale or lost sale; `01-create-tables.kql` restates the table with
 `.alter table` so the column sits before the envelope. `unknown_event`
 is a catch-all KQL table, not a generated business event.
@@ -56,8 +63,8 @@ never used. Only `unknown_event` keeps them, for queued ingestion.
 
 The Spark Kusto writes are positional, so a new column in an existing event
 table must keep the payload-then-envelope order. `01-create-tables.kql`
-restates `truck_arrived` and `ad_impression` with `.alter table` after their
-`.create-merge` for that reason. `ad_impression.impression_time` is when an
+restates `truck_arrived`, `logistics_incident_started` and `ad_impression` with
+`.alter table` after their `.create-merge` for that reason. `ad_impression.impression_time` is when an
 impression was shown; journey touches arrive (`ingest_timestamp`) with their
 purchase, so the marketing functions use
 `coalesce(impression_time, ingest_timestamp)` as the touch time.

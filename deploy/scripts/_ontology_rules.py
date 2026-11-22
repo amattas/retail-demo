@@ -35,6 +35,8 @@ NEAR_TERM_RETURN_DAYS = 4
 HIGH_PRIORITY_DEMAND_DAYS = 2
 # fabric/lakehouse/09-ml-churn-prediction.ipynb
 CHURN_WINDOW_DAYS = 90
+# utility/src/retail_setup/generation/calibration.py
+TRUCK_LATE_MINUTES = 30
 
 
 @dataclass(frozen=True)
@@ -138,6 +140,25 @@ RULES: tuple[Rule, ...] = (
          RuleReference("ChurnPrediction", ("churn_probability", "risk_category",
                                            "churn_window_days"))),
         ("CustomerHasChurnPrediction",),
+    ),
+    Rule(
+        "LogisticsIncidentImpact",
+        "A logistics incident affects every store it lists. A DC outage holds the DC's "
+        "dispatches, so loads leave at each store's next delivery slot after it ends; a "
+        "supplier short-ship cuts the DC's supplier receipts, so the DC can run out and "
+        "its stores' reorders are short-shipped until they stock out; a lane delay or "
+        "severe weather makes trucks to the affected stores late; holiday capacity limits "
+        f"delay loading. A truck is late when it arrives {TRUCK_LATE_MINUTES} or more "
+        "minutes after its planned arrival.",
+        (
+            RuleReference(
+                "Incident",
+                ("incident_type", "started_at", "resolved_at", "affected_store_count"),
+            ),
+            RuleReference("DistributionCenter"),
+            RuleReference("Store"),
+        ),
+        ("IncidentAtDistributionCenter", "IncidentAffectsStore"),
     ),
 )
 

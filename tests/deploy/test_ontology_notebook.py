@@ -23,6 +23,7 @@ EXPECTED_BUSINESS_ENTITIES = {
     "CustomerSegment",
     "ChurnPrediction",
     "StockoutRisk",
+    "Incident",
 }
 
 EXPECTED_EVENTHOUSE_BINDINGS = {
@@ -59,6 +60,9 @@ EXPECTED_EVENTHOUSE_BINDINGS = {
     ("DistributionCenter", "reorder_triggered"),
     ("DistributionCenter", "truck_arrived"),
     ("DistributionCenter", "truck_departed"),
+    ("Incident", "logistics_incident_started"),
+    ("Incident", "logistics_incident_resolved"),
+    ("DistributionCenter", "logistics_incident_started"),
 }
 
 EXPECTED_EVENTHOUSE_RELATIONSHIP_CONTEXTS = {

@@ -121,6 +121,9 @@ ENTITIES: tuple[Entity, ...] = (
     # ranking is a global row number that changes every run; risk_id is the
     # stable store:product:horizon identity of the scored position.
     Entity("StockoutRisk", "stockout_risk", "gold", "risk_id"),
+    # One row per logistics incident (DC outage, lane delay, weather, holiday
+    # capacity, supplier short-ship); its stores come from the bridge.
+    Entity("Incident", "fact_logistics_incidents", "silver", "incident_id"),
 )
 
 # Inactive flags mirror retail_model relationships.tmdl so the TOM graph has
@@ -162,6 +165,11 @@ RELATIONSHIPS: tuple[Relationship, ...] = (
                  "stockout_risk", "store_id", "dim_stores", "ID"),
     Relationship("StockoutRiskForProduct", "StockoutRisk", "Product",
                  "stockout_risk", "product_id", "dim_products", "ID"),
+    Relationship("IncidentAtDistributionCenter", "Incident", "DistributionCenter",
+                 "fact_logistics_incidents", "dc_id", "dim_distribution_centers", "ID",
+                 active=False),
+    Relationship("IncidentOnLaneToStore", "Incident", "Store",
+                 "fact_logistics_incidents", "store_id", "dim_stores", "ID", active=False),
 )
 
 JUNCTIONS: tuple[JunctionRelationship, ...] = (
@@ -169,6 +177,10 @@ JUNCTIONS: tuple[JunctionRelationship, ...] = (
                          "fact_receipt_lines", "silver", "receipt_id_ext", "product_id"),
     JunctionRelationship("OnlineOrderContainsProduct", "OnlineOrder", "Product",
                          "fact_online_order_lines", "silver", "order_id", "product_id"),
+    # Every store an incident affects: the DC's stores, the lane's store, or
+    # the geography's stores.
+    JunctionRelationship("IncidentAffectsStore", "Incident", "Store",
+                         "fact_logistics_incident_stores", "silver", "incident_id", "store_id"),
 )
 
 # The first binding of each event table is its only active TOM relationship.
@@ -180,6 +192,8 @@ EVENT_BINDINGS: tuple[EventBinding, ...] = (
     EventBinding("OnlineOrder", "online_order_created", "order_id"),
     EventBinding("OnlineOrder", "online_order_picked", "order_id"),
     EventBinding("OnlineOrder", "online_order_shipped", "order_id"),
+    EventBinding("Incident", "logistics_incident_started", "incident_id"),
+    EventBinding("Incident", "logistics_incident_resolved", "incident_id"),
     EventBinding("Store", "receipt_created", "store_id"),
     EventBinding("Store", "payment_processed", "store_id"),
     EventBinding("Store", "promotion_applied", "store_id"),
@@ -206,6 +220,8 @@ EVENT_BINDINGS: tuple[EventBinding, ...] = (
     EventBinding("DistributionCenter", "reorder_triggered", "dc_id"),
     EventBinding("DistributionCenter", "truck_arrived", "dc_id"),
     EventBinding("DistributionCenter", "truck_departed", "dc_id"),
+    EventBinding("DistributionCenter", "logistics_incident_started", "dc_id"),
+    EventBinding("DistributionCenter", "logistics_incident_resolved", "dc_id"),
 )
 
 

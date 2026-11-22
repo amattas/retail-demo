@@ -31,7 +31,7 @@
               {
                 "textRuns": [
                   {
-                    "value": "Latest recorded logistics status for the selected trucks. Recorded ETA is separate from the labeled +60 min delay what-if; this report is not live GPS, continuous route tracking, or physical dispatch control.",
+                    "value": "Latest recorded logistics status for the selected trucks. Recorded ETA is the actual arrival once the truck arrives; compare it with the planned ETA and the recorded delay; this report is not live GPS, continuous route tracking, or physical dispatch control.",
                     "textStyle": {
                       "fontFamily": "Segoe UI",
                       "fontSize": "10pt",

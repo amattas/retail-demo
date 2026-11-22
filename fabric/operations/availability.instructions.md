@@ -8,6 +8,12 @@ Do not present simulated assumptions, forecast sales, or projected margin as obs
 Prioritize cases with stockout_probability >= 0.7 or days_of_inventory < 3.
 Explain the affected store, product, seven-day forecast, available inventory, and estimated shortage.
 Report risk_horizon_days with stockout_probability; its model horizon can differ from the seven-day plan.
+Explain supply from the same row: the serving DC (dc_id), its observed delivery lead time
+(lead_time_days), units already on trucks to the store (inbound_units, expected at
+expected_inbound_ts), and any logistics incident affecting the store at the snapshot
+(active_incident_id, active_incident_type, active_incident_cause). When an incident is present,
+name it as the likely cause of the shortage (for example a DC outage, a supplier short-ship or
+severe weather) and say that more stock from the same DC may be delayed until it resolves.
 Show the case_id with every recommendation. Limit each review to the five most urgent cases.
 Do not repeatedly recommend a case that already has a DRAFT, APPROVED, or RESOLVED action record.
 
@@ -15,8 +21,10 @@ Do not claim to create a draft or invoke an action. After explaining the evidenc
 direct an operator to run the prepare-replenishment-case notebook with the selected case_id.
 That notebook creates an idempotent draft, not a purchase order.
 {{PLANNING_HANDOFF}}
-Compare baseline, transfer, and expedite options; verify reservations, confirmed inbound, lead times,
-and shared supply/budget before approving any quantities. Historical reorder rows are not open-order evidence.
+Compare baseline, transfer, and expedite options using inbound_units, expected_inbound_ts,
+lead_time_days and the active incident; verify reservations and shared supply/budget, which the
+signals do not carry, before approving any quantities. Historical reorder rows are not
+open-order evidence; inbound_units counts only loads already on the road.
 
 Never execute purchases, contact suppliers, change prices, or mutate the historical Silver/Gold contract.
 Never infer customer identities or expose customer-level data.
@@ -47,7 +55,9 @@ ops_availability_signals
 | project case_id, event_ts, source_as_of, forecast_as_of, store_id,
     product_id, product_name, current_inventory, forecast_units_7d,
     stockout_probability, risk_horizon_days, days_of_inventory,
-    shortage_units, scenario, provenance
+    shortage_units, scenario, provenance, dc_id, lead_time_days,
+    inbound_units, expected_inbound_ts, active_incident_id,
+    active_incident_type, active_incident_cause
 ```
 
 Column meanings:
@@ -67,6 +77,19 @@ Column meanings:
 - shortage_units (long): precomputed forecast units minus current inventory, not below zero
 - scenario (string): planning scenario label; describe it as a plan, not an outcome
 - provenance (string): where the signal came from; include it verbatim
+- dc_id (long): the distribution center that supplies the store
+- lead_time_days (real): average days from scheduling a delivery to its arrival
+  at this store, from its recent shipments (empty when unknown)
+- inbound_units (long): units of this product on trucks to the store at the
+  snapshot (loaded, not yet unloaded); 0 when nothing is on the road
+- expected_inbound_ts (datetime): planned arrival of the earliest inbound load
+  (empty when nothing is inbound)
+- active_incident_id (string): logistics incident affecting the store at the
+  snapshot (empty when none)
+- active_incident_type (string): DC_OUTAGE, LANE_DELAY, WEATHER,
+  HOLIDAY_CAPACITY or SUPPLIER_SHORT_SHIP
+- active_incident_cause (string): the incident's description, its cause and
+  expected effect
 
 Define two rules over the rows returned by that query:
 
@@ -80,13 +103,15 @@ the query removed. Build every alert from the values on the matching row:
 - Body: case_id, store_id, product_id, product_name, current_inventory,
   forecast_units_7d, stockout_probability with risk_horizon_days,
   days_of_inventory, shortage_units, source_as_of, forecast_as_of, scenario,
-  and provenance.
+  provenance, dc_id, inbound_units with expected_inbound_ts, lead_time_days,
+  and, when present, active_incident_type and active_incident_cause.
 - Ending: append this exact next-step text, replacing <case_id> with the
   row's case_id:
 
 "Next step: review replenishment options before acting. Compare baseline,
-transfer, and expedite options. Verify reservations, confirmed inbound, lead
-times, shared supply, and budget; historical reorders are not open orders.
+transfer, and expedite options against the inbound units, lead time, and any
+active incident above. Verify reservations, shared supply, and budget;
+historical reorders are not open orders.
 If a reviewer approves, run the prepare-replenishment-case notebook with
 CASE_ID=<case_id>. The notebook prepares a draft for review; it does not place
 an order. This alert has not created a draft or order."

@@ -114,12 +114,14 @@ def scenario_sql(
             return f"[{schema}].[{name}]"
 
         horizon_end = "DATEADD(day, 7, CAST(source_as_of AS date))"
+        trip_days = "DATEDIFF(second, scheduled_ts, arrived_ts) / 86400.0"
         top, limit = f"TOP ({MAX_SIGNALS})\n       ", ""
     elif dialect == "spark":
         def table(schema: str, name: str) -> str:
             return ".".join(part for part in (catalog, schema, name) if part)
 
         horizon_end = "date_add(CAST(source_as_of AS date), 7)"
+        trip_days = "(unix_timestamp(arrived_ts) - unix_timestamp(scheduled_ts)) / 86400.0"
         top, limit = "", f"\nLIMIT {MAX_SIGNALS}"
     else:
         raise ValueError(f"Unsupported scenario dialect: {dialect!r}")
@@ -138,16 +140,72 @@ WITH demand AS (
     WHERE forecast_date > CAST(source_as_of AS date)
       AND forecast_date <= {horizon_end}
     GROUP BY store_id, product_id
+),
+lanes AS (
+    SELECT store_id, MAX(dc_id) AS dc_id
+    FROM {table(silver, "fact_reorders")}
+    GROUP BY store_id
+),
+trips AS (
+    SELECT shipment_id, MAX(store_id) AS store_id,
+           MIN(CASE WHEN status = 'SCHEDULED' THEN event_ts END) AS scheduled_ts,
+           MIN(CASE WHEN status = 'ARRIVED' THEN event_ts END) AS arrived_ts,
+           MIN(planned_arrival_time) AS planned_arrival
+    FROM {table(silver, "fact_truck_moves")}
+    GROUP BY shipment_id
+),
+lead AS (
+    SELECT store_id, AVG({trip_days}) AS lead_time_days
+    FROM trips
+    WHERE scheduled_ts IS NOT NULL AND arrived_ts IS NOT NULL
+    GROUP BY store_id
+),
+inbound AS (
+    SELECT trips.store_id, cargo.product_id, SUM(cargo.quantity) AS inbound_units,
+           MIN(trips.planned_arrival) AS expected_inbound_ts
+    FROM {table(silver, "fact_truck_inventory")} AS cargo
+    JOIN trips ON trips.shipment_id = cargo.shipment_id
+    WHERE cargo.action = 'LOAD'
+      AND NOT EXISTS (
+          SELECT 1 FROM {table(silver, "fact_truck_inventory")} AS unloaded
+          WHERE unloaded.shipment_id = cargo.shipment_id
+            AND unloaded.product_id = cargo.product_id
+            AND unloaded.action = 'UNLOAD'
+      )
+    GROUP BY trips.store_id, cargo.product_id
+),
+incident AS (
+    SELECT snapshot.store_id, link.incident_id, link.incident_type,
+           header.description AS incident_cause,
+           ROW_NUMBER() OVER (
+               PARTITION BY snapshot.store_id ORDER BY link.started_at DESC, link.incident_id
+           ) AS incident_rank
+    FROM (SELECT DISTINCT store_id, predicted_at FROM {table(gold, "stockout_risk")}) AS snapshot
+    JOIN {table(silver, "fact_logistics_incident_stores")} AS link
+      ON link.store_id = snapshot.store_id
+     AND link.started_at <= snapshot.predicted_at
+     AND (link.resolved_at IS NULL OR link.resolved_at > snapshot.predicted_at)
+    JOIN {table(silver, "fact_logistics_incidents")} AS header
+      ON header.incident_id = link.incident_id
 )
 SELECT {top}risk.store_id, risk.product_id, product.ProductName AS product_name,
        risk.current_inventory, demand.forecast_units_7d,
        risk.stockout_probability, risk.days_of_inventory,
        risk.forecast_horizon_days AS risk_horizon_days,
        risk.predicted_at AS source_as_of, demand.forecast_as_of, demand.forecast_days,
-       demand.forecast_rows, demand.forecast_versions
+       demand.forecast_rows, demand.forecast_versions,
+       lanes.dc_id, lead.lead_time_days,
+       COALESCE(inbound.inbound_units, 0) AS inbound_units, inbound.expected_inbound_ts,
+       incident.incident_id AS active_incident_id,
+       incident.incident_type AS active_incident_type,
+       incident.incident_cause AS active_incident_cause
 FROM {table(gold, "stockout_risk")} AS risk
 JOIN {table(silver, "dim_products")} AS product ON product.ID = risk.product_id
 JOIN demand ON demand.store_id = risk.store_id AND demand.product_id = risk.product_id
+LEFT JOIN lanes ON lanes.store_id = risk.store_id
+LEFT JOIN lead ON lead.store_id = risk.store_id
+LEFT JOIN inbound ON inbound.store_id = risk.store_id AND inbound.product_id = risk.product_id
+LEFT JOIN incident ON incident.store_id = risk.store_id AND incident.incident_rank = 1
 WHERE demand.forecast_days = 7 AND demand.forecast_rows = 7 AND demand.forecast_versions = 1
   {cohort}
 ORDER BY
@@ -174,7 +232,47 @@ FIELDS = (
     ("scenario", "string"),
     ("provenance", "string"),
     ("plan_cohort", "bool"),
+    # Supply context (Silver logistics): the store's DC, its observed delivery
+    # lead time, units on trucks to the store and their planned arrival, and
+    # the logistics incident affecting the store at the snapshot, if any.
+    ("dc_id", "long"),
+    ("lead_time_days", "real"),
+    ("inbound_units", "long"),
+    ("expected_inbound_ts", "datetime"),
+    ("active_incident_id", "string"),
+    ("active_incident_type", "string"),
+    ("active_incident_cause", "string"),
 )
+PROVENANCE = (
+    "Synthetic retail demo; observed from current Gold forecast/risk outputs and Silver "
+    "logistics. Inbound units are loads on the road at the snapshot; reservations are "
+    "unverified, not assumed available."
+)
+
+
+def supply_context(row: dict[str, Any]) -> dict[str, Any]:
+    """The signal's supply fields from a source row (NULL when the source has none)."""
+
+    def optional(name: str, cast: Any) -> Any:
+        value = row.get(name)
+        return None if value is None else cast(value)
+
+    expected = row.get("expected_inbound_ts")
+    if isinstance(expected, str):
+        expected = datetime.fromisoformat(expected.replace("Z", "+00:00"))
+    if isinstance(expected, datetime) and expected.tzinfo is None:
+        expected = expected.replace(tzinfo=UTC)
+    return {
+        "dc_id": optional("dc_id", int),
+        "lead_time_days": optional("lead_time_days", lambda v: round(float(v), 3)),
+        "inbound_units": max(0, int(row.get("inbound_units") or 0)),
+        "expected_inbound_ts": (
+            expected.astimezone(UTC).isoformat() if isinstance(expected, datetime) else None
+        ),
+        "active_incident_id": optional("active_incident_id", str),
+        "active_incident_type": optional("active_incident_type", str),
+        "active_incident_cause": optional("active_incident_cause", str),
+    }
 
 
 def scenario_signals(
@@ -263,9 +361,9 @@ def scenario_signals(
                 "days_of_inventory": cover,
                 "shortage_units": max(0, math.ceil(forecast) - inventory),
                 "scenario": "Protect weekend availability",
-                "provenance": "Synthetic retail demo; observed from current Gold forecast/risk outputs. "
-                "Reservations and confirmed inbound are unverified, not assumed available.",
+                "provenance": PROVENANCE,
                 "plan_cohort": plan_cohort,
+                **supply_context(row),
             }
         )
     # Every case carries the snapshot's as-of time. Older sources reported a
@@ -307,7 +405,10 @@ def signal_ingestion_query(signals: list[dict[str, Any]]) -> str:
         cells = []
         for name, kind in FIELDS:
             value = row[name]
-            if kind == "datetime":
+            if value is None:
+                # KQL has typed nulls; a missing string is empty.
+                cells.append('""' if kind == "string" else f"{kind}(null)")
+            elif kind == "datetime":
                 value = datetime.fromisoformat(value)
                 cells.append(f"datetime({value.astimezone(UTC).isoformat()})")
             else:
@@ -330,6 +431,11 @@ def validate_signal_readback(
         for name, kind in FIELDS:
             value = wanted[name]
             found = actual[wanted["case_id"]][name]
+            if value is None:
+                # Kusto returns an empty string for a missing string.
+                if found not in (None, ""):
+                    raise ValueError(f"Seeded availability readback differs at {name}.")
+                continue
             if kind == "datetime":
                 value = datetime.fromisoformat(value)
                 if isinstance(found, str):

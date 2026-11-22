@@ -270,6 +270,7 @@ relationship 'Campaign Performance Daily to Date'
 	toColumn: dim_date.Date
 
 relationship 'Logistics Incidents to Stores'
+	isActive: false
 	fromColumn: fact_logistics_incidents.'Store ID'
 	toColumn: dim_stores.ID
 
@@ -281,3 +282,11 @@ relationship 'Logistics Incidents to Distribution Centers'
 	isActive: false
 	fromColumn: fact_logistics_incidents.'DC ID'
 	toColumn: dim_distribution_centers.ID
+
+relationship 'Logistics Incident Stores to Logistics Incidents'
+	fromColumn: fact_logistics_incident_stores.'Incident ID'
+	toColumn: fact_logistics_incidents.'Incident ID'
+
+relationship 'Logistics Incident Stores to Stores'
+	fromColumn: fact_logistics_incident_stores.'Store ID'
+	toColumn: dim_stores.ID

@@ -212,3 +212,51 @@
               actual_unload_duration, arrival_ingest_timestamp,
               departure_ingest_timestamp, arrival_trace_id, departure_trace_id
 }
+
+// ============================================================================
+// LOGISTICS INCIDENTS
+// ============================================================================
+
+// Incidents open now: started and not yet resolved, one row per incident.
+// affected_store_ids lists every store the incident affects (the DC's stores,
+// the lane's store, or the geography's stores).
+.create-or-alter function with (folder = "logistics") fn_active_incidents()
+{
+    logistics_incident_started
+    | summarize arg_min(started_at, *) by incident_id
+    | join kind=leftanti (
+        logistics_incident_resolved
+        | where resolved_at <= now()
+        | distinct incident_id
+    ) on incident_id
+    | where started_at <= now()
+    | project incident_id, incident_type, dc_id, store_id, started_at, severity,
+              affected_store_count, affected_store_ids, description
+}
+
+// Stores impacted by the open incidents: one row per incident and store.
+// Answers "which stores does the outage at DC X affect?".
+.create-or-alter function with (folder = "logistics") fn_incident_impacted_stores()
+{
+    fn_active_incidents()
+    | mv-expand affected_store_id = affected_store_ids to typeof(long)
+    | project incident_id, incident_type, dc_id, store_id = affected_store_id,
+              lane_store_id = store_id, started_at, severity, description
+}
+
+// Planned vs actual arrival by lane over a lookback: trucks, late trucks
+// (30+ minutes after plan, calibration.TRUCK_LATE_MINUTES), the mean and
+// largest delay, and the most frequent delay reason.
+.create-or-alter function with (folder = "logistics") fn_lane_delays(lookback:timespan = 1d)
+{
+    truck_arrived
+    | where ingest_timestamp > ago(lookback)
+    | summarize arg_min(arrival_time, *) by shipment_id
+    | summarize trucks = count(),
+                late_trucks = countif(delay_minutes >= 30),
+                avg_delay_minutes = avg(todouble(delay_minutes)),
+                max_delay_minutes = max(delay_minutes),
+                top_reason = take_anyif(delay_reason, isnotempty(delay_reason))
+        by dc_id, store_id
+    | extend late_share = todouble(late_trucks) / todouble(trucks)
+}

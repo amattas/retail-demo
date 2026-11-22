@@ -16,6 +16,7 @@ from retail_setup.contracts import load_repository_manifest, resolve_profile
 from retail_setup.generation.stream_control import (
     EVENT_TABLE_QUIET,
     PENDING_EVENT_TYPES,
+    SPORADIC_EVENT_TYPES,
 )
 
 from deploy.scripts.build_artifacts import SETUP_NOTEBOOKS
@@ -2107,7 +2108,7 @@ def _live_tables() -> frozenset[str]:
         for contract in _repository_manifest().data_contracts
         if contract.kind == "event"
         for event in contract.events
-    ) - PENDING_EVENT_TYPES
+    ) - PENDING_EVENT_TYPES - SPORADIC_EVENT_TYPES
 
 
 @pytest.mark.parametrize(
@@ -2144,7 +2145,7 @@ def test_eventhouse_freshness_is_checked_per_live_table(stale_table, age, status
 
     result = _status(runner, runner._eventhouse_freshness)
 
-    assert PENDING_EVENT_TYPES.isdisjoint(ingestion)
+    assert (PENDING_EVENT_TYPES | SPORADIC_EVENT_TYPES).isdisjoint(ingestion)
     assert result.status == status
     if stale_table is None:
         assert result.freshness["age_seconds"] == 120

@@ -150,7 +150,7 @@ def test_creates_when_absent_and_reports_skipped_bronze_tables():
     assert report["bronze_tables"] == []
     assert report["discovered_bronze_tables"] == ["receipt_created"]
     assert "payment_processed" in report["skipped_bronze_tables"]
-    assert len(report["entities"]) == 13 and len(report["rules"]) == 9
+    assert len(report["entities"]) == 14 and len(report["rules"]) == 10
     name, definition = fake.items[NEW]
     paths = {part["path"] for part in definition["parts"]}
     assert name == ONTOLOGY_NAME

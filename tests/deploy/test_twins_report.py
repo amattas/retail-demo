@@ -247,7 +247,7 @@ def test_visible_guardrails_make_demo_limits_and_asofs_clear() -> None:
         "metric-specific actual as-of timestamps",
         "zone activity",
         "not available-to-promise",
-        "+60 min delay what-if",
+        "planned eta and the recorded delay",
         "cohort selection anchor",
         "not a live refresh time",
         "shipment ids are relationship evidence",
@@ -270,7 +270,7 @@ def test_visible_guardrails_make_demo_limits_and_asofs_clear() -> None:
         "Twin Truck State As Of",
         "Twin Truck Cargo As Of",
         "Twin Truck Recorded ETA",
-        "Twin Truck Delay Scenario ETA",
+        "Twin Truck Planned ETA",
     } <= measures
 
 
