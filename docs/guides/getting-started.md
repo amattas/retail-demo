@@ -271,6 +271,23 @@ around them:
 A custom layout takes its traffic from its average ticket, its hours from its
 hourly traffic curve, and its online share and zones from its profile.
 
+Holidays and weather move daily traffic the same way in history and the live
+stream. Each store type follows a US holiday calendar for its kind of store:
+
+| Store type | Holiday behavior |
+| --- | --- |
+| `supercenter` (general merchandise) | Black Friday more than doubles traffic; closed on Thanksgiving and Christmas |
+| `grocery` | Busiest the day before Thanksgiving and on July 3; open on Thanksgiving, closed on Christmas |
+| `hardware` | Spring lift: Easter Saturday, Memorial Day weekend, Mother's and Father's Day; closed on Thanksgiving and Christmas |
+| `luxury` | Valentine's Day, Black Friday and Christmas Eve lifts; closed on Thanksgiving and Christmas |
+
+A custom layout counts as a grocer when most of its department weight is food,
+as a home-improvement store when hardware, tools, building or garden
+departments carry 40% of it, and as luxury when its average ticket is $500 or
+more; anything else follows the general merchandise calendar. Online orders
+peak on Cyber Monday and Black Friday. Weather is local and persists for
+several days; snow-belt winters and southern storm seasons move traffic most.
+
 Non-interactive example:
 
 === "Windows PowerShell"

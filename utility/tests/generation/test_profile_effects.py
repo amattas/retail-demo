@@ -45,7 +45,9 @@ def test_luxury_boutiques_see_a_tenth_of_supercenter_traffic(spark):
         )
         dicts = load_dictionaries(default_dictionary_root(), store_type)
         dims = generate_dimensions(spark, dicts, cfg)
-        grid = generate_hourly_visits(spark, dims["dim_stores"], dicts.profile, cfg)
+        grid = generate_hourly_visits(
+            spark, dims["dim_stores"], dicts.profile, cfg, dims["dim_geographies"]
+        )
         total = grid.agg(F.sum("n_receipts")).first()[0]
         multipliers = dims["dim_stores"].agg(F.sum("daily_traffic_multiplier")).first()[0]
         return total / 7 / multipliers

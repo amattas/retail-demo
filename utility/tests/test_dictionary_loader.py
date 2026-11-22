@@ -135,3 +135,23 @@ def test_bad_row_error_includes_row_index(dict_root: Path):
     )
     with pytest.raises(ValueError, match=r"products\.json\[0\]"):
         load_dictionaries(dict_root, "toytown")
+
+
+def test_tax_rules_are_optional_and_validated(dict_root: Path):
+    from retail_setup.dictionaries.loader import default_dictionary_root, load_tax_rules
+
+    # Dictionary sets seeded before the rules existed load without them.
+    assert load_dictionaries(dict_root, "toytown").tax_rules == []
+    (dict_root / "_shared" / "tax_rules.json").write_text(
+        json.dumps([{"StateCode": "al", "GroceryTaxPct": 75}]), encoding="utf-8"
+    )
+    rules = load_dictionaries(dict_root, "toytown").tax_rules
+    assert [(r.StateCode, r.GroceryTaxPct, r.ClothingTaxPct) for r in rules] == [("AL", 75, 100)]
+    (dict_root / "_shared" / "tax_rules.json").write_text(
+        json.dumps([{"StateCode": "AL", "GroceryTaxPct": 120}]), encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="tax_rules.json"):
+        load_dictionaries(dict_root, "toytown")
+    committed = {r.StateCode: r for r in load_tax_rules(default_dictionary_root())}
+    assert len(committed) == len(load_tax_rules(default_dictionary_root()))
+    assert committed["AL"].GroceryTaxPct > 0 and committed["NJ"].ClothingTaxPct == 0

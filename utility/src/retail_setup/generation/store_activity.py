@@ -1,9 +1,10 @@
 """Store ops + foot traffic facts, Spark-native.
 
-fact_store_ops: exactly two rows (opened/closed) per store-day, with the
+fact_store_ops: exactly two rows (opened/closed) per open store-day, with the
 open/close hours parsed from `dim_stores.operating_hours` ("24h" or
-"open-close", from the store type's profile). Dec 25 is skipped entirely
-(stores closed for Christmas, any year).
+"open-close", from the store type's profile). Days the holiday calendar
+closes the store type's stores (Christmas, and Thanksgiving for all but
+grocers; ``stream_calendar.closed_date_column``) are skipped entirely.
 
 Footfall uses the same independently generated visitors as receipt conversion
 and counts zone passages, not shares: the store type's zones
@@ -17,11 +18,16 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
+from retail_setup.dictionaries.models import StoreTypeProfile
 from retail_setup.dictionaries.loader import load_dictionaries
 from retail_setup.generation.receipts import _open_close_cols
 from retail_setup.generation.runtime import seeded_draws, store_day_grid
 from retail_setup.generation.schemas import column_names
-from retail_setup.generation.stream_calendar import DEFAULT_OPERATING_WINDOW
+from retail_setup.generation.stream_calendar import (
+    DEFAULT_OPERATING_WINDOW,
+    closed_date_column,
+    store_class,
+)
 from retail_setup.generation.traffic import generate_hourly_visits
 from retail_setup.generation.vocabulary import (
     ble_layout,
@@ -30,28 +36,22 @@ from retail_setup.generation.vocabulary import (
 )
 
 
-BASE_CONVERSION = 0.20
-PEAK_HOURS = (12, 13, 17, 18, 19)
-PEAK_MULTIPLIER = 1.3
-WEEKEND_MULTIPLIER = 0.9
-# Baseline browsers per store-hour (scaled by store size + hour-of-day) so that
-# open hours with zero receipts still emit foot traffic.
-BASE_HOURLY_BROWSERS = 8
-
-
 def generate_store_ops(
     spark: SparkSession,
     dims: dict[str, DataFrame],
     cfg: GenerationConfig,
+    profile: StoreTypeProfile | None = None,
 ) -> DataFrame:
-    """Two rows (opened/closed) per store-day, skipping Dec 25 of any year."""
+    """Two rows (opened/closed) per store-day, skipping days the stores are closed."""
+    if profile is None:
+        profile = load_dictionaries(cfg.resolved_dictionary_root, cfg.store_type).profile
 
     stores = dims["dim_stores"].select(F.col("ID").alias("store_id"), "operating_hours")
     store_ids = [r.store_id for r in stores.select("store_id").collect()]
 
     grid = (
         store_day_grid(spark, store_ids, cfg.start_date, cfg.end_date, cfg.seed, "store_ops")
-        .filter(~((F.month("day") == 12) & (F.dayofmonth("day") == 25)))
+        .filter(~closed_date_column(F.col("day"), store_class(profile)))
         .join(stores, "store_id")
     )
 
@@ -111,7 +111,9 @@ def generate_foot_traffic(
     profile = load_dictionaries(cfg.resolved_dictionary_root, cfg.store_type).profile
     layout = ble_layout(profile)
     shares = zone_passage_shares(layout)
-    grid = generate_hourly_visits(spark, dims["dim_stores"], profile, cfg)
+    grid = generate_hourly_visits(
+        spark, dims["dim_stores"], profile, cfg, dims.get("dim_geographies")
+    )
 
     zone_structs = [
         F.struct(

@@ -67,7 +67,9 @@ def test_foot_traffic_counts_zone_passages(spark, setup):
         counts.setdefault((r.store_id, r.event_ts), {})[r.zone] = r["count"]
     visits = {
         (r.store_id, r.hour_ts): r
-        for r in generate_hourly_visits(spark, dims["dim_stores"], profile, cfg).collect()
+        for r in generate_hourly_visits(
+            spark, dims["dim_stores"], profile, cfg, dims["dim_geographies"]
+        ).collect()
     }
     assert set(counts) == set(visits)
     for key, zones in counts.items():
@@ -106,3 +108,36 @@ def test_foot_traffic_covers_open_hours_without_receipts(spark, setup):
     assert rc.join(tt, ["store_id", "hr"], "left_anti").count() == 0
     # and open store-hours with no receipts now emit browsing traffic
     assert tt.join(rc, ["store_id", "hr"], "left_anti").count() > 0
+
+
+def test_holidays_lift_and_close_store_traffic(spark):
+    # A general merchant around Thanksgiving: closed on the day, Black Friday
+    # far busier than the Friday before.
+    cfg = GenerationConfig(
+        store_type="supercenter",
+        start_date=date(2025, 11, 20),
+        end_date=date(2025, 11, 29),
+        store_count=3,
+        dc_count=1,
+        seed=4,
+        transactions_per_store_day=60,
+    )
+    dicts = load_dictionaries(default_dictionary_root(), "supercenter")
+    dims = generate_dimensions(spark, dicts, cfg)
+    visits = {
+        r.day: r.visitors
+        for r in generate_hourly_visits(
+            spark, dims["dim_stores"], dicts.profile, cfg, dims["dim_geographies"]
+        )
+        .groupBy("day")
+        .agg(F.sum("visitors").alias("visitors"))
+        .collect()
+    }
+    print(
+        f"STAT black friday visits={visits[date(2025, 11, 28)]} friday={visits[date(2025, 11, 21)]}"
+    )
+    assert date(2025, 11, 27) not in visits
+    assert visits[date(2025, 11, 28)] > 1.5 * visits[date(2025, 11, 21)]
+    ops = generate_store_ops(spark, dims, cfg, dicts.profile)
+    assert ops.filter(F.col("event_date") == date(2025, 11, 27)).count() == 0
+    assert ops.select("event_date").distinct().count() == 9

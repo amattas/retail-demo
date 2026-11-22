@@ -73,12 +73,10 @@ def _catalog_expectations(
             total = sum(weights)
             for item, price, weight in zip(items, prices, weights):
                 unit_value = weight / total * price / (1.0 - repeat)
-                if item["Department"] in {"Fresh", "Grocery"} and "Candy" not in item["Category"]:
-                    tax_share = 0.0
-                elif item["Department"] in {"Clothing", "Apparel"}:
-                    tax_share = 0.5
-                else:
-                    tax_share = 1.0
+                # Groceries are untaxed and clothing fully taxed under the
+                # default state rule (generation.baskets.line_tax_cents).
+                grocery = item["Department"] in {"Fresh", "Grocery"}
+                tax_share = 0.0 if grocery and "Candy" not in item["Category"] else 1.0
                 line += department_weight * unit_value
                 taxable += department_weight * unit_value * tax_share
             total_weight += department_weight

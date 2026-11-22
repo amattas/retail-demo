@@ -22,6 +22,7 @@ from retail_setup.generation.network import (
     pool_size,
     routes_per_dc,
 )
+from retail_setup.generation.pricing import charm_cents, margin_band
 from retail_setup.generation.runtime import (
     date_grid,
     derive_seed,
@@ -102,28 +103,46 @@ def _match_brand_category(key: str, brands_by_cat: dict[str, list]) -> list | No
     return None
 
 
-def compute_pricing(base_price: float, rng: np.random.Generator) -> tuple[float, float, float]:
+def compute_pricing(
+    base_price: float, rng: np.random.Generator, department: str = ""
+) -> tuple[float, float, float]:
     """Return ``(cost, msrp, sale_price)`` for a base price.
 
-    Ported from datagen ``PricingCalculator`` (shared/validators/pricing.py):
+    After datagen ``PricingCalculator`` (shared/validators/pricing.py):
 
-    - MSRP = BasePrice +/-15%
-    - SalePrice = MSRP (60% of the time) OR MSRP discounted 5-35% (40%)
-    - Cost = 50-85% of SalePrice
+    - MSRP = BasePrice +/-15%, at the nearest charm price (.49/.99)
+    - SalePrice = MSRP (60% of the time) OR MSRP discounted 5-35% (40%), at
+      the nearest charm price not above MSRP
+    - Cost leaves the department's gross margin (``pricing.margin_band``)
 
     Always guarantees ``Cost < SalePrice <= MSRP``.
     """
     # A positive cost and a strict one-cent margin require a minimum sale price
     # of two cents. This keeps the documented Cost < SalePrice invariant even
     # for adversarial one-cent source prices.
-    msrp = max(0.02, round(base_price * (1.0 + rng.uniform(-0.15, 0.15)), 2))
+    msrp_cents = charm_cents(max(2.0, base_price * 100 * (1.0 + rng.uniform(-0.15, 0.15))))
     if rng.random() < 0.60:
-        sale = msrp
+        sale_cents = msrp_cents
     else:
-        sale = max(0.02, round(msrp * (1.0 - rng.uniform(0.05, 0.35)), 2))
-    cost = round(sale * rng.uniform(0.50, 0.85), 2)
+        discounted = msrp_cents * (1.0 - rng.uniform(0.05, 0.35))
+        sale_cents = min(msrp_cents, charm_cents(discounted))
+    low, high = margin_band(department)
+    sale = sale_cents / 100
+    cost = round(sale * (1.0 - rng.uniform(low, high)), 2)
     cost = max(0.01, min(cost, round(sale - 0.01, 2)))
-    return float(cost), float(msrp), float(sale)
+    return float(cost), float(msrp_cents / 100), float(sale)
+
+
+def rebranded_name(name: str, brand: str, brands: list[str]) -> str:
+    """``name`` sold under ``brand``: a name that starts with a brand takes this one.
+
+    ``brands`` is every catalog brand, longest first, so the longest matching
+    prefix is replaced. Unbranded (generic) names are kept.
+    """
+    for known in brands:
+        if name.startswith(f"{known} "):
+            return f"{brand} {name[len(known) + 1 :]}"
+    return name
 
 
 def balanced_geography_sample(
@@ -371,6 +390,7 @@ def generate_dimensions(
     for b in dicts.brands:
         brands_by_cat.setdefault(b.Category.strip().lower(), []).append(b)
     all_brands = list(dicts.brands)
+    brand_names = sorted({b.Brand for b in all_brands}, key=lambda name: (-len(name), name))
     tags_by_product = {t.ProductName: t.Tags for t in dicts.tags}
     # Use naive UTC datetimes — Spark session timezone is UTC (set in conftest fixture).
     # Launch dates are placed around the pinned anchor, not the run window, so
@@ -428,11 +448,12 @@ def generate_dimensions(
                 launch = hist_start + timedelta(days=int(rng.integers(0, 183)))
             else:
                 launch = hist_start + timedelta(days=int(rng.integers(183, 366)))
-            cost, msrp, sale = compute_pricing(float(p.BasePrice), rng)
+            cost, msrp, sale = compute_pricing(float(p.BasePrice), rng, p.Department)
             prod_rows.append(
                 (
                     pid,
-                    p.ProductName,
+                    # A branded title carries the SKU's own brand.
+                    rebranded_name(p.ProductName, chosen.Brand, brand_names),
                     chosen.Brand,
                     chosen.Company,
                     p.Department,
@@ -452,11 +473,18 @@ def generate_dimensions(
 
 
 def generate_dim_date(spark: SparkSession, start: date, end: date) -> DataFrame:
-    """Exact port of 02-historical-data-load's dim_date (fiscal year starts July)."""
+    """The calendar dimension (ISO weeks; fiscal years start in July).
+
+    ``day_of_week`` and ``week_of_year`` follow ISO 8601: Monday is day 1 and
+    week 1 holds the year's first Thursday, so the first days of January can
+    fall in week 52 or 53 of the previous ISO year. ``fiscal_year`` runs July
+    to June and is labelled by the calendar year it starts in (July 2025 to
+    June 2026 is fiscal year 2025).
+    """
     dates = date_grid(spark, start, end, "date")
     month = F.month("date")
     iso_day = F.pmod(F.dayofweek("date") + F.lit(5), F.lit(7)) + F.lit(1)
-    week_of_year = F.floor((F.dayofyear("date") + F.lit(7) - F.dayofweek("date")) / F.lit(7))
+    week_of_year = F.weekofyear("date")
     return dates.select(
         F.date_format("date", "yyyyMMdd").cast("long").alias("date_key"),
         "date",

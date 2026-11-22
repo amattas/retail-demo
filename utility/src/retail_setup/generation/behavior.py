@@ -92,11 +92,9 @@ def retail_catalog(
     by_product = Window.partitionBy("event_date", "department").orderBy("product_id")
     ordered = by_product.rowsBetween(Window.unboundedPreceding, Window.currentRow)
     whole = by_product.rowsBetween(Window.unboundedPreceding, Window.unboundedFollowing)
-    taxable_share = (
-        F.when(F.col("taxability") == "TAXABLE", 1.0)
-        .when(F.col("taxability") == "REDUCED_RATE", 0.5)
-        .otherwise(0.0)
-    )
+    # Calibration uses the default state rule: clothing (REDUCED_RATE) pays
+    # the full rate and groceries (NON_TAXABLE) none (baskets.line_tax_cents).
+    taxable_share = F.when(F.col("taxability").isin("TAXABLE", "REDUCED_RATE"), 1.0).otherwise(0.0)
     eligible = (
         eligible.withColumn("_total_weight", F.sum("_popularity").over(whole))
         .withColumn("_probability", F.col("_popularity") / F.col("_total_weight"))

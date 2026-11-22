@@ -14,6 +14,27 @@ outputs, and `gold.py` builds the ten aggregates.
 `dim_geographies`, `dim_stores`, `dim_distribution_centers`, `dim_trucks`,
 `dim_customers`, `dim_products`, and `dim_date`.
 
+`dim_date` uses ISO 8601 weeks: `day_of_week` runs Monday (1) to Sunday (7),
+and `week_of_year` is the ISO week (1-53; week 1 holds the year's first
+Thursday), so the first days of January can belong to week 52 or 53 and the
+last days of December to week 1. `year` stays the calendar year. Fiscal years
+run July to June and `fiscal_year` is labelled by the calendar year they start
+in: July 2025 to June 2026 is fiscal year 2025, and July is `fiscal_quarter` 1.
+
+`dim_products` prices and names:
+
+- A base product sold by several brands keeps one title per brand: a title
+  that starts with a brand name carries the SKU's own `Brand`; generic titles
+  stay generic.
+- `MSRP` is the base price +/-15% and `SalePrice` equals it or a 5-35%
+  discount from it, both at the nearest charm price (.49 or .99, a 9-cent
+  ending below $1). Catalog base prices (`dictionaries/catalog.py`) take the
+  nearest charm price inside their subcategory band, so sub-dollar and narrow
+  bands keep their spread.
+- `Cost` leaves the department's gross margin band (`pricing.DEPARTMENT_MARGINS`,
+  for example groceries 15-30%, electronics 10-25%, apparel 45-60%, jewelry
+  45-65%).
+
 ### Facts
 
 `fact_receipts`, `fact_receipt_lines`, `fact_payments`, `fact_store_ops`,
@@ -242,6 +263,28 @@ purchase decision using store/hour conversion propensity. Footfall uses this
 same visitor grid, not receipts divided by a fixed conversion percentage.
 The existing five zone counts conserve hourly visitors exactly. These are
 allocated sensor counts, not a physical trajectory model.
+
+Visitors per store-day also follow the US holiday calendar and the local
+weather (`generation/stream_calendar.py`, shared with the live stream):
+
+- **Holidays.** `holiday_dates` lists New Year's Day, Presidents' Day,
+  Valentine's Day, Easter Saturday and Sunday, Mother's Day, Memorial Day and
+  the Saturday before it, Father's Day, July 3 and 4, Labor Day, Halloween,
+  Thanksgiving eve and day, Black Friday and the Saturday after, Cyber Monday,
+  Christmas Eve, Christmas, December 26, and New Year's Eve. Each holiday
+  scales the day's traffic by the store type's class (`store_class`: general,
+  grocery, hardware, or luxury, from the department mix and ticket size) and
+  online orders by its own factor (`HOLIDAY_EFFECTS`). A factor of 0 closes
+  the stores: Christmas for every class, Thanksgiving for all but grocers.
+  Closed days have no receipts, store operations, or returns, and returns due
+  on one move to the next day.
+- **Weather.** Each geography has a daily weather index: a weighted sum of the
+  last 8 days' seeded shocks (weights 0.7 to the power of the age), so weather
+  persists for days (lag-1 autocorrelation about 0.7). Its effect on traffic
+  depends on the state's climate and the month (snow-belt winters, southern
+  storm summers), within 0.4-1.2x and about 1 on average. An index of 2 or
+  more marks a severe-weather day (`severe_weather_column`), which the
+  logistics incident model can use for `WEATHER` incidents.
 
 Customer selection has persistent, long-tailed visit propensities and
 geography affinity. Continuous customer spending propensity and quick,
@@ -566,7 +609,8 @@ and the live stream:
   electronics -3% a year).
 - Every 13 weeks (each SKU on its own phase) a price review resets the regular
   price within 6% of trend; 30% of review periods carry a one-to-three week
-  markdown of 10-35%.
+  markdown of 10-35%. Regular prices end in .49 or .99 (9 cents below $1);
+  markdown prices end in 9 cents and always undercut the regular price.
 - `fact_receipt_lines.unit_cents` and `fact_online_order_lines.unit_cents` are
   the shelf price on the sale's local date. No separate price-history table is
   published: reports read sale prices from the lines and catalog prices from
@@ -593,7 +637,18 @@ receipt:
    `BACKTOSCHOOL20` on clothing, office and electronics); `BOGO50` discounts
    every second unit of eligible lines with two or more units. A line carries
    at most one code, and `fact_promotions` has at most one row per receipt.
-4. Tax is integer basis-point math on each line's net amount.
+4. Tax is integer basis-point math on each line's net amount, at the share of
+   the store's combined rate its state's taxability rule sets
+   (`_shared/tax_rules.json`, `baskets.line_tax_cents`). Taxable goods pay the
+   full rate everywhere. Grocery staples (`NON_TAXABLE`) are exempt unless the
+   state taxes food (for example Alabama, Mississippi, South Dakota, Tennessee
+   at a reduced share). Clothing (`REDUCED_RATE`) pays the full rate unless the
+   state exempts it (Minnesota, New Jersey, Pennsylvania, Vermont) or exempts
+   items under a price (New York under $110, Massachusetts under $175, Rhode
+   Island under $250). Online orders apply the fulfilling store's state, or the
+   customer's for ship-from-DC orders; returns refund at the original rule.
+   Dictionary sets without the rules file use the defaults (groceries exempt,
+   clothing taxed).
 
 Fulfillment prices the basket again over the lines the store could fill, so a
 promotion whose minimum the filled basket no longer meets is replaced or

@@ -106,6 +106,52 @@ def test_product_pricing_invariants(dims):
         assert r.taxability in {"TAXABLE", "NON_TAXABLE", "REDUCED_RATE"}
 
 
+def _charm(cents: int) -> bool:
+    return cents % 50 == 49 if cents >= 100 else cents % 10 == 9
+
+
+def test_prices_end_in_charm_endings_with_department_margins(spark):
+    from retail_setup.generation.pricing import margin_band
+
+    for store_type in ("grocery", "luxury"):
+        cfg = GenerationConfig(
+            store_type=store_type,
+            start_date=date(2025, 1, 1),
+            end_date=date(2025, 1, 7),
+            store_count=2,
+            dc_count=1,
+            seed=42,
+        )
+        dicts = load_dictionaries(default_dictionary_root(), store_type)
+        rows = generate_dimensions(spark, dicts, cfg)["dim_products"].collect()
+        margins: dict[str, list[float]] = {}
+        for r in rows:
+            assert _charm(round(r.MSRP * 100)) and _charm(round(r.SalePrice * 100)), r
+            margins.setdefault(r.Department, []).append((r.SalePrice - r.Cost) / r.SalePrice)
+        for department, values in margins.items():
+            low, high = margin_band(department)
+            # Cost rounds to cents, so tiny prices drift slightly out of band.
+            inside = [low - 0.02 <= m <= high + 0.02 for m in values]
+            assert sum(inside) / len(inside) > 0.97, department
+            assert low <= sorted(values)[len(values) // 2] <= high, department
+        if store_type == "grocery":
+            # Staples run thinner margins than the rest of the store.
+            assert max(margin_band("Grocery")) < min(margin_band("Jewelry & Watches"))
+
+
+def test_branded_names_carry_the_sku_brand(dims, dicts):
+    from retail_setup.generation.dims import rebranded_name
+
+    brands = sorted({b.Brand for b in dicts.brands}, key=lambda name: (-len(name), name))
+    rows = dims["dim_products"].collect()
+    branded = [r for r in rows if any(r.ProductName.startswith(f"{b} ") for b in brands)]
+    assert branded
+    # A title that names a brand names the SKU's own brand.
+    assert all(r.ProductName.startswith(f"{r.Brand} ") for r in branded)
+    assert rebranded_name("Acme Organic Apples", "Zest", ["Acme"]) == "Zest Organic Apples"
+    assert rebranded_name("Organic Apples", "Zest", ["Acme"]) == "Organic Apples"
+
+
 def test_trucks_dc_assignment(dims):
     rows = dims["dim_trucks"].collect()
     dc_ids = {float(r.ID) for r in dims["dim_distribution_centers"].collect()}
@@ -276,6 +322,16 @@ def test_dim_date(spark):
     assert r.fiscal_year == 2025 and r.fiscal_quarter == 1  # July = FY start
     sat = rows[20250705]
     assert sat.is_weekend == 1
+    # ISO weeks: Monday starts the week, week 1 holds the first Thursday.
+    assert rows[20250101].week_of_year == 1
+    assert rows[20251229].week_of_year == 1  # a Monday in ISO week 2026-W01
+    assert rows[20250630].week_of_year == 27 and rows[20250630].day_of_week == 1
+    assert {r.week_of_year for r in rows.values()} == set(range(1, 53))
+    early = {
+        r.date_key: r.week_of_year
+        for r in generate_dim_date(spark, date(2021, 1, 1), date(2021, 1, 4)).collect()
+    }
+    assert early == {20210101: 53, 20210102: 53, 20210103: 53, 20210104: 1}
 
 
 def test_dim_date_is_generated_from_a_spark_range(spark):
@@ -299,7 +355,8 @@ def test_explicit_product_attributes_override_name_rules(spark, small_cfg, dicts
     custom = replace(dicts, products=[product, *dicts.products[1:]])
 
     products = generate_dimensions(spark, custom, small_cfg)["dim_products"]
-    row = products.filter(products.ProductName == product.ProductName).first()
+    # The first dictionary product is SKU 1 (its title may carry another brand).
+    row = products.filter(products.ID == 1).first()
 
     assert row is not None
     assert (row.taxability, row.RequiresRefrigeration) == ("TAXABLE", False)

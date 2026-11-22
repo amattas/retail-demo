@@ -35,6 +35,28 @@ class TaxJurisdictionEntry(BaseModel):
             raise ValueError("CombinedRate must be a valid decimal number") from None
 
 
+class TaxRuleEntry(BaseModel):
+    """A state's taxability rule: the share of the combined rate each class pays.
+
+    ``GroceryTaxPct`` applies to grocery staples (products with taxability
+    ``NON_TAXABLE``), ``ClothingTaxPct`` to clothing (``REDUCED_RATE``); items
+    priced below ``ClothingExemptUnder`` dollars are clothing-exempt. States
+    without a rule exempt groceries and tax clothing in full.
+    """
+
+    StateCode: str = Field(..., min_length=2, max_length=2)
+    GroceryTaxPct: int = Field(default=0, ge=0, le=100)
+    ClothingTaxPct: int = Field(default=100, ge=0, le=100)
+    ClothingExemptUnder: Decimal | None = Field(default=None, gt=0)
+
+    @field_validator("StateCode")
+    @classmethod
+    def _state_upper(cls, v: str) -> str:
+        if not v.isalpha():
+            raise ValueError("StateCode must be alphabetic")
+        return v.upper()
+
+
 class GeographyEntry(BaseModel):
     City: str = Field(..., min_length=1)
     State: str = Field(..., min_length=2, max_length=2)

@@ -1,10 +1,26 @@
-"""Store calendars and live-stream volume calibration.
+"""Store calendars, holidays, weather and live-stream volume calibration.
 
 Historical traffic (``traffic.py``) draws visitors per store, local day and
-local hour from the profile's hourly, daily and monthly weights, the store's
-``daily_traffic_multiplier`` and its operating hours. The live stream uses the
-same weights, evaluated in each store's own time zone, so live volume and its
+local hour from the profile's hourly, daily and monthly weights, the US
+holiday calendar, the local weather, the store's ``daily_traffic_multiplier``
+and its operating hours. The live stream uses the same weights, holidays and
+weather, evaluated in each store's own time zone, so live volume and its
 time-of-day curve continue the history.
+
+- **Holidays.** :func:`holiday_dates` lists the US retail calendar of a year
+  (New Year, Easter, Memorial Day, July 4, Labor Day, Thanksgiving, Black
+  Friday, Cyber Monday, Christmas Eve, Christmas, ...). Each holiday scales a
+  day's store traffic by the store type's class (:func:`store_class`: a
+  hardware store's spring holidays are busier, a grocer's Thanksgiving eve,
+  a general merchant's Black Friday) and online orders by its own factor. A
+  factor of 0 closes the stores: Christmas for everyone, Thanksgiving for all
+  but grocers.
+- **Weather.** Each geography has a daily weather index, an average of the
+  last ``WEATHER_MEMORY_DAYS`` days' shocks with geometric weights, so weather
+  persists for days (lag-1 autocorrelation about ``WEATHER_PERSISTENCE``).
+  The index moves traffic more in its climate's rough season (snow-belt
+  winters, southern storm summers). :func:`severe_weather_column` marks the
+  days the logistics incident model can treat as weather disruptions.
 
 The stream is driven by a ``rate`` source. Each source row is assigned to one
 lane (store visits, online orders, marketing) and is
@@ -20,33 +36,23 @@ into the stream notebook.
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
-from math import ceil
+from functools import lru_cache
+from math import ceil, sqrt
 from zoneinfo import ZoneInfo
 
 from pyspark.sql import Column
 from pyspark.sql import functions as F
 
 from retail_setup.dictionaries.models import StoreTypeProfile, parse_operating_hours
-from retail_setup.generation.runtime import seeded_draws
+from retail_setup.generation.runtime import bind, case_when, seeded_draws
 from retail_setup.generation.vocabulary import ONLINE_HOURLY_WEIGHTS
 
 # ---------------------------------------------------------------------------
 # Operating hours
 # ---------------------------------------------------------------------------
 
-# operating_hours literal -> [open_hour, close_hour); "24h" maps to 0/24. Store
-# types may declare other "open-close" patterns (StoreTypeProfile); these are
-# the historical defaults.
-OPERATING_HOURS_MAP: dict[str, tuple[int, int]] = {
-    "6-22": (6, 22),
-    "7-22": (7, 22),
-    "7-23": (7, 23),
-    "24h": (0, 24),
-}
 # Unknown formats fall back to standard hours.
 DEFAULT_OPERATING_WINDOW = (6, 22)
-# Stores are closed on Christmas Day, any year.
-CLOSED_MONTH_DAYS = frozenset({(12, 25)})
 # A 24-hour store "closes" at 23:59 and reopens at midnight, like history.
 ALL_DAY_CLOSE_SECONDS = 23 * 3600 + 59 * 60
 
@@ -61,17 +67,385 @@ def operating_window(operating_hours: str | None) -> tuple[int, int]:
         return DEFAULT_OPERATING_WINDOW
 
 
-def is_closed_date(day: date) -> bool:
-    """True on dates every store is closed."""
-    return (day.month, day.day) in CLOSED_MONTH_DAYS
+# ---------------------------------------------------------------------------
+# Holiday calendar
+# ---------------------------------------------------------------------------
+
+# Store-type classes with their own holiday behavior (:func:`store_class`).
+GENERAL, GROCERY, HARDWARE, LUXURY = "general", "grocery", "hardware", "luxury"
+STORE_CLASSES = (GENERAL, GROCERY, HARDWARE, LUXURY)
+# Department-name tokens and the department-weight share that make a store
+# type a grocer or a home-improvement store; luxury goes by ticket size.
+GROCERY_TOKENS = (
+    "grocery", "fresh", "food", "produce", "dairy", "meat", "bakery", "deli", "frozen",
+    "pantry", "beverage", "snack",
+)  # fmt: skip
+HARDWARE_TOKENS = (
+    "hardware", "tool", "building", "lumber", "paint", "garden", "lawn", "plumbing",
+    "electrical",
+)  # fmt: skip
+GROCERY_SHARE = 0.75
+HARDWARE_SHARE = 0.40
+LUXURY_TICKET = 500.0
+
+# Holiday -> daily volume multiplier for (general, grocery, hardware, luxury)
+# store traffic and for online orders. 0 closes stores.
+HOLIDAY_EFFECTS: dict[str, tuple[float, float, float, float, float]] = {
+    "NEW_YEARS_DAY": (0.55, 0.65, 0.50, 0.40, 0.90),
+    "PRESIDENTS_DAY": (1.10, 1.00, 1.15, 1.10, 1.10),
+    "VALENTINES_DAY": (1.05, 1.15, 1.00, 1.60, 1.10),
+    "EASTER_SATURDAY": (1.15, 1.30, 1.30, 1.05, 1.00),
+    "EASTER_SUNDAY": (0.55, 0.70, 0.75, 0.45, 0.80),
+    "MOTHERS_DAY": (1.00, 1.10, 1.25, 1.30, 0.90),
+    "MEMORIAL_SATURDAY": (1.15, 1.20, 1.45, 1.05, 1.10),
+    "MEMORIAL_DAY": (1.20, 1.10, 1.60, 1.10, 1.30),
+    "FATHERS_DAY": (1.05, 1.05, 1.30, 1.05, 1.00),
+    "JULY_3": (1.15, 1.40, 1.15, 0.95, 1.00),
+    "INDEPENDENCE_DAY": (0.75, 0.85, 0.80, 0.55, 0.80),
+    "LABOR_DAY": (1.20, 1.05, 1.40, 1.10, 1.30),
+    "HALLOWEEN": (1.10, 1.10, 1.00, 0.95, 1.00),
+    "THANKSGIVING_EVE": (1.30, 1.80, 0.95, 0.95, 1.20),
+    "THANKSGIVING": (0.00, 0.45, 0.00, 0.00, 1.60),
+    "BLACK_FRIDAY": (2.20, 1.00, 1.70, 1.80, 2.20),
+    "BLACK_FRIDAY_SATURDAY": (1.35, 1.05, 1.20, 1.30, 1.50),
+    "CYBER_MONDAY": (1.00, 1.00, 1.00, 1.00, 3.00),
+    "CHRISTMAS_EVE": (1.30, 1.50, 0.70, 1.40, 0.80),
+    "CHRISTMAS": (0.00, 0.00, 0.00, 0.00, 0.50),
+    "DAY_AFTER_CHRISTMAS": (1.50, 0.90, 0.95, 1.30, 1.30),
+    "NEW_YEARS_EVE": (1.10, 1.30, 0.90, 0.90, 0.90),
+}
+_ONLINE_INDEX = len(STORE_CLASSES)
 
 
-def closed_date_column(local_day: Column) -> Column:
+def store_class(profile: StoreTypeProfile) -> str:
+    """The holiday class of a store type: luxury by ticket, else by department mix."""
+    if profile.avg_ticket_target >= LUXURY_TICKET:
+        return LUXURY
+    total = sum(profile.department_weights.values())
+
+    def share(tokens: tuple[str, ...]) -> float:
+        return (
+            sum(
+                weight
+                for name, weight in profile.department_weights.items()
+                if any(token in name.lower() for token in tokens)
+            )
+            / total
+        )
+
+    if share(GROCERY_TOKENS) >= GROCERY_SHARE:
+        return GROCERY
+    if share(HARDWARE_TOKENS) >= HARDWARE_SHARE:
+        return HARDWARE
+    return GENERAL
+
+
+def easter_sunday(year: int) -> date:
+    """Western Easter Sunday (anonymous Gregorian algorithm)."""
+    a, b, c = year % 19, year // 100, year % 100
+    d, e = b // 4, b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = c // 4, c % 4
+    l_ = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l_) // 451
+    n = h + l_ - 7 * m + 114
+    return date(year, n // 31, n % 31 + 1)
+
+
+def _nth_weekday(year: int, month: int, weekday: int, n: int) -> date:
+    """The ``n``-th (1-based; -1 = last) ``weekday`` (Monday 0) of a month."""
+    if n > 0:
+        first = date(year, month, 1)
+        return first + timedelta(days=(weekday - first.weekday()) % 7 + 7 * (n - 1))
+    last = date(year + month // 12, month % 12 + 1, 1) - timedelta(days=1)
+    return last - timedelta(days=(last.weekday() - weekday) % 7)
+
+
+@lru_cache(maxsize=256)
+def holiday_dates(year: int) -> dict[date, str]:
+    """The retail holidays of ``year`` (US calendar), by date."""
+    easter = easter_sunday(year)
+    memorial = _nth_weekday(year, 5, 0, -1)
+    thanksgiving = _nth_weekday(year, 11, 3, 4)
+    one = timedelta(days=1)
+    return {
+        date(year, 1, 1): "NEW_YEARS_DAY",
+        _nth_weekday(year, 2, 0, 3): "PRESIDENTS_DAY",
+        date(year, 2, 14): "VALENTINES_DAY",
+        easter - one: "EASTER_SATURDAY",
+        easter: "EASTER_SUNDAY",
+        _nth_weekday(year, 5, 6, 2): "MOTHERS_DAY",
+        memorial - 2 * one: "MEMORIAL_SATURDAY",
+        memorial: "MEMORIAL_DAY",
+        _nth_weekday(year, 6, 6, 3): "FATHERS_DAY",
+        date(year, 7, 3): "JULY_3",
+        date(year, 7, 4): "INDEPENDENCE_DAY",
+        _nth_weekday(year, 9, 0, 1): "LABOR_DAY",
+        date(year, 10, 31): "HALLOWEEN",
+        thanksgiving - one: "THANKSGIVING_EVE",
+        thanksgiving: "THANKSGIVING",
+        thanksgiving + one: "BLACK_FRIDAY",
+        thanksgiving + 2 * one: "BLACK_FRIDAY_SATURDAY",
+        thanksgiving + 4 * one: "CYBER_MONDAY",
+        date(year, 12, 24): "CHRISTMAS_EVE",
+        date(year, 12, 25): "CHRISTMAS",
+        date(year, 12, 26): "DAY_AFTER_CHRISTMAS",
+        date(year, 12, 31): "NEW_YEARS_EVE",
+    }
+
+
+def holiday_name(day: date) -> str | None:
+    """The holiday on ``day``, or None."""
+    return holiday_dates(day.year).get(day)
+
+
+def holiday_factor(day: date, klass: str = GENERAL) -> float:
+    """Store-traffic multiplier of ``day`` for a store class (0 when closed)."""
+    name = holiday_name(day)
+    return 1.0 if name is None else HOLIDAY_EFFECTS[name][STORE_CLASSES.index(klass)]
+
+
+def online_holiday_factor(day: date) -> float:
+    """Online-order multiplier of ``day``."""
+    name = holiday_name(day)
+    return 1.0 if name is None else HOLIDAY_EFFECTS[name][_ONLINE_INDEX]
+
+
+def is_closed_date(day: date, klass: str = GENERAL) -> bool:
+    """True on dates stores of this class are closed."""
+    return holiday_factor(day, klass) == 0.0
+
+
+def max_holiday_factor(klass: str = GENERAL) -> float:
+    """The busiest holiday's store-traffic multiplier for a class (at least 1)."""
+    index = STORE_CLASSES.index(klass)
+    return max(1.0, *(effects[index] for effects in HOLIDAY_EFFECTS.values()))
+
+
+def max_online_holiday_factor() -> float:
+    """The busiest holiday's online-order multiplier (at least 1)."""
+    return max(1.0, *(effects[_ONLINE_INDEX] for effects in HOLIDAY_EFFECTS.values()))
+
+
+def _easter_column(year: Column) -> Column:
+    """Column form of :func:`easter_sunday` for an integer year column."""
+
+    def div(x: Column, n: int) -> Column:
+        return F.floor(x / n)
+
+    a, b, c = F.pmod(year, F.lit(19)), div(year, 100), F.pmod(year, F.lit(100))
+    d, e = div(b, 4), F.pmod(b, F.lit(4))
+    g = div(b - div(b + 8, 25) + 1, 3)
+    h = F.pmod(19 * a + b - d - g + 15, F.lit(30))
+    i, k = div(c, 4), F.pmod(c, F.lit(4))
+    l_ = F.pmod(32 + 2 * e + 2 * i - h - k, F.lit(7))
+    m = div(a + 11 * h + 22 * l_, 451)
+    n = h + l_ - 7 * m + 114
+    return F.make_date(year, div(n, 31).cast("int"), (F.pmod(n, F.lit(31)) + 1).cast("int"))
+
+
+def holiday_name_column(day: Column) -> Column:
+    """Column form of :func:`holiday_name` for a date column (NULL off holidays)."""
+
+    def name(parts: Column) -> Column:
+        m, dom, wd = parts["m"], parts["dom"], parts["wd"]
+        week = F.floor((dom - 1) / 7) + 1
+
+        def fixed(month: int, day_of_month: int) -> Column:
+            return (m == month) & (dom == day_of_month)
+
+        def nth(month: int, weekday: int, n: int) -> Column:
+            return (m == month) & (wd == weekday) & (week == n)
+
+        def between(month: int, weekday: int, first: int, last: int) -> Column:
+            return (m == month) & (wd == weekday) & (dom >= first) & (dom <= last)
+
+        # ISO weekdays (Monday 1). Thanksgiving is Thursday 22-28 November.
+        rules = [
+            (fixed(1, 1), "NEW_YEARS_DAY"),
+            (nth(2, 1, 3), "PRESIDENTS_DAY"),
+            (fixed(2, 14), "VALENTINES_DAY"),
+            (F.date_add(parts["day"], 1) == parts["easter"], "EASTER_SATURDAY"),
+            (parts["day"] == parts["easter"], "EASTER_SUNDAY"),
+            (nth(5, 7, 2), "MOTHERS_DAY"),
+            (between(5, 6, 23, 29), "MEMORIAL_SATURDAY"),
+            (between(5, 1, 25, 31), "MEMORIAL_DAY"),
+            (nth(6, 7, 3), "FATHERS_DAY"),
+            (fixed(7, 3), "JULY_3"),
+            (fixed(7, 4), "INDEPENDENCE_DAY"),
+            (nth(9, 1, 1), "LABOR_DAY"),
+            (fixed(10, 31), "HALLOWEEN"),
+            (between(11, 3, 21, 27), "THANKSGIVING_EVE"),
+            (between(11, 4, 22, 28), "THANKSGIVING"),
+            (between(11, 5, 23, 29), "BLACK_FRIDAY"),
+            (between(11, 6, 24, 30), "BLACK_FRIDAY_SATURDAY"),
+            (between(11, 1, 26, 30) | between(12, 1, 1, 2), "CYBER_MONDAY"),
+            (fixed(12, 24), "CHRISTMAS_EVE"),
+            (fixed(12, 25), "CHRISTMAS"),
+            (fixed(12, 26), "DAY_AFTER_CHRISTMAS"),
+            (fixed(12, 31), "NEW_YEARS_EVE"),
+        ]
+        return case_when((condition, F.lit(label)) for condition, label in rules)
+
+    parts = F.struct(
+        day.alias("day"),
+        F.month(day).alias("m"),
+        F.dayofmonth(day).alias("dom"),
+        (F.pmod(F.dayofweek(day) + 5, F.lit(7)) + 1).alias("wd"),
+        _easter_column(F.year(day)).alias("easter"),
+    )
+    return bind(parts, name)
+
+
+def _holiday_lookup(day: Column, index: int) -> Column:
+    def factor(name: Column) -> Column:
+        branches = [
+            (name == F.lit(holiday), F.lit(float(effects[index])))
+            for holiday, effects in HOLIDAY_EFFECTS.items()
+            if effects[index] != 1.0
+        ]
+        return case_when(branches).otherwise(F.lit(1.0))
+
+    return bind(holiday_name_column(day), factor)
+
+
+def holiday_factor_column(day: Column, klass: str = GENERAL) -> Column:
+    """Column form of :func:`holiday_factor` for a date column."""
+    return _holiday_lookup(day, STORE_CLASSES.index(klass))
+
+
+def online_holiday_factor_column(day: Column) -> Column:
+    """Column form of :func:`online_holiday_factor` for a date column."""
+    return _holiday_lookup(day, _ONLINE_INDEX)
+
+
+def closed_date_column(local_day: Column, klass: str = GENERAL) -> Column:
     """Column form of :func:`is_closed_date`."""
-    condition: Column = F.lit(False)
-    for month, day in sorted(CLOSED_MONTH_DAYS):
-        condition = condition | ((F.month(local_day) == month) & (F.dayofmonth(local_day) == day))
-    return condition
+    return holiday_factor_column(local_day, klass) == F.lit(0.0)
+
+
+# ---------------------------------------------------------------------------
+# Weather
+# ---------------------------------------------------------------------------
+
+# A geography's weather index weights the last WEATHER_MEMORY_DAYS daily shocks
+# by WEATHER_PERSISTENCE ** age, so consecutive days are correlated.
+WEATHER_PERSISTENCE = 0.7
+WEATHER_MEMORY_DAYS = 8
+# Climates by state; other states are "temperate".
+WEATHER_CLIMATES: dict[str, frozenset[str]] = {
+    "cold": frozenset(
+        {
+            "AK",
+            "CO",
+            "CT",
+            "IA",
+            "ID",
+            "IL",
+            "IN",
+            "MA",
+            "ME",
+            "MI",
+            "MN",
+            "MT",
+            "ND",
+            "NE",
+            "NH",
+            "NY",
+            "OH",
+            "PA",
+            "RI",
+            "SD",
+            "UT",
+            "VT",
+            "WI",
+            "WY",
+        }
+    ),  # fmt: skip
+    "hot": frozenset({"AL", "AR", "AZ", "FL", "GA", "LA", "MS", "NM", "NV", "OK", "SC", "TX"}),
+    "mild": frozenset({"CA", "HI", "OR", "WA"}),
+}
+# Log-scale traffic sensitivity to the weather index by climate and month
+# (January first): snow-belt winters and southern storm seasons move traffic most.
+WEATHER_SIGMA: dict[str, list[float]] = {
+    "cold": [0.22, 0.22, 0.16, 0.10, 0.08, 0.08, 0.08, 0.08, 0.08, 0.10, 0.14, 0.20],
+    "hot": [0.08, 0.08, 0.08, 0.10, 0.12, 0.15, 0.15, 0.16, 0.16, 0.10, 0.08, 0.08],
+    "mild": [0.10, 0.10, 0.08, 0.06, 0.05, 0.04, 0.04, 0.04, 0.05, 0.06, 0.08, 0.10],
+    "temperate": [0.15, 0.15, 0.12, 0.10, 0.08, 0.08, 0.08, 0.08, 0.08, 0.09, 0.11, 0.14],
+}
+# Weather scales traffic within this range: bad days lose more than good days gain.
+WEATHER_FACTOR_RANGE = (0.4, 1.2)
+# An index at or above this marks a severe-weather day (about 2% of days).
+SEVERE_WEATHER_INDEX = 2.0
+
+
+def weather_climate(state: str | None) -> str:
+    """The climate of a state code (``temperate`` when unknown)."""
+    for climate, states in WEATHER_CLIMATES.items():
+        if state in states:
+            return climate
+    return "temperate"
+
+
+def weather_lag1_autocorrelation() -> float:
+    """Lag-1 autocorrelation of the weather index implied by its weights."""
+    weights = [WEATHER_PERSISTENCE**age for age in range(WEATHER_MEMORY_DAYS)]
+    return sum(a * b for a, b in zip(weights, weights[1:])) / sum(w * w for w in weights)
+
+
+def weather_index_column(draws: seeded_draws, geography_id: Column, day: Column) -> Column:
+    """A geography's standard-normal weather index on a date (higher is worse)."""
+    weights = [WEATHER_PERSISTENCE**age for age in range(WEATHER_MEMORY_DAYS)]
+    norm = sqrt(sum(w * w for w in weights))
+    geography = geography_id.cast("long")
+    total: Column = F.lit(0.0)
+    for age, weight in enumerate(weights):
+        shock = draws.gauss([geography, F.date_sub(day, age)], "weather")
+        total = total + F.lit(weight / norm) * shock
+    return total
+
+
+def _climate_column(state: Column) -> Column:
+    return case_when(
+        (state.isin(*sorted(states)), F.lit(climate))
+        for climate, states in WEATHER_CLIMATES.items()
+    ).otherwise(F.lit("temperate"))
+
+
+def weather_factor_column(
+    draws: seeded_draws, geography_id: Column, state: Column, day: Column
+) -> Column:
+    """Traffic multiplier of a geography's weather on a date (mean about 1)."""
+    climate = _climate_column(state)
+    sigma = case_when(
+        (climate == F.lit(name), F.element_at(F.array(*[F.lit(v) for v in values]), F.month(day)))
+        for name, values in WEATHER_SIGMA.items()
+    )
+    low, high = WEATHER_FACTOR_RANGE
+
+    def factor(inputs: Column) -> Column:
+        s = inputs["sigma"]
+        return F.least(F.lit(high), F.greatest(F.lit(low), F.exp(-s * inputs["index"] - s * s / 2)))
+
+    return bind(
+        F.struct(
+            sigma.alias("sigma"),
+            weather_index_column(draws, geography_id, day).alias("index"),
+        ),
+        factor,
+    )
+
+
+def severe_weather_column(draws: seeded_draws, geography_id: Column, day: Column) -> Column:
+    """True on a geography's severe-weather days.
+
+    The hook for logistics weather incidents: the incident model can open a
+    ``WEATHER`` incident on the lanes into a geography on these days, so
+    deliveries slow when store traffic drops.
+    """
+    return weather_index_column(draws, geography_id, day) >= F.lit(SEVERE_WEATHER_INDEX)
 
 
 def _close_seconds(close_hour: int) -> int:
@@ -153,11 +527,13 @@ def store_visits_per_hour(
     local: datetime,
 ) -> float:
     """Expected visits in the local hour starting at ``local`` (weather excluded)."""
-    if is_closed_date(local.date()):
+    holiday = holiday_factor(local.date(), store_class(profile))
+    if holiday == 0.0:
         return 0.0
     return (
         transactions_per_store_day
         / VISIT_CONVERSION_CALIBRATION
+        * holiday
         * daily_factors(profile)[local.weekday()]
         * monthly_factors(profile)[local.month - 1]
         * multiplier
@@ -175,6 +551,8 @@ class StoreHours:
     store_id: int
     operating_hours: str
     time_zone: str
+    # Holiday class of the store type (closures), see :func:`store_class`.
+    store_class: str = GENERAL
 
 
 def store_boundaries(
@@ -193,7 +571,7 @@ def store_boundaries(
     last = until.astimezone(zone).date()
     found: list[tuple[datetime, str]] = []
     while day <= last:
-        if not is_closed_date(day):
+        if not is_closed_date(day, store.store_class):
             for seconds, operation in (
                 (open_hour * 3600, "opened"),
                 (_close_seconds(close_hour), "closed"),
@@ -211,7 +589,7 @@ def store_boundaries(
 def is_open_at(store: StoreHours, instant: datetime) -> bool:
     """True when ``store`` is open at the UTC ``instant``."""
     local = instant.astimezone(ZoneInfo(store.time_zone))
-    if is_closed_date(local.date()):
+    if is_closed_date(local.date(), store.store_class):
         return False
     open_hour, close_hour = operating_window(store.operating_hours)
     second_of_day = local.hour * 3600 + local.minute * 60 + local.second
@@ -264,6 +642,7 @@ def plan_lanes(
     volume_scale: float = 1.0,
     rows_per_second: float | None = None,
     growth: float = 1.0,
+    calendar_peaks: bool = True,
 ) -> LanePlan:
     """Size the rate source and the lanes from the historical configuration.
 
@@ -274,11 +653,17 @@ def plan_lanes(
     ``rows_per_second`` only changes the resolution, not the volume, unless it
     is below the peak (``clipped``). ``growth`` is the volume trend multiplier
     (``pricing.volume_growth``) of the stream's dates; the lanes apply it per
-    row, so it only sizes the peaks.
+    row, so it only sizes the peaks. ``calendar_peaks`` sizes the peaks for the
+    busiest holiday and the best weather too; without it those rare hours are
+    clipped.
     """
     if volume_scale <= 0:
         raise ValueError("volume_scale must be positive")
     visit_peak_factor = _visit_peak_factor(profile, operating_hours)
+    online_peak_factor = max(monthly_factors(profile)) * max(online_hour_factors())
+    if calendar_peaks:
+        visit_peak_factor *= max_holiday_factor(store_class(profile)) * WEATHER_FACTOR_RANGE[1]
+        online_peak_factor *= max_online_holiday_factor()
     visits_per_second = (
         transactions_per_store_day / VISIT_CONVERSION_CALIBRATION / 3600.0 * multiplier_total
     )
@@ -289,10 +674,7 @@ def plan_lanes(
     # Mean events per second of each lane at time factor 1, and its peak factor.
     base = {
         "visits": (visits_per_second, visit_peak_factor * growth),
-        "online": (
-            online_per_second,
-            max(monthly_factors(profile)) * max(online_hour_factors()) * growth,
-        ),
+        "online": (online_per_second, online_peak_factor * growth),
         "marketing": (marketing_per_second, 1.0),
     }
     peaks = {lane: rate * peak * volume_scale for lane, (rate, peak) in base.items()}

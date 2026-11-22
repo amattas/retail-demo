@@ -6,7 +6,8 @@ and daily volume is negative-binomial, allowing overdispersed counts and zero da
 
 Shared with the live stream (``stream_events.plan_orders``):
 - Orders arrive on the online hourly curve (``vocabulary.ONLINE_HOURLY_WEIGHTS``,
-  UTC) at the profile's monthly weights and the year-over-year trend.
+  UTC) at the profile's monthly weights, the year-over-year trend and the
+  online holiday calendar (``stream_calendar.online_holiday_factor_column``).
 - Each order's customer is active (signed up, not churned) on the order day,
   drawn from a home-store pool by store traffic (customers.py), so orders are
   local to the customer's home store.
@@ -16,9 +17,9 @@ Shared with the live stream (``stream_events.plan_orders``):
 - Baskets are sized to the profile's ticket target like store receipts
   (``behavior.calibrated_basket_mean``), lines follow the same shopping
   missions, and repeated SKUs merge into one line.
-- Tax uses the exact integer basis-point formula from receipts
-  (``baskets.line_tax_cents``): store modes use the store's rate, ship-from-DC
-  the customer's geography (destination).
+- Tax uses the exact integer basis-point formula from receipts with the state
+  taxability rules (``baskets.line_tax_cents``): store modes use the store's
+  rate and rules, ship-from-DC the customer's geography (destination).
 - Cancelled and voided orders (decline model) have zero totals, zero line
   amounts and no payment, which preserves ``payment.amount == header.total``.
 - Backordered orders (never BOPIS) wait for stock between picking and
@@ -33,11 +34,14 @@ from pyspark.sql import functions as F
 
 from retail_setup.config.generation import GenerationConfig
 from retail_setup.dictionaries.models import StoreTypeProfile
+from retail_setup.dictionaries.loader import load_tax_rules
 from retail_setup.generation.baskets import (
     basket_products,
     line_tax_cents,
     merge_lines,
     receipt_offer,
+    tax_rule_column,
+    tax_rules_by_state,
 )
 from retail_setup.generation.behavior import (
     calibrated_basket_mean,
@@ -59,6 +63,7 @@ from retail_setup.generation.receipts import (
     payment_attempts,
 )
 from retail_setup.generation.runtime import (
+    bind,
     date_grid,
     fixed_width_decimal,
     legacy_index,
@@ -66,6 +71,7 @@ from retail_setup.generation.runtime import (
     seeded_draws,
 )
 from retail_setup.generation.schemas import column_names
+from retail_setup.generation.stream_calendar import online_holiday_factor_column
 from retail_setup.generation.vocabulary import (
     ONLINE_BACKORDER_RATE,
     ONLINE_BACKORDER_SECONDS,
@@ -115,24 +121,30 @@ def generate_online_orders(
     if mean_row is None or mean_row[0] is None:
         raise ValueError("dim_stores has no tax_rate to derive the online tax fallback")
     mean_bps = int(round(float(mean_row[0]) * 10000))
+    rules = tax_rules_by_state(load_tax_rules(cfg.resolved_dictionary_root))
+    states = dims["dim_geographies"].select(F.col("ID").alias("GeographyID"), "State")
     geo_rate = dims["dim_stores"].groupBy("GeographyID").agg(F.avg("tax_rate").alias("geo_rate"))
     customers = (
         dims["dim_customers"]
         .select(F.col("ID").alias("customer_id"), "GeographyID", "HomeStoreID")
         .join(geo_rate, "GeographyID", "left")
+        .join(states, "GeographyID", "left")
         .select(
             "customer_id",
             F.col("HomeStoreID").cast("long").alias("home_store"),
             F.coalesce(F.round(F.col("geo_rate") * 10000), F.lit(mean_bps))
             .cast("long")
             .alias("customer_bps"),
+            tax_rule_column(rules, F.col("State")).alias("customer_rule"),
         )
     )
     stores = (
         dims["dim_stores"]
+        .join(states, "GeographyID", "left")
         .select(
             F.col("ID").cast("long").alias("home_store"),
             F.round(F.col("tax_rate") * 10000).cast("long").alias("store_bps"),
+            tax_rule_column(rules, F.col("State")).alias("store_rule"),
         )
         .join(
             store_dc_map(
@@ -142,7 +154,8 @@ def generate_online_orders(
         )
     )
 
-    # --- day grid: network-wide daily volume, monthly-weight scaled
+    # --- day grid: network-wide daily volume, monthly-weight scaled, with the
+    # online holiday calendar (Black Friday, Cyber Monday, ...)
     mw = profile.monthly_weights
     m_mean = sum(mw) / 12.0
     days = date_grid(spark, cfg.start_date, cfg.end_date)
@@ -150,9 +163,12 @@ def generate_online_orders(
     lam = (
         F.lit(float(cfg.online_orders_per_day))
         * monthly_w
+        * online_holiday_factor_column(F.col("day"))
         * volume_growth_column(cfg.annual_volume_growth, cfg.anchor_date, F.col("day"))
     )
-    n_orders = d.negative_binomial(["day"], "onl_n", lam, 24).cast("int")
+    # The daily mean is bound once: the draw references it many times, and
+    # copying the holiday calendar into each reference bloats the plan.
+    n_orders = bind(lam, lambda mean: d.negative_binomial(["day"], "onl_n", mean, 24)).cast("int")
 
     # --- orders: ids, timestamps, tender, cancellation
     orders = (
@@ -261,6 +277,12 @@ def generate_online_orders(
             ),
         )
         .withColumn(
+            "tax_rule",
+            F.when(F.col("node_type") == "STORE", F.col("store_rule")).otherwise(
+                F.col("customer_rule")
+            ),
+        )
+        .withColumn(
             "is_backordered",
             (mode != "BOPIS")
             & ~F.col("is_cancelled")
@@ -359,6 +381,7 @@ def generate_online_orders(
         "is_cancelled",
         "promo_rate",
         "rate_bps",
+        "tax_rule",
         "fulfillment_mode",
         "node_type",
         "node_id",
@@ -419,7 +442,13 @@ def generate_online_orders(
         )
         .withColumn(
             "line_tax_cents",
-            line_tax_cents(F.col("ext_cents"), F.col("taxability"), F.col("rate_bps")),
+            line_tax_cents(
+                F.col("ext_cents"),
+                F.col("taxability"),
+                F.col("rate_bps"),
+                F.col("tax_rule"),
+                F.col("unit_cents"),
+            ),
         )
     )
 

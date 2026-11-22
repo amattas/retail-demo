@@ -49,8 +49,11 @@ from retail_setup.generation.attribution import (
 )
 from retail_setup.generation.baskets import (
     COMPLEMENT_RATE,
+    TaxRules,
+    line_tax_cents,
     merge_lines,
     price_basket,
+    tax_rule_column,
     with_complements,
 )
 from retail_setup.generation.behavior import pick_retail_product
@@ -76,11 +79,15 @@ from retail_setup.generation.stream_calendar import (
     StoreHours,
     closed_date_column,
     daily_factor_column,
+    holiday_factor_column,
     hour_shares,
     monthly_factor_column,
+    online_holiday_factor_column,
     online_hour_factor_column,
     operating_window,
+    store_class,
     visit_conversion,
+    weather_factor_column,
 )
 from retail_setup.generation.stream_frames import attach_sampled_id
 from retail_setup.generation.stream_state import (
@@ -245,6 +252,8 @@ def build_stream_context(
     inventory_seed: DataFrame | None = None,
     anchor_date: date | None = None,
     annual_volume_growth: float = 0.0,
+    dim_geographies: DataFrame | None = None,
+    tax_rules: TaxRules | None = None,
 ) -> StreamContext:
     """Collect the bounded store metadata and build the customer pools.
 
@@ -254,7 +263,11 @@ def build_stream_context(
     ``inventory_seed`` (``store_id, product_id, on_hand, rate``, see
     :func:`inventory_seed_frame`) seeds store stock the stream has not
     touched yet; without it, stock starts from history's opening stock.
+    ``dim_geographies`` gives each store's and customer's state (weather
+    climate and state taxability rules, ``tax_rules``), as in history; without
+    it every store has the temperate climate and the default tax rule.
     """
+    rules = tax_rules or {}
     stores = dim_stores.select(
         F.col("ID").cast("long").alias("store_id"),
         F.col("GeographyID").cast("long").alias("store_geo_id"),
@@ -265,6 +278,20 @@ def build_stream_context(
         F.round(F.col("tax_rate") * 10000).cast("long").alias("store_bps"),
         F.col("tax_rate").cast("double").alias("_tax_rate"),
     ).where(F.col("store_id").isNotNull())
+    if dim_geographies is None:
+        stores = stores.withColumn("store_state", F.lit(None).cast("string"))
+    else:
+        stores = stores.join(
+            F.broadcast(
+                dim_geographies.select(
+                    F.col("ID").cast("long").alias("store_geo_id"),
+                    F.col("State").alias("store_state"),
+                )
+            ),
+            "store_geo_id",
+            "left",
+        )
+    stores = stores.withColumn("tax_rule", tax_rule_column(rules, F.col("store_state")))
     rows = stores.orderBy("store_id").collect()
     if not rows:
         raise ValueError("dim_stores has no stores; run setup first")
@@ -347,13 +374,25 @@ def build_stream_context(
         ],
         "geo_id long, _geo_bps long",
     )
+    customer_states = (
+        spark.createDataFrame([], "geo_id long, _state string")
+        if dim_geographies is None
+        else dim_geographies.select(
+            F.col("ID").cast("long").alias("geo_id"), F.col("State").alias("_state")
+        )
+    )
     customer_tax = (
         dim_customers.select(
             F.col("ID").cast("long").alias("customer_id"),
             F.col("GeographyID").cast("long").alias("geo_id"),
         )
         .join(F.broadcast(geo_bps), "geo_id", "left")
-        .select("customer_id", F.coalesce("_geo_bps", F.lit(mean_bps)).alias("customer_bps"))
+        .join(F.broadcast(customer_states), "geo_id", "left")
+        .select(
+            "customer_id",
+            F.coalesce("_geo_bps", F.lit(mean_bps)).alias("customer_bps"),
+            tax_rule_column(rules, F.col("_state")).alias("customer_rule"),
+        )
         .persist()
     )
 
@@ -396,7 +435,12 @@ def build_stream_context(
         ids=ids,
         baskets=baskets,
         store_hours=tuple(
-            StoreHours(int(row["store_id"]), str(row["operating_hours"]), str(row["tz"]))
+            StoreHours(
+                int(row["store_id"]),
+                str(row["operating_hours"]),
+                str(row["tz"]),
+                store_class(profile),
+            )
             for row in rows
         ),
         supply=supply,
@@ -541,8 +585,13 @@ def new_visits(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
         .join(F.broadcast(ctx.stores), "store_id")
     )
     local_day = F.to_date(_local(F.col("ts")))
-    time_factor = F.when(closed_date_column(local_day), F.lit(0.0)).otherwise(
+    # History's calendar: holidays of the store type's class (0 when closed)
+    # and the geography's weather on the local day.
+    klass = store_class(ctx.profile)
+    time_factor = F.when(closed_date_column(local_day, klass), F.lit(0.0)).otherwise(
         ctx.growth(local_day)
+        * holiday_factor_column(local_day, klass)
+        * weather_factor_column(ctx.draws, F.col("store_geo_id"), F.col("store_state"), local_day)
         * daily_factor_column(ctx.profile, local_day)
         * monthly_factor_column(ctx.profile, local_day)
         * F.element_at(F.col("_hour_share"), F.hour(_local(F.col("ts"))) + 1)
@@ -952,6 +1001,7 @@ def purchase_baskets(
         "store_id",
         "customer_id",
         "store_bps",
+        "tax_rule",
         "receipt_id",
         "session_id",
         "tender",
@@ -1061,6 +1111,7 @@ def purchase_events(ctx: StreamContext, buyers: DataFrame) -> DataFrame:
             F.col("_offer"),
             F.col("store_bps"),
             ctx.profile,
+            F.col("tax_rule"),
         ),
     )
     gross = _sum_lines("priced_lines", "gross_cents")
@@ -1242,14 +1293,15 @@ def purchase_events(ctx: StreamContext, buyers: DataFrame) -> DataFrame:
 def new_orders(ctx: StreamContext, lanes: DataFrame) -> DataFrame:
     """Orders placed in this batch, at the configured daily volume.
 
-    Volume follows the profile's monthly weights and the online hourly curve
-    (UTC); ``rejected`` starts empty.
+    Volume follows the profile's monthly weights, the online holiday calendar
+    and the online hourly curve (UTC); ``rejected`` starts empty.
     """
     rows = lanes.where(F.col("lane") == "online")
     day = F.to_date(F.col("ts"))
     factor = (
         ctx.growth(day)
         * monthly_factor_column(ctx.profile, day)
+        * online_holiday_factor_column(day)
         * (online_hour_factor_column(F.col("ts")))
     )
     return rows.where(_keep(ctx, "online", factor)).select(
@@ -1265,7 +1317,11 @@ def _seconds(ctx: StreamContext, bounds: tuple[int, int], salt: str) -> Column:
 
 
 def _online_line(ctx: StreamContext, line: Column) -> Column:
-    """Online promo (history's per-order promo share and codes), then destination tax."""
+    """Online promo (history's per-order promo share and codes), then destination tax.
+
+    Tax follows the fulfilling store's (or the destination's) state rule, as
+    history does.
+    """
     d = ctx.draws
     keys = [F.col("order_id"), line["line_num"]]
     has_promo = d.u(keys, "online-promo") < F.col("_promo_share")
@@ -1276,14 +1332,8 @@ def _online_line(ctx: StreamContext, line: Column) -> Column:
     ).otherwise(F.lit(0).cast("long"))
     discount = F.floor((line["gross_cents"] * percent + F.lit(50)) / F.lit(100)).cast("long")
     net = line["gross_cents"] - discount
-    multiplier = (
-        F.when(line["taxability"] == "TAXABLE", F.lit(100))
-        .when(line["taxability"] == "REDUCED_RATE", F.lit(50))
-        .otherwise(F.lit(0))
-        .cast("long")
-    )
-    tax = F.floor((net * F.col("tax_bps") * multiplier + F.lit(500_000)) / F.lit(1_000_000)).cast(
-        "long"
+    tax = line_tax_cents(
+        net, line["taxability"], F.col("tax_bps"), F.col("tax_rule"), line["unit_cents"]
     )
     return (
         line.withField("promo_code", code)
@@ -1356,7 +1406,8 @@ def plan_orders(ctx: StreamContext, orders: DataFrame) -> DataFrame:
     bopis = mode == "BOPIS"
     orders = (
         orders.join(
-            F.broadcast(ctx.stores.select("store_id", "dc_id", "store_bps", "tz")), "store_id"
+            F.broadcast(ctx.stores.select("store_id", "dc_id", "store_bps", "tax_rule", "tz")),
+            "store_id",
         )
         .join(ctx.customer_tax, "customer_id", "left")
         .withColumn("order_id", _prefixed(ctx, "ONL", v))
@@ -1395,6 +1446,12 @@ def plan_orders(ctx: StreamContext, orders: DataFrame) -> DataFrame:
             "tax_bps",
             F.when(F.col("node_type") == "STORE", F.col("store_bps")).otherwise(
                 F.coalesce(F.col("customer_bps"), F.col("store_bps"))
+            ),
+        )
+        .withColumn(
+            "tax_rule",
+            F.when(F.col("node_type") == "STORE", F.col("tax_rule")).otherwise(
+                F.coalesce(F.col("customer_rule"), F.col("tax_rule"))
             ),
         )
         .withColumn(
