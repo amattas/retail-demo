@@ -39,7 +39,26 @@ routes and slots.
 
 Online orders follow `vocabulary.ONLINE_HOURLY_WEIGHTS` over the UTC day
 (peaking in the US evening), and a BOPIS order is collected 1-24 hours after it
-is picked (`delivered_ts`); the stream uses the same parameters.
+is picked (`delivered_ts`); the stream uses the same parameters. Online orders
+are local, like the live stream (`stream_events.plan_orders`):
+
+- The customer is active on the order day and comes from a home-store pool
+  drawn by store traffic, so an order belongs to the customer's home store.
+- One fulfillment mode serves the whole order (60% ship-from-DC, 30%
+  ship-from-store, 10% BOPIS). Ship-from-store and BOPIS orders use the
+  customer's home store as `node_id`; ship-from-DC orders use the DC that
+  supplies that store.
+- Baskets are sized to the store type's `avg_ticket_target` like store
+  receipts, lines follow the same shopping missions, and repeated SKUs merge
+  into one line.
+- A cancelled or voided order has zero header totals and zero line
+  `ext_cents`, and no payment.
+- 8% of shipped orders are backordered: they wait 3-14 days for stock between
+  picking and shipping, then ship and deliver.
+- `fulfillment_status` and the stage timestamps are as of the end of history.
+  Orders still in fulfillment then are `PENDING`, `PICKED`, or `SHIPPED`, with
+  NULL timestamps for the stages still to come; no stage time is later than
+  the end of history. The live stream does not continue these orders.
 
 `fact_logistics_incidents` holds one row per logistics disruption
 (`incident_type` is `DC_OUTAGE`, `LANE_DELAY`, `WEATHER`, `HOLIDAY`, or

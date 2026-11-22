@@ -115,6 +115,7 @@ from retail_setup.generation.vocabulary import (
     BLE_KNOWN_SHARE,
     CAMPAIGN_ARCHETYPES,
     ONLINE_BACKORDER_RATE,
+    ONLINE_BACKORDER_SECONDS,
     ONLINE_CANCEL_RATE,
     ONLINE_DELIVER_SECONDS,
     ONLINE_FULFILLMENT_MIX,
@@ -320,7 +321,19 @@ def build_stream_context(
         cumulative += row["multiplier"] / total_multiplier
         store_entries.append((cumulative, row["store_id"]))
 
-    stores = stores.join(F.broadcast(hours), "operating_hours").persist()
+    # The DC that supplies each store ships its ship-from-DC online orders.
+    missing_dc = [row["store_id"] for row in rows if int(row["store_id"]) not in supply.store_dc]
+    if missing_dc:
+        raise ValueError(f"{len(missing_dc)} stores have no supplying DC in the supply network")
+    store_dcs = spark.createDataFrame(
+        [(int(row["store_id"]), int(supply.dc_of(row["store_id"]))) for row in rows],
+        "store_id long, dc_id long",
+    )
+    stores = (
+        stores.join(F.broadcast(hours), "operating_hours")
+        .join(F.broadcast(store_dcs), "store_id")
+        .persist()
+    )
     # Destination tax for DC-shipped online orders, as in history: the mean
     # store rate of the customer's geography, else the network mean.
     mean_bps = int(round(sum(row["_tax_rate"] for row in rows) / len(rows) * 10000))
@@ -1281,10 +1294,12 @@ def _online_line(ctx: StreamContext, line: Column) -> Column:
 
 
 def _online_customers(ctx: StreamContext, orders: DataFrame) -> DataFrame:
-    """Add each order's customer: the first of a few tries active that (UTC) day.
+    """Add each order's customer and their home store (``store_id``).
 
-    As in history, a try picks a store by traffic and a ticket in its pool;
-    an order whose tries all find inactive customers is never placed.
+    The customer is the first of a few tries active that (UTC) day. As in
+    history, a try picks a store by traffic and a ticket in its pool (the
+    store's home customers); an order whose tries all find inactive customers
+    is never placed.
     """
     d = ctx.draws
     tries = orders.select(
@@ -1312,7 +1327,10 @@ def _online_customers(ctx: StreamContext, orders: DataFrame) -> DataFrame:
     chosen = (
         tries.where(active)
         .groupBy("v")
-        .agg(F.min_by("_picked", "_try").cast("long").alias("customer_id"))
+        .agg(
+            F.min_by("_picked", "_try").cast("long").alias("customer_id"),
+            F.min_by("pool_store", "_try").cast("long").alias("store_id"),
+        )
     )
     return orders.join(chosen, "v")
 
@@ -1320,26 +1338,26 @@ def _online_customers(ctx: StreamContext, orders: DataFrame) -> DataFrame:
 def plan_orders(ctx: StreamContext, orders: DataFrame) -> DataFrame:
     """Lay out each order's lifecycle (``v, start_ms, rejected, _is_new`` rows).
 
-    The customer, store, DC, tender, fulfillment mode, basket, promotions,
-    cancellation, backorder and every stage time are drawn from the order's
-    rate row, so the plan is identical in every batch that sees the order.
-    One fulfillment mode and node serve the whole order, picked by the
-    historical mix. Store-fulfilled orders (ship-from-store, BOPIS) are taxed
-    at the store's rate, DC-shipped orders at the customer's destination rate.
+    The customer, tender, fulfillment mode, basket, promotions, cancellation,
+    backorder and every stage time are drawn from the order's rate row, so the
+    plan is identical in every batch that sees the order. As in history, one
+    fulfillment mode and node serve the whole order, picked by the historical
+    mix: the customer's home store for ship-from-store and BOPIS, the DC that
+    supplies it for ship-from-DC. Store-fulfilled orders are taxed at the
+    store's rate, DC-shipped orders at the customer's destination rate.
+    Repeated SKUs merge into one line; a backordered order waits
+    ``ONLINE_BACKORDER_SECONDS`` for stock before it ships.
     """
     d = ctx.draws
     v = F.col("v")
-    for salt, name, output in (
-        ("store", "stores", "store_id"),
-        ("dc", "dcs", "dc_id"),
-    ):
-        orders = _sample(ctx, orders, salt, name, output)
     orders = _online_customers(ctx, orders)
     key = [F.col("order_id")]
     mode = F.col("fulfillment_mode")
     bopis = mode == "BOPIS"
     orders = (
-        orders.join(F.broadcast(ctx.stores.select("store_id", "store_bps", "tz")), "store_id")
+        orders.join(
+            F.broadcast(ctx.stores.select("store_id", "dc_id", "store_bps", "tz")), "store_id"
+        )
         .join(ctx.customer_tax, "customer_id", "left")
         .withColumn("order_id", _prefixed(ctx, "ONL", v))
         .withColumn("receipt_id", F.col("order_id"))
@@ -1402,7 +1420,7 @@ def plan_orders(ctx: StreamContext, orders: DataFrame) -> DataFrame:
         )
     )
     orders = attach_baskets(orders, ctx.baskets, ctx.profile, ctx.seed)
-    orders = orders.withColumn(
+    orders = orders.withColumn("basket_lines", merge_lines(F.col("basket_lines"))).withColumn(
         "priced_lines", F.transform("basket_lines", lambda line: _online_line(ctx, line))
     )
     live = ~F.col("cancelled")
@@ -1421,7 +1439,15 @@ def plan_orders(ctx: StreamContext, orders: DataFrame) -> DataFrame:
             "shipped_ms",
             F.when(
                 live & ~bopis,
-                F.col("picked_ms") + _seconds(ctx, ONLINE_SHIP_SECONDS, "online-ship") * 1000,
+                F.col("picked_ms")
+                + (
+                    _seconds(ctx, ONLINE_SHIP_SECONDS, "online-ship")
+                    + F.when(
+                        F.col("backordered"),
+                        _seconds(ctx, ONLINE_BACKORDER_SECONDS, "online-backorder-wait"),
+                    ).otherwise(F.lit(0).cast("long"))
+                )
+                * 1000,
             ),
         )
         .withColumn(
@@ -1430,7 +1456,7 @@ def plan_orders(ctx: StreamContext, orders: DataFrame) -> DataFrame:
                 live & bopis,
                 F.col("picked_ms") + _seconds(ctx, ONLINE_PICKUP_SECONDS, "online-pickup") * 1000,
             ).when(
-                live & ~F.col("backordered"),
+                live,
                 F.col("shipped_ms")
                 + _seconds(ctx, ONLINE_DELIVER_SECONDS, "online-deliver") * 1000,
             ),
@@ -1466,8 +1492,9 @@ def online_events(
     a fulfilling store could not supply were dropped as lost sales), paid
     after the tender's processing time, picked, shipped and delivered; a BOPIS
     order is picked (ready for pickup) and delivered when the customer
-    collects it, and is never shipped. Cancelled orders have zero totals, no
-    payment and no fulfillment; backordered orders ship but are not delivered.
+    collects it, and is never shipped. Cancelled orders have zero totals, zero
+    line amounts, no payment and no fulfillment; backordered orders wait for
+    stock before they ship.
     """
     v = F.col("v")
     orders = orders.withColumn("priced_lines", _kept_lines("priced_lines")).where(
@@ -1528,7 +1555,9 @@ def online_events(
                 line["product_id"].alias("product_id"),
                 line["quantity"].cast("long").alias("quantity"),
                 (line["unit_cents"] / 100.0).alias("unit_price"),
-                (line["net_cents"] / 100.0).alias("extended_price"),
+                (F.when(live, line["net_cents"]).otherwise(F.lit(0)) / 100.0).alias(
+                    "extended_price"
+                ),
                 line["promo_code"].alias("promo_code"),
                 F.col("fulfillment_mode"),
                 F.col("node_type"),

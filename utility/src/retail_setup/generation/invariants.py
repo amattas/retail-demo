@@ -10,7 +10,14 @@ from pyspark.sql import DataFrame, Row, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 
-from retail_setup.generation.vocabulary import PROMO_CATALOG
+from retail_setup.generation.vocabulary import (
+    ONLINE_BACKORDER_SECONDS,
+    ONLINE_DELIVER_SECONDS,
+    ONLINE_PICK_SECONDS,
+    ONLINE_PICKUP_SECONDS,
+    ONLINE_SHIP_SECONDS,
+    PROMO_CATALOG,
+)
 
 # Each check is one small Spark job; at demo scale their fixed per-job overhead
 # dominates. The publish notebook evaluates checks concurrently over Delta
@@ -88,6 +95,63 @@ def _check_count(report: InvariantReport, name: str, df: DataFrame) -> None:
         return 0
 
     report._pending.append((_ROW_COUNT, count))
+
+
+# Longest time an online order can stay open: BOPIS picking plus pickup, or
+# picking, the backorder wait, shipping and delivery.
+ONLINE_MAX_OPEN_SECONDS = max(
+    ONLINE_PICK_SECONDS["BOPIS"][1] + ONLINE_PICKUP_SECONDS[1],
+    ONLINE_PICK_SECONDS["SHIP"][1]
+    + ONLINE_BACKORDER_SECONDS[1]
+    + ONLINE_SHIP_SECONDS[1]
+    + ONLINE_DELIVER_SECONDS[1],
+)
+
+
+def _stale_open_orders(lines: DataFrame) -> int:
+    """Open online lines placed too long before the last order to still be open.
+
+    Also counts lines whose status disagrees with their stage times (a
+    DELIVERED line without ``delivered_ts``, an open line with one).
+    """
+    last = _single_row(lines.agg(F.max("event_ts").alias("last")))["last"]
+    if last is None:
+        return 0
+    status = F.col("fulfillment_status")
+    open_status = status.isin("PENDING", "PICKED", "SHIPPED")
+    cutoff = F.lit(last) - F.expr(f"INTERVAL {ONLINE_MAX_OPEN_SECONDS} SECONDS")
+    return lines.filter(
+        (open_status & ((F.col("event_ts") < cutoff) | F.col("delivered_ts").isNotNull()))
+        | ((status == "DELIVERED") & F.col("delivered_ts").isNull())
+    ).count()
+
+
+def _online_order_checks(r: InvariantReport, ol: DataFrame) -> None:
+    """Order-level fulfillment, zeroed cancellations and as-of-end statuses."""
+    _check(
+        r,
+        "online orders have one fulfillment mode and node",
+        lambda: (
+            ol.groupBy("order_id")
+            .agg(F.countDistinct("fulfillment_mode", "node_type", "node_id").alias("n"))
+            .filter(F.col("n") != 1)
+            .count()
+        ),
+    )
+    _check(
+        r,
+        "cancelled online lines carry no amount",
+        lambda: ol.filter(
+            (F.col("fulfillment_status") == "CANCELLED") & (F.col("ext_cents") != 0)
+        ).count(),
+    )
+    # Statuses are as of the end of history: only orders placed within the
+    # longest fulfillment time before the last order may still be open.
+    _check(
+        r,
+        "online orders open only near the end of history",
+        lambda: _stale_open_orders(ol),
+    )
 
 
 def run_invariants(
@@ -182,6 +246,7 @@ def run_invariants(
         "online lines -> headers FK",
         lambda: ol.join(oh, ol.order_id == oh.order_id_ext, "left_anti").count(),
     )
+    _online_order_checks(r, ol)
 
     so = t["fact_stockouts"]
     _check(

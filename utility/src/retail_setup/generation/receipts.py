@@ -340,6 +340,91 @@ def payment_attempts(
     return rows.withColumn(other, F.lit(None).cast("string")).select(*column_names("fact_payments"))
 
 
+def basket_calibration(catalog: DataFrame, profile: StoreTypeProfile) -> DataFrame:
+    """``event_date, _line_value, _taxable_value``: expected line values of a day's baskets.
+
+    The department-weighted (seasonal) average of ``behavior.retail_catalog``'s
+    expected line and taxable values, which ``calibrated_basket_mean`` turns
+    into the basket size that meets the profile's ticket target.
+    """
+    department_weight = sum(
+        (
+            F.when(
+                F.col("department") == name,
+                F.lit(weight) * _seasonal_factor(name, F.month("event_date")),
+            ).otherwise(0.0)
+            for name, weight in profile.department_weights.items()
+        ),
+        F.lit(0.0),
+    )
+    return (
+        catalog.withColumn("_weight", department_weight)
+        .groupBy("event_date")
+        .agg(
+            (F.sum(F.col("_weight") * F.col("_expected_line_value")) / F.sum("_weight")).alias(
+                "_line_value"
+            ),
+            (F.sum(F.col("_weight") * F.col("_expected_taxable_value")) / F.sum("_weight")).alias(
+                "_taxable_value"
+            ),
+        )
+    )
+
+
+def draw_basket_lines(
+    purchases: DataFrame,
+    key: str,
+    catalog: DataFrame,
+    d: seeded_draws,
+    profile: StoreTypeProfile,
+    carry: list[str] | None = None,
+) -> DataFrame:
+    """``key, *carry, _lines``: each purchase's drawn lines, before complements and merging.
+
+    ``purchases`` has ``key``, ``event_date``, ``basket_n``, ``_shopper`` and
+    the ``carry`` columns, which are passed through (one value per purchase).
+    Lines follow shopping missions (a favorite or mission department for most
+    lines), then a price- and promo-elastic product within the department and
+    a category quantity. Receipts and online orders draw lines the same way.
+    """
+    carry = carry or []
+    exploded = purchases.withColumn("line_num", F.explode(F.sequence(F.lit(1), F.col("basket_n"))))
+    exploded = _with_seasonal_department(
+        exploded,
+        F.when(
+            d.u([key, "line_num"], "mission-coherence") < 0.60,
+            F.when(
+                d.u([key], "favorite-mission") < 0.50,
+                d.u(["_shopper"], "favorite-department"),
+            ).otherwise(d.u([key], "mission-department")),
+        ).otherwise(d.u([key, "line_num"], "dept")),
+        profile.department_weights,
+    )
+    line_key = [key, "line_num"]
+    return (
+        exploded.join(catalog, ["event_date", "department"])
+        .withColumn("_product", pick_retail_product(F.col("_catalog"), d.u(line_key, "prod")))
+        .select(
+            key,
+            *carry,
+            F.struct(
+                F.col("line_num").cast("int").alias("line_num"),
+                F.col("_product.product_id").alias("product_id"),
+                retail_quantity(d, line_key, F.col("department")).alias("quantity"),
+                F.col("_product.unit_cents").alias("unit_cents"),
+                F.col("_product.taxability").alias("taxability"),
+                F.col("department"),
+                F.col("_product.partner_id").alias("partner_id"),
+                F.col("_product.partner_cents").alias("partner_cents"),
+                F.col("_product.partner_taxability").alias("partner_taxability"),
+                F.col("_product.partner_ok").alias("partner_ok"),
+            ).alias("_line"),
+        )
+        .groupBy(key, *carry)
+        .agg(F.array_sort(F.collect_list("_line")).alias("_lines"))
+    )
+
+
 def generate_receipts_group(
     spark: SparkSession,
     dims: dict[str, DataFrame],
@@ -439,28 +524,7 @@ def generate_receipts_group(
     # traffic grid and copy its large expressions into the plan.
     sale_dates = date_grid(spark, cfg.start_date, cfg.end_date, "event_date")
     catalog = retail_catalog(products, sale_dates, d, PriceSchedule(cfg.seed, cfg.anchor_date))
-    department_weight = sum(
-        (
-            F.when(
-                F.col("department") == name,
-                F.lit(weight) * _seasonal_factor(name, F.month("event_date")),
-            ).otherwise(0.0)
-            for name, weight in profile.department_weights.items()
-        ),
-        F.lit(0.0),
-    )
-    calibration = (
-        catalog.withColumn("_weight", department_weight)
-        .groupBy("event_date")
-        .agg(
-            (F.sum(F.col("_weight") * F.col("_expected_line_value")) / F.sum("_weight")).alias(
-                "_line_value"
-            ),
-            (F.sum(F.col("_weight") * F.col("_expected_taxable_value")) / F.sum("_weight")).alias(
-                "_taxable_value"
-            ),
-        )
-    )
+    calibration = basket_calibration(catalog, profile)
     receipts = (
         receipts.join(calibration, "event_date")
         .withColumn(
@@ -488,49 +552,12 @@ def generate_receipts_group(
         )
     )
 
-    exploded = receipts.select(
+    drawn = draw_basket_lines(
+        receipts.select("receipt_id_ext", "event_date", "basket_n", "_shopper"),
         "receipt_id_ext",
-        "event_ts",
-        "event_date",
-        "store_id",
-        "tax_rate",
-        "basket_n",
-        "_offer",
-        "_shopper",
-    ).withColumn("line_num", F.explode(F.sequence(F.lit(1), F.col("basket_n"))))
-    exploded = _with_seasonal_department(
-        exploded,
-        F.when(
-            d.u(["receipt_id_ext", "line_num"], "mission-coherence") < 0.60,
-            F.when(
-                d.u(["receipt_id_ext"], "favorite-mission") < 0.50,
-                d.u(["_shopper"], "favorite-department"),
-            ).otherwise(d.u(["receipt_id_ext"], "mission-department")),
-        ).otherwise(d.u(["receipt_id_ext", "line_num"], "dept")),
-        profile.department_weights,
-    )
-
-    key = ["receipt_id_ext", "line_num"]
-    drawn = (
-        exploded.join(catalog, ["event_date", "department"])
-        .withColumn("_product", pick_retail_product(F.col("_catalog"), d.u(key, "prod")))
-        .select(
-            "receipt_id_ext",
-            F.struct(
-                F.col("line_num").cast("int").alias("line_num"),
-                F.col("_product.product_id").alias("product_id"),
-                retail_quantity(d, key, F.col("department")).alias("quantity"),
-                F.col("_product.unit_cents").alias("unit_cents"),
-                F.col("_product.taxability").alias("taxability"),
-                F.col("department"),
-                F.col("_product.partner_id").alias("partner_id"),
-                F.col("_product.partner_cents").alias("partner_cents"),
-                F.col("_product.partner_taxability").alias("partner_taxability"),
-                F.col("_product.partner_ok").alias("partner_ok"),
-            ).alias("_line"),
-        )
-        .groupBy("receipt_id_ext")
-        .agg(F.array_sort(F.collect_list("_line")).alias("_lines"))
+        catalog,
+        d,
+        profile,
     )
     # Basket-level steps shared with the live stream: complementary products,
     # repeated SKUs merged into one line, and at most one promotion code whose

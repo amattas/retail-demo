@@ -19,9 +19,6 @@ from retail_setup.config.generation import GenerationConfig
 
 # Fallback average items/basket if the store profile can't be read.
 _DEFAULT_BASKET_LAMBDA = 12.0
-# Weighted avg lines/online-order from the 60/30/10 basket buckets
-# (1-3, 2-5, 5-8 lines): 0.6*2 + 0.3*3.5 + 0.1*6.5 ~= 2.9.
-_ONLINE_LINES_PER_ORDER = 2.9
 
 
 def _basket_lambda(cfg: GenerationConfig) -> float:
@@ -141,7 +138,8 @@ def estimate_record_counts(cfg: GenerationConfig) -> dict[str, int]:
     returns = round(receipts * cfg.return_rate)
     receipt_lines = round(receipts * basket)
     online_headers = round(cfg.online_orders_per_day * days)
-    online_lines = round(online_headers * _ONLINE_LINES_PER_ORDER)
+    # Online baskets are sized to the same ticket target as store baskets.
+    online_lines = round(online_headers * basket)
     payments = receipts + returns + online_headers
 
     groups = {

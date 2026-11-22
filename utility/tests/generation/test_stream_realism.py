@@ -242,6 +242,10 @@ def _simulate(spark):
         "network": network,
         "truck_dc": {row["ID"]: row["DCID"] for row in trucks},
         "store_bps": {row["ID"]: round(row["tax_rate"] * 10000) for row in store_rows},
+        "home_store": {
+            row["ID"]: row["HomeStoreID"]
+            for row in dims["dim_customers"].select("ID", "HomeStoreID").collect()
+        },
         "batch_count": batch_id,
         "journey_rate": calibrated_journey_rate,
     }
@@ -702,7 +706,18 @@ def test_online_orders_follow_a_staged_lifecycle(world) -> None:
         assert {line["fulfillment_mode"] for line in order_lines} == {order["fulfillment_mode"]}
         assert order["gross_subtotal_cents"] - order["discount_cents"] == order["subtotal_cents"]
         assert order["subtotal_cents"] + order["tax_cents"] == order["total_cents"]
+        # One node per order: the customer's home store, or the DC supplying it.
+        home = world["home_store"][order["customer_id"]]
+        if order["node_type"] == "STORE":
+            assert order["node_id"] == home
+        else:
+            assert order["node_id"] == world["network"].dc_of(home)
+        assert len({product for product in (line["product_id"] for line in order_lines)}) == len(
+            order_lines
+        )
         if order["total_cents"] == 0:
+            # Cancelled: zero line amounts, like the header.
+            assert all(line["extended_price"] == 0 for line in order_lines)
             assert order_id not in payments and order_id not in picked
             continue
         assert (

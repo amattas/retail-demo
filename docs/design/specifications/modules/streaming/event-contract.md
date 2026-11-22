@@ -193,20 +193,24 @@ has passed.
 Online orders arrive at `online_orders_per_day` (by default derived so online
 orders are the profile's `online_order_share` of all orders), shaped by the profile's
 monthly weights and the online hourly curve (`vocabulary.ONLINE_HOURLY_WEIGHTS`,
-UTC, peaking in the US evening; history uses the same curve). Each order has
-one fulfillment mode and node, drawn by the historical mix (60% ship from a DC,
-30% ship from a store, 10% BOPIS). Its lifecycle runs over hours and days:
+UTC, peaking in the US evening; history uses the same curve). The customer
+comes from a home-store pool, as in history. Each order has one fulfillment
+mode and node, drawn by the historical mix (60% ship from a DC, 30% ship from
+a store, 10% BOPIS): the customer's home store for ship-from-store and BOPIS,
+the DC that supplies that store for ship-from-DC. Repeated SKUs merge into one
+line. Its lifecycle runs over hours and days:
 
 | Event | When |
 | --- | --- |
 | `online_order_created` and one `online_order_line_added` per line | order time |
 | `payment_processed` (`order_id`, no store) | after the online tender's processing time |
 | `online_order_picked` | 30-240 minutes later (BOPIS: 4-24 hours, ready for pickup) |
-| `online_order_shipped` | 2-4 hours after picking; never for BOPIS |
+| `online_order_shipped` | 2-4 hours after picking (backorders: 3-14 days more); never for BOPIS |
 | `online_order_delivered` | 1-3 days after shipping; BOPIS: 1-24 hours after picking, when the customer collects it |
 
-2% of orders are cancelled at once: zero totals, no payment and no fulfillment.
-8% of shippable orders are backordered: shipped but not delivered. Payments use
+2% of orders are cancelled at once: zero totals, zero line amounts, no payment
+and no fulfillment. 8% of shippable orders are backordered: they wait 3-14 days
+for stock before they ship, then deliver as usual. Payments use
 the online tenders (no cash) and the shared decline model: a declined order is
 retried on another tender (a `DECLINED` payment a second after the order, then
 the `APPROVED` one) or voided, which cancels it, as in history. Lines carry history's online promo codes, and
