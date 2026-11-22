@@ -36,8 +36,8 @@ retained for existing TMDL bindings.
 `ad_impression`, `promotion_applied`, `online_order_created`,
 `online_order_picked`, `online_order_shipped`, `online_order_line_added`,
 `online_order_delivered`, `logistics_incident_started`, and
-`logistics_incident_resolved`. The last two are declared for the
-logistics-incident model; the stream does not emit them yet.
+`logistics_incident_resolved`. The last two carry the logistics incident
+model's starts and resolutions; they are sporadic (a few per DC and year).
 
 ### Other KQL tables
 
@@ -67,7 +67,8 @@ recommendation, approval, and rejection event tables.
 `fact_promo_lines`,
 `fact_online_order_headers`, `fact_online_order_lines`, `fact_reorders`,
 `fact_truck_moves`, `fact_truck_inventory`, `fact_dc_inventory_txn`,
-`fact_store_inventory_txn`, `fact_stockouts`, `fact_logistics_incidents`.
+`fact_store_inventory_txn`, `fact_stockouts`, `fact_logistics_incidents`,
+`fact_logistics_incident_stores`.
 
 Silver timestamps are UTC; `dim_stores.TimeZone` converts them to store-local
 time and `fact_receipts.local_hour` keeps the store-local hour.

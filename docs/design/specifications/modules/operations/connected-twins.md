@@ -71,9 +71,11 @@ and unloading evidence, and the current selected shipment's cargo ledger.
 Unknown or ambiguous state stays unknown. A departed truck is not assigned
 an invented GPS location or next destination.
 
-The delay comparison adds sixty minutes to a recorded ETA as a clearly
-labeled **what-if**. It does not change an actual timestamp, predict an
-observed delay, recompute stockout probabilities, or place an order.
+The delay comparison shows the planned ETA recorded at scheduling
+(`planned_arrival_time`) next to the recorded ETA, with the recorded delay and
+its reason (`delay_minutes`, `delay_reason` from the logistics incident model).
+Before a truck arrives the recorded delay is 0; it is observed history, not a
+forecast, and it does not recompute stockout probabilities or place an order.
 
 ## Deployment and authorization
 

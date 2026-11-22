@@ -307,7 +307,7 @@ Capacity auto-resume uses the existing deployment mechanism.
 The pilot contains one DC, two trucks, up to five connected stores, and up
 to twenty cargo SKUs. Selection follows recorded relationships rather than
 assuming that the first numbered entities are connected. Historical source
-time, signed stock, and the separate +60 minute delay what-if are visible.
+time, signed stock, and the planned ETA with the recorded delay are visible.
 Warehouse on-hand is not confirmed available supply; truck state is not GPS.
 
 Open the report link recorded in

@@ -82,6 +82,15 @@ a DRAFT, APPROVED, or RESOLVED action never alerts again.
 `deploy/scripts/_operations_scenario.current_alert_cases` is the tested
 reference for those semantics. Historical reorder rows do not establish
 open commitments, confirmed inbound, reservations, or shared DC availability.
+Each signal also carries its supply context from Silver logistics: the
+store's DC (`dc_id`), its observed delivery lead time (`lead_time_days`), the
+units of the product on trucks to the store at the snapshot (`inbound_units`,
+planned to arrive at `expected_inbound_ts`), and the logistics incident
+affecting the store at the snapshot (`active_incident_id`,
+`active_incident_type`, `active_incident_cause` from
+`fact_logistics_incident_stores` and `fact_logistics_incidents`). The agent
+explains a shortage with these fields only; reservations and shared budget
+stay unverified.
 
 The deploy seeds the signals once. `17-refresh-availability-signals` reseeds
 them nightly in `daily-maintenance` after `06-ml-demand-forecast` and
