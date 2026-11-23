@@ -44,7 +44,10 @@ Notable groups in this directory:
 
 - `03-streaming-to-silver` and `04-streaming-to-gold`: optional Eventhouse to
   Lakehouse projection. `04` and `setup-11` share one Gold definition
-  (`utility/src/retail_setup/generation/gold_rules.py`, copied into `04`)
+  (`utility/src/retail_setup/generation/gold_rules.py`, copied into `04`).
+  `03` reads only new data on each run: truck lifecycles from the replay
+  window, and marketing attribution for purchases newer than its watermark
+  minus seven days plus journeys whose rows arrived late
 - Writer notebooks (`03`, `04`, `05`, `90`, the required ML producers and
   `setup-11`) hold leases in `ag._job_locks`; see the
   [pipelines README](../pipelines/README.md#writer-coordination). Cells that

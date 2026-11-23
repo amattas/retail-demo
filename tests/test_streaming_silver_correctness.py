@@ -1082,6 +1082,7 @@ def test_process_events_recovers_missing_old_rows_and_checkpoints_after_merge() 
             "_missing_late_source_rows": lambda *_args: missing,
             "project_target_schema": lambda frame, _target: frame,
             "merge_new_rows": merge,
+            "record_late_attribution_keys": lambda *_args: None,
             "_next_watermark": lambda _previous, observed: observed,
             "update_watermark": (
                 lambda key, value: update_calls.append((key, value))
@@ -1830,7 +1831,7 @@ def test_live_alert_and_customer_transforms_emit_compatibility_columns() -> None
 
 
 def test_online_attribution_works_without_live_only_header_fields() -> None:
-    source = _source("process_marketing_attribution")
+    source = _source("build_marketing_attribution")
     assert '"fact_online_order_lines"' not in source
     assert 'F.col("node_type")' not in source
     assert 'F.col("node_id")' not in source

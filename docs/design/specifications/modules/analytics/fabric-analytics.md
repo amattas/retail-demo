@@ -84,15 +84,34 @@ Override the defaults with the `REPLAY_OVERLAP_SECONDS` and
 variables.
 
 The pipeline passes Lakehouse/schema notebook parameters and uses
-`concurrency = 1` to prevent overlapping runs of that pipeline. Manual
-notebook execution is not protected by that pipeline setting. The daily
-deep scan is cadence-gated, not a scan of all source history on every run.
+`concurrency = 1` to prevent overlapping runs of that pipeline. Across
+pipelines and manual runs, 03 holds the `silver` writer lock in
+`ag._job_locks` and skips the run when it can't get it within
+`LOCK_WAIT_SECONDS` (see `fabric/pipelines/README.md`).
+The daily deep scan is cadence-gated, not a scan of all source history on
+every run.
+
+Marketing attribution is incremental too. A run reconsiders only purchases
+newer than the `marketing_attribution` watermark (the newest purchase it has
+processed) minus the seven-day window and the replay overlap, plus purchases
+and journeys whose rows were merged this run with older event times (late
+arrivals and deep-reconciliation backfills). Touches, payments and promotions
+are read only for those candidates, from the earliest candidate minus the
+window. The first run, or a run whose late keys exceed
+`ATTRIBUTION_LATE_KEY_LIMIT`, reads full history. Journey IDs are trimmed when
+read instead of by table-wide `UPDATE`s, and the legacy store-operation casing
+repair runs once (recorded in `_watermarks`). If a run fails after merging a
+deep-reconciliation backfill but before attribution, those purchases are not
+revisited automatically. `utility/tests/generation/test_streaming_silver_bounded_runtime.py`
+checks that the candidate set stays the same when history grows tenfold.
 
 Truck arrival/departure is handled as one lifecycle: Silver joins the two
 sources on truck, distribution center, store, and shipment before appending a
-completed `fact_truck_moves` row. It scans the retained truck sources and
-anti-joins completed Silver lifecycle keys so delayed counterparts are not lost
-behind a watermark. `tests/test_truck_dwell_contract.py` verifies the
+completed `fact_truck_moves` row. A normal run reads departures from the
+replay window and their arrivals (up to a day earlier), and compares them with
+Silver lifecycles from the earliest candidate departure on. The daily deep
+reconciliation (and the first run) reads the whole retained truck sources, so
+delayed counterparts are not lost behind the watermark. `tests/test_truck_dwell_contract.py` verifies the
 cross-layer source contract; live Fabric execution remains a separate gate.
 
 Live-specific behavior and divergences:
@@ -104,7 +123,7 @@ Live-specific behavior and divergences:
   was shown) while the watermark follows `ingest_timestamp` (when it arrived
   with its purchase), so touches fall inside the replay window;
 - store operations are written as lower-case `opened`/`closed`, like history,
-  and older upper-case rows are normalized; `promotion_applied.product_ids`
+  and older upper-case rows are normalized once; `promotion_applied.product_ids`
   becomes the historical comma-separated, sorted ID list;
 - picked and shipped events populate `ag.fact_online_order_status`;
 - `fact_online_order_status` is an owned streaming-only Silver contract: its
@@ -131,6 +150,18 @@ this notebook. `python scripts/check_data_contracts.py` fails if a route,
 terminal, mapping, key, or named boundary drifts.
 
 ## Streaming-to-Gold behavior
+
+`04-streaming-to-gold.ipynb` and `setup-11` build the ten Gold tables from one
+definition, `utility/src/retail_setup/generation/gold_rules.py`, which
+`utility/scripts/build_notebooks.py` copies into notebook 04. Sales tables
+count `SALE` receipts with an approved payment, online sales count orders with
+an approved payment, `truck_dwell_daily` has one row per completed shipment
+lifecycle dated by its arrival, and no source row at or after the Gold cutoff
+is used: the end of the generated history (local midnight after `END_DATE`,
+allowing 12 hours past UTC midnight) until streaming starts, then the build
+time. `utility/tests/generation/test_gold_notebook_parity.py` runs notebook
+04's cells and `gold.py` on the same input and compares every table. 04 holds
+the `gold` writer lock and skips the run when setup-11 or maintenance holds it.
 
 `04-streaming-to-gold.ipynb` writes each of the ten Gold candidates to a
 run-scoped staging schema. All ten must exist and pass row-count/schema
