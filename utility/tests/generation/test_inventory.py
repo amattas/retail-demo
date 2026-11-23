@@ -118,13 +118,15 @@ def seeded_logistics(spark):
         _EVENT_SCHEMA,
     ).withColumn("event_date", F.to_date("event_ts"))
     store_dc = spark.createDataFrame([(1, 1), (2, 1)], "store_id long, dc_id long")
-    reorders = _reorders(events, store_dc)
-    lines = _shipment_lines(events, cfg.truck_capacity)
-    shipments = _shipments(lines, dims, cfg, routes)
+    reorders = _reorders(events, store_dc).localCheckpoint()
+    lines = _shipment_lines(events, cfg.truck_capacity).localCheckpoint()
+    # Materialize the routed shipment plan once: every collect() below would
+    # otherwise rebuild it, and the repeated plan exhausts the CI runner heap.
+    shipments = _shipments(lines, dims, cfg, routes).localCheckpoint()
     return (
         reorders,
-        _truck_moves(shipments),
-        _truck_inventory(shipments, lines, cfg.end_date),
+        _truck_moves(shipments).localCheckpoint(),
+        _truck_inventory(shipments, lines, cfg.end_date).localCheckpoint(),
         cfg,
         routes,
     )
