@@ -103,7 +103,14 @@ def test_maintenance_distinguishes_missing_tables_from_operation_failures(
     spark.catalog.tableExists.return_value = exists
     spark.sql.side_effect = error
     tree = ast.parse(_notebook_code())
-    namespace = {"spark": spark, "LAKEHOUSE_NAME": "custom_lh", "DRY_RUN": False}
+    namespace = {
+        "spark": spark,
+        "LAKEHOUSE_NAME": "custom_lh",
+        "DRY_RUN": False,
+        "is_concurrent_write_error": lambda exc: "Concurrent" in str(exc),
+    }
+    # The public wrappers only add the writer lock (tests/test_lakehouse_job_locks.py).
+    operation = f"_{operation}"
     exec(
         compile(
             ast.Module(body=[_function(tree, operation)], type_ignores=[]), "", "exec"
@@ -111,7 +118,7 @@ def test_maintenance_distinguishes_missing_tables_from_operation_failures(
         namespace,
     )
     arguments = ["ag", "fact_receipts"]
-    if operation == "vacuum_table":
+    if operation == "_vacuum_table":
         arguments.append(168)
 
     assert namespace[operation](*arguments) is expected
