@@ -133,7 +133,7 @@ and [Power BI semantic model specification](../design/specifications/modules/pow
 
 The six active Reporting tables are demand forecast, customer segments, churn
 predictions, stockout risk, product recommendations, and price elasticity.
-Optional and experimental outputs are not silently added to the 42-table
+Optional and experimental outputs are not silently added to the 44-table
 semantic model.
 
 <!-- manifest-contract:readiness -->

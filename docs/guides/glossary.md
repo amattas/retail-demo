@@ -52,6 +52,11 @@ These definitions describe this demo, not every use of each term in Fabric.
 | **Medallion architecture** | Data organized into Bronze source records, Silver cleaned tables, and Gold summaries and model outputs. |
 | **Shortcut** | A Fabric reference to data stored elsewhere. A shortcut makes data visible without creating another physical copy. |
 | **Watermark** | A saved progress marker. `ag._watermarks` records how far a streaming transformation has processed so that the next run can continue safely. |
+| **Stream state** | What the live stream remembers between its one-minute batches: store stock, trucks on the road, online orders and store visits in progress, and which stores are open. It is kept in the `ag._stream_state_*` tables so a restarted or repeated batch produces the same events. |
+| **Incarnation** | One run history of a live stream checkpoint. Deleting the checkpoint starts a new incarnation with new event IDs, so new events never collide with old ones in Eventhouse. |
+| **Writer lock** | A short lease in `ag._job_locks` that a notebook holds while it writes shared Lakehouse tables, so two pipelines never overwrite each other. A lock expires within 15 minutes if its holder crashes. |
+| **Logistics incident** | A simulated supply-chain disruption: a DC outage, a delayed lane, severe weather, holiday capacity limits, or a supplier short-shipment. Incidents delay trucks and can cause store stockouts. |
+| **UTC and local hour** | All stored timestamps are in UTC. `fact_receipts.local_hour` and `dim_stores.TimeZone` give the store's own clock for hour-of-day reporting. |
 
 ## Deployment and operations terms
 
