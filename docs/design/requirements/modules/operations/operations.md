@@ -34,3 +34,11 @@ reservations, or execution. Deployment shall be independently selectable and
 retain verifiable artifact, binding, and data evidence.
 
 See [connected twins](../../../specifications/modules/operations/connected-twins.md).
+
+### REQ-OPS-006 - Live data invariants
+
+Readiness shall check the live data, not only its freshness: no negative
+stock balances, ordered order and truck lifecycles, BLE resolution at least
+the historical rate, complete attribution of reconciled purchases, and alert
+rates inside their calibrated bands. Missing evidence shall be unknown, never
+a pass.

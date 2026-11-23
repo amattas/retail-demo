@@ -40,6 +40,25 @@
   Changes to hosted CI, live Delta `MERGE`, and Fabric
   failure/recovery still require separate proof.
 
+### IMP-014 - Readiness invariants and live data-review acceptance {#imp-014}
+
+- **Priority / effort:** P2 / M
+- **Outcome:** Readiness checks the live data's invariants (`REQ-OPS-006`),
+  and one recorded live run accepts the data-review changes.
+- **Implemented:** `negative_balances` and `lifecycle_out_of_order` in the
+  settled reconciliation; per-table Eventhouse and Silver freshness; alert and
+  operations-signal freshness.
+- **Open:** readiness checks for live BLE resolution (at least the historical
+  rate), attribution completeness, and alert rates inside their calibrated
+  bands.
+- **Live acceptance:** redeploy a custom layout (`retail-demo-kroger`) and a
+  preset environment with setup re-run, KQL redeployed, and a two-hour stream
+  run in a new incarnation; export the report pages; run the agents' sample
+  questions; confirm `fn_rule_thresholds()`, the rules, the anomaly functions,
+  the changed measures, and overlapping pipeline runs under the writer locks.
+  The streaming checks are listed under
+  [IMP-005](../streaming/backlog.md#imp-005).
+
 ### ENH-008 - Use more platform-native monitoring and governance {#enh-008}
 
 - **Priority / effort:** Idea / M
