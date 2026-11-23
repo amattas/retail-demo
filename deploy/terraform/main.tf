@@ -61,6 +61,13 @@ resource "fabric_lakehouse" "main" {
   configuration = {
     enable_schemas = var.lakehouse_enable_schemas
   }
+
+  # Later deploy steps own these: fabric-cicd publishes the manifest
+  # description, and workspace_folders moves the item into its type folder.
+  # Without this, every plan resets both and the next steps restore them.
+  lifecycle {
+    ignore_changes = [description, folder_id]
+  }
 }
 
 resource "fabric_eventhouse" "main" {
@@ -70,6 +77,11 @@ resource "fabric_eventhouse" "main" {
 
   configuration = var.eventhouse_minimum_consumption_units == null ? null : {
     minimum_consumption_units = var.eventhouse_minimum_consumption_units
+  }
+
+  # workspace_folders owns the item's type folder (see fabric_lakehouse.main).
+  lifecycle {
+    ignore_changes = [folder_id]
   }
 }
 

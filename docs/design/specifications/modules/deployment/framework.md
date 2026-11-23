@@ -454,9 +454,11 @@ notebook's deterministic logical ID and the default-workspace sentinel.
 `fabric-cicd` resolves those values natively during publication, avoiding
 generated per-notebook parameter rules.
 
-Bulk publish is not enabled by default. The upstream API remains experimental,
-and full-demo post-ontology publication still uses dynamic target-item
-resolution for Data Agents.
+Bulk publish is not enabled by default because the upstream bulk import API
+remains experimental. Since `fabric-cicd` 1.4.0, bulk mode also resolves dynamic
+replacement variables (such as the Data Agents' `$items.Ontology.<name>.$id`),
+so that is no longer a blocker; enabling it would still need a live full-demo
+post-ontology proof.
 
 ## KQL application
 
