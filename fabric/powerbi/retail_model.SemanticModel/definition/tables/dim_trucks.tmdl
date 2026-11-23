@@ -6,7 +6,7 @@ table dim_trucks
 		formatString: #,0
 		lineageTag: 01a1a1b5-0001-0001-0001-000000000001
 
-	/// Latest recorded truck-move event timestamp at or before UTC current time for one selected truck in the current source-grounded Store/DC filter context.
+	/// Latest recorded truck-move event timestamp at or before the source as-of (the latest recorded store sale, capped at UTC now) for one selected truck in the current source-grounded Store/DC filter context.
 	measure 'Twin Truck State As Of' = ```
 			VAR _SelectedTruckId =
 				SELECTEDVALUE('dim_trucks'[ID])
@@ -15,7 +15,10 @@ table dim_trucks
 			VAR _VisibleDCIds =
 				VALUES('dim_distribution_centers'[ID])
 			VAR _ObservationCutoff =
-				UTCNOW()
+				MIN(
+					UTCNOW(),
+					CALCULATE(MAX('fact_receipts'[Event Timestamp]), REMOVEFILTERS())
+				)
 			VAR _LatestEventTs =
 				IF(
 					NOT ISBLANK(_SelectedTruckId),
@@ -259,14 +262,17 @@ table dim_trucks
 		displayFolder: Connected Twins\Truck\Schedule
 		lineageTag: c2200003-0000-0000-0000-000000000007
 
-	/// Observed cargo balance for the latest source-recorded truck/shipment pair at or before UTC current time: LOAD adds quantity and UNLOAD removes quantity. Product filters apply after shipment selection.
+	/// Observed cargo balance for the latest source-recorded truck/shipment pair at or before the source as-of (the latest recorded store sale, capped at UTC now): LOAD adds quantity and UNLOAD removes quantity. Product filters apply after shipment selection.
 	measure 'Twin Truck Cargo Balance' = ```
 			VAR _SelectedTruckId =
 				SELECTEDVALUE('dim_trucks'[ID])
 			VAR _LastShipment =
 				[Twin Truck Last Shipment]
 			VAR _ObservationCutoff =
-				UTCNOW()
+				MIN(
+					UTCNOW(),
+					CALCULATE(MAX('fact_receipts'[Event Timestamp]), REMOVEFILTERS())
+				)
 			VAR _CargoEvents =
 				CALCULATETABLE(
 					'fact_truck_inventory',
@@ -307,14 +313,17 @@ table dim_trucks
 		displayFolder: Connected Twins\Truck\Cargo
 		lineageTag: c2200003-0000-0000-0000-000000000008
 
-	/// Latest observed cargo event timestamp at or before UTC current time for the latest source-recorded truck/shipment pair. Product filters preserve source evidence.
+	/// Latest observed cargo event timestamp at or before the source as-of (the latest recorded store sale, capped at UTC now) for the latest source-recorded truck/shipment pair. Product filters preserve source evidence.
 	measure 'Twin Truck Cargo As Of' = ```
 			VAR _SelectedTruckId =
 				SELECTEDVALUE('dim_trucks'[ID])
 			VAR _LastShipment =
 				[Twin Truck Last Shipment]
 			VAR _ObservationCutoff =
-				UTCNOW()
+				MIN(
+					UTCNOW(),
+					CALCULATE(MAX('fact_receipts'[Event Timestamp]), REMOVEFILTERS())
+				)
 			VAR _CargoEvents =
 				CALCULATETABLE(
 					'fact_truck_inventory',

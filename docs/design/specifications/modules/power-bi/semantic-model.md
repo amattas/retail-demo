@@ -41,6 +41,45 @@ grain, temporal, lineage, intended-use, and limitation contracts in
 - relationships from dimensions to facts and aggregates
 - persona-oriented report pages
 
+## Measure conventions
+
+Measures that look alike say their basis in their description, and
+`tests/test_semantic_model_measures.py` keeps them honest:
+
+- **Sales basis.** `Total Sales`, `Total Store Sales` and `Online Revenue` are
+  receipt or order totals including tax. `Net Sales`, `Line Revenue`,
+  `Online Line Revenue` and `Omnichannel Revenue` are line revenue excluding
+  tax. "Net" means net of returns (RETURN rows are negative); `Gross Sales` is
+  SALE line revenue before returns.
+- **Returns.** `Receipt Count` counts SALE receipts only, so `Average Basket
+  Size` (`Gross Sales` per receipt) and `Units per Receipt` describe
+  purchases. `Return Rate %` divides refunded totals by gross SALE totals.
+  Gold `sales_minute_store` still counts return receipts as notebook 04
+  builds it.
+- **Payments.** Payment amounts (`Total Amounts`, `Store Payment Amount`,
+  `Online Payment Amount`) are APPROVED payments; payment counts are attempts,
+  approved and declined, which the decline-rate measures need.
+- **Year over year.** Prior-year measures (`Store Sales PY`, `Omnichannel
+  Revenue PY`, `Net Sales (Prior Year)`, `Omnichannel Revenue (Prior Year)`)
+  compare like for like: the same calendar days one year earlier, for the days
+  in context that have data. A partial latest year, or one with a gap between
+  history and a later live stream, is never compared with a whole prior year.
+- **Forecast intervals.** `Forecast Lower Bound` and `Forecast Upper Bound`
+  are the row's bounds on a single forecast row. Over several rows the
+  per-row half-widths are combined in quadrature around the summed prediction
+  (independent errors), not summed; the seven-day measures do the same.
+- **Attribution dates.** `Attributed Revenue` (`fact_marketing_attribution`)
+  is dated by the purchase. `Campaign Attributed Revenue`
+  (`campaign_performance_daily`) is dated by the marketing touch, so spend
+  and the revenue it drove share a day. The two differ for the same date
+  filter by design.
+- **Traffic.** `Traffic Conversion Proxy %` is SALE receipts per entrance
+  passage, not a measured conversion rate.
+- **Twins.** Twin "as of" measures observe events up to the source as-of: the
+  latest recorded store sale (history's end, or the latest live receipt),
+  capped at the current UTC time. Pre-generated future truck stages do not
+  become "observed" as the clock moves.
+
 ## ML publication contract
 
 The historical generator remains valid without ML or Reporting. `standard` and
@@ -83,6 +122,7 @@ Relevant tests:
 
 - `tests/scripts/test_configure_semantic_model.py`
 - `tests/scripts/test_reference_integrity.py`
+- `tests/test_semantic_model_measures.py`
 - `tests/scripts/test_ml_semantic_contract_imp008.py`
 - `utility/tests/contracts/test_ml_contracts.py`
 - `utility/tests/generation/test_schema_contract.py`

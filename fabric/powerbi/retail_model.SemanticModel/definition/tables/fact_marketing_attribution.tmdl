@@ -2,7 +2,7 @@ table fact_marketing_attribution
 	lineageTag: 1ed91da8-9ba5-4a61-b85f-99a3f3b782c2
 	sourceLineageTag: [ag].[fact_marketing_attribution]
 
-	/// Attributed revenue, recomputed from cents (zero on non-ATTRIBUTED rows).
+	/// Attributed revenue (net subtotal excluding tax; zero on non-ATTRIBUTED rows), recomputed from cents and dated by the purchase (Event Date). Campaign Attributed Revenue dates the same revenue by the day of the marketing touch, so the two differ for the same date filter.
 	measure 'Attributed Revenue' = DIVIDE(SUM('fact_marketing_attribution'[Attributed Revenue Cents]), 100, 0)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Marketing Attribution\Revenue

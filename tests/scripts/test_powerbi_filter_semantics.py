@@ -156,7 +156,7 @@ def test_product_filters_reach_receipt_and_order_denominators() -> None:
     assert "COUNTROWS('fact_receipts')" not in receipt_count
     assert "DISTINCTCOUNT('fact_online_order_lines'[Order ID])" in order_count
     assert "COUNTROWS('fact_online_order_headers')" not in order_count
-    assert "[Net Sales]" in average_basket
+    assert "[Gross Sales]" in average_basket
     assert "[Receipt Count]" in average_basket
     assert "[Online Line Revenue]" in average_online_order
     assert "[Online Order Count]" in average_online_order

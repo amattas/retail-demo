@@ -2,49 +2,55 @@ table fact_receipts
 	lineageTag: dbb3a597-d860-42d1-9585-a7da0fc2a2a4
 	sourceLineageTag: [ag].[fact_receipts]
 
-	/// Total store sales from receipt headers, stored in cents and reported in currency.
+	/// Store receipt totals including tax, net of returns (RETURN receipts carry negative totals), from receipt headers. Stored in cents, reported in currency.
 	measure 'Total Sales' = DIVIDE(SUM('fact_receipts'[Total Cents]), 100, 0)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Core Metrics\Sales
 		lineageTag: 01a1a1a1-0001-0001-0001-000000000001
 
-	/// Total tax collected from store receipts.
+	/// Tax on store receipts, net of the tax refunded on returns.
 	measure 'Total Tax' = DIVIDE(SUM('fact_receipts'[Tax Cents]), 100, 0)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Core Metrics\Sales
 		lineageTag: 01a1a1a1-0001-0001-0001-000000000002
 
-	/// Store receipt subtotal before tax.
+	/// Store receipt subtotals excluding tax, net of returns.
 	measure 'Total Subtotal' = DIVIDE(SUM('fact_receipts'[Subtotal Cents]), 100, 0)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Core Metrics\Sales
 		lineageTag: 01a1a1a1-0001-0001-0001-000000000003
 
-	/// Distinct store receipts represented by the filtered receipt lines, so product and category filters reach the denominator.
-	measure 'Receipt Count' = DISTINCTCOUNT('fact_receipt_lines'[Receipt ID])
+	/// Distinct SALE store receipts represented by the filtered receipt lines, so product and category filters reach the denominator. Returns are refunds, not purchases, and are not counted.
+	measure 'Receipt Count' = CALCULATE(DISTINCTCOUNT('fact_receipt_lines'[Receipt ID]), KEEPFILTERS('fact_receipts'[Receipt Type] = "SALE"))
 		formatString: #,0
 		displayFolder: Core Metrics\Sales
 		lineageTag: 01a1a1a1-0001-0001-0001-000000000004
 
-	/// Average store receipt value in the current product and category context.
-	measure 'Average Basket Size' = DIVIDE([Net Sales], [Receipt Count], 0)
+	/// Average SALE store receipt value excluding tax, before returns, in the current product and category context.
+	measure 'Average Basket Size' = DIVIDE([Gross Sales], [Receipt Count], 0)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Core Metrics\Sales
 		lineageTag: 01a1a1a1-0001-0001-0001-000000000005
 
-	/// Sales associated with return receipts.
+	/// Refunded store receipt totals including tax (RETURN receipts; negative).
 	measure 'Total Returns' = CALCULATE([Total Sales], 'fact_receipts'[Receipt Type] = "RETURN")
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Core Metrics\Returns
 		lineageTag: 01a1a1a1-0001-0001-0001-000000000006
 
-	/// Net store sales (line-level). Sources from fact_receipt_lines so product/department/category filters propagate correctly.
+	/// Store line revenue excluding tax, net of returns (return lines are negative). Sources from fact_receipt_lines so product/department/category filters propagate correctly.
 	measure 'Net Sales' = [Line Revenue]
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Core Metrics\Sales
 		lineageTag: 01a1a1a1-0001-0001-0001-000000000007
 
-	/// Month-to-date net store sales.
+	/// Store line revenue on SALE receipts excluding tax, before returns.
+	measure 'Gross Sales' = CALCULATE([Line Revenue], KEEPFILTERS('fact_receipts'[Receipt Type] = "SALE"))
+		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
+		displayFolder: Core Metrics\Sales
+		lineageTag: c1010001-0000-0000-0000-000000000040
+
+	/// Month-to-date net store sales (excluding tax, net of returns).
 	measure 'Store Sales MTD' = CALCULATE([Net Sales], DATESMTD('dim_date'[Date]))
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Time Intelligence\Store Sales
@@ -56,31 +62,38 @@ table fact_receipts
 		displayFolder: Time Intelligence\Store Sales
 		lineageTag: c1010001-0000-0000-0000-000000000002
 
-	/// Year-to-date net store sales.
+	/// Year-to-date net store sales (excluding tax, net of returns).
 	measure 'Store Sales YTD' = CALCULATE([Net Sales], DATESYTD('dim_date'[Date]))
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Time Intelligence\Store Sales
 		lineageTag: c1010001-0000-0000-0000-000000000003
 
-	/// Prior-year net store sales for the selected period.
-	measure 'Store Sales PY' = CALCULATE([Net Sales], SAMEPERIODLASTYEAR('dim_date'[Date]))
+	/// Net store sales on the same calendar days one year earlier, for the days in context that have store receipts. Like-for-like: a partial period, or one with a data gap, is compared with the same days of the prior year, not the whole prior period.
+	measure 'Store Sales PY' = ```
+			VAR _DaysWithSales =
+				SUMMARIZE('fact_receipts', 'dim_date'[Date])
+			VAR _PriorDays =
+				SELECTCOLUMNS(_DaysWithSales, "Date", EDATE('dim_date'[Date], -12))
+			RETURN
+				CALCULATE([Net Sales], REMOVEFILTERS('dim_date'), TREATAS(_PriorDays, 'dim_date'[Date]))
+			```
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Time Intelligence\Store Sales
 		lineageTag: c1010001-0000-0000-0000-000000000004
 
-	/// Year-over-year store sales growth percentage.
+	/// Like-for-like year-over-year store sales growth: Net Sales against Store Sales PY (the same calendar days one year earlier).
 	measure 'Store Sales YoY %' = VAR CurrentSales = [Net Sales] VAR PriorSales = [Store Sales PY] RETURN DIVIDE(CurrentSales - PriorSales, PriorSales, BLANK())
 		formatString: 0.0%;-0.0%;0.0%
 		displayFolder: Time Intelligence\Store Sales
 		lineageTag: c1010001-0000-0000-0000-000000000005
 
-	/// Year-to-date count of store receipts.
+	/// Year-to-date count of SALE store receipts.
 	measure 'Receipt Count YTD' = CALCULATE([Receipt Count], DATESYTD('dim_date'[Date]))
 		formatString: #,0
 		displayFolder: Time Intelligence\Store Sales
 		lineageTag: c1010001-0000-0000-0000-000000000006
 
-	/// Store sales normalized by active stores in the filter context.
+	/// Net store sales (excluding tax, net of returns) per active store in the filter context.
 	measure 'Sales per Store' = DIVIDE([Net Sales], [# of Stores], 0)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Core Metrics\Productivity
@@ -107,25 +120,25 @@ table fact_receipts
 		displayFolder: Core Metrics\Productivity
 		lineageTag: c1010001-0000-0000-0000-000000000008
 
-	/// Return sales as a percentage of total store sales.
-	measure 'Return Rate %' = DIVIDE(ABS([Total Returns]), [Total Sales], 0)
+	/// Refunded store receipt totals as a share of gross SALE receipt totals (both including tax).
+	measure 'Return Rate %' = DIVIDE(ABS([Total Returns]), CALCULATE([Total Sales], KEEPFILTERS('fact_receipts'[Receipt Type] = "SALE")), 0)
 		formatString: 0.0%;-0.0%;0.0%
 		displayFolder: Core Metrics\Returns
 		lineageTag: c1010001-0000-0000-0000-000000000009
 
-	/// Combined store and online revenue (line-level on both sides so product filters propagate to the decomp tree).
+	/// Combined store and online line revenue excluding tax, net of returns (line-level on both sides so product filters propagate to the decomp tree).
 	measure 'Omnichannel Revenue' = [Net Sales] + [Online Line Revenue]
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Omnichannel
 		lineageTag: c1010001-0000-0000-0000-00000000000a
 
-	/// Combined store receipts and online orders.
+	/// Combined SALE store receipts and online orders.
 	measure 'Omnichannel Orders' = [Receipt Count] + [Online Order Count]
 		formatString: #,0
 		displayFolder: Omnichannel
 		lineageTag: c1010001-0000-0000-0000-00000000000b
 
-	/// Average value across store receipts and online orders.
+	/// Average order value excluding tax across SALE store receipts and online orders.
 	measure 'Omnichannel AOV' = DIVIDE([Omnichannel Revenue], [Omnichannel Orders], 0)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Omnichannel
@@ -149,13 +162,25 @@ table fact_receipts
 		displayFolder: Time Intelligence\Omnichannel
 		lineageTag: c1010001-0000-0000-0000-00000000000f
 
-	/// Prior-year omnichannel revenue for the selected period.
-	measure 'Omnichannel Revenue PY' = CALCULATE([Omnichannel Revenue], SAMEPERIODLASTYEAR('dim_date'[Date]))
+	/// Omnichannel revenue on the same calendar days one year earlier, for the days in context with store receipts or online orders (like-for-like).
+	measure 'Omnichannel Revenue PY' = ```
+			VAR _DaysWithSales =
+				DISTINCT(
+					UNION(
+						SUMMARIZE('fact_receipts', 'dim_date'[Date]),
+						SUMMARIZE('fact_online_order_headers', 'dim_date'[Date])
+					)
+				)
+			VAR _PriorDays =
+				SELECTCOLUMNS(_DaysWithSales, "Date", EDATE('dim_date'[Date], -12))
+			RETURN
+				CALCULATE([Omnichannel Revenue], REMOVEFILTERS('dim_date'), TREATAS(_PriorDays, 'dim_date'[Date]))
+			```
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Time Intelligence\Omnichannel
 		lineageTag: c1010001-0000-0000-0000-000000000010
 
-	/// Year-over-year omnichannel revenue growth percentage.
+	/// Like-for-like year-over-year omnichannel revenue growth against Omnichannel Revenue PY (the same calendar days one year earlier).
 	measure 'Omnichannel Revenue YoY %' = VAR CurrentRevenue = [Omnichannel Revenue] VAR PriorRevenue = [Omnichannel Revenue PY] RETURN DIVIDE(CurrentRevenue - PriorRevenue, PriorRevenue, BLANK())
 		formatString: 0.0%;-0.0%;0.0%
 		displayFolder: Time Intelligence\Omnichannel
@@ -215,33 +240,71 @@ table fact_receipts
 		displayFolder: Time Intelligence\Store Sales
 		lineageTag: c1010001-0000-0000-0000-000000000022
 
-	/// Most recent calendar year with receipt data (hidden helper). Globally scoped so it is invariant to slicers.
-	measure '_Latest Sales Year' = YEAR(CALCULATE(MAX('fact_receipts'[Event Timestamp]), REMOVEFILTERS('dim_date')))
+	/// Calendar year of the latest store receipt date (hidden helper). Globally scoped so it is invariant to date slicers.
+	measure '_Latest Sales Year' = YEAR([_Latest Sales Date])
 		formatString: 0
 		isHidden
 		displayFolder: Time Intelligence\Latest Year
 		lineageTag: c1010001-0000-0000-0000-000000000030
 
-	/// Net Sales scoped to the latest year of receipt data, preserving any month bucket on the visual axis. Use on TY/PY trend visuals.
+	/// Latest date with store receipts (hidden helper). Globally scoped so it is invariant to date slicers.
+	measure '_Latest Sales Date' = CALCULATE(MAX('fact_receipts'[Event Date]), REMOVEFILTERS('dim_date'))
+		formatString: Short Date
+		isHidden
+		displayFolder: Time Intelligence\Latest Year
+		lineageTag: c1010001-0000-0000-0000-000000000035
+
+	/// Net Sales in the latest year with store receipts (year to date of the latest receipt), preserving any month bucket on the visual axis. Use on TY/PY trend visuals.
 	measure 'Net Sales (Latest Year)' = VAR Yr = [_Latest Sales Year] RETURN CALCULATE([Net Sales], REMOVEFILTERS('dim_date'[Year]), REMOVEFILTERS('dim_date'[Date]), 'dim_date'[Year] = Yr)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Time Intelligence\Latest Year
 		lineageTag: c1010001-0000-0000-0000-000000000031
 
-	/// Net Sales scoped to the year before the latest year of receipt data. Use as the PY series on TY/PY trend visuals.
-	measure 'Net Sales (Prior Year)' = VAR Yr = [_Latest Sales Year] RETURN CALCULATE([Net Sales], REMOVEFILTERS('dim_date'[Year]), REMOVEFILTERS('dim_date'[Date]), 'dim_date'[Year] = Yr - 1)
+	/// Like-for-like prior-year Net Sales: the same calendar days one year before the latest year's days that have store receipts, so a partial latest year (or one with a gap before the live stream) is never compared with a whole prior year. Use as the PY series on TY/PY trend visuals.
+	measure 'Net Sales (Prior Year)' = ```
+			VAR _Yr = [_Latest Sales Year]
+			VAR _LatestDays =
+				CALCULATETABLE(
+					SUMMARIZE('fact_receipts', 'dim_date'[Date]),
+					REMOVEFILTERS('dim_date'[Year]),
+					REMOVEFILTERS('dim_date'[Date]),
+					'dim_date'[Year] = _Yr
+				)
+			VAR _PriorDays =
+				SELECTCOLUMNS(_LatestDays, "Date", EDATE('dim_date'[Date], -12))
+			RETURN
+				CALCULATE([Net Sales], REMOVEFILTERS('dim_date'), TREATAS(_PriorDays, 'dim_date'[Date]))
+			```
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Time Intelligence\Latest Year
 		lineageTag: c1010001-0000-0000-0000-000000000032
 
-	/// Omnichannel Revenue scoped to the latest year of receipt data, preserving any month bucket on the visual axis.
+	/// Omnichannel Revenue in the latest year with store receipts (year to date), preserving any month bucket on the visual axis.
 	measure 'Omnichannel Revenue (Latest Year)' = VAR Yr = [_Latest Sales Year] RETURN CALCULATE([Omnichannel Revenue], REMOVEFILTERS('dim_date'[Year]), REMOVEFILTERS('dim_date'[Date]), 'dim_date'[Year] = Yr)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Time Intelligence\Latest Year
 		lineageTag: c1010001-0000-0000-0000-000000000033
 
-	/// Omnichannel Revenue scoped to the year before the latest year of receipt data.
-	measure 'Omnichannel Revenue (Prior Year)' = VAR Yr = [_Latest Sales Year] RETURN CALCULATE([Omnichannel Revenue], REMOVEFILTERS('dim_date'[Year]), REMOVEFILTERS('dim_date'[Date]), 'dim_date'[Year] = Yr - 1)
+	/// Like-for-like prior-year Omnichannel Revenue: the same calendar days one year before the latest year's days with store receipts or online orders.
+	measure 'Omnichannel Revenue (Prior Year)' = ```
+			VAR _Yr = [_Latest Sales Year]
+			VAR _LatestDays =
+				CALCULATETABLE(
+					DISTINCT(
+						UNION(
+							SUMMARIZE('fact_receipts', 'dim_date'[Date]),
+							SUMMARIZE('fact_online_order_headers', 'dim_date'[Date])
+						)
+					),
+					REMOVEFILTERS('dim_date'[Year]),
+					REMOVEFILTERS('dim_date'[Date]),
+					'dim_date'[Year] = _Yr
+				)
+			VAR _PriorDays =
+				SELECTCOLUMNS(_LatestDays, "Date", EDATE('dim_date'[Date], -12))
+			RETURN
+				CALCULATE([Omnichannel Revenue], REMOVEFILTERS('dim_date'), TREATAS(_PriorDays, 'dim_date'[Date]))
+			```
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Time Intelligence\Latest Year
 		lineageTag: c1010001-0000-0000-0000-000000000034

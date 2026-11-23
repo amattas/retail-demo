@@ -4,13 +4,13 @@
       "table": "dim_stores",
       "name": "Twin Store State",
       "data_type": "String",
-      "description": "Latest recorded opened/closed operation at or before UTC current time for one selected store; returns not observed with no source evidence and BLANK for ties or multi-store context."
+      "description": "Latest recorded opened/closed operation at or before the source as-of (the latest recorded store sale, capped at UTC now) for one selected store; returns not observed with no source evidence and BLANK for ties or multi-store context."
     },
     {
       "table": "dim_stores",
       "name": "Twin Store State As Of",
       "data_type": "DateTime",
-      "description": "Timestamp of the latest recorded store operation event at or before UTC current time for one selected store in the current filter context."
+      "description": "Timestamp of the latest recorded store operation event at or before the source as-of (the latest recorded store sale, capped at UTC now) for one selected store in the current filter context."
     },
     {
       "table": "dim_stores",
@@ -64,37 +64,37 @@
       "table": "dim_distribution_centers",
       "name": "Twin Warehouse Shipment Count",
       "data_type": "Int64",
-      "description": "Distinct source-recorded shipments in the trailing 14 days ending at the latest recorded truck-move timestamp at or before UTC current time in context; preserves Store/DC filters."
+      "description": "Distinct source-recorded shipments in the trailing 14 days ending at the latest recorded truck-move timestamp at or before the source as-of (the latest recorded store sale, capped at UTC now) in context; preserves Store/DC filters."
     },
     {
       "table": "dim_trucks",
       "name": "Twin Truck Last Status",
       "data_type": "String",
-      "description": "Latest recorded truck status at or before UTC current time for one selected truck; returns not observed with no source evidence and BLANK for ties or multi-truck context."
+      "description": "Latest recorded truck status at or before the source as-of (the latest recorded store sale, capped at UTC now) for one selected truck; returns not observed with no source evidence and BLANK for ties or multi-truck context."
     },
     {
       "table": "dim_trucks",
       "name": "Twin Truck State As Of",
       "data_type": "DateTime",
-      "description": "Timestamp of the latest recorded truck-move event at or before UTC current time for one selected truck in the current source-grounded Store/DC filter context."
+      "description": "Timestamp of the latest recorded truck-move event at or before the source as-of (the latest recorded store sale, capped at UTC now) for one selected truck in the current source-grounded Store/DC filter context."
     },
     {
       "table": "dim_trucks",
       "name": "Twin Truck Last Shipment",
       "data_type": "String",
-      "description": "Shipment ID from the single latest recorded truck-move row at or before UTC current time for one selected truck; ties or no evidence return BLANK."
+      "description": "Shipment ID from the single latest recorded truck-move row at or before the source as-of (the latest recorded store sale, capped at UTC now) for one selected truck; ties or no evidence return BLANK."
     },
     {
       "table": "dim_trucks",
       "name": "Twin Truck Last Store",
       "data_type": "Int64",
-      "description": "Store ID from the single latest recorded truck-move row at or before UTC current time for one selected truck; ties or no evidence return BLANK."
+      "description": "Store ID from the single latest recorded truck-move row at or before the source as-of (the latest recorded store sale, capped at UTC now) for one selected truck; ties or no evidence return BLANK."
     },
     {
       "table": "dim_trucks",
       "name": "Twin Truck Last DC",
       "data_type": "Int64",
-      "description": "Distribution center ID from the single latest recorded truck-move row at or before UTC current time for one selected truck; ties or no evidence return BLANK."
+      "description": "Distribution center ID from the single latest recorded truck-move row at or before the source as-of (the latest recorded store sale, capped at UTC now) for one selected truck; ties or no evidence return BLANK."
     },
     {
       "table": "dim_trucks",
@@ -112,13 +112,13 @@
       "table": "dim_trucks",
       "name": "Twin Truck Cargo Balance",
       "data_type": "Int64",
-      "description": "Observed net cargo at or before UTC current time for the latest source-recorded truck/shipment pair using source action semantics: LOAD adds quantity and UNLOAD removes quantity."
+      "description": "Observed net cargo at or before the source as-of (the latest recorded store sale, capped at UTC now) for the latest source-recorded truck/shipment pair using source action semantics: LOAD adds quantity and UNLOAD removes quantity."
     },
     {
       "table": "dim_trucks",
       "name": "Twin Truck Cargo As Of",
       "data_type": "DateTime",
-      "description": "Latest observed cargo event timestamp at or before UTC current time for the latest source-recorded truck/shipment pair; product filters preserve source evidence."
+      "description": "Latest observed cargo event timestamp at or before the source as-of (the latest recorded store sale, capped at UTC now) for the latest source-recorded truck/shipment pair; product filters preserve source evidence."
     },
     {
       "table": "dim_trucks",

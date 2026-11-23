@@ -8,14 +8,28 @@ table demand_forecast
 		displayFolder: ML\Demand Forecast
 		lineageTag: c5e6e000-0000-0000-0004-000000000101
 
-	/// Lower bound of the predicted units confidence interval.
-	measure 'Forecast Lower Bound' = SUM('demand_forecast'[Lower Bound])
+	/// Lower bound of the predicted units interval. On one forecast row it is the row's lower bound; over several rows the per-row half-widths are combined in quadrature (independent errors) around the summed prediction, because summing per-row bounds gives a far too wide interval.
+	measure 'Forecast Lower Bound' = ```
+			VAR _Predicted =
+				SUM('demand_forecast'[Predicted Units])
+			VAR _HalfWidth =
+				SQRT(SUMX('demand_forecast', ('demand_forecast'[Predicted Units] - 'demand_forecast'[Lower Bound]) ^ 2))
+			RETURN
+				IF(ISBLANK(_Predicted), BLANK(), MAX(0, _Predicted - _HalfWidth))
+			```
 		formatString: #,0
 		displayFolder: ML\Demand Forecast
 		lineageTag: c5e6e000-0000-0000-0004-000000000102
 
-	/// Upper bound of the predicted units confidence interval.
-	measure 'Forecast Upper Bound' = SUM('demand_forecast'[Upper Bound])
+	/// Upper bound of the predicted units interval. On one forecast row it is the row's upper bound; over several rows the per-row half-widths are combined in quadrature (independent errors) around the summed prediction, because summing per-row bounds gives a far too wide interval.
+	measure 'Forecast Upper Bound' = ```
+			VAR _Predicted =
+				SUM('demand_forecast'[Predicted Units])
+			VAR _HalfWidth =
+				SQRT(SUMX('demand_forecast', ('demand_forecast'[Upper Bound] - 'demand_forecast'[Predicted Units]) ^ 2))
+			RETURN
+				IF(ISBLANK(_Predicted), BLANK(), _Predicted + _HalfWidth)
+			```
 		formatString: #,0
 		displayFolder: ML\Demand Forecast
 		lineageTag: c5e6e000-0000-0000-0004-000000000103
@@ -43,7 +57,7 @@ table demand_forecast
 		displayFolder: ML\Demand Forecast
 		lineageTag: c5e6e000-0000-0000-0004-000000000108
 
-	/// Lower bound of the predicted units across the same seven-day window.
+	/// Lower bound of the predicted units over the same seven-day window, combining the daily intervals in quadrature (Forecast Lower Bound).
 	measure 'Forecast Lower Bound Next 7 Days' = ```
 			VAR _SourceAsOfDateTime =
 				MAX('demand_forecast'[Source As Of])
@@ -66,7 +80,7 @@ table demand_forecast
 		displayFolder: ML\Demand Forecast
 		lineageTag: c5e6e000-0000-0000-0004-000000000109
 
-	/// Upper bound of the predicted units across the same seven-day window.
+	/// Upper bound of the predicted units over the same seven-day window, combining the daily intervals in quadrature (Forecast Upper Bound).
 	measure 'Forecast Upper Bound Next 7 Days' = ```
 			VAR _SourceAsOfDateTime =
 				MAX('demand_forecast'[Source As Of])
