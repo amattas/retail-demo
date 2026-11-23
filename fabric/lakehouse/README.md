@@ -60,7 +60,8 @@ Notable groups in this directory:
   a table while another job holds its writer lock
 - `06` through `14`: ML and advanced analytics. The required producers share
   one source as-of (the latest Silver receipt); demand counts `SALE` receipts
-  through the last complete day, segmentation and churn include online
+  through the last complete day and treats days with no source data (the
+  history-to-stream gap) as gaps rather than zero demand, segmentation and churn include online
   orders, market-basket support is over all `SALE` baskets, elasticity is
   promotion-controlled and published only when significant, and stockout rolls
   current positions forward to the as-of time. `15` gates them on freshness,

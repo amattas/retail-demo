@@ -47,15 +47,15 @@ Measures that look alike say their basis in their description, and
 `tests/test_semantic_model_measures.py` keeps them honest:
 
 - **Sales basis.** `Total Sales`, `Total Store Sales` and `Online Revenue` are
-  receipt or order totals including tax. `Net Sales`, `Line Revenue`,
+  receipt or order totals including tax (`Total Store Sales` and the other
+  Gold sales tables count SALE receipts with an approved payment, before
+  returns). `Net Sales`, `Line Revenue`,
   `Online Line Revenue` and `Omnichannel Revenue` are line revenue excluding
   tax. "Net" means net of returns (RETURN rows are negative); `Gross Sales` is
   SALE line revenue before returns.
 - **Returns.** `Receipt Count` counts SALE receipts only, so `Average Basket
   Size` (`Gross Sales` per receipt) and `Units per Receipt` describe
   purchases. `Return Rate %` divides refunded totals by gross SALE totals.
-  Gold `sales_minute_store` still counts return receipts as notebook 04
-  builds it.
 - **Payments.** Payment amounts (`Total Amounts`, `Store Payment Amount`,
   `Online Payment Amount`) are APPROVED payments; payment counts are attempts,
   approved and declined, which the decline-rate measures need.

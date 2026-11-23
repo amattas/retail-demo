@@ -2,17 +2,17 @@ table sales_minute_store
 	lineageTag: a8fa2a6d-f69b-426f-a314-e3a5843c3295
 	sourceLineageTag: [au].[sales_minute_store]
 
-	/// Store receipt totals including tax, net of returns, from Gold sales_minute_store (comparable with Total Sales, not with Net Sales, which excludes tax).
+	/// SALE store receipt totals including tax, before returns, for receipts with an approved payment, from Gold sales_minute_store (gross, so above Total Sales, which nets returns; Net Sales also excludes tax).
 	measure 'Total Store Sales' = SUM('sales_minute_store'[Total Sales])
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1c1-0001-0001-0001-000000000001
 
-	/// Store receipts per minute from Gold sales_minute_store, as notebook 04 counts them (see Receipt Count for SALE receipts only).
+	/// SALE store receipts with an approved payment per minute, from Gold sales_minute_store (returns are not counted, as in Receipt Count).
 	measure 'Total Store Receipts' = SUM('sales_minute_store'[Receipts])
 		formatString: #,0
 		lineageTag: 01a1a1c1-0001-0001-0001-000000000002
 
-	/// Total Store Sales per Gold store receipt, including tax and net of returns.
+	/// Total Store Sales per Gold SALE receipt, including tax.
 	measure 'Avg Store Basket' = DIVIDE([Total Store Sales], [Total Store Receipts], 0)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1c1-0001-0001-0001-000000000003

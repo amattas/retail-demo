@@ -101,7 +101,7 @@ def test_sales_measures_state_their_tax_and_returns_basis() -> None:
         ("fact_receipts", "Omnichannel Revenue"): ("excluding tax", "net of returns"),
         ("fact_receipt_lines", "Line Revenue"): ("excluding tax", "net of returns"),
         ("online_sales_daily", "Online Revenue"): ("including tax",),
-        ("sales_minute_store", "Total Store Sales"): ("including tax", "net of returns"),
+        ("sales_minute_store", "Total Store Sales"): ("including tax", "before returns"),
         ("sales_minute_store", "Avg Store Basket"): ("including tax",),
     }
     for (table, name), phrases in bases.items():
