@@ -184,8 +184,12 @@ TRAFFIC_WEATHER_FACTOR_MAX = 1.2
 # ---------------------------------------------------------------------------
 
 # A receipt is high value when its total exceeds this multiple of the store
-# type's calibrated average ticket (profile.avg_ticket_target).
-HIGH_VALUE_TICKET_MULTIPLE = 3.0
+# type's calibrated average ticket (profile.avg_ticket_target). Baskets are
+# heavy-tailed (mission mix, shopper budgets, long-tail prices): in the
+# simulated live stream the median ticket is about 0.6 x the average, 6% of
+# tickets exceed 3 x, 1% exceed 6 x and about 0.1% exceed 10 x, so 10 x keeps
+# the alert to roughly one receipt in a thousand.
+HIGH_VALUE_TICKET_MULTIPLE = 10.0
 HIGH_VALUE_RULE_WINDOW_MINUTES = 5
 # Store type whose thresholds the checked-in fn_rule_thresholds() carries;
 # deployment writes the deployed store type's values (apply_kql).

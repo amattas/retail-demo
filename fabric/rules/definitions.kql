@@ -56,7 +56,7 @@ customer_entered
 | where arrivals > surge_arrivals
 | project store_id, zone, arrivals, surge_arrivals, avg_arrival_dwell_seconds
 
-// High-value receipt: total above 3 x the store type's average ticket
+// High-value receipt: total above 10 x the store type's average ticket
 // (fn_rule_thresholds().high_value_receipt_total,
 // calibration.high_value_receipt_threshold), one alert per receipt.
 let high_value_total = toscalar(fn_rule_thresholds() | project high_value_receipt_total);

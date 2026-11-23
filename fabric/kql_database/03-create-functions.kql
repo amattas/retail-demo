@@ -243,14 +243,14 @@
 // ============================================================================
 
 // Store-type thresholds of the live rules (fabric/rules/definitions.kql), from
-// calibration.rule_thresholds(): the high-value receipt total (3 x the store
+// calibration.rule_thresholds(): the high-value receipt total (10 x the store
 // type's average ticket) and the zone arrival surge (arrivals per store and
 // zone in 5 minutes). The checked-in values are the reference store type's
 // (supercenter at its default volume); deploy/scripts/apply_kql.py writes the
 // deployed environment's values when it applies this script.
 .create-or-alter function with (folder = "rules") fn_rule_thresholds()
 {
-    print high_value_receipt_total = real(255.0),
+    print high_value_receipt_total = real(850.0),
           zone_surge_arrivals = long(117)
 }
 

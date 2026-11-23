@@ -22,7 +22,9 @@ the same events again) and raises one alert per entity and window:
   busiest hour, weekday and month in the best weather. Peak holidays are left
   out on purpose, so a Black Friday crowd at a flagship store alerts. The
   expected-dwell branch was dropped: no zone's dwell range reaches it.
-- **High-value receipt**: a receipt above 3 x the store type's average ticket.
+- **High-value receipt**: a receipt above 10 x the store type's average ticket,
+  about one receipt in a thousand (baskets are heavy-tailed: 6% of tickets
+  exceed 3 x).
 
 Logistics rules read the incident model's events (`incidents.py`):
 
@@ -39,7 +41,7 @@ Logistics rules read the incident model's events (`incidents.py`):
 
 Thresholds (the 90-minute truck dwell SLA, the 30-minute late-truck and
 60-minute lane-delay limits, the incident-stockout count, rule windows, the
-zone-surge count, and the high-value receipt total of 3 x the store type's
+zone-surge count, and the high-value receipt total of 10 x the store type's
 average ticket) come from `utility/src/retail_setup/generation/calibration.py`.
 `utility/tests/generation/test_calibration.py` fails when a literal here
 drifts from it, and `utility/tests/generation/test_logistics_rules.py` runs
