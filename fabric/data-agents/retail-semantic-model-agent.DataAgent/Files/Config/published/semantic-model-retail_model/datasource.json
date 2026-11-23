@@ -2,7 +2,7 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/dataAgent/definition/dataSource/1.0.0/schema.json",
   "artifactId": "07e6f51e-aaac-4594-bf50-94db9c1daf89",
   "workspaceId": "5219ac70-71d4-4dfc-af32-5b8a6c29a471",
-  "dataSourceInstructions": "All semantic-model tables are selected; the data is fully synthetic. Prefer the defined measures (for example fact_receipts[Net Sales] and fact_receipt_lines[Gross Margin %]) over ad hoc aggregation, and use fact tables for sales, margin, basket, payment, order, and inventory questions. Use Gold summary tables when they answer the question directly. Do not list individual customers' names, addresses, phone numbers, or loyalty-card values; answer customer questions with aggregates or customer IDs. Treat forecasts, risk scores, recommendations, and expected impact as modeled outputs rather than realized outcomes.",
+  "dataSourceInstructions": "All semantic-model tables are selected; the data is fully synthetic. Prefer the defined measures (for example fact_receipts[Net Sales] and fact_receipt_lines[Gross Margin %]) over ad hoc aggregation, and use fact tables for sales, margin, basket, payment, order, and inventory questions. Use Gold summary tables when they answer the question directly. Each measure's description states its basis: Total Sales, Total Store Sales and Online Revenue include tax, while Net Sales, Gross Sales and line revenue exclude it; Receipt Count counts SALE receipts only; payment amounts are approved payments while payment counts are attempts; prior-year measures compare the same calendar days; Attributed Revenue is dated by purchase and Campaign Attributed Revenue by marketing touch. Do not list individual customers' names, addresses, phone numbers, or loyalty-card values; answer customer questions with aggregates or customer IDs. Treat forecasts, risk scores, recommendations, and expected impact as modeled outputs rather than realized outcomes.",
   "displayName": "retail_model",
   "type": "semantic_model",
   "userDescription": "Retail analytics over the full retail_model semantic model (synthetic data): sales, margin, customers, inventory, fulfillment, marketing, logistics, and ML outputs.",
@@ -608,6 +608,15 @@
           "data_type": "Int64",
           "description": null,
           "children": []
+        },
+        {
+          "id": "c2200104-0000-0000-0000-000000000001",
+          "is_selected": true,
+          "display_name": "As Of",
+          "type": "semantic_model.column",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
         }
       ]
     },
@@ -640,6 +649,33 @@
           "id": "c5e6e000-0000-0000-0004-000000000103",
           "is_selected": true,
           "display_name": "Forecast Upper Bound",
+          "type": "semantic_model.measure",
+          "data_type": "Double",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c5e6e000-0000-0000-0004-000000000108",
+          "is_selected": true,
+          "display_name": "Forecasted Units Next 7 Days",
+          "type": "semantic_model.measure",
+          "data_type": "Double",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c5e6e000-0000-0000-0004-000000000109",
+          "is_selected": true,
+          "display_name": "Forecast Lower Bound Next 7 Days",
+          "type": "semantic_model.measure",
+          "data_type": "Double",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c5e6e000-0000-0000-0004-000000000110",
+          "is_selected": true,
+          "display_name": "Forecast Upper Bound Next 7 Days",
           "type": "semantic_model.measure",
           "data_type": "Double",
           "description": null,
@@ -1033,6 +1069,42 @@
           "children": []
         },
         {
+          "id": "c2200002-0000-0000-0000-000000000001",
+          "is_selected": true,
+          "display_name": "Twin Warehouse Signed Stock",
+          "type": "semantic_model.measure",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200002-0000-0000-0000-000000000002",
+          "is_selected": true,
+          "display_name": "Twin Warehouse Available Stock",
+          "type": "semantic_model.measure",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200002-0000-0000-0000-000000000003",
+          "is_selected": true,
+          "display_name": "Twin Warehouse Inventory As Of",
+          "type": "semantic_model.measure",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200002-0000-0000-0000-000000000004",
+          "is_selected": true,
+          "display_name": "Twin Warehouse Shipment Count",
+          "type": "semantic_model.measure",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
           "id": "3afba350-57be-485b-a77f-7f375ca85abd",
           "is_selected": true,
           "display_name": "ID",
@@ -1312,6 +1384,69 @@
           "children": []
         },
         {
+          "id": "c2200001-0000-0000-0000-000000000001",
+          "is_selected": true,
+          "display_name": "Twin Store State As Of",
+          "type": "semantic_model.measure",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200001-0000-0000-0000-000000000002",
+          "is_selected": true,
+          "display_name": "Twin Store State",
+          "type": "semantic_model.measure",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200001-0000-0000-0000-000000000003",
+          "is_selected": true,
+          "display_name": "Twin Store Signed Stock",
+          "type": "semantic_model.measure",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200001-0000-0000-0000-000000000004",
+          "is_selected": true,
+          "display_name": "Twin Store Available Stock",
+          "type": "semantic_model.measure",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200001-0000-0000-0000-000000000005",
+          "is_selected": true,
+          "display_name": "Twin Store Inventory As Of",
+          "type": "semantic_model.measure",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200001-0000-0000-0000-000000000006",
+          "is_selected": true,
+          "display_name": "Twin Store Stockout Risk",
+          "type": "semantic_model.measure",
+          "data_type": "Double",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200001-0000-0000-0000-000000000007",
+          "is_selected": true,
+          "display_name": "Twin Store Zone Activity",
+          "type": "semantic_model.measure",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
           "id": "2d99adc6-f14d-456a-8a96-828c3d9cf143",
           "is_selected": true,
           "display_name": "ID",
@@ -1416,6 +1551,114 @@
           "display_name": "# of Trucks",
           "type": "semantic_model.measure",
           "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200003-0000-0000-0000-000000000001",
+          "is_selected": true,
+          "display_name": "Twin Truck State As Of",
+          "type": "semantic_model.measure",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200003-0000-0000-0000-000000000002",
+          "is_selected": true,
+          "display_name": "Twin Truck Last Status",
+          "type": "semantic_model.measure",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200003-0000-0000-0000-000000000003",
+          "is_selected": true,
+          "display_name": "Twin Truck Last Shipment",
+          "type": "semantic_model.measure",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200003-0000-0000-0000-000000000004",
+          "is_selected": true,
+          "display_name": "Twin Truck Last Store",
+          "type": "semantic_model.measure",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200003-0000-0000-0000-000000000005",
+          "is_selected": true,
+          "display_name": "Twin Truck Last DC",
+          "type": "semantic_model.measure",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200003-0000-0000-0000-000000000006",
+          "is_selected": true,
+          "display_name": "Twin Truck Recorded ETA",
+          "type": "semantic_model.measure",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200003-0000-0000-0000-000000000007",
+          "is_selected": true,
+          "display_name": "Twin Truck Recorded ETD",
+          "type": "semantic_model.measure",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200003-0000-0000-0000-000000000008",
+          "is_selected": true,
+          "display_name": "Twin Truck Cargo Balance",
+          "type": "semantic_model.measure",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200003-0000-0000-0000-000000000009",
+          "is_selected": true,
+          "display_name": "Twin Truck Cargo As Of",
+          "type": "semantic_model.measure",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200003-0000-0000-0000-00000000000a",
+          "is_selected": true,
+          "display_name": "Twin Truck Planned ETA",
+          "type": "semantic_model.measure",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200003-0000-0000-0000-00000000000b",
+          "is_selected": true,
+          "display_name": "Twin Truck Delay Minutes",
+          "type": "semantic_model.measure",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200003-0000-0000-0000-00000000000c",
+          "is_selected": true,
+          "display_name": "Twin Truck Delay Reason",
+          "type": "semantic_model.measure",
+          "data_type": "String",
           "description": null,
           "children": []
         },
@@ -1736,6 +1979,249 @@
         },
         {
           "id": "347e7b41-cd79-4e79-8f79-45413192743d",
+          "is_selected": true,
+          "display_name": "Event Date",
+          "type": "semantic_model.column",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200102-0000-0000-0000-000000000001",
+          "is_selected": true,
+          "display_name": "Event Timestamp",
+          "type": "semantic_model.column",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "c2400000-0000-0000-0000-000000000001",
+      "is_selected": true,
+      "display_name": "fact_logistics_incident_stores",
+      "type": "semantic_model.table",
+      "description": null,
+      "children": [
+        {
+          "id": "c2400002-0000-0000-0000-000000000001",
+          "is_selected": true,
+          "display_name": "Incident Store Impacts",
+          "type": "semantic_model.measure",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2400001-0000-0000-0000-000000000001",
+          "is_selected": true,
+          "display_name": "Incident ID",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2400001-0000-0000-0000-000000000002",
+          "is_selected": true,
+          "display_name": "Store ID",
+          "type": "semantic_model.column",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2400001-0000-0000-0000-000000000003",
+          "is_selected": true,
+          "display_name": "DC ID",
+          "type": "semantic_model.column",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2400001-0000-0000-0000-000000000004",
+          "is_selected": true,
+          "display_name": "Incident Type",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2400001-0000-0000-0000-000000000005",
+          "is_selected": true,
+          "display_name": "Started At",
+          "type": "semantic_model.column",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2400001-0000-0000-0000-000000000006",
+          "is_selected": true,
+          "display_name": "Resolved At",
+          "type": "semantic_model.column",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2400001-0000-0000-0000-000000000007",
+          "is_selected": true,
+          "display_name": "Trace ID",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2400001-0000-0000-0000-000000000008",
+          "is_selected": true,
+          "display_name": "Event Date",
+          "type": "semantic_model.column",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "c2300000-0000-0000-0000-000000000001",
+      "is_selected": true,
+      "display_name": "fact_logistics_incidents",
+      "type": "semantic_model.table",
+      "description": null,
+      "children": [
+        {
+          "id": "c2300002-0000-0000-0000-000000000001",
+          "is_selected": true,
+          "display_name": "Logistics Incidents",
+          "type": "semantic_model.measure",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2300002-0000-0000-0000-000000000002",
+          "is_selected": true,
+          "display_name": "Open Logistics Incidents",
+          "type": "semantic_model.measure",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2300002-0000-0000-0000-000000000003",
+          "is_selected": true,
+          "display_name": "Incident Affected Stores",
+          "type": "semantic_model.measure",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2300002-0000-0000-0000-000000000004",
+          "is_selected": true,
+          "display_name": "Average Incident Hours",
+          "type": "semantic_model.measure",
+          "data_type": "Double",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2300001-0000-0000-0000-000000000001",
+          "is_selected": true,
+          "display_name": "Incident ID",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2300001-0000-0000-0000-000000000002",
+          "is_selected": true,
+          "display_name": "Incident Type",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2300001-0000-0000-0000-000000000003",
+          "is_selected": true,
+          "display_name": "DC ID",
+          "type": "semantic_model.column",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2300001-0000-0000-0000-000000000004",
+          "is_selected": true,
+          "display_name": "Store ID",
+          "type": "semantic_model.column",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2300001-0000-0000-0000-000000000005",
+          "is_selected": true,
+          "display_name": "Started At",
+          "type": "semantic_model.column",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2300001-0000-0000-0000-000000000006",
+          "is_selected": true,
+          "display_name": "Resolved At",
+          "type": "semantic_model.column",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2300001-0000-0000-0000-000000000007",
+          "is_selected": true,
+          "display_name": "Severity",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2300001-0000-0000-0000-000000000008",
+          "is_selected": true,
+          "display_name": "Affected Store Count",
+          "type": "semantic_model.column",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2300001-0000-0000-0000-000000000009",
+          "is_selected": true,
+          "display_name": "Description",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2300001-0000-0000-0000-000000000010",
+          "is_selected": true,
+          "display_name": "Trace ID",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2300001-0000-0000-0000-000000000011",
           "is_selected": true,
           "display_name": "Event Date",
           "type": "semantic_model.column",
@@ -3247,6 +3733,15 @@
           "children": []
         },
         {
+          "id": "c1010001-0000-0000-0000-000000000040",
+          "is_selected": true,
+          "display_name": "Gross Sales",
+          "type": "semantic_model.measure",
+          "data_type": "Double",
+          "description": null,
+          "children": []
+        },
+        {
           "id": "c1010001-0000-0000-0000-000000000001",
           "is_selected": true,
           "display_name": "Store Sales MTD",
@@ -3499,6 +3994,15 @@
           "children": []
         },
         {
+          "id": "c1010001-0000-0000-0000-000000000035",
+          "is_selected": true,
+          "display_name": "_Latest Sales Date",
+          "type": "semantic_model.measure",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
           "id": "c1010001-0000-0000-0000-000000000031",
           "is_selected": true,
           "display_name": "Net Sales (Latest Year)",
@@ -3666,6 +4170,15 @@
           "display_name": "Local Hour",
           "type": "semantic_model.column",
           "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "a1a1a1a1-0000-0000-0000-000000000013",
+          "is_selected": true,
+          "display_name": "Original Receipt ID",
+          "type": "semantic_model.column",
+          "data_type": "String",
           "description": null,
           "children": []
         }
@@ -4037,6 +4550,15 @@
           "data_type": "DateTime",
           "description": null,
           "children": []
+        },
+        {
+          "id": "c2200101-0000-0000-0000-000000000001",
+          "is_selected": true,
+          "display_name": "Event Timestamp",
+          "type": "semantic_model.column",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
         }
       ]
     },
@@ -4118,6 +4640,15 @@
           "data_type": "Int64",
           "description": null,
           "children": []
+        },
+        {
+          "id": "c2200106-0000-0000-0000-000000000001",
+          "is_selected": true,
+          "display_name": "Event Timestamp",
+          "type": "semantic_model.column",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
         }
       ]
     },
@@ -4141,6 +4672,33 @@
           "id": "a9f8319e-9d48-47b4-a120-000000000002",
           "is_selected": true,
           "display_name": "Avg Unload Duration",
+          "type": "semantic_model.measure",
+          "data_type": "Double",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200106-0000-0000-0000-000000000001",
+          "is_selected": true,
+          "display_name": "Late Truck Arrivals",
+          "type": "semantic_model.measure",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200106-0000-0000-0000-000000000002",
+          "is_selected": true,
+          "display_name": "Delayed Shipments %",
+          "type": "semantic_model.measure",
+          "data_type": "Double",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200106-0000-0000-0000-000000000003",
+          "is_selected": true,
+          "display_name": "Average Delay Minutes",
           "type": "semantic_model.measure",
           "data_type": "Double",
           "description": null,
@@ -4210,6 +4768,42 @@
           "children": []
         },
         {
+          "id": "c2200105-0000-0000-0000-000000000001",
+          "is_selected": true,
+          "display_name": "Event Timestamp",
+          "type": "semantic_model.column",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200105-0000-0000-0000-000000000002",
+          "is_selected": true,
+          "display_name": "Recorded ETA",
+          "type": "semantic_model.column",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200105-0000-0000-0000-000000000003",
+          "is_selected": true,
+          "display_name": "Recorded ETD",
+          "type": "semantic_model.column",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200105-0000-0000-0000-000000000004",
+          "is_selected": true,
+          "display_name": "Departure Time",
+          "type": "semantic_model.column",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
           "id": "c2200105-0000-0000-0000-000000000005",
           "is_selected": true,
           "display_name": "Planned Arrival Time",
@@ -4233,33 +4827,6 @@
           "display_name": "Delay Reason",
           "type": "semantic_model.column",
           "data_type": "String",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2200106-0000-0000-0000-000000000001",
-          "is_selected": true,
-          "display_name": "Late Truck Arrivals",
-          "type": "semantic_model.measure",
-          "data_type": "Int64",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2200106-0000-0000-0000-000000000002",
-          "is_selected": true,
-          "display_name": "Delayed Shipments %",
-          "type": "semantic_model.measure",
-          "data_type": "Double",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2200106-0000-0000-0000-000000000003",
-          "is_selected": true,
-          "display_name": "Average Delay Minutes",
-          "type": "semantic_model.measure",
-          "data_type": "Double",
           "description": null,
           "children": []
         },
@@ -4386,6 +4953,15 @@
           "display_name": "On Hand",
           "type": "semantic_model.column",
           "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "c2200103-0000-0000-0000-000000000001",
+          "is_selected": true,
+          "display_name": "As Of",
+          "type": "semantic_model.column",
+          "data_type": "DateTime",
           "description": null,
           "children": []
         }
@@ -5110,6 +5686,15 @@
           "children": []
         },
         {
+          "id": "c5e6e000-0000-0000-0003-000000000012",
+          "is_selected": true,
+          "display_name": "Risk ID",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
           "id": "c5e6e000-0000-0000-0003-00000000000e",
           "is_selected": true,
           "display_name": "Inventory As Of",
@@ -5547,204 +6132,6 @@
           "display_name": "Customers",
           "type": "semantic_model.column",
           "data_type": "Int64",
-          "description": null,
-          "children": []
-        }
-      ]
-    },
-    {
-      "id": "c2300000-0000-0000-0000-000000000001",
-      "is_selected": true,
-      "display_name": "fact_logistics_incidents",
-      "type": "semantic_model.table",
-      "description": null,
-      "children": [
-        {
-          "id": "c2300001-0000-0000-0000-000000000001",
-          "is_selected": true,
-          "display_name": "Incident ID",
-          "type": "semantic_model.column",
-          "data_type": "String",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2300001-0000-0000-0000-000000000002",
-          "is_selected": true,
-          "display_name": "Incident Type",
-          "type": "semantic_model.column",
-          "data_type": "String",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2300001-0000-0000-0000-000000000003",
-          "is_selected": true,
-          "display_name": "DC ID",
-          "type": "semantic_model.column",
-          "data_type": "Int64",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2300001-0000-0000-0000-000000000004",
-          "is_selected": true,
-          "display_name": "Store ID",
-          "type": "semantic_model.column",
-          "data_type": "Int64",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2300001-0000-0000-0000-000000000005",
-          "is_selected": true,
-          "display_name": "Started At",
-          "type": "semantic_model.column",
-          "data_type": "DateTime",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2300001-0000-0000-0000-000000000006",
-          "is_selected": true,
-          "display_name": "Resolved At",
-          "type": "semantic_model.column",
-          "data_type": "DateTime",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2300001-0000-0000-0000-000000000007",
-          "is_selected": true,
-          "display_name": "Severity",
-          "type": "semantic_model.column",
-          "data_type": "String",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2300001-0000-0000-0000-000000000008",
-          "is_selected": true,
-          "display_name": "Affected Store Count",
-          "type": "semantic_model.column",
-          "data_type": "Int64",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2300001-0000-0000-0000-000000000009",
-          "is_selected": true,
-          "display_name": "Description",
-          "type": "semantic_model.column",
-          "data_type": "String",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2300001-0000-0000-0000-000000000010",
-          "is_selected": true,
-          "display_name": "Trace ID",
-          "type": "semantic_model.column",
-          "data_type": "String",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2300001-0000-0000-0000-000000000011",
-          "is_selected": true,
-          "display_name": "Event Date",
-          "type": "semantic_model.column",
-          "data_type": "DateTime",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2300002-0000-0000-0000-000000000003",
-          "is_selected": true,
-          "display_name": "Incident Affected Stores",
-          "type": "semantic_model.measure",
-          "data_type": "Int64",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2300002-0000-0000-0000-000000000004",
-          "is_selected": true,
-          "display_name": "Average Incident Hours",
-          "type": "semantic_model.measure",
-          "data_type": "Double",
-          "description": null,
-          "children": []
-        }
-      ]
-    },
-    {
-      "id": "c2400000-0000-0000-0000-000000000001",
-      "is_selected": true,
-      "display_name": "fact_logistics_incident_stores",
-      "type": "semantic_model.table",
-      "description": null,
-      "children": [
-        {
-          "id": "c2400002-0000-0000-0000-000000000001",
-          "is_selected": true,
-          "display_name": "Incident Store Impacts",
-          "type": "semantic_model.measure",
-          "data_type": "Int64",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2400001-0000-0000-0000-000000000001",
-          "is_selected": true,
-          "display_name": "Incident ID",
-          "type": "semantic_model.column",
-          "data_type": "String",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2400001-0000-0000-0000-000000000002",
-          "is_selected": true,
-          "display_name": "Store ID",
-          "type": "semantic_model.column",
-          "data_type": "Int64",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2400001-0000-0000-0000-000000000003",
-          "is_selected": true,
-          "display_name": "DC ID",
-          "type": "semantic_model.column",
-          "data_type": "Int64",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2400001-0000-0000-0000-000000000004",
-          "is_selected": true,
-          "display_name": "Incident Type",
-          "type": "semantic_model.column",
-          "data_type": "String",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2400001-0000-0000-0000-000000000005",
-          "is_selected": true,
-          "display_name": "Started At",
-          "type": "semantic_model.column",
-          "data_type": "DateTime",
-          "description": null,
-          "children": []
-        },
-        {
-          "id": "c2400001-0000-0000-0000-000000000006",
-          "is_selected": true,
-          "display_name": "Resolved At",
-          "type": "semantic_model.column",
-          "data_type": "DateTime",
           "description": null,
           "children": []
         }

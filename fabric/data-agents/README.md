@@ -16,7 +16,14 @@ or manually altered completion phase.
 
 Both agents include matching draft and published source snapshots plus
 `publish_info.json`. This makes the intended publish state explicit in source
-control. Readiness currently proves that the Data Agent items exist and bind to
+control. The snapshots are generated, not hand-edited: after a semantic-model
+or ontology change, run `python -m deploy.scripts.agent_snapshots` from the
+repository root. It rebuilds the semantic-model agent's `datasource.json`
+elements from the `retail_model` TMDL (every table, measure and column, keyed
+by lineage tag) and the ontology agent's entity descriptions from
+`deploy/scripts/_ontology_model.py`, and keeps the instructions and item IDs.
+`tests/test_ancillary_fabric_assets.py` fails when a snapshot drifts.
+Readiness currently proves that the Data Agent items exist and bind to
 the target semantic model or ontology; it does not prove that every consumption
 channel can invoke the published agent. Re-export each item from a live Fabric
 workspace after publication to confirm that Fabric has preserved the checked-in
