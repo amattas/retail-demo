@@ -58,8 +58,16 @@ Notable groups in this directory:
   `fact_online_order_status`, `ag._watermarks`, `ag._job_locks`,
   `setup_run_log` and the live stream's `ag._stream_state_*` tables. It skips
   a table while another job holds its writer lock
-- `06` through `14`: ML and advanced analytics. `14` also appends `PENDING`
-  pricing recommendations to the Eventhouse approval workflow.
+- `06` through `14`: ML and advanced analytics. The required producers share
+  one source as-of (the latest Silver receipt); demand counts `SALE` receipts
+  through the last complete day, segmentation and churn include online
+  orders, market-basket support is over all `SALE` baskets, elasticity is
+  promotion-controlled and published only when significant, and stockout rolls
+  current positions forward to the as-of time. `15` gates them on freshness,
+  dimension keys, a shared as-of and the category values the measures use
+  (see the [ML contracts](../../docs/design/specifications/modules/ml-ai/model-contracts.md)).
+  `14` also appends `PENDING` pricing recommendations to the Eventhouse
+  approval workflow.
 - `16-persist-anomaly-alerts`: runs in `streaming-data-load` and appends new
   Eventhouse anomaly alerts plus a detection-run record
 - `17-refresh-availability-signals`: runs in `daily-maintenance` after `06`

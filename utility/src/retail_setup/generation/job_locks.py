@@ -24,7 +24,7 @@ cell (``scripts/build_notebooks.py`` copies it in).
 """
 
 import threading
-import time
+import time as _time
 import uuid
 from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta, timezone
@@ -120,7 +120,7 @@ class DeltaJobLockStore:
             except Exception as exc:
                 if not is_concurrent_write_error(exc):
                     raise
-                time.sleep(1)
+                _time.sleep(1)
 
 
 class MemoryJobLockStore:
@@ -169,8 +169,8 @@ def acquire_job_locks(
     *,
     wait_seconds: float,
     poll_seconds: float = JOB_LOCK_POLL_SECONDS,
-    sleep: Callable[[float], None] = time.sleep,
-    monotonic: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = _time.sleep,
+    monotonic: Callable[[], float] = _time.monotonic,
 ) -> list[str] | None:
     """Claim every lock in ``names`` or none of them.
 
