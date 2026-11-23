@@ -119,10 +119,10 @@ def test_promotion_logic_uses_exact_grain_calendar_and_correct_ols_se() -> None:
     assert '"baseline_start_date") >= F.col("first_observed_date")' in source
     assert '"post_promo_end_date") <= F.col("last_observed_date")' in source
     assert "excluded_incomplete_periods" in source
-    assert (
-        'F.sqrt((F.col("sse") / (F.col("n_observations") - F.lit(2.0))) '
-        '/ F.col("sxx"))'
-    ) in source
+    # Elasticity: shelf price per line, a promotion control, a significance gate.
+    assert '(F.col("unit_cents").cast("double") / F.lit(100.0)).alias("shelf_price")' in source
+    assert 'F.sqrt((F.col("sse") / dof) * variance_factor)' in source
+    assert '"NOT_SIGNIFICANT"' in source
     assert "OBSERVATIONAL_CALENDAR_COMPARISON" in source
     assert "observed_promo_lift_pct" in source
     assert "incremental_lift_pct" not in source
@@ -213,6 +213,10 @@ def test_dynamic_pricing_propagates_evidence_without_numeric_confidence() -> Non
     assert all(f'"{column}"' in promotion_source for column in required_evidence)
     assert "10-ml-promotion-effectiveness.ipynb" in pricing_source
     assert "EXPERIMENTAL_NOT_FOR_AUTOMATED_PRICING" in pricing_source
+    design = 'ELASTICITY_ANALYSIS_DESIGN = "SYNTHETIC_OBSERVATIONAL_LOG_LOG_OLS_PROMO_CONTROLLED"'
+    assert design in promotion_source and design in pricing_source
+    assert '(F.col("upstream_evidence_status") == "VALID_OBSERVATIONAL_ESTIMATE")' in pricing_source
+    assert 'F.lit("SYNTHETIC_ELASTICITY")' in pricing_source
     assert "elasticity_evidence_valid" in pricing_source
     assert "elasticity_standard_error" in pricing_source
     assert "elasticity_r_squared" in pricing_source

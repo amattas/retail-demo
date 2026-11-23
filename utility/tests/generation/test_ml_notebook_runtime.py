@@ -229,3 +229,69 @@ def test_market_basket_rules_recover_complements_over_all_baskets(spark):
         r.receipt_id_ext for r in nb07["sample_baskets"](baskets, total, 1000).collect()
     )
     assert nb07["sample_baskets"](baskets, total, total) is baskets
+
+
+def test_elasticity_recovers_price_response_and_gates_on_significance(spark):
+    import math
+    import random
+
+    nb10 = _load(
+        "10-ml-promotion-effectiveness.ipynb",
+        {
+            "build_daily_price_sales",
+            "estimate_elasticity",
+            "ELASTICITY_ANALYSIS_DESIGN",
+        },
+        MIN_OBSERVATIONS=30,
+        SIGNIFICANCE_Z=1.96,
+    )
+    rng = random.Random(11)
+    lines = []
+    start = date(2026, 1, 5)
+    for day in range(120):
+        sale_date = start + timedelta(days=day)
+        markdown = (day // 7) % 3 == 0
+        # Promotions run in markdown weeks too, so price and promo are confounded.
+        promo_share = 0.6 if markdown and day % 2 == 0 else 0.0
+        department_units = rng.randint(800, 1200)
+        for product, elasticity in ((1, -2.0), (2, 0.0)):
+            # Each product has its own markdown weeks.
+            own_markdown = markdown if product == 1 else (day // 7) % 3 == 1
+            price = 10.0 * (0.75 if own_markdown else 1.0) * rng.uniform(0.97, 1.03)
+            share = 0.05 * (price / 10.0) ** elasticity * (1 + 0.8 * promo_share)
+            units = max(1, round(department_units * share * math.exp(rng.gauss(0, 0.05))))
+            promoted = round(units * promo_share)
+            lines += [(product, sale_date, units - promoted, price, None)]
+            if promoted:
+                lines.append((product, sale_date, promoted, price, "PROMO"))
+        # A flat-priced product.
+        lines.append((3, sale_date, rng.randint(20, 40), 5.0, None))
+        lines.append((99, sale_date, department_units, 1.0, None))
+    sales = (
+        spark.createDataFrame(
+            lines,
+            "product_id long, date date, quantity long, shelf_price double, promo_code string",
+        )
+        .withColumn("product_name", F.concat(F.lit("P"), F.col("product_id").cast("string")))
+        .withColumn("product_category", F.lit("C"))
+        .withColumn("department", F.lit("Toys"))
+        .withColumn("regular_price", F.lit(10.0))
+    )
+    products = spark.createDataFrame([(1,), (2,), (3,)], "product_id long")
+    rows = {
+        row.product_id: row
+        for row in nb10["estimate_elasticity"](
+            nb10["build_daily_price_sales"](sales, products)
+        ).collect()
+    }
+
+    elastic = rows[1]
+    assert elastic.elasticity_coefficient == pytest.approx(-2.0, abs=0.2)
+    assert elastic.elasticity_evidence_status == "VALID_OBSERVATIONAL_ESTIMATE"
+    assert elastic.elasticity_category == "Highly Elastic"
+    assert elastic.confidence_interval_upper < -1.0
+    assert elastic.analysis_design == nb10["ELASTICITY_ANALYSIS_DESIGN"]
+    assert rows[2].elasticity_evidence_status == "NOT_SIGNIFICANT"
+    assert rows[2].elasticity_category == "Insufficient Evidence"
+    assert rows[3].elasticity_evidence_status == "INSUFFICIENT_PRICE_VARIATION"
+    assert rows[3].elasticity_coefficient is None

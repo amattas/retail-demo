@@ -186,7 +186,21 @@ Optional and experimental corrections are also contract-bound:
   no inference-ready arrivals publish an empty contract-valid snapshot;
 - pricing uses a non-null no-estimate evidence sentinel, advances cooldown state
   only for accepted price changes, and applies the log-log quantity response
-  `(new_price / old_price) ** elasticity - 1`.
+  `(new_price / old_price) ** elasticity - 1`;
+- `price_elasticity` regresses each product's daily share of its department's
+  units on its shelf price (`unit_cents`, the day's price from the generator's
+  price schedule) with the share of its lines on promotion as a control, so
+  traffic, seasonality and discounts don't pose as price response. Only a
+  significantly negative slope (|t| >= 1.96) gets status
+  `VALID_OBSERVATIONAL_ESTIMATE` and an elasticity category; others are
+  `NOT_SIGNIFICANT`, `NON_NEGATIVE_ESTIMATE`, `INSUFFICIENT_PRICE_VARIATION`
+  or `INSUFFICIENT_SAMPLE`, categorized `Insufficient Evidence`.
+  `analysis_design` is `SYNTHETIC_OBSERVATIONAL_LOG_LOG_OLS_PROMO_CONTROLLED`:
+  the estimates recover the generator's demand response
+  (`retail_setup.generation.pricing`), not real shopper behavior. Notebook 14
+  applies elasticity only to valid estimates whose interval lies below -1, tags
+  those recommendations `SYNTHETIC_ELASTICITY`, and still appends `PENDING`
+  rows to `pricing_recommendation_created` for human approval.
 
 ## Semantic-model dependency
 
