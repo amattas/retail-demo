@@ -103,6 +103,17 @@ mover's months-old snapshot is therefore scored on today's demand, not the
 demand around its last ledger change. Ledger rows after the as-of time, such
 as scheduled deliveries, are ignored.
 
+Segmentation and churn count every purchase of a known customer: store `SALE`
+receipts and online orders (`fact_online_order_headers`). Returns and
+anonymous purchases (null `customer_id`) never count. Segmentation produces
+one row per customer with at least one purchase. Churn scores a customer at a
+snapshot only when they purchased in the feature window before it, so
+never-active and long-lapsed customers are neither trivial training examples
+nor published predictions; an online order in the forward window keeps a
+customer active. Churn aggregates purchases to customer-days first and pairs
+each day only with the snapshots whose feature or label window contains it,
+so its work grows with activity rather than with customers times snapshots.
+
 ### Stockout inventory semantics
 
 The inventory ledger retains signed balances; a deficit is not a negative

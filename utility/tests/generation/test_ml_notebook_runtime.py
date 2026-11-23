@@ -97,3 +97,92 @@ def test_stockout_current_positions_roll_forward_to_the_as_of_time(spark):
     assert slow.snapshot_date == date(2026, 7, 21)
     assert slow.features_as_of == as_of
     assert current[11].current_inventory == 7.0
+
+
+def _customer_sources(spark):
+    receipts = spark.createDataFrame(
+        [
+            # Store customer 1: two sales and a return.
+            (1, 10, "SALE", datetime(2026, 1, 5, 12), "12.00", 1200, "CARD"),
+            (1, 11, "SALE", datetime(2026, 2, 9, 12), "8.00", 800, "CASH"),
+            (1, 10, "RETURN", datetime(2026, 2, 10, 12), "-8.00", -800, "CASH"),
+            # Anonymous shopper.
+            (None, 10, "SALE", datetime(2026, 2, 9, 12), "50.00", 5000, "CARD"),
+            # After the as-of time.
+            (1, 10, "SALE", datetime(2026, 6, 1, 12), "9.00", 900, "CARD"),
+        ],
+        "customer_id long, store_id long, receipt_type string, event_ts timestamp, "
+        "total_amount string, total_cents long, payment_method string",
+    )
+    online = spark.createDataFrame(
+        [
+            # Online-only customer 2.
+            (2, datetime(2026, 1, 20, 12), "30.00", 3000, "CARD"),
+            (2, datetime(2026, 3, 2, 12), "20.00", 2000, "CARD"),
+            (None, datetime(2026, 3, 2, 12), "5.00", 500, "CARD"),
+        ],
+        "customer_id long, event_ts timestamp, total_amount string, total_cents long, "
+        "payment_method string",
+    )
+    return receipts, online
+
+
+def test_segmentation_counts_online_and_skips_returns_and_anonymous(spark):
+    nb08 = _load(
+        "08-ml-customer-segmentation.ipynb",
+        {"purchase_amount", "customer_purchases", "build_rfm"},
+    )
+    receipts, online = _customer_sources(spark)
+    as_of = datetime(2026, 3, 10, 12)
+    purchases = nb08["customer_purchases"](receipts, online, as_of)
+    rows = {row.customer_id: row for row in nb08["build_rfm"](purchases, as_of.date()).collect()}
+
+    assert set(rows) == {1, 2}
+    assert (rows[1].frequency, rows[1].monetary_value) == (2, 20.0)
+    assert (rows[2].frequency, rows[2].monetary_value) == (2, 50.0)
+    assert rows[2].recency_days == 8
+
+
+def test_churn_snapshots_pair_only_active_customers_and_see_online_activity(spark):
+    nb09 = _load(
+        "09-ml-churn-prediction.ipynb",
+        {
+            "customer_activity",
+            "daily_customer_activity",
+            "pair_with_snapshots",
+            "build_feature_snapshots",
+            "attach_forward_churn_labels",
+        },
+        FEATURE_WINDOW_DAYS=60,
+        CHURN_WINDOW_DAYS=30,
+    )
+    receipts, online = _customer_sources(spark)
+    daily = nb09["daily_customer_activity"](
+        nb09["customer_activity"](receipts, online, datetime(2026, 3, 10, 12))
+    )
+    customers = spark.createDataFrame(
+        [(1, 5.0), (2, 6.0), (3, 7.0)], "customer_id long, geography_id double"
+    )
+    snapshots = [date(2026, 1, 1), date(2026, 2, 1), date(2026, 3, 1)]
+    features = nb09["build_feature_snapshots"](daily, customers, snapshots)
+    labeled = {
+        (row.customer_id, row.snapshot_date): row
+        for row in nb09["attach_forward_churn_labels"](features, daily, snapshots).collect()
+    }
+
+    # Customer 3 never purchased and nobody is scored before their first purchase.
+    assert set(labeled) == {
+        (1, date(2026, 2, 1)),
+        (1, date(2026, 3, 1)),
+        (2, date(2026, 2, 1)),
+        (2, date(2026, 3, 1)),
+    }
+    first = labeled[(1, date(2026, 3, 1))]
+    assert (first.purchase_count, first.total_spend, first.unique_stores) == (2, 20.0, 2)
+    assert first.basket_std == pytest.approx(2.8284, abs=1e-4)
+    # Customer 2's online order on 2 March keeps them active after 1 February.
+    online_only = labeled[(2, date(2026, 2, 1))]
+    assert (online_only.online_purchase_count, online_only.is_churned) == (1, 0.0)
+    assert online_only.unique_stores == 0
+    assert labeled[(1, date(2026, 2, 1))].is_churned == 0.0
+    assert labeled[(1, date(2026, 3, 1))].is_churned == 1.0

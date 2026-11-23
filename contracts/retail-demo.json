@@ -3876,7 +3876,8 @@
         }
       },
       "source_tables": [
-        "fact_receipts"
+        "fact_receipts",
+        "fact_online_order_headers"
       ],
       "output": {
         "table": "customer_segments",
@@ -4018,6 +4019,7 @@
       },
       "source_tables": [
         "fact_receipts",
+        "fact_online_order_headers",
         "dim_customers"
       ],
       "output": {
@@ -4098,7 +4100,8 @@
       "limitations": [
         "Current inference intentionally has no actual outcome label; deprecated is_churned_actual is always null for backward compatibility.",
         "Scores are calibrated estimates and require later outcome monitoring.",
-        "Training, calibration, and test partition on label availability with a 90-day forward-label embargo."
+        "Training, calibration, and test partition on label availability with a 90-day forward-label embargo.",
+        "Only customers with a store or online purchase in the feature window are scored; lapsed and anonymous customers have no row."
       ],
       "asset_ids": [
         "asset.ml-notebooks",

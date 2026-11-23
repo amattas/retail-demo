@@ -209,8 +209,11 @@ def test_churn_snapshots_labels_and_probabilities_are_non_leaky() -> None:
     assert purged["test_start"] > purged["calibration_end"] + timedelta(days=90)
     feature_source = _function_source(path, "build_feature_snapshots")
     label_source = _function_source(path, "attach_forward_churn_labels")
-    assert '< F.col("snapshot.snapshot_date")' in feature_source
-    assert '>= F.col("snapshot.snapshot_date")' in label_source
+    assert "pair_with_snapshots(\n        daily_activity, snapshot_dates, 0, FEATURE_WINDOW_DAYS" in (
+        feature_source
+    )
+    assert "-CHURN_WINDOW_DAYS,\n            0," in label_source
+    assert "crossJoin" not in code
     assert "F.date_add(" in label_source
     assert "days_since_last_purchase" not in code
     assert "IsotonicRegression(" in code
