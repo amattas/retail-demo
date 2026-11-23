@@ -128,7 +128,7 @@ profile's required post-publish pipeline.
 | Capability | What it does |
 | --- | --- |
 | [Historical data](docs/design/specifications/modules/generation/data-contract.md) | Generates repeatable store and online transactions, inventory and logistics, customer activity, promotions, and purchase attribution. Fulfillment respects available stock. |
-| [Live events](docs/design/specifications/modules/streaming/event-contract.md) | Streams eighteen business event types directly to Eventhouse through the Spark Kusto connector. The stream is optional and operator-controlled. |
+| [Live events](docs/design/specifications/modules/streaming/event-contract.md) | Streams twenty-two business event types directly to Eventhouse through the Spark Kusto connector, continuing the generated history with stateful stock, trucks, online orders and logistics incidents. The stream is optional and operator-controlled. |
 | [Incremental analytics](docs/design/specifications/modules/analytics/fabric-analytics.md) | Projects Eventhouse data through optional shortcuts into Silver and Gold, with replay-safe merges, watermarks, reconciliation, and Delta maintenance. |
 | [Power BI](docs/design/specifications/modules/power-bi/semantic-model.md) | Provides executive, sales, supply-chain, omnichannel, operations, and marketing analysis through Direct Lake. Date filters follow the generated history window. |
 | [Machine learning](docs/design/specifications/modules/ml-ai/model-contracts.md) | Produces forecasts, customer segments, churn predictions, stockout risk, product recommendations, and price elasticity. Additional outputs cover associations, journeys, delivery dwell, and experimental promotion and pricing analysis. |
@@ -143,10 +143,10 @@ profile's required post-publish pipeline.
 | [KQL queries and templates](docs/design/specifications/modules/analytics/fabric-analytics.md#querysets) | Deploys saved operational queries. Real-time dashboard templates and Activator rules remain reference sources for manual work, not automatically deployed items. |
 | [Deployment and operations](docs/guides/operations.md) | Provides workspace-isolated configuration and Terraform state, tenant and capacity checks, parallel setup and ML, exact-run recovery, read-only readiness reports, and object-type workspace folders. |
 
-The historical Lakehouse contract has seven dimensions and nineteen facts in
+The historical Lakehouse contract has seven dimensions and twenty-one facts in
 Silver (`ag`), plus ten Gold aggregates (`au`). Eventhouse also has an
-`unknown_event` catch-all. Power BI uses a 42-table Direct Lake semantic model:
-36 historical tables and six required ML outputs.
+`unknown_event` catch-all. Power BI uses a 44-table Direct Lake semantic model:
+38 historical tables and six required ML outputs.
 
 There are fourteen contracted ML outputs: six required, five optional, and
 three experimental. Reporting publishes only after all required outputs pass

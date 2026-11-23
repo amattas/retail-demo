@@ -542,12 +542,17 @@ Open the deployed `stream-events` notebook in Fabric. Find the cell labeled
 bounded first run:
 
 ```python
-source_rows_per_second = 5
+source_rows_per_second = 0
 sink = "eventhouse"
 run_seconds = 180
 kusto_uri = ""
 kql_database = "retail_eventhouse"
 ```
+
+`source_rows_per_second = 0` derives the stream's rate from your store count
+and the historical volume, so the live data continues the history. Live store
+events follow each store's local opening hours; set `volume_scale` (for
+example `5.0`) for a busier short run.
 
 !!! warning "Do not leave the first run unbounded"
 

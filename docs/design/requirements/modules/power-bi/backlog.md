@@ -24,3 +24,5 @@
   labels, `dim_date` slicing, volume-weighted rollups, and hidden
   non-aggregatable technical fields.
 - Optional ML tables require explicit support and deployment status.
+- Measure fixes keep existing measure names; payment counts are attempts and
+  payment amounts are approved payments.

@@ -330,6 +330,20 @@ Publication behavior:
 | TMDL format (`.platform` `config.version` `2.0`) | `updateDefinition` in place |
 | Old format (`definition.json` or `EntityTypes/` parts) | Create and verify `RetailOntology_AutoGen_tmdl`, then delete the old item and rename the staged item; a failed staging readback leaves the old item intact |
 
+Platform constraints that shape this design:
+
+- An ontology-derived graph no longer loads instance data by default;
+  materialization is an explicit step, and no automation API for it is known
+  yet (`ENH-010`).
+- Every ontology read, including UI, MCP, and agent reads, is metered as
+  Ontology Discovery capacity. Readiness keeps to one definition read.
+- Service-principal access to the ontology MCP is unsupported, and preview
+  tool names may change.
+- The new experience has no Activator integration; `fabric/rules/` stays a
+  separate manual asset.
+- Inheritance (`baseEntityType`), `redefines`, and reusable properties may not
+  be enabled in every tenant, so the definition does not use them.
+
 Readback must be in TMDL format and contain every generated table, entity,
 and rule part. The service elides defaults, so readback compares element
 sets rather than text. Evidence is written to
@@ -370,7 +384,17 @@ instructions, so every ontology entity type is selected and the stage
 individual customers' names, addresses, phone numbers, and loyalty-card values
 out of answers. The legacy
 `ontology-<name>/datasource.json` binding fails against TMDL ontologies.
-Source schema validation and
+The committed draft and published snapshots are generated, not exported by
+hand: `deploy/scripts/agent_snapshots.py` rebuilds the semantic-model agent's
+`datasource.json` from the `retail_model` TMDL (every table, column and
+measure, hidden ones included, keyed by lineage tag, in TMDL order, all
+selected) and the ontology agent's `ontology.json` element descriptions from
+`_ontology_model.build_definition`. Instance fields (artifact and workspace
+IDs, instructions) are kept from the committed files. Run
+`python -m deploy.scripts.agent_snapshots` after a model or ontology change;
+`--check` reports drift without writing, and
+`tests/test_ancillary_fabric_assets.py` runs it in CI. Source schema
+validation and
 matching local draft/published snapshots do not prove remote publication,
 permissions, or behavior. Rebind and verify the deployed agents in Fabric.
 Mandatory per-agent governance metadata remains outside the default release;

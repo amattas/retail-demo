@@ -115,5 +115,29 @@ python -m deploy.scripts.deploy_fabric_app --environment <env> --dry-run
 python -m deploy.scripts.deploy_fabric_app --environment <env>
 ```
 
-Then follow the acceptance checklist in
-`context/plans/2026-10-07-fabcon-live-tests.md`.
+### Live acceptance checklist
+
+These checks need two signed-in users and have not been run yet
+(`REQ-MLAI-005`):
+
+1. Open the app URL from the item properties and confirm Fabric SSO sign-in.
+2. As user A, submit a proposal. Confirm that the UI blocks A from deciding
+   it.
+3. As user B, who needs **Run and interact** permission, approve it with a
+   comment. Confirm that the status, reviewer and comment show for both
+   users.
+4. In the child SQL database, query `ReplenishmentProposal` and
+   `ApprovalDecision`. Confirm that `created_by` and `reviewer_id` equal each
+   caller's subject claim.
+5. Negative API checks against the app's `/api/graphql` endpoint with user
+   B's session: an update or delete of a decision is denied, and creating a
+   decision with someone else's `reviewer_id` is denied.
+6. Known gap to confirm: user A can create a decision on their own proposal
+   through GraphQL and can backdate `decided_at`. If confirmed, add a Rayfin
+   Function that sets the timestamp server-side and checks the proposal's
+   creator, and remove the client `create` grant on `ApprovalDecision`.
+7. Optional: add a semantic-model connector (`npx rayfin connector add --type
+   fabric-semanticmodel`) to show `stockout_risk` context beside each
+   proposal.
+
+Record the outcome in the ML and AI backlog and the traceability ledger.

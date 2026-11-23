@@ -137,10 +137,11 @@ for store opened/closed; 12 hours for store-visit, purchase, inventory,
 reorder, truck and online-order tables (stores close overnight, loads wait to
 consolidate, small fleets have few orders per hour); 24 hours for stockouts;
 36 hours for online deliveries, which come a day or more after the order; and
-6 hours for ad impressions. The Silver watermark check adds the same quiet time. Event types declared but not yet emitted
-(`stream_control.PENDING_EVENT_TYPES`) and the logistics incident events, which
-happen only a few times a year per DC (`stream_control.SPORADIC_EVENT_TYPES`),
-are not expected to be fresh. Silver watermark
+6 hours for ad impressions. The Silver watermark check adds the same quiet time. The logistics incident
+events, which happen only a few times a year per DC
+(`stream_control.SPORADIC_EVENT_TYPES`), are not expected to be fresh;
+`stream_control.PENDING_EVENT_TYPES` (declared but not emitted) is empty now
+that the stream emits all 22 types. Silver watermark
 evidence uses the stalest live table's `last_processed_ts` (the event time
 Silver has processed), not `updated_at`, which the daily deep reconciliation
 refreshes without new rows. Its maximum age is two `streaming-data-load`
@@ -331,7 +332,19 @@ ingested. To start a new incarnation (new tags and IDs, same stream ID),
 delete `eventhouse-live/` and `_metadata/eventhouse-live.json` together. To
 start a new stream ID, delete the whole checkpoint root. A new incarnation
 also re-runs the history handoff check; set `allow_history_gap = True` if
-history ends more than a day before the restart.
+history ends more than a day before the restart. A new incarnation ignores
+the earlier incarnation's rows in `ag._stream_state_*` and seeds store state
+and stock from Silver; the old rows can be deleted.
+
+### Writer lock held
+
+Notebook 03 or 04 logs that it skipped its run, notebook 90 or setup-11
+fails, or an ML producer fails after 30 minutes, because another writer holds
+its lock in `ag._job_locks`. A healthy holder renews its lease every two
+minutes; a crashed one's lease expires within 15 minutes. Check
+`SELECT * FROM ag._job_locks` for the holder and `expires_at`. Delete a row by
+hand (`DELETE FROM ag._job_locks WHERE lock_name = 'silver'`) only when you
+are sure its holder is no longer running.
 
 ### Ontology/task-flow binding missing
 

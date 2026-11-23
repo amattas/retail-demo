@@ -4,16 +4,20 @@ This directory contains the `retail_model` Power BI Project.
 
 ## Active semantic model
 
-The model is Direct Lake over the Lakehouse and has 40 active tables:
+The model is Direct Lake over the Lakehouse and has 44 active tables:
 
 - seven dimensions
-- nineteen facts
+- twenty-one facts
 - ten Gold aggregates
-- four ML outputs: `churn_predictions`, `customer_segments`,
-  `demand_forecast`, and `stockout_risk`
+- six required ML outputs: `churn_predictions`, `customer_segments`,
+  `demand_forecast`, `stockout_risk`, `product_recommendations`, and
+  `price_elasticity`
 
-It is not a hybrid KQL/DirectQuery model. The six optional and four
-experimental ML outputs are intentionally outside the active model.
+It is not a hybrid KQL/DirectQuery model. The five optional and three
+experimental ML outputs are intentionally outside the active model. Measure
+bases (sales only, approved payments, like-for-like prior year, tax and
+returns treatment) are described in the
+[semantic-model specification](../../docs/design/specifications/modules/power-bi/semantic-model.md#measure-conventions).
 
 ## Report
 

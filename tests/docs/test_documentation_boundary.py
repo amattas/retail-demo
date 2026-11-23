@@ -115,7 +115,7 @@ def test_traceability_has_unique_rows_for_owned_requirements_and_threats() -> No
 
 def test_entry_points_do_not_claim_old_counts_or_current_live_completion() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "42-table Direct Lake semantic model" in readme
+    assert "44-table Direct Lake semantic model" in readme
     assert "six required ML" in readme
     framework = (
         DESIGN / "specifications" / "modules" / "deployment" / "framework.md"

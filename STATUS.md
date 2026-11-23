@@ -1,6 +1,47 @@
 # Status: Local Remediation and Native Decision Pack
 
-**Updated**: 2026-10-23 | **Wave**: E — ontology agent fixed, three standalone Fabric Apps live, user guides reconciled
+**Updated**: 2026-11-23 | **Wave**: E — adversarial data review merged (#451-#461) and reconciled; dependency refresh (#450) merged; live acceptance pending
+
+## Adversarial data review (2026-11-21 to 2026-11-23, merged, not live)
+
+An adversarial review of the generated data, the live stream, the Lakehouse
+transforms, ML and every consumer was fixed in eleven PRs, each merged with
+green CI:
+
+| PR | Scope |
+| --- | --- |
+| #451 | Broken consumers: readiness receipt join, Operations Agent query and cohort, nightly signal refresh, persisted anomaly alerts, pricing producer, ontology keys, pipeline failures that were hidden |
+| #452 | Shared vocabulary and calibration, UTC timestamps with `dim_stores.TimeZone` and `local_hour`, deterministic dimensions (`anchor_date`), incident and online-order contract additions |
+| #453 | Stream robustness: backlog cap, write retries, supervised restarts, checkpoint incarnations, history handoff guard, 60-second trigger |
+| #454 | Calibrated live volume and customers from the historical models; versioned stream state in `ag._stream_state_*` |
+| #455 | Stateful live store stock, trucks and online order lifecycles |
+| #456-#458 | Batch realism: customer lifecycle and churn, store-type profiles, shelf prices and elasticity, basket promotions, consolidated logistics, foot-traffic passages, partial returns, decline retry and void, exposure-driven attribution, local online orders, holidays, weather, state tax, feasibility guards |
+| #459 | Logistics incidents (batch and stream), planned versus actual arrivals, finite DC stock, incident consumers |
+| #460 | One Gold builder, writer locks and ML waves, incremental Silver, ML input fixes and a stricter validator |
+| #461 | Semantic-model measure bases, calibrated rules with `fn_rule_thresholds()`, anomaly series, generated agent snapshots |
+
+#450 refreshed the deploy dependencies (`fabric-cicd` 1.4.0, provider 1.15.1)
+and made Terraform ignore item folders and the Lakehouse description; its
+publication and readiness were checked live on `retail-demo-kroger` before
+the data-review merges.
+
+None of the data-review changes has run in Fabric. They change the
+historical and event contracts, so existing environments need the
+[upgrade steps](docs/guides/operations.md#upgrading-after-the-data-review-changes):
+reset Silver, re-run setup, redeploy KQL, and start a new stream incarnation.
+The requirements and evidence are in the
+[traceability ledger](docs/design/requirements/traceability.md)
+(`REQ-GEN-006` to `REQ-GEN-014`, `REQ-STREAM-006` to `REQ-STREAM-008`,
+`REQ-AN-005` to `REQ-AN-008`, `REQ-MLAI-007`, `REQ-MLAI-008`, `REQ-BI-005`,
+`REQ-OPS-006`, `THREAT-012`, `THREAT-013`). The live acceptance run and the
+remaining readiness invariants are `IMP-014`; the live streaming checks are
+listed under `IMP-005`.
+
+One defect found during the review: `job_locks.py` used `import time`, which
+replaced the `time` that `dc_supply.py` and `gold_rules.py` import from
+`datetime` once the setup package was flattened into one notebook cell, and
+broke setup-08's inventory worker. It now imports
+`time as _time` (#460).
 
 ## Ontology agent, Fabric Apps, and guides (2026-10-23)
 
@@ -397,8 +438,8 @@ item is in TMDL format. None of this has been run live yet.
 proposal and approval records (7 Vitest tests, including a check on the
 generated DAB permissions). The Operations Agent definition matches the
 June 2026 schema, so the HTTP 400 needs a live retry. Both live tests are
-blocked on demo-tenant sign-in; see
-`context/plans/2026-10-07-fabcon-live-tests.md`.
+blocked on demo-tenant sign-in; the remaining checks are in the ML and AI
+backlog and the `app/fabric-app/README.md` acceptance checklist.
 
 ## Ontology TMDL migration and rules (2026-10-07, `dev` branch, offline)
 
@@ -406,8 +447,8 @@ blocked on demo-tenant sign-in; see
 ontology generator, a staged-cutover publisher, and nine source-checked
 business rules, all with tests. The publisher is not wired into deployment;
 `30-create-ontology` remains the deployed path. Live spikes and acceptance are
-blocked on a sign-in to the demo tenant. See
-`context/plans/2026-10-07-ontology-new-experience-and-rules.md`.
+blocked on a sign-in to the demo tenant. The design decisions are in the
+ML and AI contracts and the remaining work is `ENH-010` and `ENH-011`.
 
 ## Deploy everything by default (2026-10-07, `dev` branch)
 

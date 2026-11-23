@@ -284,6 +284,99 @@ demo; it multiplies every live volume.
 A new incarnation checks the history handoff again. If history ends more than
 a day before the start, rerun setup or set `allow_history_gap = True`.
 
+## Upgrading after the data-review changes
+
+The data-review changes on `main` (after release 1.3.0) change the data and
+event contracts. An environment deployed before them can't be updated in
+place by a normal redeploy:
+
+- **Historical data.** Silver timestamps are now true UTC (they were store
+  local), and setup adds `dim_stores.TimeZone`, `dim_customers.HomeStoreID`,
+  `fact_receipts.local_hour` and `original_receipt_id_ext`, the truck delay
+  columns, `fact_logistics_incidents`, `fact_logistics_incident_stores`, and
+  more trucks per DC. Prices, tax, customers, returns, payments and
+  promotions are generated differently. Setup must run again; its first
+  notebook re-seeds the dictionaries, which picks up the new
+  `_shared/tax_rules.json`.
+- **Eventhouse.** KQL adds four event tables, `impression_time`,
+  `requested_quantity` and the truck delay columns (restating
+  `ad_impression`, `inventory_updated` and `truck_arrived` with
+  `.alter table`), new functions and a materialized view, an ingest-tag
+  retention policy, and `fn_rule_thresholds()` with your store type's values.
+- **Live stream.** The stream keeps state in new `ag._stream_state_*` tables
+  and its checkpoints in new folders (`eventhouse-live/`, `eventhouse-smoke/`
+  with incarnation records). The old `eventhouse/` checkpoint is not read.
+- **Historical Silver is protected.** Once `ag._watermarks` exists, setup
+  refuses to replace Silver, so a workspace that has run the streaming
+  pipeline needs a reset first.
+
+The simplest upgrade is a clean rebuild of a disposable demo workspace:
+
+```powershell
+retail-setup configure --workspace-name <workspace>  # keeps your settings; pins anchor_date
+retail-setup render --env <env>                      # renders the new tokens into the notebooks
+retail-setup deploy --env <env> --recreate
+```
+
+`--recreate` deletes the workspace and everything in it; see
+[Reset and recreate](#reset-and-recreate). To keep the workspace instead:
+
+1. Stop `stream-events` and disable the `streaming-data-load` schedule.
+2. Run `99-reset-lakehouse` by hand. It drops the Silver and Gold schemas,
+   including `_watermarks`, the ML outputs, `_job_locks` and any stream state.
+3. Delete the Lakehouse folder `Files/setup/stream/checkpoint`.
+4. Optionally clear the old live rows from Eventhouse
+   (`.clear table <event_table> data` for each event table), so notebook 03
+   does not project pre-upgrade events into the new Silver.
+5. Run `retail-setup configure`, `retail-setup render`, and
+   `retail-setup deploy --env <env>`. The
+   deployment applies the KQL changes, re-runs setup and the ML pipelines,
+   and republishes the reports.
+6. Start the stream again; it begins a new incarnation from the new history.
+
+The `.alter table` restatements and the in-place path have not been verified
+against a live Eventhouse yet.
+
+### New tunables and defaults
+
+Stream notebook parameters (the **Parameters** cell of `stream-events`):
+
+| Parameter | Default | Meaning |
+| --- | --- | --- |
+| `source_rows_per_second` | `0` | `0` derives the rate from the store count, `transactions_per_store_day`, online orders and marketing volume. A larger value only adds resolution; a value below the peak under-produces peak hours and prints a warning. |
+| `volume_scale` | `1.0` | Multiplies every live volume; use it for a busier demo. |
+| `trigger_seconds` | `60` | Live micro-batch interval: one write per event table per batch. Bounded runs use at most 10 seconds. |
+| `max_lag_seconds` | `600` | Backlog cap: after a stop, only the last 10 minutes of the downtime are generated. |
+| `max_restarts` | `5` | Supervised restarts of a failed live query. |
+| `allow_history_gap` | `False` | Start a new stream even when history ends more than a day before now. |
+
+Generation settings (`retail-setup configure`, saved per environment):
+
+| Setting | Default |
+| --- | --- |
+| `transactions_per_store_day` | The store type's profile: supercenter 400, grocery 280, hardware 180, luxury 40 |
+| `online_orders_per_day` | Derived from the profile's online share of all orders |
+| `customer_count` | Derived from identified traffic and visit frequency (about 14,000 per supercenter) |
+| `anonymous_share` | `0.45` of receipts have no customer |
+| `annual_churn_rate` | `0.20` |
+| `annual_volume_growth` | `0.03` |
+| `anchor_date` | Pinned at the first `configure` (the history start) and kept afterwards, so dimensions don't change when you re-render later |
+
+Calibrated rule and detector thresholds live in
+`utility/src/retail_setup/generation/calibration.py`, and contract tests keep
+the KQL rules, dashboard tiles, anomaly functions and semantic model equal to
+them. The main values:
+
+| Threshold | Value |
+| --- | --- |
+| Truck dwell SLA | 90 minutes |
+| Late truck | 30 minutes after the planned arrival |
+| Lane-delay rule | 60 minutes |
+| High-value receipt | 10 × the store type's `avg_ticket_target` (written into `fn_rule_thresholds()` at deployment) |
+| Zone surge | Entrance arrivals per 5 minutes at the store type's busiest hour plus 4 standard deviations (117 for supercenter; written into `fn_rule_thresholds()`) |
+| Incident stockouts | At least 3 stockouts in 60 minutes for one incident |
+| Anomaly detection | 168-hour lookback, threshold 1.5; inventory movement scored per store after 24 active hours |
+
 ## Rerun safely
 
 For a normal update:

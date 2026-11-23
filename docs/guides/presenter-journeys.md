@@ -13,15 +13,20 @@ Before presenting:
 2. Override the stream parameters with these presenter settings:
 
     ```python
-    source_rows_per_second = 10
+    source_rows_per_second = 0
+    volume_scale = 5.0
     sink = "eventhouse"
     run_seconds = 180
     ```
 
-   The source template defaults to `source_rows_per_second = 5` and
-   `run_seconds = 0`; zero runs indefinitely. Each source row emits one
-   scenario bundle, so the presenter settings create a three-minute bounded
-   run rather than a fixed business-event count.
+   The source template defaults to `source_rows_per_second = 0` (the rate is
+   derived from the store count and the historical volume), `volume_scale =
+   1.0`, and `run_seconds = 0`; zero runs indefinitely. Live volume follows
+   each store's local opening hours, so `volume_scale = 5.0` makes a short run
+   busier; a larger `source_rows_per_second` only adds resolution, not
+   volume. Outside store hours (for example late at night in US time zones)
+   store events stop and only online orders and marketing continue, so
+   rehearse at the time of day you will present.
 
    In Fabric, open the `stream-events` notebook, find the cell labeled
    **Parameters**, replace the values there, and then select **Run all**. Do not
@@ -138,7 +143,7 @@ union withsource=table_name receipt_created, online_order_created,
 ### Reset and recovery
 
 1. If the notebook exceeds its bounded run, cancel the active Spark query.
-2. Rerun it with `source_rows_per_second = 10` and `run_seconds = 180`.
+2. Rerun it with `volume_scale = 5.0` and `run_seconds = 180`.
 3. Poll the readiness query every 15 seconds for up to five minutes; require
    all four tables and recent `latest` values.
 4. If they do not advance, verify the Query URI, database name, permissions,
@@ -248,7 +253,7 @@ Present the replenishment step only after all four rows pass.
 
 ### Reset and recovery
 
-1. Rerun the bounded stream with `source_rows_per_second = 10` and
+1. Rerun the bounded stream with `volume_scale = 5.0` and
    `run_seconds = 180`.
 2. Poll every 15 seconds for up to five minutes and require recent rows for
    `receipt_line_added`, `inventory_updated`, `stockout_detected`, and
@@ -353,7 +358,7 @@ union withsource=table_name payment_processed, online_order_created
 
 ### Reset and recovery
 
-1. Rerun the bounded stream with `source_rows_per_second = 10` and
+1. Rerun the bounded stream with `volume_scale = 5.0` and
    `run_seconds = 180`.
 2. Poll the readiness query every 15 seconds for up to five minutes, then rerun
    the store-sales query and confirm recent minute buckets.

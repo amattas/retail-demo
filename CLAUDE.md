@@ -19,6 +19,7 @@ Microsoft Fabric retail demo powered by synthetic data generation.
 ### Reference Files
 - Streaming event payloads: `utility/notebooks/templates/driver-05-stream.py`
 - Lakehouse table contract: `utility/src/retail_setup/generation/schemas.py`
+- Shared vocabulary and thresholds: `utility/src/retail_setup/generation/vocabulary.py`, `calibration.py`
 - KQL tables: `fabric/kql_database/01-create-tables.kql`
 - Silver transforms: `fabric/lakehouse/03-streaming-to-silver.ipynb`
 - Gold aggregations: `fabric/lakehouse/04-streaming-to-gold.ipynb`
@@ -196,7 +197,10 @@ retail-demo/
 - Event tables: Streaming-only (from the stream-events notebook via the Spark Kusto connector)
 - Dimension/Fact tables: Historical setup notebooks write the base contract directly to Lakehouse
 - Eventhouse shortcuts: Optional streaming projection into Lakehouse Silver/Gold
-- Gold layer: Aggregations built in PySpark notebooks
+- Gold layer: One definition (`generation/gold_rules.py`) used by setup-11 and notebook 04
+- Timestamps: generation follows store-local time; Silver and events store true UTC (`dim_stores.TimeZone`, `fact_receipts.local_hour` for the local view)
+- Live stream state: versioned Delta tables `ag._stream_state_*`, read as of the previous batch and replaced per `batch_id`
+- Writer coordination: lease rows in `ag._job_locks` (`generation/job_locks.py`)
 
 ## When NOT to Over-Parallelize
 
@@ -212,8 +216,21 @@ The fact tables formerly tracked in issues #7-#13 (fact_payments, fact_stockouts
 fact_reorders, fact_promotions, fact_store_ops, fact_customer_zone_changes) and the
 `truck_departed` event are all implemented — see
 `utility/src/retail_setup/generation/schemas.py` and
-`utility/notebooks/templates/driver-05-stream.py`. Check the GitHub issue tracker
-for current open work.
+`utility/notebooks/templates/driver-05-stream.py`.
+
+The adversarial data review (PRs #451-#461) is merged but has not run in
+Fabric. Open work lives in the module backlogs under `docs/design/requirements/`:
+
+- `IMP-014` (operations): live acceptance of the data-review changes, and the
+  remaining readiness invariants (live BLE resolution, attribution
+  completeness, alert-rate bands).
+- `IMP-005` (streaming): the live streaming checks, plus known stream
+  limitations such as the `C-16` residual (historical truck stages between the
+  end of history and a late stream start become observable).
+- Deployment-started streams pass `stream.rows_per_second` (default 5, range
+  1-1000), so they can't use the notebook's derived rate (`0`).
+
+Check the GitHub issue tracker for other current work.
 
 ---
 
@@ -223,6 +240,7 @@ for current open work.
 
 **Timestamps & Time Zones**
 - Always use UTC with timezone info: `datetime.now(timezone.utc)`
+- Generate in store-local time, publish UTC; read the local view from `dim_stores.TimeZone` / `local_hour`
 - Event timestamps must be monotonically increasing within a batch
 - Use `pd.Timestamp.utcnow()` in pandas, not `pd.Timestamp.now()`
 
@@ -240,10 +258,23 @@ for current open work.
 - Events can arrive out of order; design consumers accordingly
 - Use partition keys for ordering guarantees within a partition
 - Set reasonable batch sizes (100-500 events) to balance latency vs throughput
+- Reuse the batch models in the stream (inlined by `build_notebooks.py`); never add live-only vocabulary or thresholds
+- Kusto `ingestion_time()` is not visible through the OneLake shortcut; carry arrival time in a payload column
+- Positional Spark Kusto writes need the table's column order: restate changed tables with `.alter table`
+
+**Inlined notebook code**
+- `build_notebooks.py` flattens package modules into one notebook namespace: a module-level `import x` can shadow another module's name. Alias stdlib imports (`import time as _time`)
+- Spark workers pickle module-level `functools.lru_cache` wrappers by reference; use plain dict caches in code that runs on workers
+- Keep Spark plans small: bind random draws once and avoid `distinct()` over large generated frames that the optimizer can push into cross joins
 
 ### Past Incidents
 
 _Document issues and their resolutions here as they occur:_
+
+- **2026-11-23**: `job_locks.py`'s `import time` broke setup-08's inventory worker (PR #460)
+  - Root cause: the setup notebooks inline every package module into one flat engine cell. `job_locks.py`'s module-level `import time` replaced the `time` that `dc_supply.py` and `gold_rules.py` import from `datetime`, so the inventory worker failed with `'module' object is not callable`
+  - Fix: `import time as _time` in `job_locks.py`, notebooks rebuilt (commit c10268b); the inventory, job-lock and notebook-build tests pass again
+  - Prevention: alias stdlib module imports in modules that are inlined into notebooks, and run the flat-bundle tests (`test_notebook_build.py`, `test_inventory_notebook.py`) after adding a module to the bundle
 
 - **2026-01-28**: Schema field name mismatch in reorder transform (PR #224)
   - Root cause: Transform referenced `quantity_ordered` instead of `reorder_quantity` from source schema

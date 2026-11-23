@@ -54,3 +54,20 @@ Native Planning shall require a supported shared
 model connection and explicit billing acknowledgement. Source publication,
 interactive feature acceptance, and external execution shall remain distinct
 claims; unresolved tenant/connection prerequisites shall fail honestly.
+
+### REQ-MLAI-007 - Correct model inputs and validation
+
+Required ML producers shall read sales correctly (sale receipts only,
+complete days, online orders included, returns and anonymous rows excluded,
+gaps between history and the stream treated as missing), share one source
+as-of, and score only entities active in the feature window. Elasticity shall
+be estimated from shelf prices with a promotion control and gated on
+significance. The required-output validator shall check source as-of
+consistency, freshness against Silver, foreign keys, allowed category values,
+and forecast quality.
+
+### REQ-MLAI-008 - Generated agent snapshots
+
+Data Agent draft and published snapshots shall be generated from the active
+TMDL and the ontology builder, and CI shall fail when a committed snapshot
+drifts from them.
