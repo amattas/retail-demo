@@ -64,29 +64,29 @@ def test_optional_ml_notebooks_are_valid_json_and_python() -> None:
                 )
 
 
-def test_market_basket_uses_union_frequency_and_replaces_empty_outputs() -> None:
+def test_market_basket_counts_pairs_over_all_sale_baskets() -> None:
     source = _source("market_basket")
 
     assert "canonicalize_itemset(F.collect_set(\"product_id\"))" in source
-    assert "canonicalize_itemset(F.array_union(" in source
-    assert '(F.size(F.col("antecedent")) == 1)' in source
-    assert '(F.size(F.col("consequent")) == 1)' in source
-    assert 'F.col("rule_itemset_freq") / F.lit(float(total_baskets))' in source
-    assert 'F.col("confidence").alias("support")' not in source
-    assert '.agg(F.max("support")' not in source
-    assert '.agg(F.max("confidence")' not in source
-    assert '.agg(F.max("lift")' not in source
-    assert "model = None" in source
+    # Single-item baskets stay in the denominator; nothing pre-filters to
+    # popular products or multi-item baskets.
+    assert "TOP_PRODUCTS" not in source
+    assert "FPGrowth" not in source
+    assert ".filter(F.size(F.col(\"items\")) > 1)\n" not in source
+    assert "cooccurrence_rules(baskets, total_baskets, MIN_PAIR_BASKETS)" in source
+    assert 'MIN_PAIR_BASKETS = int(get_env("MIN_PAIR_BASKETS", default="20"))' in source
+    assert 'F.lit(source_as_of).cast("timestamp")' in source
     assert "recommendations_table, recommendations_count = save_gold(" in source
-    assert "Skipping: no rules to create recommendations" not in source
 
 
 def test_market_basket_falls_back_to_observed_pairs_when_thresholds_yield_no_rules() -> None:
     source = _source("market_basket")
 
-    assert 'MIN_PAIR_BASKETS = int(get_env("MIN_PAIR_BASKETS", default="2"))' in source
-    assert "fallback_rules = cooccurrence_rules(baskets, total_baskets, MIN_PAIR_BASKETS)" in source
-    assert 'RULE_SOURCE = "cooccurrence"' in source
+    assert (
+        "fallback_rules = cooccurrence_rules(baskets, total_baskets, "
+        "FALLBACK_MIN_PAIR_BASKETS)"
+    ) in source
+    assert 'RULE_SOURCE = "cooccurrence_fallback"' in source
     assert '"rule_source": RULE_SOURCE,' in source
 
 

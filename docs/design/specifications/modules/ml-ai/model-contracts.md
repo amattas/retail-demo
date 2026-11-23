@@ -157,11 +157,18 @@ blocked.
 Optional and experimental corrections are also contract-bound:
 
 - recommendation support, confidence, and lift come from one singleton-pair
-  market-basket rule. When no FP-Growth rule meets `MIN_SUPPORT` and
-  `MIN_CONFIDENCE`, the producer instead uses the pairs bought together in at
-  least `MIN_PAIR_BASKETS` (default 2) multi-item baskets. Those pairs use the
-  same support, confidence, and lift definitions, and MLflow records
-  `rule_source` (`fpgrowth` or `cooccurrence`). Required recommendations still
+  market-basket rule counted over every `SALE` basket, single-item baskets
+  included, so support and lift are relative to all baskets. A rule needs at
+  least `MIN_PAIR_BASKETS` (default 20) co-purchases, `MIN_CONFIDENCE`
+  (default 0.05) and lift above `MIN_LIFT` (default 1.0); each product keeps
+  its `MAX_RULES_PER_PRODUCT` (default 5) best rules by lift. The generator's
+  complementary products (`baskets.with_complements`) are what these rules
+  recover. Above `MAX_PAIR_BASKETS` (default 2,000,000) baskets, pairs are
+  counted on a deterministic hash sample of baskets. When no pair meets the
+  thresholds, the producer instead uses the pairs bought together in at least
+  `FALLBACK_MIN_PAIR_BASKETS` (default 2) baskets with the same definitions,
+  and MLflow records `rule_source` (`cooccurrence` or
+  `cooccurrence_fallback`). Required recommendations still
   need multi-item baskets. `configure`, the setup interface's configuration
   page, and `render` therefore reject a store type whose calibrated basket
   averages less than 0.1 extra items, for profiles with required ML. Every

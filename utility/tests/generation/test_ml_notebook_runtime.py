@@ -186,3 +186,46 @@ def test_churn_snapshots_pair_only_active_customers_and_see_online_activity(spar
     assert online_only.unique_stores == 0
     assert labeled[(1, date(2026, 2, 1))].is_churned == 0.0
     assert labeled[(1, date(2026, 3, 1))].is_churned == 1.0
+
+
+def test_market_basket_rules_recover_complements_over_all_baskets(spark):
+    import random
+
+    nb07 = _load(
+        "07-ml-market-basket.ipynb", {"sample_baskets", "cooccurrence_rules", "select_rules"}
+    )
+    rng = random.Random(7)
+    rows = []
+    for index in range(3000):
+        size = rng.choice([1, 1, 2, 3])
+        items = set(rng.sample(range(1, 41), size))
+        # Product 5's complement is 6, product 9's is 10 (like with_complements).
+        for product, partner in ((5, 6), (9, 10)):
+            if product in items and rng.random() < 0.6:
+                items.add(partner)
+        rows.append((f"R{index}", sorted(items)))
+    baskets = spark.createDataFrame(rows, "receipt_id_ext string, items array<long>")
+    total = len(rows)
+
+    rules = nb07["select_rules"](
+        nb07["cooccurrence_rules"](baskets, total, 20), 0.0, 0.05, 1.0, 5, 100
+    ).collect()
+    pairs = {(rule.antecedent[0], rule.consequent[0]): rule for rule in rules}
+
+    assert set(pairs) == {(5, 6), (6, 5), (9, 10), (10, 9)}
+    rule = pairs[(5, 6)]
+    with_5 = sum(5 in items for _, items in rows)
+    with_6 = sum(6 in items for _, items in rows)
+    both = sum(5 in items and 6 in items for _, items in rows)
+    # Ratios over all baskets, single-item ones included.
+    assert rule.support == pytest.approx(both / total)
+    assert rule.confidence == pytest.approx(both / with_5)
+    assert rule.lift == pytest.approx((both / with_5) / (with_6 / total))
+    assert rule.lift > 5
+
+    sampled = nb07["sample_baskets"](baskets, total, 1000)
+    assert 800 < sampled.count() < 1200
+    assert sorted(r.receipt_id_ext for r in sampled.collect()) == sorted(
+        r.receipt_id_ext for r in nb07["sample_baskets"](baskets, total, 1000).collect()
+    )
+    assert nb07["sample_baskets"](baskets, total, total) is baskets
