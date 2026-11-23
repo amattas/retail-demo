@@ -38,6 +38,16 @@
   whose policies permit its documented prerequisites.
 - Configure and accept native approvals/SQL writeback in-product before any
   simulated execution bridge is added. Real ERP execution is outside scope.
+- Pre-approved actions are not in the public definition schema. In the agent
+  settings, mark **Prepare replenishment case** as pre-approved if the preview
+  offers it, confirm the action still creates only a DRAFT row in
+  `ops.replenishment_cases`, and check whether `getDefinition` then exposes
+  the setting so the publisher can set it. Confirm that **Investigate
+  further** in Teams shows Investigator insights (anomaly root-cause
+  analysis, on by default).
+- The agent's signals now carry `dc_id`, lead time, inbound units and the
+  active logistics incident, and its query suppresses cases that already
+  have an action; this needs the same live acceptance.
 
 ### ENH-003 - Ground semantic-model agents and gate ontology agents {#enh-003}
 
@@ -99,8 +109,21 @@
     - whether the MCP tools still work on the new item;
   - retiring the `30-create-ontology` notebook once the TMDL path is
     proven (it is already skipped for TMDL-format items);
-  - re-exporting the ontology Data Agent snapshots;
-  - pointing `app/backend/ontology_graph.py` at the generator.
+  - re-exporting the ontology Data Agent snapshots and comparing them with
+    the generated ones (`REQ-MLAI-008`);
+  - pointing `app/backend/ontology_graph.py` at the generator's
+    `entityRelationships.tmdl` instead of the notebook's `RELATIONSHIPS`
+    literal;
+  - checking whether a graph materialization API exists; until one does,
+    materialization is a documented manual step and the app's multi-hop
+    features must degrade explicitly;
+  - confirming `search_ontology` and `list_ontology_entity_types` work on the
+    new item, and the ontology Data Agent answers the sample questions in
+    `guides/sample-retail-questions.md`;
+  - recording the Ontology Discovery capacity use of one readiness run, and
+    keeping readiness to one definition read.
+- **Gap:** there is no Shipment entity because `fact_truck_moves` has no
+  unique shipment-row key.
 
 ### ENH-011 - Add ontology business rules {#enh-011}
 
@@ -142,7 +165,10 @@
   caller. Separation of duties and the decision timestamp are still enforced
   only in the client. Reporting profiles deploy it through the non-required
   `deploy-fabric-app` step, which needs Node.js 20+. Live deployment and the
-  negative API checks are pending: see `context/plans/2026-10-07-fabcon-live-tests.md`.
+  negative API checks are pending: see the live acceptance checklist in
+  `app/fabric-app/README.md` (two-user SSO, server-side reviewer identity,
+  denied update/delete and forged `reviewer_id`, and the known self-approval
+  and backdated `decided_at` gap).
 - Validate the [living scenario and action contract](../../../specifications/modules/ml-ai/decision-experience.md)
   end to end; do not infer completion from `app/backend/replay.py`.
 - Retain replay/live parity, golden answers, scenario generation/checksums,
