@@ -610,15 +610,30 @@ def test_committed_pipelines_isolate_ml_tiers_and_gate_reporting(
         "10-ml-promotion-effectiveness",
         "setup-11-build-gold",
     }
-    # Gold reads only Silver, so it runs here alongside training. It shares a
-    # lane with the shortest producer so at most six sessions run at once.
-    lanes = {"setup-11-build-gold": [], "08-ml-customer-segmentation": ["setup-11-build-gold"]}
+    # Gold reads only Silver, so it runs here alongside training. Two waves keep
+    # at most five sessions running: Gold, 06, 07, 10 and 12 first, then the
+    # customer models (08 needs Gold to have succeeded; 09 only waits).
+    first_wave = {
+        "setup-11-build-gold",
+        "06-ml-demand-forecast",
+        "07-ml-market-basket",
+        "10-ml-promotion-effectiveness",
+        "12-ml-stockout-prediction",
+    }
     validator = required["15-validate-required-ml-contract"]
-    assert all(
-        [dependency["activity"] for dependency in required[name]["dependsOn"]]
-        == lanes.get(name, [])
-        for name in required_producers
-    )
+    for name in first_wave:
+        assert required[name]["dependsOn"] == []
+    for name in ("08-ml-customer-segmentation", "09-ml-churn-prediction"):
+        conditions = {
+            dependency["activity"]: dependency["dependencyConditions"]
+            for dependency in required[name]["dependsOn"]
+        }
+        assert set(conditions) == first_wave
+        expected_gold = (
+            ["Succeeded"] if name == "08-ml-customer-segmentation" else ["Completed"]
+        )
+        assert conditions.pop("setup-11-build-gold") == expected_gold
+        assert all(value == ["Completed"] for value in conditions.values())
     assert {
         dependency["activity"] for dependency in validator["dependsOn"]
     } == required_producers

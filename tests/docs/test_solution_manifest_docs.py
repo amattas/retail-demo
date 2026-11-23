@@ -237,7 +237,7 @@ def test_source_derived_data_event_model_and_ml_counts_match_guide() -> None:
         "TABLES",
     )
     gold_tables = _literal_assignment(
-        ROOT / "utility" / "src" / "retail_setup" / "generation" / "gold.py",
+        ROOT / "utility" / "src" / "retail_setup" / "generation" / "gold_rules.py",
         "GOLD_TABLES",
     )
     event_names = _dict_assignment_keys(

@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 import json
 import math
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from functools import reduce
 from pathlib import Path
 from types import FunctionType, SimpleNamespace
@@ -37,10 +37,12 @@ def _notebook(path: Path) -> dict[str, Any]:
 
 
 def _code(path: Path) -> str:
+    # Generated SHARED SOURCE cells (job locks) are tested with their module.
     return "\n".join(
         "".join(cell.get("source", []))
         for cell in _notebook(path)["cells"]
         if cell.get("cell_type") == "code"
+        and not "".join(cell.get("source", [])).startswith("# SHARED SOURCE")
     )
 
 
@@ -111,18 +113,23 @@ def test_demand_uses_dense_rolling_origins_and_recursive_state() -> None:
         "df_evaluation_base, df_evaluation_cohort = "
         "build_dense_daily_calendar(\n"
         "    df_daily_sales,\n"
-        "    source_as_of_date,\n"
+        "    anchor_date,\n"
         "    train_end_date,"
     ) in code
     assert (
         "df_inference_base, df_inference_cohort = "
         "build_dense_daily_calendar(\n"
         "    df_daily_sales,\n"
-        "    source_as_of_date,\n"
-        "    source_as_of_date,"
+        "    anchor_date,\n"
+        "    anchor_date,"
     ) in code
     assert "add_demand_features(df_evaluation_base)" in code
     assert "    df_inference_base,\n    forecast_start_date," in code
+    assert "forecast_start_date = anchor_date + timedelta(days=1)" in code
+
+    last_complete_day = _function(path, "last_complete_day", {"timedelta": timedelta})
+    assert last_complete_day(datetime(2026, 7, 21, 0, 30)) == date(2026, 7, 20)
+    assert last_complete_day(datetime(2026, 7, 21, 23, 59)) == date(2026, 7, 20)
 
     mape = _function(path, "mape_ratio_column")
     mape_source = ast.unparse(ast.parse(_function_source(path, mape.__name__)))
@@ -202,8 +209,11 @@ def test_churn_snapshots_labels_and_probabilities_are_non_leaky() -> None:
     assert purged["test_start"] > purged["calibration_end"] + timedelta(days=90)
     feature_source = _function_source(path, "build_feature_snapshots")
     label_source = _function_source(path, "attach_forward_churn_labels")
-    assert '< F.col("snapshot.snapshot_date")' in feature_source
-    assert '>= F.col("snapshot.snapshot_date")' in label_source
+    assert "pair_with_snapshots(\n        daily_activity, snapshot_dates, 0, FEATURE_WINDOW_DAYS" in (
+        feature_source
+    )
+    assert "-CHURN_WINDOW_DAYS,\n            0," in label_source
+    assert "crossJoin" not in code
     assert "F.date_add(" in label_source
     assert "days_since_last_purchase" not in code
     assert "IsotonicRegression(" in code
@@ -368,3 +378,61 @@ def test_required_validator_detects_every_non_finite_float(
     assert any_non_finite(("metric",))
     FakeFunctions.values["metric"] = 1.25
     assert not any_non_finite(("metric",))
+
+
+def test_required_validator_category_values_cover_producers_and_measures() -> None:
+    import re
+
+    allowed = _literal_assignment(NOTEBOOKS["validator"], "ALLOWED_CATEGORY_VALUES")
+    producers = {
+        "customer_segments": NOTEBOOKS["segments"],
+        "churn_predictions": NOTEBOOKS["churn"],
+        "stockout_risk": NOTEBOOKS["stockout"],
+        "price_elasticity": REPO_ROOT / "fabric" / "lakehouse" / "10-ml-promotion-effectiveness.ipynb",
+    }
+    for table, columns in allowed.items():
+        code = _code(producers[table])
+        for values in columns.values():
+            for value in values:
+                assert f'"{value}"' in code, (table, value)
+
+    # Every literal a measure filters a category column on is an allowed value.
+    tables = REPO_ROOT / "fabric" / "powerbi" / "retail_model.SemanticModel" / "definition" / "tables"
+    display = {
+        "stockout_risk": ("Risk Level", "risk_level"),
+        "churn_predictions": ("Risk Category", "risk_category"),
+        "price_elasticity": ("Elasticity Category", "elasticity_category"),
+    }
+    for table, (column, source_column) in display.items():
+        tmdl = (tables / f"{table}.tmdl").read_text(encoding="utf-8")
+        literals = set()
+        for match in re.finditer(
+            rf"'{table}'\[{column}\]\s*(?:=\s*\"([^\"]+)\"|IN\s*\{{([^}}]*)\}})", tmdl
+        ):
+            literals |= {match.group(1)} if match.group(1) else set(
+                re.findall(r'"([^"]+)"', match.group(2))
+            )
+        assert literals, table
+        assert literals <= set(allowed[table][source_column]), (table, literals)
+
+
+def test_required_validator_requires_one_current_source_as_of() -> None:
+    from datetime import datetime as dt
+
+    validate = _function(
+        NOTEBOOKS["validator"],
+        "_validate_source_as_of",
+        {"MAX_SOURCE_LAG_HOURS": 24.0, "MAX_AS_OF_SKEW_HOURS": 6.0},
+    )
+    silver = dt(2026, 7, 21, 9)
+    same = {"demand_forecast": silver, "stockout_risk": silver - timedelta(hours=2)}
+    validate(same, silver)
+
+    with pytest.raises(RuntimeError, match="behind the Silver"):
+        validate({**same, "churn_predictions": silver - timedelta(days=2)}, silver)
+    with pytest.raises(RuntimeError, match="ahead of the Silver"):
+        validate({**same, "churn_predictions": silver + timedelta(hours=1)}, silver)
+    with pytest.raises(RuntimeError, match="disagree"):
+        validate(
+            {"demand_forecast": silver, "stockout_risk": silver - timedelta(hours=7)}, silver
+        )

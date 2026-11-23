@@ -1,258 +1,28 @@
-"""Gold aggregates — exact port of 02-historical-data-load.ipynb Part 3.
+"""Gold aggregates for setup-11, built from the shared ``gold_rules`` module.
 
-Operates on the in-memory ``GenerationResult.tables`` dict (``tables[...]``
-replaces the legacy ``read_silver(...)``). Definitions are identical in
-02-historical-data-load and 04-streaming-to-gold (verified 2026-06-12).
-
-Deliberate decisions (vs the legacy notebooks):
-- Money sums: legacy summed the formatted STRING columns (total_amount,
-  subtotal_amount, tax_amount, ext_price, cost) relying on Spark's implicit
-  cast — here we cast explicitly to double. Identical results, honest types.
-- ``computed_at`` (top_products_15m) and ``as_of`` (both inventory positions)
-  are produced exactly as the legacy code does, even though the TMDL doesn't
-  bind them — extra columns are allowed.
-- Legacy quirks preserved: truck_dwell_daily derives ``site`` as
-  ``STORE_<id>`` / ``DC_<id>`` and filters ``dwell_min > 0``; the two
-  inventory positions take the latest balance per key via a row_number
-  window over ``event_ts`` and ``trace_id`` descending.
+Setup-11 (``ml-required``) and notebook 04 (``streaming-data-load``) publish
+the same ten Gold tables. Both use ``gold_rules`` (notebook 04 embeds its
+source; ``scripts/build_notebooks.py --check`` enforces that), so the tables
+don't change depending on which pipeline ran last. This module only adds the
+contract column order from ``schemas.TABLES``.
 """
 
-from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql import functions as F
-from pyspark.sql.window import Window
+from datetime import datetime
 
+from pyspark.sql import DataFrame, SparkSession
+
+from retail_setup.generation.gold_rules import GOLD_TABLES, build_gold_tables
 from retail_setup.generation.schemas import column_names
 
-GOLD_TABLES: list[str] = [
-    "sales_minute_store",
-    "top_products_15m",
-    "inventory_position_current",
-    "dc_inventory_position_current",
-    "truck_dwell_daily",
-    "online_sales_daily",
-    "zone_dwell_minute",
-    "marketing_cost_daily",
-    "campaign_performance_daily",
-    "tender_mix_daily",
-]
+__all__ = ["GOLD_TABLES", "generate_gold"]
 
 
-def _money(col: str):
-    """Explicit double cast for the legacy formatted string money columns."""
-    return F.col(col).cast("double")
+def generate_gold(
+    spark: SparkSession, tables: dict[str, DataFrame], cutoff: datetime
+) -> dict[str, DataFrame]:
+    """Build the 10 Gold aggregate frames from the Silver fact tables.
 
-
-def _latest_inventory_position(
-    transactions: DataFrame,
-    node_column: str,
-    gold_table: str,
-) -> DataFrame:
-    """Select the final deterministic balance for each node/product key."""
-    latest = Window.partitionBy(node_column, "product_id").orderBy(
-        F.desc("event_ts"),
-        F.desc("trace_id"),
-    )
-    return (
-        transactions.withColumn("rn", F.row_number().over(latest))
-        .filter(F.col("rn") == 1)
-        .select(
-            node_column,
-            "product_id",
-            F.col("balance").alias("on_hand"),
-            F.col("event_ts").alias("as_of"),
-        )
-        .select(*column_names(gold_table))
-    )
-
-
-def generate_campaign_performance(
-    fact_marketing: DataFrame,
-    fact_marketing_attribution: DataFrame,
-) -> DataFrame:
-    """Aggregate campaign spend and reconciled conversions by touch day."""
-
-    campaign_spend = (
-        fact_marketing.withColumn("day", F.to_date("event_ts"))
-        .groupBy("campaign_id", "channel", "day")
-        .agg(
-            F.countDistinct("impression_id_ext").alias("impressions"),
-            F.sum("cost_cents").cast("long").alias("spend_cents"),
-        )
-    )
-    campaign_conversions = (
-        fact_marketing_attribution.filter(F.col("attribution_status") == "ATTRIBUTED")
-        .withColumn("day", F.to_date("touch_ts"))
-        .groupBy("campaign_id", "channel", "day")
-        .agg(
-            F.countDistinct("attribution_id").alias("conversions"),
-            F.sum("attributed_revenue_cents").cast("long").alias("attributed_revenue_cents"),
-            F.sum("discount_cents").cast("long").alias("discount_cents"),
-            F.sum("tax_cents").cast("long").alias("tax_cents"),
-            F.sum("payment_cents").cast("long").alias("payment_cents"),
-        )
-    )
-    return (
-        campaign_spend.join(campaign_conversions, ["campaign_id", "channel", "day"], "left")
-        .fillna(
-            0,
-            subset=[
-                "conversions",
-                "attributed_revenue_cents",
-                "discount_cents",
-                "tax_cents",
-                "payment_cents",
-            ],
-        )
-        .withColumn(
-            "conversion_rate",
-            F.when(F.col("impressions") == 0, F.lit(0.0)).otherwise(
-                F.col("conversions") / F.col("impressions")
-            ),
-        )
-        .withColumn(
-            "roas",
-            F.when(F.col("spend_cents") == 0, F.lit(0.0)).otherwise(
-                F.col("attributed_revenue_cents") / F.col("spend_cents")
-            ),
-        )
-        .select(*column_names("campaign_performance_daily"))
-    )
-
-
-def generate_truck_dwell_daily(fact_truck_moves: DataFrame) -> DataFrame:
-    """Average unload dwell (`etd - eta`) per site and day.
-
-    Empty when the window produced no completed deliveries, e.g. a short
-    history whose opening stock never reaches a reorder point.
+    ``cutoff`` is the exclusive upper bound from ``gold_rules.gold_cutoff``.
     """
-    return (
-        fact_truck_moves.withColumn("day", F.to_date("event_ts"))
-        .withColumn(
-            "site",
-            F.when(
-                F.col("store_id").isNotNull(), F.concat(F.lit("STORE_"), F.col("store_id"))
-            ).otherwise(F.concat(F.lit("DC_"), F.col("dc_id"))),
-        )
-        .withColumn(
-            "dwell_min",
-            (F.unix_timestamp("etd") - F.unix_timestamp("eta")) / 60,
-        )
-        .filter(F.col("dwell_min").isNotNull() & (F.col("dwell_min") > 0))
-        .groupBy("site", "day")
-        .agg(
-            F.avg("dwell_min").alias("avg_dwell_min"),
-            F.countDistinct("truck_id").alias("trucks"),
-        )
-        .select(*column_names("truck_dwell_daily"))
-    )
-
-
-def generate_gold(spark: SparkSession, tables: dict[str, DataFrame]) -> dict[str, DataFrame]:
-    """Build the 10 Gold aggregate frames from the generated fact tables."""
-    gold: dict[str, DataFrame] = {}
-
-    # Sales by minute per store
-    gold["sales_minute_store"] = (
-        tables["fact_receipts"]
-        .withColumn("ts", F.date_trunc("minute", F.col("event_ts")))
-        .groupBy("store_id", "ts")
-        .agg(
-            F.sum(_money("total_amount")).alias("total_sales"),
-            F.count("*").alias("receipts"),
-            F.avg(_money("total_amount")).alias("avg_basket"),
-        )
-        .select(*column_names("sales_minute_store"))
-    )
-
-    # Top products by revenue (15m windows). Real-time tile: keep only the most
-    # recent 15-minute window so SUM(revenue)/SUM(units) reflect the latest
-    # window, not lifetime totals (the legacy build retained every window).
-    _top15 = (
-        tables["fact_receipt_lines"]
-        .withColumn("window_15m", F.window(F.col("event_ts"), "15 minutes"))
-        .groupBy("product_id", "window_15m")
-        .agg(
-            F.sum(_money("ext_price")).alias("revenue"),
-            F.sum("quantity").alias("units"),
-        )
-        .withColumn("computed_at", F.col("window_15m.end"))
-        .drop("window_15m")
-    )
-    _latest_15m = _top15.agg(F.max("computed_at").alias("m")).collect()[0]["m"]
-    if _latest_15m is not None:
-        _top15 = _top15.filter(F.col("computed_at") == F.lit(_latest_15m))
-    gold["top_products_15m"] = _top15.select(*column_names("top_products_15m"))
-
-    # Current store inventory position (latest balance per store/product).
-    gold["inventory_position_current"] = _latest_inventory_position(
-        tables["fact_store_inventory_txn"],
-        "store_id",
-        "inventory_position_current",
-    )
-
-    # DC inventory position (latest balance per dc/product).
-    gold["dc_inventory_position_current"] = _latest_inventory_position(
-        tables["fact_dc_inventory_txn"],
-        "dc_id",
-        "dc_inventory_position_current",
-    )
-
-    # Truck dwell time daily
-    gold["truck_dwell_daily"] = generate_truck_dwell_daily(tables["fact_truck_moves"])
-
-    # Online sales daily
-    gold["online_sales_daily"] = (
-        tables["fact_online_order_headers"]
-        .withColumn("day", F.to_date("event_ts"))
-        .groupBy("day")
-        .agg(
-            F.count("*").alias("orders"),
-            F.sum(_money("subtotal_amount")).alias("subtotal"),
-            F.sum(_money("tax_amount")).alias("tax"),
-            F.sum(_money("total_amount")).alias("total"),
-            F.avg(_money("total_amount")).alias("avg_order_value"),
-        )
-        .select(*column_names("online_sales_daily"))
-    )
-
-    # Zone dwell per minute
-    gold["zone_dwell_minute"] = (
-        tables["fact_foot_traffic"]
-        .withColumn("ts", F.date_trunc("minute", F.col("event_ts")))
-        .groupBy("store_id", "zone", "ts")
-        .agg(
-            F.avg("dwell_seconds").alias("avg_dwell"),
-            F.sum("count").alias("customers"),
-        )
-        .select(*column_names("zone_dwell_minute"))
-    )
-
-    # Marketing cost daily
-    gold["marketing_cost_daily"] = (
-        tables["fact_marketing"]
-        .withColumn("day", F.to_date("event_ts"))
-        .groupBy("campaign_id", "day")
-        .agg(
-            F.count("*").alias("impressions"),
-            F.sum(_money("cost")).alias("cost"),
-        )
-        .select(*column_names("marketing_cost_daily"))
-    )
-
-    gold["campaign_performance_daily"] = generate_campaign_performance(
-        tables["fact_marketing"], tables["fact_marketing_attribution"]
-    )
-
-    # Tender mix daily
-    gold["tender_mix_daily"] = (
-        tables["fact_receipts"]
-        .withColumn("day", F.to_date("event_ts"))
-        .groupBy("day", "payment_method")
-        .agg(
-            F.count("*").alias("transactions"),
-            F.sum(_money("total_amount")).alias("total_amount"),
-        )
-        .select(*column_names("tender_mix_daily"))
-    )
-
-    return gold
+    gold = build_gold_tables(tables, cutoff)
+    return {name: gold[name].select(*column_names(name)) for name in GOLD_TABLES}

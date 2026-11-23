@@ -12,6 +12,7 @@ NOTEBOOK = ROOT / "fabric" / "lakehouse" / "05-maintain-delta-tables.ipynb"
 # Tables in the Silver schema that are owned outside schemas.TABLES.
 SILVER_CONTROL_TABLES = {
     "_watermarks": "fabric/lakehouse/03-streaming-to-silver.ipynb",
+    "_job_locks": "utility/src/retail_setup/generation/job_locks.py",
     "_stream_state_stores": "utility/src/retail_setup/generation/stream_state.py",
     "_stream_state_visits": "utility/src/retail_setup/generation/stream_state.py",
     "_stream_state_meta": "utility/src/retail_setup/generation/stream_state.py",

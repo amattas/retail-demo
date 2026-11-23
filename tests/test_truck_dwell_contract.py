@@ -130,8 +130,10 @@ def test_silver_joins_one_completed_lifecycle_on_authoritative_keys() -> None:
 def test_gold_aggregates_one_lifecycle_in_minutes_with_canonical_sites() -> None:
     source = _notebook_source(GOLD_NOTEBOOK)
 
-    assert f"lifecycle_keys = {LIFECYCLE_KEYS!r}".replace("'", '"') in source
-    assert ".groupBy(*lifecycle_keys)" in source
+    assert f"GOLD_TRUCK_LIFECYCLE_KEYS = {LIFECYCLE_KEYS!r}".replace("'", '"') in source
+    assert 'filter(F.col("status") == "COMPLETED")' in source
+    assert ".groupBy(*GOLD_TRUCK_LIFECYCLE_KEYS)" in source
+    assert 'F.to_date("arrival_time")' in source
     assert 'F.min("eta").alias("arrival_time")' in source
     assert 'F.col("departure_time") > F.col("arrival_time")' in source
     assert 'F.lit("STORE_")' in source

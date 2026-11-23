@@ -655,13 +655,14 @@ The supported calculation uses base capacity only:
 - The deploy reserves 25% headroom:
   `usable_vcores = floor(CU * 2 * 0.75)`.
 - The required-ML pipeline's root notebook producer count is authoritative
-  (currently six concurrent sessions).
+  (currently five concurrent sessions: Gold and four producers run first, and
+  the second wave is narrower).
 - Medium nodes use 8 vCores. Each session receives
   `floor(usable_vcores / (producer_count * 8))` nodes, clamped to 2–16.
 - The minimum is `min(2, max_nodes)`. Preflight fails if every producer cannot
   receive at least two Medium nodes (one driver and one executor).
 
-This yields 2 nodes per session on F64, 4 on F128, 8 on F256, and the 16-node
+This yields 2 nodes per session on F64, 4 on F128, 9 on F256, and the 16-node
 cap on F512 and larger. The calculation does not use or claim burst capacity.
 Live preflight writes bounded, non-secret evidence to
 `deploy/.generated/<env>/capacity-sizing.json`; custom-pool config generation

@@ -16,6 +16,10 @@ Usage:
 
 ``--check`` rebuilds into a temp dir and byte-diffs against the committed
 notebooks in ``utility/notebooks/``; exits 1 listing any drifted files.
+
+The build also refreshes the shared cells of the hand-authored Lakehouse
+notebooks listed in ``LAKEHOUSE_SHARED_CELLS`` (``fabric/lakehouse/``), and
+``--check`` reports them when they differ from their package module.
 """
 
 import argparse
@@ -62,7 +66,9 @@ ENGINE_MODULES = [
     "generation/sensors.py",
     "generation/inventory_balances.py",
     "generation/inventory.py",
+    "generation/gold_rules.py",
     "generation/gold.py",
+    "generation/job_locks.py",
     "generation/invariants.py",
     "generation/handoff.py",
     "generation/engine.py",
@@ -167,6 +173,25 @@ STREAM_MODULES = [
     "generation/stream_supply.py",
     "generation/stream_events.py",
 ]
+
+# Lakehouse notebooks under fabric/lakehouse/ are hand-authored, except cells
+# that start with SHARED_CELL_MARKER: those are copies of package modules, so
+# the setup notebooks and the Lakehouse pipelines share one definition.
+LAKEHOUSE_DIR = UTILITY.parent / "fabric" / "lakehouse"
+SHARED_CELL_MARKER = "# SHARED SOURCE (generated - do not edit): retail_setup/"
+_JOB_LOCKS = "generation/job_locks.py"
+LAKEHOUSE_SHARED_CELLS: dict[str, list[str]] = {
+    "03-streaming-to-silver": [_JOB_LOCKS],
+    "04-streaming-to-gold": ["generation/gold_rules.py", _JOB_LOCKS],
+    "05-maintain-delta-tables": [_JOB_LOCKS],
+    "06-ml-demand-forecast": [_JOB_LOCKS],
+    "07-ml-market-basket": [_JOB_LOCKS],
+    "08-ml-customer-segmentation": [_JOB_LOCKS],
+    "09-ml-churn-prediction": [_JOB_LOCKS],
+    "10-ml-promotion-effectiveness": [_JOB_LOCKS],
+    "12-ml-stockout-prediction": [_JOB_LOCKS],
+    "90-augment-and-dedupe-receipts": [_JOB_LOCKS],
+}
 
 _PKG_IMPORT = re.compile(r"^\s*(from retail_setup|import retail_setup)")
 
@@ -341,6 +366,61 @@ def render_notebook(
     }
 
 
+def shared_cell_source(rel: str) -> str:
+    """The generated body of a Lakehouse notebook cell that copies ``rel``."""
+    module = strip_package_imports((SRC / rel).read_text(encoding="utf-8")).strip("\n")
+    body = "\n".join(
+        [
+            f"{SHARED_CELL_MARKER}{rel}",
+            f"# Edit utility/src/retail_setup/{rel}, then run utility/scripts/build_notebooks.py.",
+            "",
+            module,
+        ]
+    )
+    compile(body, f"<shared {rel}>", "exec")
+    assert "retail_setup" not in "\n".join(
+        line for line in body.split("\n") if re.match(r"^\s*(from|import)\s", line)
+    ), f"unstripped package import in shared module {rel}"
+    return body
+
+
+def render_lakehouse_notebook(path: Path, modules: list[str]) -> tuple[str, str]:
+    """Return (committed text, rebuilt text) for a Lakehouse notebook's shared cells."""
+    committed = path.read_text(encoding="utf-8").replace("\r\n", "\n")
+    notebook = json.loads(committed)
+    found: list[str] = []
+    for cell in notebook["cells"]:
+        source = "".join(cell.get("source", []))
+        if cell.get("cell_type") != "code" or not source.startswith(SHARED_CELL_MARKER):
+            continue
+        rel = source.split("\n", 1)[0][len(SHARED_CELL_MARKER) :].strip()
+        if rel not in modules:
+            raise ValueError(f"{path.name}: shared cell for undeclared module {rel}")
+        cell["source"] = _source_lines(shared_cell_source(rel))
+        found.append(rel)
+    if sorted(found) != sorted(modules):
+        raise ValueError(f"{path.name}: shared cells {found} != declared {modules}")
+    rebuilt = json.dumps(notebook, indent=1, ensure_ascii=False)
+    if committed.endswith("\n"):
+        rebuilt += "\n"
+    return committed, rebuilt
+
+
+def build_lakehouse_shared(write: bool) -> list[Path]:
+    """Refresh (or, with ``write=False``, only diff) the Lakehouse shared cells."""
+    if not LAKEHOUSE_DIR.is_dir():
+        return []
+    drifted = []
+    for name, modules in LAKEHOUSE_SHARED_CELLS.items():
+        path = LAKEHOUSE_DIR / f"{name}.ipynb"
+        committed, rebuilt = render_lakehouse_notebook(path, modules)
+        if committed != rebuilt:
+            drifted.append(path)
+            if write:
+                path.write_text(rebuilt, encoding="utf-8", newline="\n")
+    return drifted
+
+
 def notebook_json(nb: dict) -> str:
     # byte-stability relies on insertion-stable dict order from render paths;
     # do NOT add sort_keys=True (it would reorder committed notebooks)
@@ -370,10 +450,11 @@ def check() -> int:
             drifted.append(committed)
     # A committed notebook no template builds (e.g. after a rename) is drift too.
     drifted.extend(path for path in sorted(NOTEBOOKS_DIR.glob("*.ipynb")) if path.stem not in built)
+    drifted.extend(build_lakehouse_shared(write=False))
     if drifted:
         print("notebook drift detected — re-run `python scripts/build_notebooks.py`:")
         for path in drifted:
-            print(f"  {path.relative_to(UTILITY)}")
+            print(f"  {path.relative_to(UTILITY.parent)}")
         return 1
     print(f"{len(built)} notebooks in sync")
     return 0
@@ -398,6 +479,8 @@ def main(argv: list[str] | None = None) -> int:
     built = build_all(args.output_dir)
     for name in built:
         print(f"built {args.output_dir / f'{name}.ipynb'}")
+    for path in build_lakehouse_shared(write=True):
+        print(f"refreshed shared cells in {path}")
     return 0
 
 

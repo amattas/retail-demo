@@ -16,7 +16,7 @@ KQL_FUNCTIONS = ROOT / "fabric" / "kql_database" / "03-create-functions.kql"
 SILVER_NOTEBOOK = ROOT / "fabric" / "lakehouse" / "03-streaming-to-silver.ipynb"
 GOLD_NOTEBOOK = ROOT / "fabric" / "lakehouse" / "04-streaming-to-gold.ipynb"
 SCHEMAS = ROOT / "utility" / "src" / "retail_setup" / "generation" / "schemas.py"
-GOLD = ROOT / "utility" / "src" / "retail_setup" / "generation" / "gold.py"
+GOLD = ROOT / "utility" / "src" / "retail_setup" / "generation" / "gold_rules.py"
 
 PURCHASE_FIELDS = {
     "campaign_id",
@@ -181,7 +181,7 @@ def test_silver_persists_only_complete_reconciled_journeys() -> None:
         'F.col("payment_cents") == F.col("total_cents")',
         'F.col("promotion_discount_cents") == F.col("discount_cents")',
         'F.lit("UNATTRIBUTED_NO_JOURNEY").alias("attribution_status")',
-        "attribution = attribution.unionByName(unattributed)",
+        "return attribution.unionByName(unattributed), purchases",
         '"fact_marketing_attribution"',
         "total += process_marketing_attribution()",
     ):
@@ -196,8 +196,11 @@ def test_blank_eventhouse_correlations_are_normalized_before_attribution() -> No
     assert source.count(
         '_normalized_attribution_journey_id("correlation_id")'
     ) == 5
-    assert "length(trim(attribution_journey_id)) = 0 THEN CAST(NULL AS STRING)" in source
-    assert '_normalized_attribution_journey_id("attribution_journey_id")' in source
+    # Journeys are normalized when read (no per-run table-wide UPDATE).
+    assert "UPDATE {target_name}" not in source
+    assert source.count(
+        '_normalized_attribution_journey_id("attribution_journey_id")'
+    ) >= 4
 
 
 def test_gold_contract_exists_in_batch_and_streaming_paths() -> None:

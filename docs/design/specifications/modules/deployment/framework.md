@@ -350,9 +350,9 @@ For `standard` and `full-demo`, the orchestrator:
 1. stages and publishes infrastructure, notebooks, experiments, and pipelines
    without the `Reports` and `Semantic Models` folders;
 2. waits for `setup-pipeline` to complete;
-3. starts `ml-required`; its six independent producers fan out concurrently,
-   and the validator joins all six successful producer activities before the
-   pipeline can complete;
+3. starts `ml-required`; Gold (`setup-11`) and four producers run first,
+   segmentation and churn run once that wave finishes, and the validator
+   joins all seven successful activities before the pipeline can complete;
 4. stages and publishes the semantic model and report only after status
    `Completed`;
 5. runs any selected optional/experimental pipelines after Reporting;
@@ -360,11 +360,13 @@ For `standard` and `full-demo`, the orchestrator:
    visible to SQL and Power BI clients.
 
 `setup-pipeline`, `ml-required`, `ml-optional`, and `ml-experimental` each
-declare `concurrency: 1` to prevent overlapping duplicate runs. The six
-required-ML producer activities retain `retry: 0`. Only
-`15-validate-required-ml-contract` has a bounded retry of two attempts at
-120-second intervals and a one-hour timeout, so transient validation failures
-do not replay successful producers.
+declare `concurrency: 1` to prevent overlapping duplicate runs. The
+required-ML producers and `setup-11` retry once after 10 minutes: each is an
+idempotent overwrite that holds its writer lock in `ag._job_locks`, and the
+wait lets a crashed attempt's 15-minute lease expire. Activity retries stay
+inside the same pipeline run, so the deploy still adopts and awaits that one
+run. `15-validate-required-ml-contract` keeps a bounded retry of two attempts
+at 120-second intervals and a one-hour timeout.
 
 The required pipeline's final activity is
 `15-validate-required-ml-contract`. A missing, empty, schema-incompatible,

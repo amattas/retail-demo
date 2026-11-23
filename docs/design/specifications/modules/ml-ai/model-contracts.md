@@ -6,10 +6,11 @@ The deployment separates data setup, required Reporting dependencies, and
 extended ML:
 
 1. `setup-pipeline` runs setup notebooks 01 through 11.
-2. `ml-required` runs demand forecast (06), customer segmentation (08), churn
-   (09), stockout (12), market-basket mining (07), and promotion/elasticity
-   analysis (10) producers serially, in that order, to avoid oversubscribing
-   the shared Spark pool.
+2. `ml-required` runs in two waves to avoid oversubscribing the shared Spark
+   pool: Gold (`setup-11`), demand forecast (06), market-basket mining (07),
+   promotion/elasticity analysis (10) and stockout (12) first; customer
+   segmentation (08) and churn (09) once that wave finishes. Producers retry
+   once and hold a writer lock on their output (`ag._job_locks`).
 3. `15-validate-required-ml-contract` runs only after all six producers
    succeed, and validates all six required output tables.
 4. Reporting can publish only after that exact pipeline run reaches terminal
@@ -66,7 +67,24 @@ stockout outputs. This includes `product_recommendations` and
 The runtime validator creates no tables. It rejects missing/empty required
 outputs, incompatible columns or types, null/duplicate grain keys, invalid
 probabilities or bounds, NaN or infinity in any floating output, missing
-as-of/lineage, and incomplete forecast horizons. Repository validation parses
+as-of/lineage, and incomplete forecast horizons. It also rejects:
+
+- a table whose source as-of column (`SOURCE_AS_OF_COLUMNS`) holds more than
+  one value, outputs whose source as-of values differ by more than
+  `MAX_AS_OF_SKEW_HOURS` (default 6), and any source as-of that is ahead of the
+  current Silver as-of or behind it by more than `MAX_SOURCE_LAG_HOURS`
+  (default 24);
+- store, product and customer keys missing from `dim_stores`, `dim_products`
+  or `dim_customers` (`FOREIGN_KEYS`);
+- category values outside `ALLOWED_CATEGORY_VALUES`, which include every
+  literal the semantic model's measures filter on (`HIGH` stockout risk,
+  `High`/`Very High` churn, `Highly Elastic`/`Inelastic` SKUs);
+- a demand `mape` at or above `MAX_FORECAST_MAPE` (default 1.0, the error of
+  forecasting zero). Demand is the only required output that records a quality
+  metric in its table; the other producers log theirs to MLflow.
+
+`tests/scripts/test_ml_required_logic_imp008.py` checks the category values
+against the producers and the TMDL measures. Repository validation parses
 the validator's required grain, as-of, lineage, probability, and horizon rules
 and compares them exactly with the manifest.
 
@@ -81,6 +99,37 @@ Demand evaluation freezes store/product eligibility at the training cutoff;
 current production inference selects its cohort independently. Churn and
 stockout partition on label-availability dates and purge 90-day and three-day
 forward-label horizons, respectively.
+
+### Shared source as-of
+
+Every required producer anchors on the same source as-of time: the latest
+`event_ts` in Silver `fact_receipts`. Each reads only source rows at or before
+it, so the six outputs describe one snapshot of Silver even when the stream
+adds rows between producers.
+
+Demand counts `SALE` receipts only (returns never net units sold) and anchors
+on the last complete day, the day before the as-of date. The partial as-of day
+is not used for training, testing or the inference lags, and forecasts start
+on the as-of date, so `forecast_date - to_date(source_as_of)` runs from 0 to
+`forecast_horizon_days - 1`.
+
+Stockout scores current positions rolled forward to the as-of time. Each
+store/product keeps its last ledger balance (`inventory_as_of` is when that
+balance was recorded), while its demand windows end at the as-of time. A slow
+mover's months-old snapshot is therefore scored on today's demand, not the
+demand around its last ledger change. Ledger rows after the as-of time, such
+as scheduled deliveries, are ignored.
+
+Segmentation and churn count every purchase of a known customer: store `SALE`
+receipts and online orders (`fact_online_order_headers`). Returns and
+anonymous purchases (null `customer_id`) never count. Segmentation produces
+one row per customer with at least one purchase. Churn scores a customer at a
+snapshot only when they purchased in the feature window before it, so
+never-active and long-lapsed customers are neither trivial training examples
+nor published predictions; an online order in the forward window keeps a
+customer active. Churn aggregates purchases to customer-days first and pairs
+each day only with the snapshots whose feature or label window contains it,
+so its work grows with activity rather than with customers times snapshots.
 
 ### Stockout inventory semantics
 
@@ -125,11 +174,18 @@ blocked.
 Optional and experimental corrections are also contract-bound:
 
 - recommendation support, confidence, and lift come from one singleton-pair
-  market-basket rule. When no FP-Growth rule meets `MIN_SUPPORT` and
-  `MIN_CONFIDENCE`, the producer instead uses the pairs bought together in at
-  least `MIN_PAIR_BASKETS` (default 2) multi-item baskets. Those pairs use the
-  same support, confidence, and lift definitions, and MLflow records
-  `rule_source` (`fpgrowth` or `cooccurrence`). Required recommendations still
+  market-basket rule counted over every `SALE` basket, single-item baskets
+  included, so support and lift are relative to all baskets. A rule needs at
+  least `MIN_PAIR_BASKETS` (default 20) co-purchases, `MIN_CONFIDENCE`
+  (default 0.05) and lift above `MIN_LIFT` (default 1.0); each product keeps
+  its `MAX_RULES_PER_PRODUCT` (default 5) best rules by lift. The generator's
+  complementary products (`baskets.with_complements`) are what these rules
+  recover. Above `MAX_PAIR_BASKETS` (default 2,000,000) baskets, pairs are
+  counted on a deterministic hash sample of baskets. When no pair meets the
+  thresholds, the producer instead uses the pairs bought together in at least
+  `FALLBACK_MIN_PAIR_BASKETS` (default 2) baskets with the same definitions,
+  and MLflow records `rule_source` (`cooccurrence` or
+  `cooccurrence_fallback`). Required recommendations still
   need multi-item baskets. `configure`, the setup interface's configuration
   page, and `render` therefore reject a store type whose calibrated basket
   averages less than 0.1 extra items, for profiles with required ML. Every
@@ -147,7 +203,21 @@ Optional and experimental corrections are also contract-bound:
   no inference-ready arrivals publish an empty contract-valid snapshot;
 - pricing uses a non-null no-estimate evidence sentinel, advances cooldown state
   only for accepted price changes, and applies the log-log quantity response
-  `(new_price / old_price) ** elasticity - 1`.
+  `(new_price / old_price) ** elasticity - 1`;
+- `price_elasticity` regresses each product's daily share of its department's
+  units on its shelf price (`unit_cents`, the day's price from the generator's
+  price schedule) with the share of its lines on promotion as a control, so
+  traffic, seasonality and discounts don't pose as price response. Only a
+  significantly negative slope (|t| >= 1.96) gets status
+  `VALID_OBSERVATIONAL_ESTIMATE` and an elasticity category; others are
+  `NOT_SIGNIFICANT`, `NON_NEGATIVE_ESTIMATE`, `INSUFFICIENT_PRICE_VARIATION`
+  or `INSUFFICIENT_SAMPLE`, categorized `Insufficient Evidence`.
+  `analysis_design` is `SYNTHETIC_OBSERVATIONAL_LOG_LOG_OLS_PROMO_CONTROLLED`:
+  the estimates recover the generator's demand response
+  (`retail_setup.generation.pricing`), not real shopper behavior. Notebook 14
+  applies elasticity only to valid estimates whose interval lies below -1, tags
+  those recommendations `SYNTHETIC_ELASTICITY`, and still appends `PENDING`
+  rows to `pricing_recommendation_created` for human approval.
 
 ## Semantic-model dependency
 

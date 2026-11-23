@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 
@@ -44,7 +44,7 @@ def test_write_all_writes_everything_and_run_log(spark, tmp_path):
     )
     dicts = load_dictionaries(default_dictionary_root(), "grocery")
     result = generate_all(spark, dicts, cfg)
-    gold = generate_gold(spark, result.tables)
+    gold = generate_gold(spark, result.tables, datetime(2100, 1, 1))
 
     written = write_all(
         result.tables, gold, cfg, run_id="testrun", base_path=str(tmp_path), fmt="parquet"
