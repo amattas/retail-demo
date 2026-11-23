@@ -68,6 +68,7 @@ ENGINE_MODULES = [
     "generation/inventory.py",
     "generation/gold_rules.py",
     "generation/gold.py",
+    "generation/job_locks.py",
     "generation/invariants.py",
     "generation/handoff.py",
     "generation/engine.py",
@@ -178,8 +179,18 @@ STREAM_MODULES = [
 # the setup notebooks and the Lakehouse pipelines share one definition.
 LAKEHOUSE_DIR = UTILITY.parent / "fabric" / "lakehouse"
 SHARED_CELL_MARKER = "# SHARED SOURCE (generated - do not edit): retail_setup/"
+_JOB_LOCKS = "generation/job_locks.py"
 LAKEHOUSE_SHARED_CELLS: dict[str, list[str]] = {
-    "04-streaming-to-gold": ["generation/gold_rules.py"],
+    "03-streaming-to-silver": [_JOB_LOCKS],
+    "04-streaming-to-gold": ["generation/gold_rules.py", _JOB_LOCKS],
+    "05-maintain-delta-tables": [_JOB_LOCKS],
+    "06-ml-demand-forecast": [_JOB_LOCKS],
+    "07-ml-market-basket": [_JOB_LOCKS],
+    "08-ml-customer-segmentation": [_JOB_LOCKS],
+    "09-ml-churn-prediction": [_JOB_LOCKS],
+    "10-ml-promotion-effectiveness": [_JOB_LOCKS],
+    "12-ml-stockout-prediction": [_JOB_LOCKS],
+    "90-augment-and-dedupe-receipts": [_JOB_LOCKS],
 }
 
 _PKG_IMPORT = re.compile(r"^\s*(from retail_setup|import retail_setup)")

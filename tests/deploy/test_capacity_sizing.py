@@ -54,7 +54,7 @@ def _config(tmp_path: Path, profile: str = "full-demo"):
         ("F64", 2),
         ("FTL64", 2),
         ("F128", 4),
-        ("F256", 8),
+        ("F256", 9),
         ("F512", 16),
         ("F1024", 16),
     ],
@@ -69,12 +69,12 @@ def test_capacity_sizing_uses_base_vcores_and_caps_nodes(
         repo_root=REPO_ROOT,
     )
 
-    assert evidence.producer_concurrency == 6
+    assert evidence.producer_concurrency == 5
     assert evidence.node_size == "Medium"
     assert evidence.node_vcores == 8
     assert evidence.min_node_count == 2
     assert evidence.max_node_count == expected_max
-    assert evidence.aggregate_max_vcores == 6 * expected_max * 8
+    assert evidence.aggregate_max_vcores == 5 * expected_max * 8
     assert evidence.usable_vcores == evidence.capacity_units * 2 * 3 // 4
 
 
@@ -155,7 +155,7 @@ def test_evidence_rejects_required_ml_producer_count_drift(
                             "type": "TridentNotebook",
                             "dependsOn": [],
                         }
-                        for index in range(5)
+                        for index in range(4)
                     ]
                 }
             }
@@ -230,3 +230,31 @@ def test_setup_pipeline_never_outgrows_the_sized_session_concurrency() -> None:
     # lines, which draw DC stock), so up to five sessions run at once.
     assert width == 5
     assert width <= required_ml_producer_count(REPO_ROOT)
+
+
+def test_required_ml_later_waves_never_outgrow_the_root_wave() -> None:
+    """Sizing counts root producers; the second wave must not run more sessions."""
+    from deploy.scripts.capacity_sizing import required_ml_producer_count
+
+    content = json.loads(
+        (
+            REPO_ROOT / "fabric" / "pipelines" / "ml-required.DataPipeline"
+            / "pipeline-content.json"
+        ).read_text(encoding="utf-8")
+    )
+    parents = {
+        activity["name"]: {dep["activity"] for dep in activity["dependsOn"]}
+        for activity in content["properties"]["activities"]
+    }
+    depth: dict[str, int] = {}
+
+    def level(name: str) -> int:
+        if name not in depth:
+            depth[name] = 1 + max((level(parent) for parent in parents[name]), default=-1)
+        return depth[name]
+
+    widths: dict[int, int] = {}
+    for name in parents:
+        widths[level(name)] = widths.get(level(name), 0) + 1
+    assert widths[0] == required_ml_producer_count(REPO_ROOT) == 5
+    assert max(widths.values()) == widths[0]

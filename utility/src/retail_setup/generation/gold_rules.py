@@ -148,7 +148,7 @@ def gold_top_products_15m(
     sales = gold_approved_sales(fact_receipts, fact_payments, cutoff).select(
         "receipt_id_ext", "event_ts"
     )
-    latest_sale = sales.agg(F.max("event_ts")).first()[0]
+    latest_sale = sales.agg(F.max("event_ts")).collect()[0][0]
     lines = _gold_before(fact_receipt_lines, "event_ts", cutoff)
     if latest_sale is not None:
         start = latest_sale - timedelta(days=1)
@@ -165,7 +165,7 @@ def gold_top_products_15m(
         .withColumn("computed_at", F.col("window_15m.end"))
         .drop("window_15m")
     )
-    latest_window = windows.agg(F.max("computed_at")).first()[0]
+    latest_window = windows.agg(F.max("computed_at")).collect()[0][0]
     if latest_window is not None:
         windows = windows.filter(F.col("computed_at") == F.lit(latest_window))
     return windows.select("product_id", "revenue", "units", "computed_at")

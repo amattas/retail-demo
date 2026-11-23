@@ -223,7 +223,7 @@ def test_cli_resumes_only_when_requested_and_uses_configured_target(
     evidence = yaml.safe_load(evidence_path.read_text(encoding="utf-8"))
     assert evidence["environment"] == "dev"
     assert evidence["capacity_id"] == "capacity-id"
-    assert evidence["producer_concurrency"] == 6
+    assert evidence["producer_concurrency"] == 5
     assert evidence["max_node_count"] == 2
     assert sessions == [{"auth_mode": "azure_powershell", "tenant_id": config.tenant_id}]
     assert len(requests) == int(resume)

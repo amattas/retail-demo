@@ -43,11 +43,18 @@ publication that the legacy notebook does not provide.
 Notable groups in this directory:
 
 - `03-streaming-to-silver` and `04-streaming-to-gold`: optional Eventhouse to
-  Lakehouse projection
+  Lakehouse projection. `04` and `setup-11` share one Gold definition
+  (`utility/src/retail_setup/generation/gold_rules.py`, copied into `04`)
+- Writer notebooks (`03`, `04`, `05`, `90`, the required ML producers and
+  `setup-11`) hold leases in `ag._job_locks`; see the
+  [pipelines README](../pipelines/README.md#writer-coordination). Cells that
+  start with `# SHARED SOURCE (generated - do not edit)` are copies of package
+  modules: edit the module and run `utility/scripts/build_notebooks.py`
 - `05-maintain-delta-tables`: maintenance of every Silver, Gold and ML table
   in the contracts, including the owned streaming-only
-  `fact_online_order_status`, `ag._watermarks`, `setup_run_log` and the live
-  stream's `ag._stream_state_*` tables
+  `fact_online_order_status`, `ag._watermarks`, `ag._job_locks`,
+  `setup_run_log` and the live stream's `ag._stream_state_*` tables. It skips
+  a table while another job holds its writer lock
 - `06` through `14`: ML and advanced analytics. `14` also appends `PENDING`
   pricing recommendations to the Eventhouse approval workflow.
 - `16-persist-anomaly-alerts`: runs in `streaming-data-load` and appends new
@@ -57,7 +64,8 @@ Notable groups in this directory:
 - `30-create-ontology`: legacy-format ontology creation. It mirrors the
   canonical deploy builder (`deploy/scripts/_ontology_model.py`) and is
   historical-only; its Eventhouse TimeSeries bindings stay disabled
-- `90` and `99`: manual augmentation/reset utilities
+- `90` and `99`: manual augmentation/reset utilities. `90` refuses to run once
+  streaming has initialized (`ag._watermarks` exists)
 
 See the [historical data contract](../../docs/design/specifications/modules/generation/data-contract.md),
 [Fabric analytics specification](../../docs/design/specifications/modules/analytics/fabric-analytics.md),

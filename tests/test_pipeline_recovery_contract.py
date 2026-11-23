@@ -30,14 +30,40 @@ def test_expensive_deployment_pipelines_serialize_runs() -> None:
         assert _pipeline(name)["properties"]["concurrency"] == 1
 
 
-def test_required_ml_retries_only_the_bounded_validator() -> None:
+def test_required_ml_runs_in_waves_with_producer_retries() -> None:
     activities = {
         activity["name"]: activity
         for activity in _pipeline("ml-required")["properties"]["activities"]
     }
     validator = activities.pop("15-validate-required-ml-contract")
+    wave_one = {name for name, activity in activities.items() if not activity["dependsOn"]}
+    wave_two = set(activities) - wave_one
 
-    assert all(activity["policy"]["retry"] == 0 for activity in activities.values())
+    assert wave_one == {
+        "setup-11-build-gold",
+        "06-ml-demand-forecast",
+        "07-ml-market-basket",
+        "10-ml-promotion-effectiveness",
+        "12-ml-stockout-prediction",
+    }
+    # The customer models (largest at P5a volumes) run after the first wave
+    # finishes, whatever its outcome; segmentation needs the Gold build.
+    assert wave_two == {"08-ml-customer-segmentation", "09-ml-churn-prediction"}
+    for name in wave_two:
+        conditions = {
+            dependency["activity"]: dependency["dependencyConditions"]
+            for dependency in activities[name]["dependsOn"]
+        }
+        assert set(conditions) == wave_one
+        for parent, condition in conditions.items():
+            needs_gold = name.startswith("08") and parent == "setup-11-build-gold"
+            assert condition == (["Succeeded"] if needs_gold else ["Completed"])
+
+    # Producers are idempotent overwrites guarded by job locks: one retry
+    # after the lease of a crashed attempt can expire.
+    for activity in activities.values():
+        assert activity["policy"]["retry"] == 1
+        assert activity["policy"]["retryIntervalInSeconds"] == 600
     assert validator["policy"]["retry"] == 2
     assert validator["policy"]["retryIntervalInSeconds"] == 120
     assert validator["policy"]["timeout"] == "0.01:00:00"
@@ -45,9 +71,24 @@ def test_required_ml_retries_only_the_bounded_validator() -> None:
         validator["policy"]["timeout"] < activity["policy"]["timeout"]
         for activity in activities.values()
     )
-    assert {
-        dependency["activity"] for dependency in validator["dependsOn"]
-    } == set(activities)
+    assert {dependency["activity"] for dependency in validator["dependsOn"]} == set(activities)
+    assert all(
+        dependency["dependencyConditions"] == ["Succeeded"]
+        for dependency in validator["dependsOn"]
+    )
+
+
+def test_append_only_kusto_writers_are_not_retried() -> None:
+    for pipeline, name in (
+        ("streaming-data-load", "16-persist-anomaly-alerts"),
+        ("daily-maintenance", "17-refresh-availability-signals"),
+    ):
+        activity = next(
+            activity
+            for activity in _pipeline(pipeline)["properties"]["activities"]
+            if activity["name"] == name
+        )
+        assert activity["policy"]["retry"] == 0
 
 
 def test_windows_ci_runs_real_non_filesystem_spark_smokes():

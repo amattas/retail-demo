@@ -6,10 +6,11 @@ The deployment separates data setup, required Reporting dependencies, and
 extended ML:
 
 1. `setup-pipeline` runs setup notebooks 01 through 11.
-2. `ml-required` runs demand forecast (06), customer segmentation (08), churn
-   (09), stockout (12), market-basket mining (07), and promotion/elasticity
-   analysis (10) producers serially, in that order, to avoid oversubscribing
-   the shared Spark pool.
+2. `ml-required` runs in two waves to avoid oversubscribing the shared Spark
+   pool: Gold (`setup-11`), demand forecast (06), market-basket mining (07),
+   promotion/elasticity analysis (10) and stockout (12) first; customer
+   segmentation (08) and churn (09) once that wave finishes. Producers retry
+   once and hold a writer lock on their output (`ag._job_locks`).
 3. `15-validate-required-ml-contract` runs only after all six producers
    succeed, and validates all six required output tables.
 4. Reporting can publish only after that exact pipeline run reaches terminal

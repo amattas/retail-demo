@@ -85,7 +85,8 @@ journal `RUNNING` and resumable without cancelling or relaunching Fabric work.
 The legacy setup trigger no longer retries POSTs blindly.
 
 The four expensive deployment pipelines now declare `concurrency: 1`.
-Required-ML producers retain `retry: 0`; only the contract validator retries
+Required-ML producers retained `retry: 0` then; since the data-review P6 change
+they retry once (guarded by `ag._job_locks`) and the validator still retries
 twice at 120-second intervals with a one-hour timeout. Cohort-based notebook
 staging remains explicitly out of scope for this change.
 
