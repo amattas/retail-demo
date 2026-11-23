@@ -378,3 +378,61 @@ def test_required_validator_detects_every_non_finite_float(
     assert any_non_finite(("metric",))
     FakeFunctions.values["metric"] = 1.25
     assert not any_non_finite(("metric",))
+
+
+def test_required_validator_category_values_cover_producers_and_measures() -> None:
+    import re
+
+    allowed = _literal_assignment(NOTEBOOKS["validator"], "ALLOWED_CATEGORY_VALUES")
+    producers = {
+        "customer_segments": NOTEBOOKS["segments"],
+        "churn_predictions": NOTEBOOKS["churn"],
+        "stockout_risk": NOTEBOOKS["stockout"],
+        "price_elasticity": REPO_ROOT / "fabric" / "lakehouse" / "10-ml-promotion-effectiveness.ipynb",
+    }
+    for table, columns in allowed.items():
+        code = _code(producers[table])
+        for values in columns.values():
+            for value in values:
+                assert f'"{value}"' in code, (table, value)
+
+    # Every literal a measure filters a category column on is an allowed value.
+    tables = REPO_ROOT / "fabric" / "powerbi" / "retail_model.SemanticModel" / "definition" / "tables"
+    display = {
+        "stockout_risk": ("Risk Level", "risk_level"),
+        "churn_predictions": ("Risk Category", "risk_category"),
+        "price_elasticity": ("Elasticity Category", "elasticity_category"),
+    }
+    for table, (column, source_column) in display.items():
+        tmdl = (tables / f"{table}.tmdl").read_text(encoding="utf-8")
+        literals = set()
+        for match in re.finditer(
+            rf"'{table}'\[{column}\]\s*(?:=\s*\"([^\"]+)\"|IN\s*\{{([^}}]*)\}})", tmdl
+        ):
+            literals |= {match.group(1)} if match.group(1) else set(
+                re.findall(r'"([^"]+)"', match.group(2))
+            )
+        assert literals, table
+        assert literals <= set(allowed[table][source_column]), (table, literals)
+
+
+def test_required_validator_requires_one_current_source_as_of() -> None:
+    from datetime import datetime as dt
+
+    validate = _function(
+        NOTEBOOKS["validator"],
+        "_validate_source_as_of",
+        {"MAX_SOURCE_LAG_HOURS": 24.0, "MAX_AS_OF_SKEW_HOURS": 6.0},
+    )
+    silver = dt(2026, 7, 21, 9)
+    same = {"demand_forecast": silver, "stockout_risk": silver - timedelta(hours=2)}
+    validate(same, silver)
+
+    with pytest.raises(RuntimeError, match="behind the Silver"):
+        validate({**same, "churn_predictions": silver - timedelta(days=2)}, silver)
+    with pytest.raises(RuntimeError, match="ahead of the Silver"):
+        validate({**same, "churn_predictions": silver + timedelta(hours=1)}, silver)
+    with pytest.raises(RuntimeError, match="disagree"):
+        validate(
+            {"demand_forecast": silver, "stockout_risk": silver - timedelta(hours=7)}, silver
+        )

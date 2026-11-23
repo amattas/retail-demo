@@ -67,7 +67,24 @@ stockout outputs. This includes `product_recommendations` and
 The runtime validator creates no tables. It rejects missing/empty required
 outputs, incompatible columns or types, null/duplicate grain keys, invalid
 probabilities or bounds, NaN or infinity in any floating output, missing
-as-of/lineage, and incomplete forecast horizons. Repository validation parses
+as-of/lineage, and incomplete forecast horizons. It also rejects:
+
+- a table whose source as-of column (`SOURCE_AS_OF_COLUMNS`) holds more than
+  one value, outputs whose source as-of values differ by more than
+  `MAX_AS_OF_SKEW_HOURS` (default 6), and any source as-of that is ahead of the
+  current Silver as-of or behind it by more than `MAX_SOURCE_LAG_HOURS`
+  (default 24);
+- store, product and customer keys missing from `dim_stores`, `dim_products`
+  or `dim_customers` (`FOREIGN_KEYS`);
+- category values outside `ALLOWED_CATEGORY_VALUES`, which include every
+  literal the semantic model's measures filter on (`HIGH` stockout risk,
+  `High`/`Very High` churn, `Highly Elastic`/`Inelastic` SKUs);
+- a demand `mape` at or above `MAX_FORECAST_MAPE` (default 1.0, the error of
+  forecasting zero). Demand is the only required output that records a quality
+  metric in its table; the other producers log theirs to MLflow.
+
+`tests/scripts/test_ml_required_logic_imp008.py` checks the category values
+against the producers and the TMDL measures. Repository validation parses
 the validator's required grain, as-of, lineage, probability, and horizon rules
 and compares them exactly with the manifest.
 

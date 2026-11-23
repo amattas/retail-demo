@@ -295,3 +295,42 @@ def test_elasticity_recovers_price_response_and_gates_on_significance(spark):
     assert rows[2].elasticity_category == "Insufficient Evidence"
     assert rows[3].elasticity_evidence_status == "INSUFFICIENT_PRICE_VARIATION"
     assert rows[3].elasticity_coefficient is None
+
+
+def test_required_validator_rejects_orphans_unknown_categories_and_weak_forecasts(spark):
+    from functools import reduce
+
+    gate = _load(
+        "15-validate-required-ml-contract.ipynb",
+        {
+            "_fail_if",
+            "FOREIGN_KEYS",
+            "ALLOWED_CATEGORY_VALUES",
+            "_validate_foreign_keys",
+            "_validate_categories",
+            "_validate_quality",
+        },
+        reduce=reduce,
+        MAX_FORECAST_MAPE=1.0,
+    )
+    dims = {
+        "dim_stores": spark.createDataFrame([(1,)], "ID long"),
+        "dim_products": spark.createDataFrame([(10,), (11,)], "ID long"),
+    }
+    risk = spark.createDataFrame(
+        [(1, 10, "HIGH", "HIGH"), (1, 11, "LOW", "LOW")],
+        "store_id long, product_id long, risk_level string, risk string",
+    )
+    gate["_validate_foreign_keys"](risk, "stockout_risk", dims)
+    gate["_validate_categories"](risk, "stockout_risk")
+
+    orphan = risk.union(spark.createDataFrame([(2, 10, "LOW", "LOW")], risk.schema))
+    with pytest.raises(RuntimeError, match=r"store_id has keys missing from dim_stores: \[2\]"):
+        gate["_validate_foreign_keys"](orphan, "stockout_risk", dims)
+    with pytest.raises(RuntimeError, match="risk_level holds a value outside"):
+        gate["_validate_categories"](risk.withColumn("risk_level", F.lit("High")), "stockout_risk")
+
+    forecast = spark.createDataFrame([(0.4,)], "mape double")
+    gate["_validate_quality"](forecast, "demand_forecast")
+    with pytest.raises(RuntimeError, match="no better than forecasting zero"):
+        gate["_validate_quality"](forecast.withColumn("mape", F.lit(1.2)), "demand_forecast")
