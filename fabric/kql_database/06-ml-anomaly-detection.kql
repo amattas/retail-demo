@@ -96,11 +96,17 @@
 // Detects unusual spikes or drops in transaction counts by store
 .create-or-alter function with (folder = "ml_anomaly_detection") fn_detect_transaction_velocity_anomalies(lookback_hours:int = 168)
 {
-    let end_time = bin(now(), 1h) + 1h;
-    let start_time = end_time - lookback_hours * 1h;
-    // Explicit bounds and defaults preserve inactive hours as zero-value bins.
-    let time_series = receipt_created
-        | where ingest_timestamp >= start_time and ingest_timestamp < end_time
+    // Closed hours only: the series ends at the start of the open hour and
+    // starts at the first event of the lookback, so the hours before the
+    // stream ran are not read as zero activity.
+    let end_time = bin(now(), 1h);
+    let events = receipt_created
+        | where ingest_timestamp >= end_time - lookback_hours * 1h
+              and ingest_timestamp < end_time
+        | where isnotnull(store_id);
+    let start_time = coalesce(
+        toscalar(events | summarize first_hour = bin(min(ingest_timestamp), 1h)), end_time);
+    let time_series = events
         | make-series count_list = count() default = 0
             on ingest_timestamp from start_time to end_time step 1h by store_id;
     // Detect anomalies using series decomposition
@@ -134,15 +140,23 @@
 // Detects unusual purchase amounts (potential fraud or pricing errors)
 .create-or-alter function with (folder = "ml_anomaly_detection") fn_detect_basket_size_anomalies(lookback_hours:int = 168)
 {
-    let end_time = bin(now(), 1h) + 1h;
-    let start_time = end_time - lookback_hours * 1h;
-    // Explicit bounds and defaults preserve inactive hours as zero-value bins.
-    let time_series = receipt_created
-        | where ingest_timestamp >= start_time and ingest_timestamp < end_time
-        | where isnotnull(total) and total > 0
-        | make-series basket_list = avg(total) default = 0.0,
-                      max_basket_list = max(total) default = 0.0
-            on ingest_timestamp from start_time to end_time step 1h by store_id;
+    // Closed hours only: the series ends at the start of the open hour and
+    // starts at the first event of the lookback, so the hours before the
+    // stream ran are not read as zero activity.
+    let end_time = bin(now(), 1h);
+    let events = receipt_created
+        | where ingest_timestamp >= end_time - lookback_hours * 1h
+              and ingest_timestamp < end_time
+        | where isnotnull(store_id)
+        | where isnotnull(total) and total > 0;
+    let start_time = coalesce(
+        toscalar(events | summarize first_hour = bin(min(ingest_timestamp), 1h)), end_time);
+    let time_series = events
+        | make-series basket_list = avg(total) default = real(null),
+                      max_basket_list = max(total) default = real(null)
+            on ingest_timestamp from start_time to end_time step 1h by store_id
+        // An hour without receipts has no average basket, not a $0 one.
+        | extend basket_list = series_fill_linear(basket_list);
     // Detect anomalies in average basket size
     time_series
     | extend (anomalies, anomaly_score, expected_basket) = series_decompose_anomalies(basket_list, 1.5, -1, 'avg')
@@ -172,19 +186,30 @@
 }
 
 // INVENTORY MOVEMENT ANOMALIES
-// Detects unusual inventory changes (potential theft, data errors, or equipment issues)
+// Detects unusual inventory changes per store (potential theft, data errors,
+// or equipment issues)
 .create-or-alter function with (folder = "ml_anomaly_detection") fn_detect_inventory_movement_anomalies(lookback_hours:int = 168)
 {
-    let end_time = bin(now(), 1h) + 1h;
-    let start_time = end_time - lookback_hours * 1h;
-    // Explicit bounds and defaults preserve inactive hours as zero-value bins.
-    let time_series = inventory_updated
-        | where ingest_timestamp >= start_time and ingest_timestamp < end_time
-        | where isnotnull(quantity_delta)
+    // Closed hours only: the series ends at the start of the open hour and
+    // starts at the first event of the lookback, so the hours before the
+    // stream ran are not read as zero activity.
+    let end_time = bin(now(), 1h);
+    let events = inventory_updated
+        | where ingest_timestamp >= end_time - lookback_hours * 1h
+              and ingest_timestamp < end_time
+        | where isnotnull(store_id)
+        | where isnotnull(quantity_delta);
+    let start_time = coalesce(
+        toscalar(events | summarize first_hour = bin(min(ingest_timestamp), 1h)), end_time);
+    let time_series = events
         | make-series delta_list = sum(abs(quantity_delta)) default = 0,
                       net_delta_list = sum(quantity_delta) default = 0
             on ingest_timestamp from start_time to end_time step 1h
-            by store_id, product_id;
+            by store_id
+        // A store needs this many hours with stock movement before its series
+        // is scored (calibration.ANOMALY_MIN_ACTIVE_HOURS); in a sparse series
+        // every movement is an outlier.
+        | where array_sum(array_iff(series_greater(delta_list, 0), 1, 0)) >= 24;
     // Detect anomalies in absolute movement volume (catches both large gains and losses)
     time_series
     | extend (anomalies, anomaly_score, expected_delta) = series_decompose_anomalies(delta_list, 1.5, -1, 'avg')
@@ -199,8 +224,8 @@
       )
     | project detection_time = now(),
               metric_type = "inventory_movement",
-              entity_type = "store_product",
-              entity_id = strcat(store_id, ":", product_id),
+              entity_type = "store",
+              entity_id = tostring(store_id),
               time_window = ingest_timestamp,
               expected_value = expected_delta,
               actual_value = delta_list,
@@ -208,7 +233,6 @@
               severity = severity,
               alert_details = pack(
                   "store_id", store_id,
-                  "product_id", product_id,
                   "net_delta", net_delta_list,
                   "movement_type", iif(net_delta_list > 0, "gain", "loss"),
                   "deviation_pct", round((delta_list - expected_delta) / expected_delta * 100, 2)
@@ -219,16 +243,24 @@
 // Detects unusual patterns in payment methods or processing failures
 .create-or-alter function with (folder = "ml_anomaly_detection") fn_detect_payment_anomalies(lookback_hours:int = 168)
 {
-    let end_time = bin(now(), 1h) + 1h;
-    let start_time = end_time - lookback_hours * 1h;
-    // Explicit bounds and defaults preserve inactive hours as zero-value bins.
-    let time_series = payment_processed
-        | where ingest_timestamp >= start_time and ingest_timestamp < end_time
-        | extend failure_value = iff(status == "DECLINED", 100.0, 0.0)
-        | make-series rate_list = avg(failure_value) default = 0.0,
+    // Closed hours only: the series ends at the start of the open hour and
+    // starts at the first event of the lookback, so the hours before the
+    // stream ran are not read as zero activity.
+    let end_time = bin(now(), 1h);
+    let events = payment_processed
+        | where ingest_timestamp >= end_time - lookback_hours * 1h
+              and ingest_timestamp < end_time
+        | where isnotnull(store_id)
+        | extend failure_value = iff(status == "DECLINED", 100.0, 0.0);
+    let start_time = coalesce(
+        toscalar(events | summarize first_hour = bin(min(ingest_timestamp), 1h)), end_time);
+    let time_series = events
+        | make-series rate_list = avg(failure_value) default = real(null),
                       total_list = count() default = 0,
                       failed_list = countif(status == "DECLINED") default = 0
-            on ingest_timestamp from start_time to end_time step 1h by store_id;
+            on ingest_timestamp from start_time to end_time step 1h by store_id
+        // An hour without payments has no failure rate, not a 0% one.
+        | extend rate_list = series_fill_linear(rate_list);
     // Detect anomalies in failure rate
     time_series
     | extend (anomalies, anomaly_score, expected_rate) = series_decompose_anomalies(rate_list, 1.5, -1, 'avg')
@@ -262,11 +294,17 @@
 // Detects unusual foot traffic patterns (equipment failures, security incidents)
 .create-or-alter function with (folder = "ml_anomaly_detection") fn_detect_traffic_anomalies(lookback_hours:int = 168)
 {
-    let end_time = bin(now(), 1h) + 1h;
-    let start_time = end_time - lookback_hours * 1h;
-    // Explicit bounds and defaults preserve inactive hours as zero-value bins.
-    let time_series = customer_entered
-        | where ingest_timestamp >= start_time and ingest_timestamp < end_time
+    // Closed hours only: the series ends at the start of the open hour and
+    // starts at the first event of the lookback, so the hours before the
+    // stream ran are not read as zero activity.
+    let end_time = bin(now(), 1h);
+    let events = customer_entered
+        | where ingest_timestamp >= end_time - lookback_hours * 1h
+              and ingest_timestamp < end_time
+        | where isnotnull(store_id);
+    let start_time = coalesce(
+        toscalar(events | summarize first_hour = bin(min(ingest_timestamp), 1h)), end_time);
+    let time_series = events
         | make-series traffic_list = sum(customer_count) default = 0
             on ingest_timestamp from start_time to end_time step 1h by store_id;
     // Detect anomalies in customer traffic

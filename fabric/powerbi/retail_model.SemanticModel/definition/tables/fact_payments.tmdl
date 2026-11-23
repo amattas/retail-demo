@@ -2,7 +2,7 @@ table fact_payments
 	lineageTag: a9ee5779-cb04-439d-8691-5ae9eb849b4e
 	sourceLineageTag: [ag].[fact_payments]
 
-	/// All-channel payment amount. Store filters scope the store component while online payments remain included because they have no store key.
+	/// Approved all-channel payment amount; declined attempts are excluded. Store filters scope the store component while online payments remain included because they have no store key.
 	measure 'Total Amounts' = ```
 			VAR _StoreAmount =
 				[Store Payment Amount]
@@ -19,7 +19,7 @@ table fact_payments
 		displayFolder: Payments
 		lineageTag: 79b75b7a-6c45-4df5-a579-ead43dd9e267
 
-	/// In-store payment amount. Date, store, and customer filters use direct payment relationships; receipt drillthrough is applied explicitly.
+	/// Approved in-store payment amount (declined attempts excluded). Date, store, and customer filters use direct payment relationships; receipt drillthrough is applied explicitly.
 	measure 'Store Payment Amount' = ```
 			VAR _ReceiptIds =
 				FILTERS('fact_receipts'[Receipt ID])
@@ -31,11 +31,13 @@ table fact_payments
 						ISFILTERED('fact_receipts'[Receipt ID]),
 						CALCULATE(
 							DIVIDE(SUM('fact_payments'[Amount Cents]), 100, 0),
+							KEEPFILTERS('fact_payments'[Status] = "APPROVED"),
 							KEEPFILTERS('fact_payments'[Receipt ID] <> BLANK()),
 							TREATAS(_ReceiptIds, 'fact_payments'[Receipt ID])
 						),
 						CALCULATE(
 							DIVIDE(SUM('fact_payments'[Amount Cents]), 100, 0),
+							KEEPFILTERS('fact_payments'[Status] = "APPROVED"),
 							KEEPFILTERS('fact_payments'[Receipt ID] <> BLANK())
 						)
 					)
@@ -45,7 +47,7 @@ table fact_payments
 		displayFolder: Payments\Store
 		lineageTag: 4e9fdc07-da4c-4224-ae56-c2f543e17292
 
-	/// Online payment amount. Date and customer filters apply directly; store filters are intentionally ignored because online payments have no store key.
+	/// Approved online payment amount (declined attempts excluded). Date and customer filters apply directly; store filters are intentionally ignored because online payments have no store key.
 	measure 'Online Payment Amount' = ```
 			VAR _OrderIds =
 				FILTERS('fact_online_order_headers'[Order ID])
@@ -58,12 +60,14 @@ table fact_payments
 						CALCULATE(
 							DIVIDE(SUM('fact_payments'[Amount Cents]), 100, 0),
 							CROSSFILTER('fact_payments'[Store ID], 'dim_stores'[ID], NONE),
+							KEEPFILTERS('fact_payments'[Status] = "APPROVED"),
 							KEEPFILTERS('fact_payments'[Order ID] <> BLANK()),
 							TREATAS(_OrderIds, 'fact_payments'[Order ID])
 						),
 						CALCULATE(
 							DIVIDE(SUM('fact_payments'[Amount Cents]), 100, 0),
 							CROSSFILTER('fact_payments'[Store ID], 'dim_stores'[ID], NONE),
+							KEEPFILTERS('fact_payments'[Status] = "APPROVED"),
 							KEEPFILTERS('fact_payments'[Order ID] <> BLANK())
 						)
 					)
@@ -73,7 +77,7 @@ table fact_payments
 		displayFolder: Payments\Online
 		lineageTag: 5138edd5-2bcb-4b9d-8427-4e73df9552fe
 
-	/// All-channel payment count with the same explicit store and online roles as Total Amounts.
+	/// All-channel payment attempts, approved and declined, with the same explicit store and online roles as Total Amounts.
 	measure 'Payment Count' = ```
 			VAR _StoreCount =
 				[Store Payment Count]
@@ -90,7 +94,7 @@ table fact_payments
 		displayFolder: Payments
 		lineageTag: c1050001-0000-0000-0000-000000000001
 
-	/// Count of in-store payment transactions in the current date, store, customer, or receipt context.
+	/// In-store payment attempts (approved and declined) in the current date, store, customer, or receipt context.
 	measure 'Store Payment Count' = ```
 			VAR _ReceiptIds =
 				FILTERS('fact_receipts'[Receipt ID])
@@ -116,7 +120,7 @@ table fact_payments
 		displayFolder: Payments\Store
 		lineageTag: 629d97f1-0532-4549-852b-ea34985fe847
 
-	/// Count of online payment transactions in the current date and customer context; store filters do not remove unassigned online payments.
+	/// Online payment attempts (approved and declined) in the current date and customer context; store filters do not remove unassigned online payments.
 	measure 'Online Payment Count' = ```
 			VAR _OrderIds =
 				FILTERS('fact_online_order_headers'[Order ID])

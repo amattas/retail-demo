@@ -20,7 +20,7 @@ table fact_foot_traffic
 		displayFolder: Store Operations\Traffic
 		lineageTag: 01a1a1cb-0001-0001-0001-000000000002
 
-	/// Store receipt conversion proxy from receipts divided by observed traffic.
+	/// Proxy, not a measured conversion rate: SALE store receipts per entrance passage. History and the live stream both count one sensor passage per zone a visit enters, so the ratio compares across them, but passages are not unique visitors.
 	measure 'Traffic Conversion Proxy %' = DIVIDE([Receipt Count], [Foot Traffic Count], 0)
 		formatString: 0.0%;-0.0%;0.0%
 		displayFolder: Store Operations\Traffic

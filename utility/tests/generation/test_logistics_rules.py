@@ -18,6 +18,7 @@ from retail_setup.generation.stream_supply import (
     StockDemand,
     SupplyBatch,
     SupplyNetwork,
+    TruckDeparture,
     default_dc_entry,
     incident_transitions,
     inventory_entry,
@@ -81,9 +82,11 @@ def _seeds(keys: set[str]) -> dict:
     return seeded
 
 
-def _simulate(incidents: tuple[Incident, ...], step: int = 30 * MINUTE):
+def _simulate(
+    incidents: tuple[Incident, ...], step: int = 30 * MINUTE, extra: tuple[StockDemand, ...] = ()
+):
     """Batches of ``step`` over the run: ``[(previous, clock, output, started, resolved)]``."""
-    demand = _demand()
+    demand = _demand() + list(extra)
     store = MemoryStateStore("rules")
     batches = []
     previous = None
@@ -103,6 +106,65 @@ def _simulate(incidents: tuple[Incident, ...], step: int = 30 * MINUTE):
 
 
 # --- Rules (Python mirrors of fabric/rules/definitions.kql) -----------------
+
+
+def _windows(batches, minutes: int):
+    """Rule evaluations every ``minutes`` over the run and an hour past its end."""
+    window = minutes * MINUTE
+    return range(T0 + window, batches[-1][1] + HOUR + 1, window)
+
+
+def per_store_alerts(records, batches, minutes: int) -> list[tuple[int, int | None, int, int]]:
+    """``(evaluated_at, store_id, dc_id, products)``: one alert per store (or DC) and window.
+
+    Mirrors the stockout and URGENT reorder rules: rows of the window
+    deduplicated on their event key (``trace_id``), then counted per entity.
+    """
+    window = minutes * MINUTE
+    alerts = []
+    for at in _windows(batches, minutes):
+        rows = {r.key: r for r in records if at - window < r.at_ms <= at}
+        products: dict[tuple[int | None, int], set[int]] = defaultdict(set)
+        for row in rows.values():
+            products[(row.store_id, row.dc_id)].add(row.product_id)
+        alerts += [
+            (at, store, dc, len(ids)) for (store, dc), ids in sorted(products.items(), key=str)
+        ]
+    return alerts
+
+
+def stockout_alerts(batches, replayed: int = 0) -> list[tuple[int, int | None, int, int]]:
+    stockouts = [s for _, _, output, _, _ in batches for s in output.stockouts]
+    # A replayed micro-batch writes the same events (same trace_id) again.
+    return per_store_alerts(
+        stockouts + stockouts[:replayed], batches, cal.STOCKOUT_RULE_WINDOW_MINUTES
+    )
+
+
+def urgent_alerts(batches) -> list[tuple[int, int | None, int, int]]:
+    urgent = [
+        r for _, _, output, _, _ in batches for r in output.reorders if r.priority == "URGENT"
+    ]
+    return per_store_alerts(urgent, batches, cal.URGENT_REORDER_RULE_WINDOW_MINUTES)
+
+
+def dwell_breaches(batches) -> list[tuple[int, str]]:
+    """``(evaluated_at, shipment_id)`` of the dwell-breach rule.
+
+    A departure is ingested with the batch that emits it (``ingestion_time()``),
+    whatever its own departure time; the rule looks back one window.
+    """
+    window = cal.TRUCK_DWELL_RULE_WINDOW_MINUTES * MINUTE
+    arrived = {a.shipment_id: a.at_ms for _, _, output, _, _ in batches for a in output.arrivals}
+    ingested = [(clock, d) for _, clock, output, _, _ in batches for d in output.departures]
+    return [
+        (at, departure.shipment_id)
+        for at in _windows(batches, cal.TRUCK_DWELL_RULE_WINDOW_MINUTES)
+        for clock, departure in ingested
+        if at - window < clock <= at
+        and (departure.at_ms - arrived[departure.shipment_id]) / MINUTE
+        > cal.TRUCK_DWELL_SLA_MINUTES
+    ]
 
 
 def late_trucks(batches) -> list:
@@ -244,3 +306,79 @@ def test_rule_alerts_are_deduped_per_incident_across_replays() -> None:
     assert dc_outages(first) == dc_outages(again) == [OUTAGE.incident_id]
     resolved = [i.incident_id for _, _, _, _, ended in first for i in ended]
     assert resolved == [OUTAGE.incident_id]
+
+
+# A shopping rush at store 7 (served by the well-stocked DC 2) empties every
+# shelf of the supplier group in one minute.
+RUSH_AT = T0 + 3 * DAY + 14 * HOUR + 2 * MINUTE
+RUSH = tuple(
+    StockDemand(RUSH_AT, 7, product, 1, (START + timedelta(days=3)).date(), f"RUSH-{product}-{n}")
+    for product in PRODUCTS
+    for n in range(400)
+)
+
+
+def test_inventory_rules_alert_once_per_store_and_window_within_a_band() -> None:
+    batches = _simulate(())
+    alerts = stockout_alerts(batches)
+    # Only the lean DC 1 and its stores run short; DC 2's stores keep their cover.
+    assert alerts and {store for _, store, _, _ in alerts if store} <= set(DC1_STORES)
+    assert len({(at, store, dc) for at, store, dc, _ in alerts}) == len(alerts)
+    per_store_day = sum(1 for _, store, _, _ in alerts if store) / (len(STORES) * DAYS)
+    print(f"STAT normal stockout alerts per store-day={per_store_day:.3f}")
+    assert per_store_day <= 0.25
+    # Replayed events (same trace_id) add no alert.
+    stockouts = sum(len(output.stockouts) for _, _, output, _, _ in batches)
+    assert stockout_alerts(batches, replayed=stockouts) == alerts
+    urgent = urgent_alerts(batches)
+    # Empty shelves at the lean DC's stores reorder URGENT; DC 2's never do.
+    assert urgent and {store for _, store, _, _ in urgent} <= set(DC1_STORES)
+    assert len({(at, store, dc) for at, store, dc, _ in urgent}) == len(urgent)
+    urgent_per_store_day = len(urgent) / (len(STORES) * DAYS)
+    print(f"STAT normal URGENT reorder alerts per store-day={urgent_per_store_day:.3f}")
+    assert urgent_per_store_day <= 0.25
+
+
+def test_stockout_rule_fires_once_per_store_for_a_rush() -> None:
+    batches = _simulate((), extra=RUSH)
+    window = cal.STOCKOUT_RULE_WINDOW_MINUTES * MINUTE
+    rush_window = T0 + ((RUSH_AT - T0) // window + 1) * window
+    # Every product runs out at once: one alert for the store, not one per product.
+    assert [a for a in stockout_alerts(batches) if a[1] == 7][0] == (
+        rush_window,
+        7,
+        2,
+        len(PRODUCTS),
+    )
+
+
+def test_dwell_breach_alerts_once_when_the_departure_is_ingested() -> None:
+    batches = _simulate((OUTAGE,))
+    # Normal unloads stay under the SLA.
+    assert dwell_breaches(batches) == []
+    # Inject a breach that reaches the Eventhouse three hours after the truck
+    # left (a stream restarted after a gap): the payload time is long past,
+    # but the rule alerts once, in the window after ingestion.
+    late_batch = 4 * 48
+    clock = batches[late_batch][1]
+    arrival = next(
+        a
+        for _, _, output, _, _ in batches
+        for a in output.arrivals
+        if a.at_ms + 3 * HOUR + 2 * HOUR <= clock
+    )
+    batches[late_batch][2].departures.append(
+        TruckDeparture(
+            arrival.at_ms + 2 * HOUR,
+            arrival.truck_id,
+            arrival.dc_id,
+            arrival.store_id,
+            arrival.shipment_id,
+            120,
+            1,
+        )
+    )
+    window = cal.TRUCK_DWELL_RULE_WINDOW_MINUTES * MINUTE
+    assert dwell_breaches(batches) == [
+        (T0 + ((clock - T0 - 1) // window + 1) * window, arrival.shipment_id)
+    ]

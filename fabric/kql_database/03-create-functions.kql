@@ -133,34 +133,53 @@
     | where lag_seconds <= windowHours * 3600
 }
 
+// Spend is the cost of impressions shown in the window. Conversions are the
+// attributed purchases in the window, by the day of their touch; a touch can
+// be up to seven days older than its purchase, so the cost of the converted
+// impressions is reported separately (converted_spend_cents, on the touch's
+// day) and never added to the window's spend.
 .create-or-alter function with (folder = "marketing") fn_campaign_performance(lookback:timespan)
 {
+    let window_start = ago(lookback);
     let attributed =
         fn_attribution()
-        | where purchase_ts > ago(lookback);
+        | where purchase_ts > window_start;
     let converted_impressions =
         attributed
         | project impression_id;
     let spend =
         ad_impression
-        | where ingest_timestamp > ago(lookback)
-                or impression_id in (converted_impressions)
+        | where ingest_timestamp > window_start
+        | extend shown_ts = coalesce(impression_time, ingest_timestamp)
+        | where shown_ts > window_start
         | summarize arg_max(ingest_timestamp, *) by impression_id
         | summarize impressions = dcount(impression_id),
                     spend_cents = sum(tolong(round(cost * 100.0)))
-            by campaign_id, channel,
-               day = startofday(coalesce(impression_time, ingest_timestamp));
+            by campaign_id, channel, day = startofday(shown_ts);
+    let converted_cost =
+        ad_impression
+        | where impression_id in (converted_impressions)
+        | summarize arg_max(ingest_timestamp, *) by impression_id
+        | project impression_id, cost_cents = tolong(round(cost * 100.0));
     let conversions =
         attributed
+        | join kind=leftouter converted_cost on impression_id
         | summarize conversions = dcount(attribution_id),
+                    converted_spend_cents = sum(coalesce(cost_cents, long(0))),
                     attributed_revenue_cents = sum(attributed_revenue_cents),
                     discount_cents = sum(discount_cents),
                     tax_cents = sum(tax_cents),
                     payment_cents = sum(payment_cents)
             by campaign_id, channel, day = startofday(touch_ts);
     spend
-    | join kind=leftouter conversions on campaign_id, channel, day
-    | extend conversions = coalesce(conversions, long(0)),
+    | join kind=fullouter conversions on campaign_id, channel, day
+    | extend campaign_id = coalesce(campaign_id, campaign_id1),
+             channel = coalesce(channel, channel1),
+             day = coalesce(day, day1)
+    | extend impressions = coalesce(impressions, long(0)),
+             spend_cents = coalesce(spend_cents, long(0)),
+             conversions = coalesce(conversions, long(0)),
+             converted_spend_cents = coalesce(converted_spend_cents, long(0)),
              attributed_revenue_cents = coalesce(attributed_revenue_cents, long(0)),
              discount_cents = coalesce(discount_cents, long(0)),
              tax_cents = coalesce(tax_cents, long(0)),
@@ -173,8 +192,8 @@
                  todouble(attributed_revenue_cents) / spend_cents
              )
     | project campaign_id, channel, day, impressions, spend_cents,
-              conversions, attributed_revenue_cents, discount_cents,
-              tax_cents, payment_cents, conversion_rate, roas
+              conversions, converted_spend_cents, attributed_revenue_cents,
+              discount_cents, tax_cents, payment_cents, conversion_rate, roas
 }
 
 // ============================================================================
@@ -183,7 +202,10 @@
 
 // NOTE: Materialized views don't support joins. Use this function instead.
 // One row per completed lifecycle. Dwell is reported in seconds and minutes;
-// site labels match Lakehouse Gold (STORE_<id> / DC_<id>).
+// site labels match Lakehouse Gold (STORE_<id> / DC_<id>; live trucks only
+// deliver to stores, so live sites are STORE_<id>). departure_ingested_at is
+// when the departure reached the Eventhouse (ingestion_time()), which alerts
+// and recent-activity tiles filter on.
 .create-or-alter function with (folder = "kpis") fn_truck_sla()
 {
     truck_arrived
@@ -193,9 +215,11 @@
               arrival_trace_id = trace_id
     | join kind=inner (
         truck_departed
+        | extend departure_ingested_at = ingestion_time()
         | summarize arg_max(departure_time, *) by truck_id, dc_id, store_id, shipment_id
         | project truck_id, dc_id, store_id, shipment_id, departure_time,
                   departure_ingest_timestamp = ingest_timestamp,
+                  departure_ingested_at,
                   departure_trace_id = trace_id,
                   actual_unload_duration
     ) on truck_id, dc_id, store_id, shipment_id
@@ -210,7 +234,24 @@
     | project truck_id, dc_id, store_id, shipment_id, site,
               arrival_time, departure_time, dwell_seconds, dwell_minutes,
               actual_unload_duration, arrival_ingest_timestamp,
-              departure_ingest_timestamp, arrival_trace_id, departure_trace_id
+              departure_ingest_timestamp, departure_ingested_at,
+              arrival_trace_id, departure_trace_id
+}
+
+// ============================================================================
+// RULE THRESHOLDS
+// ============================================================================
+
+// Store-type thresholds of the live rules (fabric/rules/definitions.kql), from
+// calibration.rule_thresholds(): the high-value receipt total (10 x the store
+// type's average ticket) and the zone arrival surge (arrivals per store and
+// zone in 5 minutes). The checked-in values are the reference store type's
+// (supercenter at its default volume); deploy/scripts/apply_kql.py writes the
+// deployed environment's values when it applies this script.
+.create-or-alter function with (folder = "rules") fn_rule_thresholds()
+{
+    print high_value_receipt_total = real(850.0),
+          zone_surge_arrivals = long(117)
 }
 
 // ============================================================================

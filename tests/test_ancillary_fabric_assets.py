@@ -115,10 +115,12 @@ def test_truck_dwell_alerts_are_driven_by_completed_nonfuture_departures() -> No
         if tile["title"] == "Truck Dwell by Site (24h)"
     )
 
-    for query in (rules, queryset, dashboard_query):
+    for query in (queryset, dashboard_query):
         assert "departure_ingest_timestamp > ago(" in query
         assert "departure_ingest_timestamp <= now()" in query
         assert "departure_time <= now()" in query
+    # The alert follows when a completed departure reached the Eventhouse.
+    assert "departure_ingested_at > ago(5m)" in rules
     assert "arrival_ingest_timestamp > ago(5m)" not in rules
 
 
@@ -300,3 +302,33 @@ def test_taskflow_uses_matching_type_and_identifier_prefixes() -> None:
     )
     datasource = _semantic_datasource("draft")
     assert semantic_item["artifactUniqueId"] == f"dataset:{datasource['artifactId']}"
+
+
+def test_agent_snapshots_match_the_model_and_ontology_they_describe() -> None:
+    # C-20, C-21: regenerate with `python -m deploy.scripts.agent_snapshots`.
+    from deploy.scripts import agent_snapshots
+
+    assert agent_snapshots.stale() == []
+    semantic = _semantic_datasource("draft")
+    names = {
+        (str(table["display_name"]), str(child["display_name"]))
+        for table in semantic["elements"]  # type: ignore[union-attr]
+        if isinstance(table, dict)
+        for child in table["children"]
+    }
+    for table, name in (
+        ("dim_trucks", "Twin Truck Last Status"),
+        ("fact_truck_moves", "Event Timestamp"),
+        ("inventory_position_current", "As Of"),
+        ("demand_forecast", "Forecast Lower Bound Next 7 Days"),
+    ):
+        assert (table, name) in names
+    descriptions = {
+        str(element["id"]): str(element["description"]).split(",")
+        for element in _ontology_datasource("draft")["elements"]  # type: ignore[union-attr]
+        if isinstance(element, dict)
+    }
+    assert {"event_ts", "event_date", "gross_subtotal_cents"} <= set(descriptions["Receipt"])
+    assert {"gross_subtotal_cents", "discount_cents", "attribution_journey_id"} <= set(
+        descriptions["OnlineOrder"]
+    )

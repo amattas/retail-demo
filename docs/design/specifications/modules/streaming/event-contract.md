@@ -561,7 +561,10 @@ Eventhouse exposes reconciliation diagnostics through
 `fn_marketing_attribution()`. Consumer-facing `fn_attribution()` and
 `fn_attribution_window()` return only reconciled `ATTRIBUTED` purchases after
 future and out-of-window touches are removed and the latest valid touch is
-selected. `fn_campaign_performance()` uses that reconciled set. Gold publishes
+selected. `fn_campaign_performance()` uses that reconciled set. Its spend is
+the cost of impressions shown in the window; the cost of the impressions
+behind the window's conversions, shown up to seven days earlier, is reported
+separately as `converted_spend_cents`. Gold publishes
 `campaign_performance_daily`, and the Direct Lake model exposes both the audit
 fact and campaign KPIs. Contract tests cover batch determinism, live
 payload/KQL mappings, Silver/Gold wiring, semantic measures, and all cent

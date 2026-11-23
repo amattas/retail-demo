@@ -17,7 +17,7 @@
       "is_selected": true,
       "display_name": "Store",
       "type": "ontology.entity",
-      "description": "id,store_number,address,geography_id,tax_rate,volume_class,store_format,operating_hours,daily_traffic_multiplier",
+      "description": "id,store_number,address,geography_id,tax_rate,volume_class,store_format,operating_hours,daily_traffic_multiplier,time_zone",
       "children": []
     },
     {
@@ -41,7 +41,7 @@
       "is_selected": true,
       "display_name": "Customer",
       "type": "ontology.entity",
-      "description": "id,first_name,last_name,address,geography_id,loyalty_card,phone,ble_id,ad_id",
+      "description": "id,first_name,last_name,address,geography_id,loyalty_card,phone,ble_id,ad_id,home_store_id",
       "children": []
     },
     {
@@ -49,7 +49,7 @@
       "is_selected": true,
       "display_name": "Product",
       "type": "ontology.entity",
-      "description": "id,product_name,brand,company,department,category,subcategory,cost,msrp,sale_price,requires_refrigeration,taxability,tags",
+      "description": "id,product_name,brand,company,department,category,subcategory,cost,msrp,sale_price,requires_refrigeration,launch_date,taxability,tags",
       "children": []
     },
     {
@@ -57,7 +57,7 @@
       "is_selected": true,
       "display_name": "Receipt",
       "type": "ontology.entity",
-      "description": "customer_id,store_id,tax_cents,total_cents,payment_method,subtotal_cents,receipt_id_ext,total_amount,tax_amount,receipt_type,discount_amount,subtotal",
+      "description": "receipt_id_ext,trace_id,event_ts,event_date,store_id,customer_id,receipt_type,tender_type,subtotal_cents,discount_amount,tax_cents,total_cents,subtotal_amount,tax_amount,total_amount,payment_method,subtotal,gross_subtotal_cents,discount_cents,attribution_journey_id,campaign_id,impression_id_ext,local_hour,original_receipt_id_ext",
       "children": []
     },
     {
@@ -65,7 +65,7 @@
       "is_selected": true,
       "display_name": "OnlineOrder",
       "type": "ontology.entity",
-      "description": "customer_id,subtotal_cents,order_id_ext,payment_method,total_amount,total_cents,tax_amount,subtotal_amount,tax_cents,event_date",
+      "description": "order_id_ext,customer_id,subtotal_cents,tax_cents,total_cents,subtotal_amount,tax_amount,total_amount,payment_method,event_ts,event_date,gross_subtotal_cents,discount_cents,attribution_journey_id,campaign_id,impression_id_ext",
       "children": []
     },
     {
@@ -73,7 +73,7 @@
       "is_selected": true,
       "display_name": "Promotion",
       "type": "ontology.entity",
-      "description": "receipt_id_ext,promo_code,discount_amount,discount_cents,discount_type,product_count,product_ids,store_id,customer_id,event_date",
+      "description": "event_ts,trace_id,receipt_id_ext,promo_code,discount_amount,discount_cents,discount_type,product_count,product_ids,store_id,customer_id,event_date,attribution_journey_id",
       "children": []
     },
     {
@@ -81,7 +81,7 @@
       "is_selected": true,
       "display_name": "Payment",
       "type": "ontology.entity",
-      "description": "receipt_id_ext,order_id_ext,payment_method,amount_cents,amount,transaction_id,processing_time_ms,status,decline_reason,store_id,customer_id,event_ts,event_date",
+      "description": "receipt_id_ext,order_id_ext,event_ts,event_date,payment_method,amount_cents,amount,transaction_id,status,decline_reason,processing_time_ms,store_id,customer_id,attribution_journey_id",
       "children": []
     },
     {
@@ -105,7 +105,7 @@
       "is_selected": true,
       "display_name": "StockoutRisk",
       "type": "ontology.entity",
-      "description": "store_id,product_id,inventory_as_of,current_inventory,demand_velocity_daily,days_of_inventory,demand_trend,stockout_probability,stockout_predicted,risk,ranking,risk_level,predicted_at,generated_at,forecast_horizon_days,department,category,subcategory,model_run_id,schema_version",
+      "description": "store_id,product_id,risk_id,inventory_as_of,current_inventory,demand_velocity_daily,days_of_inventory,demand_trend,stockout_probability,stockout_predicted,risk,ranking,risk_level,predicted_at,generated_at,forecast_horizon_days,department,category,subcategory,model_run_id,schema_version",
       "children": []
     },
     {

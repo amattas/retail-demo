@@ -127,10 +127,14 @@ tenders and the decline model, the promotion catalog and per-line eligibility,
 BLE, ad, beacon, sensor, and campaign ID formats, zones, marketing channels
 and cost bands, device types, and fulfillment modes. `generation/calibration.py`
 owns thresholds that consumers repeat as literals: the 90-minute truck dwell
-SLA, stockout and reorder thresholds, zone-surge thresholds, the high-value
-receipt rule (3 x the store type's `avg_ticket_target`), and the anomaly
-detector parameters. Contract tests fail when the stream, rules, KQL
-functions, or semantic model drift from them.
+SLA, stockout and reorder thresholds, the zone-surge count (sized from the
+stream's own visit rate at the store type's peak), the high-value receipt rule
+(10 x the store type's `avg_ticket_target`, about one ticket in a thousand), and the anomaly detector
+parameters. Contract tests fail when the stream, rules, KQL functions, or
+semantic model drift from them. The two store-type thresholds reach the rules
+through the Eventhouse function `fn_rule_thresholds()`, whose values the
+deployment's KQL step writes for the deployed store type
+(`calibration.rule_thresholds`).
 
 ### Operational output
 

@@ -69,8 +69,26 @@ impression was shown; journey touches arrive (`ingest_timestamp`) with their
 purchase, so the marketing functions use
 `coalesce(impression_time, ingest_timestamp)` as the touch time.
 
+`fn_rule_thresholds()` returns the store-type thresholds the rules in
+`fabric/rules/definitions.kql` read: the high-value receipt total and the zone
+arrival-surge count (`calibration.rule_thresholds`). The checked-in values are
+the supercenter's; `deploy/scripts/apply_kql.py` writes the deployed
+environment's values (its store type, custom layouts included, and
+transactions per store-day) when it applies the scripts. `fn_truck_sla()`
+returns `departure_ingested_at` (`ingestion_time()` of the departure) for
+alerts that follow the live stream.
+
+The anomaly functions in `06-ml-anomaly-detection.kql` score closed hours
+only: each series ends at the start of the open hour and starts at the first
+event of the lookback, so the hours before a manually started stream are not
+read as zero activity. Average series (basket size, payment failure rate) are
+missing rather than zero in hours without events and are filled by
+`series_fill_linear`. Every series is per store; rows without a store (online
+ship-from-DC payments, DC stock) are left out, and a store's inventory series
+is scored only once it has 24 hours with stock movement.
+
 Thresholds in `06-ml-anomaly-detection.kql` (detector threshold, seasonality,
-trend, severity bands, lookback) must equal
+trend, severity bands, lookback, minimum active hours) must equal
 `utility/src/retail_setup/generation/calibration.py`;
 `utility/tests/generation/test_calibration.py` checks them.
 

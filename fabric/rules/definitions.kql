@@ -1,28 +1,49 @@
 // Fabric Rules reference queries — pair each with delivery actions
+// Event rows are deduplicated on trace_id (a replayed micro-batch writes the
+// same event again) and aggregated to one alert per entity and window.
 
-// Stockout detected: immediate alert
+// Stockout detected: one alert per store (or DC, store_id empty) with the
+// distinct products whose balance reached zero in the window.
 stockout_detected
 | where ingest_timestamp > ago(5m)
-| project store_id, dc_id, product_id, last_known_quantity, detection_time, trace_id
+| summarize arg_min(detection_time, *) by trace_id
+| summarize stockouts = dcount(product_id),
+            product_ids = make_set(product_id, 50),
+            first_detection = min(detection_time),
+            last_detection = max(detection_time)
+    by store_id, dc_id
+| project store_id, dc_id, stockouts, product_ids, first_detection, last_detection
 
-// Reorder URGENT
+// Reorder URGENT: one alert per store with the products reordered at an empty
+// shelf (inventory_policy.reorder_priority) in the window.
 reorder_triggered
-| where priority == 'URGENT' and ingest_timestamp > ago(10m)
-| project store_id, dc_id, product_id, reorder_quantity, reorder_point, current_quantity, trace_id
+| where ingest_timestamp > ago(10m)
+| where priority == 'URGENT'
+| summarize arg_min(ingest_timestamp, *) by trace_id
+| summarize urgent_reorders = dcount(product_id),
+            product_ids = make_set(product_id, 50),
+            reorder_units = sum(reorder_quantity),
+            first_reorder = min(ingest_timestamp)
+    by store_id, dc_id
+| project store_id, dc_id, urgent_reorders, product_ids, reorder_units, first_reorder
 
-// Truck dwell breach: completed lifecycle exceeds the 90-minute SLA
+// Truck dwell breach: completed lifecycle exceeds the 90-minute SLA. Filters
+// on when the departure reached the Eventhouse (ingestion_time()), so an
+// alert follows the live stream and stops when it stops.
 let threshold_minutes = 90.0;
 fn_truck_sla()
-| where departure_ingest_timestamp > ago(5m)
-| where departure_ingest_timestamp <= now()
-| where departure_time <= now()
+| where departure_ingested_at > ago(5m)
 | where dwell_minutes > threshold_minutes
 | project truck_id, dc_id, store_id, shipment_id, site,
           arrival_time, departure_time, dwell_minutes, threshold_minutes
 
-// Zone arrival surge or long expected dwell: this is not an occupancy estimate.
+// Zone arrival surge: this is not an occupancy estimate. Arrivals per store
+// and zone in the window above the store type's calibrated surge count
+// (fn_rule_thresholds().zone_surge_arrivals, calibration.zone_surge_arrivals).
+let surge_arrivals = toscalar(fn_rule_thresholds() | project zone_surge_arrivals);
 customer_entered
 | where ingest_timestamp > ago(5m)
+| summarize arg_min(ingest_timestamp, *) by trace_id
 | summarize arrivals = sum(customer_count),
             dwell_seconds_weighted =
                 sum(todouble(dwell_time) * todouble(customer_count))
@@ -32,22 +53,25 @@ customer_entered
              real(null),
              dwell_seconds_weighted / todouble(arrivals)
          )
-| where arrivals > 50 or avg_arrival_dwell_seconds > 600
-| project store_id, zone, arrivals, avg_arrival_dwell_seconds
+| where arrivals > surge_arrivals
+| project store_id, zone, arrivals, surge_arrivals, avg_arrival_dwell_seconds
 
-// High-value receipt: total above 3 x the store type's average ticket
-// (calibration.HIGH_VALUE_TICKET_MULTIPLE x profile.avg_ticket_target).
-// 255.0 is the supercenter value (3 x $85); set it for the deployed store type.
+// High-value receipt: total above 10 x the store type's average ticket
+// (fn_rule_thresholds().high_value_receipt_total,
+// calibration.high_value_receipt_threshold), one alert per receipt.
+let high_value_total = toscalar(fn_rule_thresholds() | project high_value_receipt_total);
 receipt_created
 | where ingest_timestamp > ago(5m)
-| where total > 255.0
-| project store_id, receipt_id, total, trace_id
+| where total > high_value_total
+| summarize arg_min(ingest_timestamp, *) by trace_id
+| project store_id, receipt_id, total, high_value_total, trace_id
 
 // Late truck: arrived 30+ minutes after its planned arrival
-// (calibration.TRUCK_LATE_MINUTES), with the cause.
+// (calibration.TRUCK_LATE_MINUTES), with the cause, one alert per arrival.
 truck_arrived
 | where ingest_timestamp > ago(5m)
 | where delay_minutes >= 30
+| summarize arg_min(ingest_timestamp, *) by trace_id
 | project truck_id, dc_id, store_id, shipment_id, planned_arrival_time,
           arrival_time, delay_minutes, delay_reason, trace_id
 
@@ -58,6 +82,7 @@ truck_arrived
 truck_arrived
 | where ingest_timestamp > ago(60m)
 | where delay_reason in ('LANE_DELAY', 'WEATHER')
+| summarize arg_min(ingest_timestamp, *) by trace_id
 | summarize trucks = dcount(shipment_id),
             avg_delay_minutes = avg(todouble(delay_minutes)),
             max_delay_minutes = max(delay_minutes),

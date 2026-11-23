@@ -2,13 +2,13 @@ table fact_receipt_lines
 	lineageTag: aab05dc7-35b4-4318-affd-bc107c21f8f7
 	sourceLineageTag: [ag].[fact_receipt_lines]
 
-	/// Total item units sold in store receipt lines.
+	/// Store receipt-line units, net of returned units (return lines are negative).
 	measure 'Total Units Sold' = SUM('fact_receipt_lines'[Quantity])
 		formatString: #,0
 		displayFolder: Core Metrics\Units
 		lineageTag: 01a1a1a2-0001-0001-0001-000000000001
 
-	/// Store receipt-line revenue, stored in cents and reported in currency.
+	/// Store receipt-line revenue excluding tax, net of returns, stored in cents and reported in currency.
 	measure 'Line Revenue' = DIVIDE(SUM('fact_receipt_lines'[Extended Cents]), 100, 0)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Core Metrics\Sales
@@ -54,8 +54,8 @@ table fact_receipt_lines
 		displayFolder: Profitability
 		lineageTag: c1020001-0000-0000-0000-000000000003
 
-	/// Units per store receipt.
-	measure 'Units per Receipt' = DIVIDE([Total Units Sold], [Receipt Count], 0)
+	/// Units per SALE store receipt (return lines and receipts excluded).
+	measure 'Units per Receipt' = DIVIDE(CALCULATE([Total Units Sold], KEEPFILTERS('fact_receipts'[Receipt Type] = "SALE")), [Receipt Count], 0)
 		formatString: #,0.00
 		displayFolder: Core Metrics\Productivity
 		lineageTag: c1020001-0000-0000-0000-000000000004

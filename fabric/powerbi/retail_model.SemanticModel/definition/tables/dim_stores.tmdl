@@ -6,12 +6,15 @@ table dim_stores
 		formatString: #,0
 		lineageTag: 01a1a1b2-0001-0001-0001-000000000001
 
-	/// Latest recorded store open/close event timestamp at or before UTC current time for one selected store in the current filter context.
+	/// Latest recorded store open/close event timestamp at or before the source as-of (the latest recorded store sale, capped at UTC now) for one selected store in the current filter context.
 	measure 'Twin Store State As Of' = ```
 			VAR _SelectedStoreId =
 				SELECTEDVALUE('dim_stores'[ID])
 			VAR _ObservationCutoff =
-				UTCNOW()
+				MIN(
+					UTCNOW(),
+					CALCULATE(MAX('fact_receipts'[Event Timestamp]), REMOVEFILTERS())
+				)
 			VAR _LatestEventTs =
 				IF(
 					NOT ISBLANK(_SelectedStoreId),

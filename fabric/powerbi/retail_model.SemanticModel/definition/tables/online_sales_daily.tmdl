@@ -2,14 +2,17 @@ table online_sales_daily
 	lineageTag: a2c1b744-09a3-4341-9934-282e0cd86ef7
 	sourceLineageTag: [au].[online_sales_daily]
 
+	/// Online order totals including tax, from Gold online_sales_daily. Online Line Revenue excludes tax, so the two differ by the tax.
 	measure 'Online Revenue' = SUM('online_sales_daily'[Total])
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1c3-0001-0001-0001-000000000001
 
+	/// Online orders, from Gold online_sales_daily.
 	measure 'Online Orders' = SUM('online_sales_daily'[Orders])
 		formatString: #,0
 		lineageTag: 01a1a1c3-0001-0001-0001-000000000002
 
+	/// Online order value including tax (Online Revenue per online order).
 	measure 'Online Average Order Value' = DIVIDE([Online Revenue], [Online Orders], 0)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		lineageTag: 01a1a1c3-0001-0001-0001-000000000003

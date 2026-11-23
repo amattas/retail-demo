@@ -111,7 +111,11 @@ Demand counts `SALE` receipts only (returns never net units sold) and anchors
 on the last complete day, the day before the as-of date. The partial as-of day
 is not used for training, testing or the inference lags, and forecasts start
 on the as-of date, so `forecast_date - to_date(source_as_of)` runs from 0 to
-`forecast_horizon_days - 1`.
+`forecast_horizon_days - 1`. A day with no receipts at all in the source (the
+gap between the end of history and a later live stream) is a source gap, not
+zero demand: the dense calendar flags it, gives it the combination's mean
+observed demand for the lag and rolling features only, and never uses it as a
+training label, calibration or test actual, or for eligibility.
 
 Stockout scores current positions rolled forward to the as-of time. Each
 store/product keeps its last ledger balance (`inventory_as_of` is when that

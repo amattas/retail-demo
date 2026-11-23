@@ -67,6 +67,41 @@ def test_demand_counts_sales_only_through_the_last_complete_day(spark):
     assert rows == {date(2026, 7, 19): 2.0, date(2026, 7, 20): 3.0}
 
 
+def test_demand_calendar_imputes_source_gaps_instead_of_zero_demand(spark):
+    nb06 = _load(
+        "06-ml-demand-forecast.ipynb",
+        {"build_dense_daily_calendar", "build_source_days"},
+        MIN_REQUIRED_HISTORY_DAYS=5,
+        MIN_DAILY_SALES=0.5,
+    )
+    start = date(2026, 1, 1)
+    # History through Jan 10, no source data Jan 11-15, the stream from Jan 16.
+    observed = [start + timedelta(days=d) for d in range(20) if not 10 <= d < 15]
+    receipts = spark.createDataFrame(
+        [(datetime.combine(day, datetime.min.time()),) for day in observed],
+        "event_ts timestamp",
+    )
+    # Demand 2 a day, except a real zero-sale day (Jan 5) inside history.
+    sales = spark.createDataFrame(
+        [(1, 7, day, 2.0, 4.0) for day in observed if day != date(2026, 1, 5)],
+        "store_id long, product_id long, sale_date date, units_sold double, revenue double",
+    )
+    anchor = start + timedelta(days=19)
+    source_days = nb06["build_source_days"](receipts, anchor)
+    base, cohort = nb06["build_dense_daily_calendar"](sales, anchor, anchor, source_days)
+    rows = {row.sale_date: row for row in base.collect()}
+
+    assert len(rows) == 20
+    assert {d for d, row in rows.items() if row.source_gap} == {
+        start + timedelta(days=d) for d in range(10, 15)
+    }
+    # A real no-sale day stays zero; gap days carry the observed mean (28/15).
+    assert rows[date(2026, 1, 5)].units_sold == 0.0
+    assert rows[date(2026, 1, 12)].units_sold == pytest.approx(28 / 15)
+    # Eligibility looks at observed days only.
+    assert cohort.first().history_days == 15
+
+
 def test_stockout_current_positions_roll_forward_to_the_as_of_time(spark):
     nb12 = _load(
         "12-ml-stockout-prediction.ipynb",

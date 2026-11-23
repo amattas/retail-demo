@@ -81,14 +81,17 @@ table dim_distribution_centers
 		displayFolder: Connected Twins\Warehouse\Inventory
 		lineageTag: c2200002-0000-0000-0000-000000000003
 
-	/// Distinct source-recorded shipments in a source-anchored trailing 14-day window ending at the latest recorded truck-move timestamp at or before UTC current time in context.
+	/// Distinct source-recorded shipments in a source-anchored trailing 14-day window ending at the latest recorded truck-move timestamp at or before the source as-of (the latest recorded store sale, capped at UTC now) in context.
 	measure 'Twin Warehouse Shipment Count' = ```
 			VAR _VisibleStoreIds =
 				VALUES('dim_stores'[ID])
 			VAR _VisibleDCIds =
 				VALUES('dim_distribution_centers'[ID])
 			VAR _ObservationCutoff =
-				UTCNOW()
+				MIN(
+					UTCNOW(),
+					CALCULATE(MAX('fact_receipts'[Event Timestamp]), REMOVEFILTERS())
+				)
 			VAR _SourceAnchor =
 				CALCULATE(
 					MAX('fact_truck_moves'[Event Timestamp]),

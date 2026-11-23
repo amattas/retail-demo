@@ -2,7 +2,7 @@ table campaign_performance_daily
 	lineageTag: 7d488d7d-c3f2-4225-aa21-598ced6cae84
 	sourceLineageTag: [au].[campaign_performance_daily]
 
-	/// Total campaign spend, recomputed from cents.
+	/// Campaign spend on impressions shown on the day (Day), recomputed from cents.
 	measure 'Campaign Spend' = DIVIDE(SUM('campaign_performance_daily'[Spend Cents]), 100, 0)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Campaign Performance\Spend
@@ -14,13 +14,13 @@ table campaign_performance_daily
 		displayFolder: Campaign Performance\Reach
 		lineageTag: 8f0fb83f-f454-4be7-ad97-cf440a73db48
 
-	/// Total campaign conversions.
+	/// Attributed purchases by the day of their marketing touch (Day).
 	measure 'Campaign Conversions' = SUM('campaign_performance_daily'[Conversions])
 		formatString: #,0
 		displayFolder: Campaign Performance\Conversions
 		lineageTag: 18e1d027-ca59-4508-9c24-31c29f3072e1
 
-	/// Total attributed revenue driven by campaigns, recomputed from cents.
+	/// Attributed revenue (excluding tax) by campaign, recomputed from cents and dated by the day of the marketing touch (Day), so spend and the revenue it drove share a date. Attributed Revenue in fact_marketing_attribution dates it by purchase instead.
 	measure 'Campaign Attributed Revenue' = DIVIDE(SUM('campaign_performance_daily'[Attributed Revenue Cents]), 100, 0)
 		formatString: \$#,0.00;(\$#,0.00);\$#,0.00
 		displayFolder: Campaign Performance\Revenue

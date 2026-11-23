@@ -212,7 +212,8 @@ def test_anomaly_functions_fill_explicit_hourly_series() -> None:
         body = _object_body(source, name)
         assert "make-series" in body, name
         assert "from start_time to end_time step 1h" in body, name
-        assert "default = 0" in body, name
+        # Counts and sums default to zero; averages are missing in empty hours.
+        assert "default = 0" in body or "default = real(null)" in body, name
 
 
 def test_anomaly_order_uses_numeric_severity_rank_without_schema_drift() -> None:

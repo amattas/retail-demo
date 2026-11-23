@@ -25,6 +25,9 @@ from retail_setup.generation.calibration import (
     REFERENCE_STORE_TYPE,
     STOCKOUT_QUANTITY_THRESHOLD,
     TRUCK_LOAD_MINUTES,
+    ZONE_SURGE_WINDOW_MINUTES,
+    high_value_receipt_threshold,
+    zone_surge_arrivals,
 )
 from retail_setup.generation.stream_calendar import operating_window, plan_lanes
 from retail_setup.generation.stream_state import (
@@ -801,3 +804,74 @@ def test_online_orders_follow_a_staged_lifecycle(world) -> None:
     )
     assert 0.6 * expected <= in_window <= 1.4 * expected
     assert 0.45 <= ship_from_dc <= 0.75
+
+
+# ---------------------------------------------------------------------------
+# Store-type rules (fabric/rules/definitions.kql) on the live events
+# ---------------------------------------------------------------------------
+
+
+def _zone_surges(events: list[dict], surge: int) -> set[tuple[int, str, int]]:
+    """(store, zone, window) of the zone-surge rule: arrivals deduped on trace_id."""
+    window = ZONE_SURGE_WINDOW_MINUTES * MINUTE_MS
+    rows = {e["trace_id"]: e for e in events}
+    arrivals: dict[tuple[int, str, int], int] = {}
+    for event in rows.values():
+        payload = event["payload"]
+        key = (payload["store_id"], payload["zone"], _ms(event["ingest_timestamp"]) // window)
+        arrivals[key] = arrivals.get(key, 0) + payload["customer_count"]
+    return {key for key, count in arrivals.items() if count > surge}
+
+
+def _high_value(events: list[dict], threshold: float) -> list[str]:
+    """Receipt IDs of the high-value rule: one alert per receipt (trace_id)."""
+    rows = {e["trace_id"]: e["payload"] for e in events}
+    return sorted(p["receipt_id"] for p in rows.values() if p["total"] > threshold)
+
+
+def test_store_type_rules_stay_quiet_on_live_traffic_and_fire_on_injected_events(world) -> None:
+    profile = world["profile"]
+    entered = _of(world, "customer_entered")
+    surge = zone_surge_arrivals(profile, TRANSACTIONS)
+    window = ZONE_SURGE_WINDOW_MINUTES * MINUTE_MS
+    busiest: dict[tuple[int, str, int], int] = {}
+    for event in entered:
+        payload = event["payload"]
+        key = (payload["store_id"], payload["zone"], _ms(event["ingest_timestamp"]) // window)
+        busiest[key] = busiest.get(key, 0) + payload["customer_count"]
+    print(f"STAT busiest zone window={max(busiest.values())} surge count={surge}")
+    # Normal live traffic never reaches the surge count, replayed events included.
+    assert _zone_surges(entered + entered[:500], surge) == set()
+    # A crowd at the busiest zone in its busiest window does.
+    store, zone, at = max(busiest, key=busiest.__getitem__)
+    when = datetime.fromtimestamp(at * window / 1000, timezone.utc)
+    crowd = [
+        {
+            "trace_id": f"TRC-crowd-{n}",
+            "ingest_timestamp": when.isoformat().replace("+00:00", "Z"),
+            "payload": {"store_id": store, "zone": zone, "customer_count": 1},
+        }
+        for n in range(surge + 1 - busiest[(store, zone, at)])
+    ]
+    assert _zone_surges(entered + crowd, surge) == {(store, zone, at)}
+
+    receipts = _of(world, "receipt_created")
+    threshold = high_value_receipt_threshold(profile)
+    alerts = _high_value(receipts + receipts[:200], threshold)
+    share = len(alerts) / len(receipts)
+    print(f"STAT high-value receipt share={share:.4f} above ${threshold}")
+    ratios = sorted(r["payload"]["total"] / profile.avg_ticket_target for r in receipts)
+    print(
+        "STAT ticket ratio quantiles "
+        + " ".join(
+            f"{q}={ratios[min(len(ratios) - 1, int(q * len(ratios)))]:.2f}"
+            for q in (0.5, 0.9, 0.95, 0.99, 0.995, 0.999)
+        )
+        + f" mean={sum(ratios) / len(ratios):.2f} n={len(ratios)}"
+    )
+    assert share <= 0.005
+    # The multiple sits beyond the 99th percentile of live tickets.
+    assert threshold / profile.avg_ticket_target > ratios[int(0.99 * len(ratios))]
+    big = {**receipts[0], "trace_id": "TRC-big"}
+    big["payload"] = {**receipts[0]["payload"], "receipt_id": "RCP-big", "total": threshold + 1}
+    assert _high_value(receipts + [big, big], threshold) == sorted([*alerts, "RCP-big"])

@@ -172,8 +172,9 @@ def test_eventhouse_queryset_dashboard_and_rule_share_units_and_threshold() -> N
     assert threshold_match is not None
     assert float(threshold_match.group(1)) == 90.0
     assert "fn_truck_sla()" in rules
-    assert "departure_ingest_timestamp > ago(5m)" in rules
-    assert "departure_ingest_timestamp <= now()" in rules
-    assert "departure_time <= now()" in rules
+    # The rule follows Eventhouse ingestion of the departure.
+    assert "departure_ingested_at = ingestion_time()" in function
+    assert "departure_ingested_at > ago(5m)" in rules
+    assert "departure_ingest_timestamp" not in rules
     assert "where dwell_minutes > threshold_minutes" in rules
     assert "site" in rules
