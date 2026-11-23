@@ -202,7 +202,8 @@ class StreamConfig:
     """Optional start of the live ``stream-events`` notebook after deployment."""
 
     start_after_deploy: bool = False
-    rows_per_second: int = 5
+    # 0 lets the notebook derive the rate from the store count and history volume.
+    rows_per_second: int = 0
     # 0 runs until the notebook job is cancelled in Fabric.
     run_seconds: int = 0
 
@@ -366,12 +367,12 @@ def _to_deploy_config(data: dict[str, Any]) -> DeployConfig:
         raise ValueError("schedules.streaming_data_load must be a boolean or null")
     if "start_after_deploy" in stream and not isinstance(stream["start_after_deploy"], bool):
         raise ValueError("stream.start_after_deploy must be a boolean")
-    rows_per_second = stream.get("rows_per_second", 5)
+    rows_per_second = stream.get("rows_per_second", 0)
     run_seconds = stream.get("run_seconds", 0)
     if isinstance(rows_per_second, bool) or not isinstance(rows_per_second, int) or not (
-        1 <= rows_per_second <= 1000
+        0 <= rows_per_second <= 1000
     ):
-        raise ValueError("stream.rows_per_second must be an integer from 1 to 1000")
+        raise ValueError("stream.rows_per_second must be an integer from 0 (derived) to 1000")
     if isinstance(run_seconds, bool) or not isinstance(run_seconds, int) or run_seconds < 0:
         raise ValueError("stream.run_seconds must be a non-negative integer (0 = until stopped)")
     for flag in ("enabled", "include_plan", "plan_billing_acknowledged", "activate_agent"):
