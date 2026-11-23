@@ -227,8 +227,6 @@ Fabric. Open work lives in the module backlogs under `docs/design/requirements/`
 - `IMP-005` (streaming): the live streaming checks, plus known stream
   limitations such as the `C-16` residual (historical truck stages between the
   end of history and a late stream start become observable).
-- Deployment-started streams pass `stream.rows_per_second` (default 5, range
-  1-1000), so they can't use the notebook's derived rate (`0`).
 
 Check the GitHub issue tracker for other current work.
 

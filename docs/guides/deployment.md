@@ -350,7 +350,7 @@ schedules:
   streaming_data_load: null    # streaming Silver/Gold and anomaly alerts every 30 minutes; null follows start_after_deploy
 stream:
   start_after_deploy: false    # start stream-events after readiness
-  rows_per_second: 5           # passed as source_rows_per_second; see the note below
+  rows_per_second: 0           # passed as source_rows_per_second; 0 = derived (see below)
   run_seconds: 0               # 0 = until cancelled in Fabric
 ```
 
@@ -372,10 +372,10 @@ stream:
   parameters keep their defaults (a 60-second trigger, a 10-minute catch-up
   cap after a stop, five supervised restarts, `volume_scale = 1.0`). The
   notebook's own default rate is `0`, which derives the rate from the store
-  count and history; `stream.rows_per_second` accepts only 1-1000, so a
-  deployment-started stream always runs at an explicit rate. If that rate is
-  below the peak the notebook needs, it prints a warning and under-produces
-  peak hours; raise `rows_per_second` or start the stream by hand with `0`. If a stream is already
+  count and history. `stream.rows_per_second` defaults to `0` so a
+  deployment-started stream uses that derived rate; it accepts 0-1000. An
+  explicit value adds resolution, not volume; one below the peak the notebook
+  needs under-produces peak hours and prints a warning. If a stream is already
   queued or running, it reports that run instead of starting another. A
   failure leaves the deployment `DEGRADED`, not failed, and records
   `stream-report.json`. An unbounded stream holds a Spark session and capacity

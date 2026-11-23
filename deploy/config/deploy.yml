@@ -32,7 +32,9 @@ schedules:
 # a Spark session (and capacity) until it stops.
 stream:
   start_after_deploy: false
-  rows_per_second: 5
+  # 0 derives the rate from the store count and history volume; a larger value
+  # adds resolution, not volume (the notebook's volume_scale changes volume).
+  rows_per_second: 0
   # 0 runs until the notebook job is cancelled in Fabric.
   run_seconds: 0
 auth:

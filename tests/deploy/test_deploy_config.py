@@ -249,6 +249,8 @@ def test_maintenance_schedule_is_enabled_and_the_stream_left_off_by_default(tmp_
 
     assert config.schedules.enabled_pipelines() == ("daily-maintenance",)
     assert config.stream.start_after_deploy is False
+    # 0 lets stream-events derive its rate from the store count and history volume.
+    assert config.stream.rows_per_second == 0
 
 
 def test_automation_settings_load_explicit_choices(tmp_path):
@@ -293,7 +295,8 @@ def test_streaming_schedule_follows_a_started_stream_unless_set(
         ({"schedules": {"daily_maintenance": "yes"}}, "schedules.daily_maintenance"),
         ({"schedules": {"streaming_data_load": "on"}}, "schedules.streaming_data_load"),
         ({"stream": {"start_after_deploy": 1}}, "stream.start_after_deploy"),
-        ({"stream": {"rows_per_second": 0}}, "stream.rows_per_second"),
+        ({"stream": {"rows_per_second": -1}}, "stream.rows_per_second"),
+        ({"stream": {"rows_per_second": 1001}}, "stream.rows_per_second"),
         ({"stream": {"run_seconds": -1}}, "stream.run_seconds"),
         ({"stream": []}, "stream must be a mapping"),
     ],
