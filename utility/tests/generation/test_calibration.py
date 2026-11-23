@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import re
 from datetime import date, datetime
 from pathlib import Path
@@ -53,6 +54,9 @@ TRUCK_MOVES_TMDL = (
 DELIVERY_NOTEBOOK = (REPO / "fabric" / "lakehouse" / "13-ml-delivery-prediction.ipynb").read_text(
     encoding="utf-8"
 )
+DASHBOARD = (REPO / "fabric" / "dashboards" / "retail-ops.template.json").read_text(
+    encoding="utf-8"
+)
 STREAM_TEMPLATE = (REPO / "utility" / "notebooks" / "templates" / "driver-05-stream.py").read_text(
     encoding="utf-8"
 )
@@ -81,6 +85,31 @@ def _window_minutes(rule: str) -> int:
     windows = {int(m) for m in re.findall(r"ago\((\d+)m\)", rule)}
     assert len(windows) == 1, rule
     return windows.pop()
+
+
+def _kql_object(source: str, name: str) -> str:
+    """Body of the KQL function or materialized view ``name``."""
+    match = re.search(rf"\b{name}\b[^\n]*\n\{{\n(.*?)\n\}}\n", source, re.DOTALL)
+    assert match is not None, name
+    return match.group(1)
+
+
+def test_dashboard_late_truck_and_incident_tiles_read_calibrated_sources() -> None:
+    tiles = {tile["title"]: tile["query"] for tile in json.loads(DASHBOARD)["tiles"]}
+    # Late trucks come from the hourly delay view, which counts them at the
+    # calibrated threshold; no tile repeats a delay or dwell literal of its own.
+    late = tiles["Late Trucks by Lane (24h)"]
+    assert late.startswith("mv_truck_delay_hourly")
+    assert "late_trucks=sum(late_trucks)" in late
+    for query in tiles.values():
+        assert not re.search(r"delay_minutes\s*>=?\s*\d", query), query
+        assert not re.search(r"dwell_minutes\s*>=?\s*\d", query), query
+    # Incident tiles read the open-incident functions.
+    assert tiles["Active Logistics Incidents"].startswith("fn_active_incidents()")
+    assert tiles["Stores Impacted by Open Incidents"].startswith("fn_incident_impacted_stores()")
+    active = _kql_object(KQL_FUNCTIONS, "fn_active_incidents")
+    assert "join kind=leftanti" in active and "where started_at <= now()" in active
+    assert "fn_active_incidents()" in _kql_object(KQL_FUNCTIONS, "fn_incident_impacted_stores")
 
 
 def test_truck_dwell_sla_is_one_value_everywhere() -> None:
@@ -158,6 +187,9 @@ def test_late_truck_threshold_is_one_value_everywhere() -> None:
     for source in (KQL_FUNCTIONS, KQL_VIEWS):
         literals = {int(v) for v in re.findall(r"countif\(delay_minutes >= (\d+)\)", source)}
         assert literals == {cal.TRUCK_LATE_MINUTES}
+    late = f"countif(delay_minutes >= {cal.TRUCK_LATE_MINUTES})"
+    assert late in _kql_object(KQL_VIEWS, "mv_truck_delay_hourly")
+    assert late in _kql_object(KQL_FUNCTIONS, "fn_lane_delays")
     measure = re.search(
         r"measure 'Late Truck Arrivals' = .*\[Delay Minutes\] >= (\d+)\)", TRUCK_MOVES_TMDL
     )

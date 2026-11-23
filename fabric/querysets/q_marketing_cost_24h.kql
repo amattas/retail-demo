@@ -1,7 +1,13 @@
-// Marketing cost per campaign in last 24h
+// Marketing cost per campaign in the last 24h: spend on impressions shown in
+// the window. converted_spend is the cost of the impressions behind the
+// window's conversions, which may have been shown up to seven days earlier;
+// it is reported beside spend, not added to it.
 fn_campaign_performance(24h)
 | summarize impressions = sum(impressions),
-            spend_cents = sum(spend_cents)
+            spend_cents = sum(spend_cents),
+            conversions = sum(conversions),
+            converted_spend_cents = sum(converted_spend_cents)
     by campaign_id
-| extend cost = todouble(spend_cents) / 100.0
+| extend cost = todouble(spend_cents) / 100.0,
+         converted_cost = todouble(converted_spend_cents) / 100.0
 | order by spend_cents desc

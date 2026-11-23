@@ -133,34 +133,53 @@
     | where lag_seconds <= windowHours * 3600
 }
 
+// Spend is the cost of impressions shown in the window. Conversions are the
+// attributed purchases in the window, by the day of their touch; a touch can
+// be up to seven days older than its purchase, so the cost of the converted
+// impressions is reported separately (converted_spend_cents, on the touch's
+// day) and never added to the window's spend.
 .create-or-alter function with (folder = "marketing") fn_campaign_performance(lookback:timespan)
 {
+    let window_start = ago(lookback);
     let attributed =
         fn_attribution()
-        | where purchase_ts > ago(lookback);
+        | where purchase_ts > window_start;
     let converted_impressions =
         attributed
         | project impression_id;
     let spend =
         ad_impression
-        | where ingest_timestamp > ago(lookback)
-                or impression_id in (converted_impressions)
+        | where ingest_timestamp > window_start
+        | extend shown_ts = coalesce(impression_time, ingest_timestamp)
+        | where shown_ts > window_start
         | summarize arg_max(ingest_timestamp, *) by impression_id
         | summarize impressions = dcount(impression_id),
                     spend_cents = sum(tolong(round(cost * 100.0)))
-            by campaign_id, channel,
-               day = startofday(coalesce(impression_time, ingest_timestamp));
+            by campaign_id, channel, day = startofday(shown_ts);
+    let converted_cost =
+        ad_impression
+        | where impression_id in (converted_impressions)
+        | summarize arg_max(ingest_timestamp, *) by impression_id
+        | project impression_id, cost_cents = tolong(round(cost * 100.0));
     let conversions =
         attributed
+        | join kind=leftouter converted_cost on impression_id
         | summarize conversions = dcount(attribution_id),
+                    converted_spend_cents = sum(coalesce(cost_cents, long(0))),
                     attributed_revenue_cents = sum(attributed_revenue_cents),
                     discount_cents = sum(discount_cents),
                     tax_cents = sum(tax_cents),
                     payment_cents = sum(payment_cents)
             by campaign_id, channel, day = startofday(touch_ts);
     spend
-    | join kind=leftouter conversions on campaign_id, channel, day
-    | extend conversions = coalesce(conversions, long(0)),
+    | join kind=fullouter conversions on campaign_id, channel, day
+    | extend campaign_id = coalesce(campaign_id, campaign_id1),
+             channel = coalesce(channel, channel1),
+             day = coalesce(day, day1)
+    | extend impressions = coalesce(impressions, long(0)),
+             spend_cents = coalesce(spend_cents, long(0)),
+             conversions = coalesce(conversions, long(0)),
+             converted_spend_cents = coalesce(converted_spend_cents, long(0)),
              attributed_revenue_cents = coalesce(attributed_revenue_cents, long(0)),
              discount_cents = coalesce(discount_cents, long(0)),
              tax_cents = coalesce(tax_cents, long(0)),
@@ -173,8 +192,8 @@
                  todouble(attributed_revenue_cents) / spend_cents
              )
     | project campaign_id, channel, day, impressions, spend_cents,
-              conversions, attributed_revenue_cents, discount_cents,
-              tax_cents, payment_cents, conversion_rate, roas
+              conversions, converted_spend_cents, attributed_revenue_cents,
+              discount_cents, tax_cents, payment_cents, conversion_rate, roas
 }
 
 // ============================================================================

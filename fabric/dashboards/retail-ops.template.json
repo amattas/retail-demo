@@ -35,7 +35,7 @@
       "title": "Marketing Cost (24h)",
       "type": "kql",
       "dataset": { "kqlDatabaseResourceId": "<fabric-kql-database-resource-id>" },
-      "query": "let window=24h; ad_impression | where ingest_timestamp > ago(window) | summarize impressions=count(), cost=sum(cost) by campaign_id | top 10 by cost desc"
+      "query": "let window=24h; ad_impression | where ingest_timestamp > ago(window) | where coalesce(impression_time, ingest_timestamp) > ago(window) | summarize arg_max(ingest_timestamp, *) by impression_id | summarize impressions=count(), cost=sum(cost) by campaign_id | top 10 by cost desc"
     },
     {
       "title": "Tender Mix (15m)",

@@ -139,7 +139,8 @@ def test_kql_functions_enforce_last_touch_and_reconciliation() -> None:
         # touches are dated by when they were shown, not when they arrived
         "touch_ts = coalesce(impression_time, ingest_timestamp)",
         'format_datetime(touch_ts, "yyyy-MM-dd HH:mm:ss.fffffff")',
-        "day = startofday(coalesce(impression_time, ingest_timestamp))",
+        "shown_ts = coalesce(impression_time, ingest_timestamp)",
+        "by campaign_id, channel, day = startofday(shown_ts)",
         "arg_max(touch_rank, *)",
         "lag_seconds between (0 .. 604800)",
         'payment_status == "APPROVED"',
@@ -149,10 +150,15 @@ def test_kql_functions_enforce_last_touch_and_reconciliation() -> None:
         "subtotal_cents + tax_cents == total_cents",
         'attribution_model = "LAST_TOUCH_7D"',
         "attributed_revenue_cents",
-        "or impression_id in (converted_impressions)",
+        "| where impression_id in (converted_impressions)",
+        "converted_spend_cents = sum(coalesce(cost_cents, long(0)))",
     ):
         assert expected in source
     assert "0L" not in source
+    # Spend covers impressions shown in the window only; the converted
+    # impressions' cost is a separate column, never folded into spend.
+    assert "or impression_id in (converted_impressions)" not in source
+    assert "| where shown_ts > window_start" in source
 
 
 def test_querysets_use_reconciled_attribution_functions() -> None:
@@ -163,7 +169,20 @@ def test_querysets_use_reconciled_attribution_functions() -> None:
     )
 
     assert "fn_campaign_performance(7d)" in funnel.read_text(encoding="utf-8")
-    assert "fn_campaign_performance(24h)" in cost.read_text(encoding="utf-8")
+    cost_text = cost.read_text(encoding="utf-8")
+    assert "fn_campaign_performance(24h)" in cost_text
+    assert "converted_spend_cents = sum(converted_spend_cents)" in cost_text
+    dashboard = json.loads(
+        (ROOT / "fabric" / "dashboards" / "retail-ops.template.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    tile = next(
+        str(t["query"]) for t in dashboard["tiles"] if t["title"] == "Marketing Cost (24h)"
+    )
+    # The dashboard tile counts the same impressions: shown in the window, once each.
+    assert "coalesce(impression_time, ingest_timestamp) > ago(window)" in tile
+    assert "arg_max(ingest_timestamp, *) by impression_id" in tile
     reconciliation_text = reconciliation.read_text(encoding="utf-8")
     assert "fn_marketing_attribution()" in reconciliation_text
     assert "payment_total_delta" in reconciliation_text
