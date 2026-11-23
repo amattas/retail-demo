@@ -68,6 +68,13 @@ are not part of the default release.
 - Canonical public documentation is built only from reviewed `docs/` content.
 - The default semantic model and agents may expose generated row-level detail
   to authorized workspace consumers.
+- Shared Lakehouse control tables (`ag._stream_state_*`, `ag._job_locks`,
+  `ag._watermarks`) are protected only by workspace permissions. The stream
+  state is versioned per incarnation and batch, and leases expire; neither is
+  an access control (`THREAT-012`, `SEC-015`).
+- Deploy-time generation writes only typed numeric thresholds into
+  `fn_rule_thresholds()`, and Data Agent snapshots are generated from the TMDL
+  and the ontology builder with a CI drift check (`THREAT-013`, `SEC-016`).
 
 ## Verification boundaries
 

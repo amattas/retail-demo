@@ -26,6 +26,11 @@ verification evidence.
 - Lakehouse, Eventhouse, semantic-model, ontology, and Data Agent access.
 - Deployment credentials, tokens, and environment-specific identifiers.
 - Run-history, freshness, approval, and verification evidence.
+- Lakehouse control state: live stream state (`ag._stream_state_*`), writer
+  leases (`ag._job_locks`), and Silver watermarks (`ag._watermarks`).
+- Deploy-time generated artifacts: environment rule thresholds in
+  `fn_rule_thresholds()` and the Data Agent `datasource.json`/`ontology.json`
+  snapshots.
 - Canonical documentation and the public static site.
 
 ## Trust boundaries
@@ -61,9 +66,11 @@ flowchart LR
 | `THREAT-009` | The optional app presents replay, local approval, or lossy telemetry as authenticated production action/audit evidence. | False operational assurance, unauthorized future actions, or lost evidence. | `SEC-003`, `SEC-008`, `SEC-012` | Proposals are local drafts and Eventhouse logging is best-effort. Per-user authorization, production adapters, durable audit, evidence validation, idempotency, and scope limits are not established by an approval button. |
 | `THREAT-010` | Notebook substitution executes configuration strings, or unverified/mismatched dictionary content is reused. | Unintended statements or irreproducible data. | `SEC-007`, `SEC-013` | Literal/JSON encoding, ref and cache checks, mutable refresh, and manifest-last publication are implemented; notebooks were rebuilt and drift checked. Explicit refs/fork overrides remain caller-selected; fresh live execution remains open. |
 | `THREAT-011` | A custom business layout carries injected instructions, unsafe text, real trademarks, or tampered dictionaries into notebooks, reports, or apps. | Script/markup injection in themed artifacts, trademark misuse in demos, or data that differs from the reviewed layout. | `SEC-007`, `SEC-014` | Copilot runs without built-in tools or permissions and output is schema- and text-validated; colors reach artifacts only as validated hex. The logo session's only tool is a read-only Wikimedia Commons search: Copilot's pick must be a returned file, the code downloads it from Wikimedia hosts only, and the SVG is sanitized and pinned by SHA-256 before it reaches reports or apps. Commons descriptions are untrusted model input; at worst they steer the choice among real search results, which the operator reviews in the preview. The fictionalization guard rejects only names the model declares or the business name itself, so the operator preview remains the final check for undeclared real brands. Copilot data handling follows the operator's GitHub Copilot terms. |
+| `THREAT-012` | Lakehouse control state (`ag._stream_state_*`, `ag._job_locks`) is edited, deleted, or left stale out of band, or a writer ignores the locks. | The stream emits inconsistent events (negative stock, duplicate or missing trucks), two writers overwrite the same Delta table, or a stale lease blocks Silver, Gold or ML runs. | `SEC-008`, `SEC-011`, `SEC-015` | Any workspace contributor can write these tables; the controls make normal replays, restarts and crashes safe, not tampering. Live Fabric behavior of the leases and the state tables is unverified. |
+| `THREAT-013` | Deploy-time substitution or snapshot generation writes unintended content into deployed definitions: non-numeric text in `fn_rule_thresholds()`, or Data Agent snapshots that drift from the model or select unintended fields. | Broken or misleading alerting, KQL that fails to apply, or agents grounded on stale or unintended fields. | `SEC-013`, `SEC-016` | Thresholds come from the operator's own environment configuration; the snapshots select every model field by design because the data is synthetic. Live re-export comparison of the deployed agents is outstanding. |
 
 ## Review triggers
 
 Review when identities, public endpoints, agents, data classification, preview
-defaults, external action adapters, or documentation publication boundaries
-change. Prior Fabric runs do not validate changes made after those runs.
+defaults, external action adapters, Lakehouse control tables, deploy-time
+substitutions, or documentation publication boundaries change. Prior Fabric runs do not validate changes made after those runs.
