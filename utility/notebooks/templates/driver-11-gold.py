@@ -89,18 +89,8 @@ from datetime import date, datetime, timezone
 from uuid import uuid4
 
 # Gold derives from what was actually published by setup-10 — read the
-# source fact tables back from the catalog instead of regenerating.
-GOLD_SOURCE_TABLES = [
-    "fact_receipts",
-    "fact_receipt_lines",
-    "fact_online_order_headers",
-    "fact_marketing",
-    "fact_marketing_attribution",
-    "fact_foot_traffic",
-    "fact_truck_moves",
-    "fact_store_inventory_txn",
-    "fact_dc_inventory_txn",
-]
+# source fact tables (gold_rules.GOLD_SOURCE_TABLES) back from the catalog
+# instead of regenerating.
 tables = {
     name: spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.{name}")
     for name in GOLD_SOURCE_TABLES
@@ -126,7 +116,14 @@ spark.conf.set("spark.sql.adaptive.enabled", "true")
 spark.conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
 spark.conf.set("spark.sql.shuffle.partitions", str(shuffle_partitions_for(cfg)))
 
-gold = generate_gold(spark, tables)
+# Same cutoff rule as notebook 04: history end until streaming starts, then now.
+GOLD_CUTOFF = gold_cutoff(
+    cfg.end_date,
+    spark.catalog.tableExists(f"{LAKEHOUSE_NAME}.{SILVER_DB}._watermarks"),
+    datetime.now(timezone.utc),
+)
+print(f"Gold cutoff (exclusive, UTC): {GOLD_CUTOFF}")
+gold = generate_gold(spark, tables, GOLD_CUTOFF)
 
 attempt_ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 run_id = f"setup-gold-{STORE_TYPE}-{SEED}-{attempt_ts}-{uuid4().hex[:8]}"

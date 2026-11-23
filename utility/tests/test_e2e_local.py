@@ -3,7 +3,7 @@
 Proves the full pipeline without a Fabric workspace (spec requirement).
 """
 
-from datetime import date
+from datetime import date, datetime
 
 from pyspark.sql import functions as F
 
@@ -34,7 +34,7 @@ def test_full_pipeline_hardware_store(spark, tmp_path):
     report = run_invariants(spark, result.tables)
     assert report.passed, report.failures
 
-    gold = generate_gold(spark, result.tables)
+    gold = generate_gold(spark, result.tables, datetime(2100, 1, 1))
     written = write_all(
         result.tables, gold, cfg, run_id="e2e", base_path=str(tmp_path), fmt="parquet"
     )

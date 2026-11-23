@@ -16,7 +16,7 @@ KQL_FUNCTIONS = ROOT / "fabric" / "kql_database" / "03-create-functions.kql"
 SILVER_NOTEBOOK = ROOT / "fabric" / "lakehouse" / "03-streaming-to-silver.ipynb"
 GOLD_NOTEBOOK = ROOT / "fabric" / "lakehouse" / "04-streaming-to-gold.ipynb"
 SCHEMAS = ROOT / "utility" / "src" / "retail_setup" / "generation" / "schemas.py"
-GOLD = ROOT / "utility" / "src" / "retail_setup" / "generation" / "gold.py"
+GOLD = ROOT / "utility" / "src" / "retail_setup" / "generation" / "gold_rules.py"
 
 PURCHASE_FIELDS = {
     "campaign_id",

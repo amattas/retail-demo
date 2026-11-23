@@ -172,28 +172,21 @@ def test_setup_pipeline_draws_the_stage_graph():
 
 
 def test_setup11_loads_every_gold_source_table():
-    driver_path = UTILITY / "notebooks" / "templates" / "driver-11-gold.py"
-    driver_tree = ast.parse(driver_path.read_text())
-    sources_assignment = next(
-        node
-        for node in driver_tree.body
-        if isinstance(node, ast.Assign)
-        and any(
-            isinstance(target, ast.Name) and target.id == "GOLD_SOURCE_TABLES"
-            for target in node.targets
-        )
-    )
-    loaded_sources = set(ast.literal_eval(sources_assignment.value))
+    from retail_setup.generation.gold_rules import GOLD_SOURCE_TABLES
 
-    gold_tree = ast.parse((UTILITY / "src" / "retail_setup" / "generation" / "gold.py").read_text())
+    driver = (UTILITY / "notebooks" / "templates" / "driver-11-gold.py").read_text()
+    assert "for name in GOLD_SOURCE_TABLES" in driver
+
+    rules_tree = ast.parse(
+        (UTILITY / "src" / "retail_setup" / "generation" / "gold_rules.py").read_text()
+    )
     required_sources = {
         node.slice.value
-        for node in ast.walk(gold_tree)
+        for node in ast.walk(rules_tree)
         if isinstance(node, ast.Subscript)
         and isinstance(node.value, ast.Name)
         and node.value.id == "tables"
         and isinstance(node.slice, ast.Constant)
         and isinstance(node.slice.value, str)
     }
-
-    assert loaded_sources == required_sources
+    assert set(GOLD_SOURCE_TABLES) == required_sources
