@@ -10,7 +10,9 @@ calibrated against, so a normal truck stays under the dwell SLA and a late
 truck exceeds it.
 """
 
-from retail_setup.dictionaries.models import StoreTypeProfile
+from math import ceil, sqrt
+
+from retail_setup.dictionaries.models import StoreTypeProfile, parse_operating_hours
 
 # ---------------------------------------------------------------------------
 # Truck dwell (minutes from arrival to departure)
@@ -157,11 +159,25 @@ DC_ONLINE_DEMAND_SHARE = 0.1
 # ---------------------------------------------------------------------------
 
 # Arrival-surge rule: per (store, zone) over the window, alert when arrivals
-# exceed the surge count or the arrival-weighted expected dwell exceeds the
-# long-dwell seconds.
+# exceed zone_surge_arrivals(). The live stream (stream_events.visit_events)
+# emits one customer_entered per zone a visit passes, and every visit passes
+# the entrance and the exit, so those zones carry the store's whole visit
+# rate. The threshold sits ZONE_SURGE_SIGMAS Poisson standard deviations above
+# the busiest window a normal store can have: the busiest hour, weekday and
+# month of the store type, at the largest store traffic multiplier and in the
+# best weather. Peak holidays are left out on purpose: a Black Friday crowd at
+# a flagship store's entrance is a surge.
 ZONE_SURGE_WINDOW_MINUTES = 5
-ZONE_SURGE_ARRIVALS = 50
-ZONE_LONG_DWELL_SECONDS = 600
+ZONE_SURGE_SIGMAS = 4.0
+ZONE_SURGE_MIN_ARRIVALS = 10
+# Traffic model values mirrored from the generators (a test keeps them in
+# step): visits per receipt (stream_calendar.VISIT_CONVERSION_CALIBRATION),
+# the largest store daily_traffic_multiplier (dims.VOLUME_CLASSES) and the
+# best-weather traffic factor (stream_calendar.WEATHER_FACTOR_RANGE). They are
+# repeated here so deployment can size the rules without Spark.
+TRAFFIC_VISIT_CONVERSION = 0.225
+TRAFFIC_STORE_MULTIPLIER_MAX = 2.5
+TRAFFIC_WEATHER_FACTOR_MAX = 1.2
 
 # ---------------------------------------------------------------------------
 # High-value receipts
@@ -171,13 +187,74 @@ ZONE_LONG_DWELL_SECONDS = 600
 # type's calibrated average ticket (profile.avg_ticket_target).
 HIGH_VALUE_TICKET_MULTIPLE = 3.0
 HIGH_VALUE_RULE_WINDOW_MINUTES = 5
-# Store type whose threshold the static reference rule carries.
+# Store type whose thresholds the checked-in fn_rule_thresholds() carries;
+# deployment writes the deployed store type's values (apply_kql).
 REFERENCE_STORE_TYPE = "supercenter"
 
 
 def high_value_receipt_threshold(profile: StoreTypeProfile) -> float:
     """Receipt total (dollars) above which a receipt counts as high value."""
     return round(HIGH_VALUE_TICKET_MULTIPLE * profile.avg_ticket_target, 2)
+
+
+def _peak_hour_share(profile: StoreTypeProfile) -> float:
+    """Largest share of a store-day's visits in one local hour, over the opening patterns."""
+    best = 0.0
+    for hours in profile.resolved_operating_hours() or ["24h"]:
+        open_hour, close_hour = parse_operating_hours(hours)
+        masked = [
+            weight if open_hour <= hour < close_hour else 0.0
+            for hour, weight in enumerate(profile.hourly_weights)
+        ]
+        if sum(masked) > 0:
+            best = max(best, max(masked) / sum(masked))
+    return best
+
+
+def peak_store_visits_per_hour(
+    profile: StoreTypeProfile, transactions_per_store_day: float
+) -> float:
+    """Visits in the busiest hour of a store at traffic multiplier 1.
+
+    The stream's rate model (``stream_calendar.store_visits_per_hour``) at the
+    store type's busiest hour, weekday and month, without holidays or weather.
+    """
+    daily_peak = max(profile.daily_weights) * 7 / sum(profile.daily_weights)
+    monthly_peak = max(profile.monthly_weights) * 12 / sum(profile.monthly_weights)
+    return (
+        transactions_per_store_day
+        / TRAFFIC_VISIT_CONVERSION
+        * daily_peak
+        * monthly_peak
+        * _peak_hour_share(profile)
+    )
+
+
+def zone_peak_arrivals(profile: StoreTypeProfile, transactions_per_store_day: float) -> float:
+    """Expected arrivals in one surge window at the busiest zone of the busiest store."""
+    return (
+        peak_store_visits_per_hour(profile, transactions_per_store_day)
+        * TRAFFIC_STORE_MULTIPLIER_MAX
+        * TRAFFIC_WEATHER_FACTOR_MAX
+        * ZONE_SURGE_WINDOW_MINUTES
+        / 60.0
+    )
+
+
+def zone_surge_arrivals(profile: StoreTypeProfile, transactions_per_store_day: float) -> int:
+    """Arrivals per (store, zone) and window above which the surge rule alerts."""
+    mean = zone_peak_arrivals(profile, transactions_per_store_day)
+    return max(ZONE_SURGE_MIN_ARRIVALS, ceil(mean + ZONE_SURGE_SIGMAS * sqrt(mean)))
+
+
+def rule_thresholds(
+    profile: StoreTypeProfile, transactions_per_store_day: float
+) -> dict[str, float | int]:
+    """Store-type thresholds the live rules read from ``fn_rule_thresholds()``."""
+    return {
+        "high_value_receipt_total": high_value_receipt_threshold(profile),
+        "zone_surge_arrivals": zone_surge_arrivals(profile, transactions_per_store_day),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -188,6 +265,10 @@ ANOMALY_LOOKBACK_HOURS = 168
 ANOMALY_THRESHOLD = 1.5
 ANOMALY_SEASONALITY = -1  # autodetect
 ANOMALY_TREND = "avg"
+# Hours with stock movement a store's inventory series needs before it is
+# scored: the stream moves stock in bursts (sales, reorders, unloads), so a
+# series with only a few active hours makes every movement an outlier.
+ANOMALY_MIN_ACTIVE_HOURS = 24
 # Severity by |anomaly_score|, highest band first; below the last band is "low".
 ANOMALY_SEVERITY_BANDS: list[tuple[str, float]] = [
     ("critical", 3.0),

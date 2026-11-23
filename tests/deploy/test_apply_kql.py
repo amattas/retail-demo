@@ -541,3 +541,47 @@ def test_summarize_result_falls_back_without_columns(capsys) -> None:
     apply_kql._summarize_result(table)
 
     assert "KQL applied: 7 command(s)." in capsys.readouterr().out
+
+
+def _rule_thresholds_body(script: str) -> str:
+    match = re.search(r"fn_rule_thresholds\(\)\s*\{([^{}]*)\}", script)
+    assert match is not None
+    return match.group(1)
+
+
+def test_rule_thresholds_are_sized_for_the_environment_store_type(tmp_path: Path) -> None:
+    from retail_setup.dictionaries.loader import (
+        default_dictionary_root,
+        load_dictionaries,
+    )
+    from retail_setup.generation import calibration
+
+    environments = tmp_path / "utility" / "config" / "environments"
+    environments.mkdir(parents=True)
+    (environments / "demo.yaml").write_text(
+        "store_type: hardware\nmonths: 12\nstore_count: 20\n", encoding="utf-8"
+    )
+    profile = load_dictionaries(default_dictionary_root(), "hardware").profile
+
+    thresholds = apply_kql.environment_rule_thresholds("demo", tmp_path)
+
+    assert thresholds == calibration.rule_thresholds(
+        profile, profile.resolved_transactions_per_store_day()
+    )
+    assert apply_kql.environment_rule_thresholds("missing", tmp_path / "none") is None
+
+    script = apply_kql.build_database_script(apply_kql.collect_kql_scripts())
+    applied = apply_kql.apply_rule_thresholds(script, thresholds)
+    body = _rule_thresholds_body(applied)
+    assert f"high_value_receipt_total = real({thresholds['high_value_receipt_total']!r})" in body
+    assert f"zone_surge_arrivals = long({thresholds['zone_surge_arrivals']})" in body
+    # Only the thresholds change.
+    assert applied.replace(body, "") == script.replace(_rule_thresholds_body(script), "")
+
+
+def test_rule_thresholds_must_each_be_set_once() -> None:
+    script = ".create-or-alter function fn_rule_thresholds() { print a = real(1.0) }"
+    assert apply_kql.apply_rule_thresholds("print 1", {"a": 2.0}) == "print 1"
+    assert "a = real(2.0)" in apply_kql.apply_rule_thresholds(script, {"a": 2.0})
+    with pytest.raises(ValueError, match="exactly once"):
+        apply_kql.apply_rule_thresholds(script, {"b": 2})

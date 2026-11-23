@@ -115,10 +115,12 @@ def test_truck_dwell_alerts_are_driven_by_completed_nonfuture_departures() -> No
         if tile["title"] == "Truck Dwell by Site (24h)"
     )
 
-    for query in (rules, queryset, dashboard_query):
+    for query in (queryset, dashboard_query):
         assert "departure_ingest_timestamp > ago(" in query
         assert "departure_ingest_timestamp <= now()" in query
         assert "departure_time <= now()" in query
+    # The alert follows when a completed departure reached the Eventhouse.
+    assert "departure_ingested_at > ago(5m)" in rules
     assert "arrival_ingest_timestamp > ago(5m)" not in rules
 
 

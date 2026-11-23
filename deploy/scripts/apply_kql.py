@@ -117,6 +117,65 @@ def build_database_script(scripts: list[Path]) -> str:
     return "\n".join(parts).rstrip() + "\n"
 
 
+_RULE_THRESHOLDS_FUNCTION = re.compile(
+    r"fn_rule_thresholds\(\)\s*\{(?P<body>[^{}]*)\}", re.DOTALL
+)
+
+
+def environment_rule_thresholds(
+    environment: str, repo_root: Path = REPO_ROOT
+) -> dict[str, float | int] | None:
+    """Rule thresholds of the environment's store type, or None without a config.
+
+    ``calibration.rule_thresholds`` sizes them from the store type's profile
+    (custom layouts included) and the configured transactions per store-day.
+    """
+
+    from retail_setup.config.generation import (
+        load_generation_config,
+        resolve_generation_config_path,
+    )
+    from retail_setup.customization.store import active_dictionary_root
+    from retail_setup.dictionaries.loader import load_dictionaries
+    from retail_setup.generation.calibration import rule_thresholds
+
+    path = resolve_generation_config_path(repo_root, environment)
+    if not path.is_file():
+        return None
+    config = load_generation_config(
+        path, dictionary_root=active_dictionary_root(repo_root, environment)
+    )
+    profile = load_dictionaries(
+        config.resolved_dictionary_root, config.store_type
+    ).profile
+    return rule_thresholds(profile, config.transactions_per_store_day)
+
+
+def apply_rule_thresholds(script: str, thresholds: dict[str, float | int]) -> str:
+    """Write ``thresholds`` into the ``fn_rule_thresholds()`` body of ``script``.
+
+    The checked-in function carries the reference store type's values; every
+    threshold must appear exactly once in its body as ``name = real(...)`` or
+    ``name = long(...)``.
+    """
+
+    functions = list(_RULE_THRESHOLDS_FUNCTION.finditer(script))
+    if not functions:
+        return script
+    if len(functions) > 1:
+        raise ValueError("fn_rule_thresholds() is defined more than once")
+    match = functions[0]
+    body = match.group("body")
+    for name, value in thresholds.items():
+        pattern = re.compile(rf"\b{re.escape(name)} = (real|long)\([^)]*\)")
+        found = pattern.findall(body)
+        if len(found) != 1:
+            raise ValueError(f"fn_rule_thresholds() must set {name} exactly once")
+        literal = repr(float(value)) if found[0] == "real" else str(int(value))
+        body = pattern.sub(lambda m, v=literal: f"{name} = {m.group(1)}({v})", body)
+    return script[: match.start("body")] + body + script[match.end("body") :]
+
+
 def _credential(
     credential: TokenCredential | None = None,
     *,
@@ -342,6 +401,16 @@ def main() -> int:
     script = build_database_script(
         collect_kql_scripts(args.source_dir, selected_scripts)
     )
+    if args.environment:
+        thresholds = environment_rule_thresholds(args.environment)
+        if thresholds is None:
+            console.warn(
+                "No generation config for this environment; the rule thresholds "
+                "keep the reference store type's values."
+            )
+        else:
+            script = apply_rule_thresholds(script, thresholds)
+            console.info(f"Rule thresholds for this store type: {thresholds}")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(script, encoding="utf-8")
     console.info(f"Wrote combined KQL script to {args.output}")
