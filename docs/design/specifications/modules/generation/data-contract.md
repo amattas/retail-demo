@@ -5,7 +5,8 @@
 `utility/src/retail_setup/generation/schemas.py` defines the base Lakehouse
 tables, columns, and types. `engine.py` orchestrates generation,
 `invariants.py` validates relationships across tables, `writer.py` publishes
-outputs, and `gold.py` builds the ten aggregates.
+outputs, and `gold.py` builds the ten aggregates from `gold_rules.py`, the one
+Gold definition that notebook 04 also uses.
 
 ## Base Silver output
 
@@ -203,13 +204,18 @@ source.
 
 ML output tables are not part of this base contract.
 
+Every Gold table is built from `gold_rules.py`: sales tables count `SALE`
+receipts with an approved payment, online sales count orders with an approved
+payment, `truck_dwell_daily` has one row per completed shipment lifecycle, and
+no source row at or after the Gold cutoff is used (see
+[Fabric analytics](../analytics/fabric-analytics.md#streaming-to-gold-behavior)).
+
 The source-derived live-route check compares this inventory with declared
 event paths. Seven dimensions, `fact_promo_lines`, `fact_truck_inventory`,
-`fact_dc_inventory_txn`, and `dc_inventory_position_current` are the named
-historical-only boundary (the stream also appends DC stock moves to
-`fact_dc_inventory_txn`). `fact_online_order_lines`,
-`fact_logistics_incidents` and `fact_logistics_incident_stores` have declared
-live routes. The manifest records those targets and rationale;
+and `dc_inventory_position_current` are the named historical-only boundary.
+`fact_dc_inventory_txn` has a live route (the stream emits DC stock moves as
+`inventory_updated` rows without a store), as do `fact_online_order_lines`,
+`fact_logistics_incidents` and `fact_logistics_incident_stores`. The manifest records those targets and rationale;
 `schemas.py` continues to own their fields, types, nullability behavior, and
 mixed-case compatibility.
 
@@ -247,9 +253,11 @@ Setup-10 runs its invariant checks and per-table staging, validation, and
 promotion concurrently; every phase still completes for all tables before the
 next starts, and any promotion failure rolls back every table.
 
-Gold (`setup-11-build-gold`) runs in `ml-required` alongside model training.
-It shares a lane with customer segmentation, keeping that pipeline within
-six sessions.
+Gold (`setup-11-build-gold`) runs in the first `ml-required` wave with the
+demand forecast, market basket, promotion effectiveness and stockout models,
+before customer segmentation and churn, so the pipeline needs at most five
+sessions. Setup-11 holds the `gold` writer lock in `ag._job_locks` while it
+publishes.
 Inside a notebook, up to six ready stages run concurrently. A stage writes
 its own outputs one after another so related cached plans are never built
 concurrently. Completion order and the notebook split do not change the output;
@@ -285,9 +293,9 @@ stream is never shuffled.
 Historical store demand starts with open-hour visitors. A seeded
 negative-binomial count controls arrival variability; each visitor has a
 purchase decision using store/hour conversion propensity. Footfall uses this
-same visitor grid, not receipts divided by a fixed conversion percentage.
-The existing five zone counts conserve hourly visitors exactly. These are
-allocated sensor counts, not a physical trajectory model.
+same visitor grid, not receipts divided by a fixed conversion percentage, and
+counts zone passages along the shared visit path (see
+[Store profiles and derived defaults](#store-profiles-and-derived-defaults)).
 
 Visitors per store-day also follow the US holiday calendar and the local
 weather (`generation/stream_calendar.py`, shared with the live stream):
@@ -332,8 +340,10 @@ most common and no artificial four-unit maximum.
 
 Promotion exposure precedes basket-size sampling and raises additional-item
 demand. Discounts still precede tax, and receipt/payment amounts reconcile in
-integer cents. This models coupon-driven basket expansion, not fitted causal
-price elasticity or a market-basket model learned from real transactions.
+integer cents. Price response comes from the shelf-price schedule and the
+department elasticities, and product pairs from fixed complements (see
+[Prices, baskets and promotions](#prices-baskets-and-promotions)); both are
+synthetic designs, not models learned from real transactions.
 
 The shared draw implementation uses Box-Muller normal draws and an exact
 integer-shape negative-binomial distribution (sum of geometric draws).
@@ -430,8 +440,8 @@ without these columns derive fulfilled requested quantities from negative
 did not record lost sales. This is read-side compatibility only: writes still
 require the declared target schema. Regenerate historical setup or explicitly
 migrate the target before resuming streaming against an older table.
-Live deltas have zero unfulfilled demand; this is
-not evidence of measured lost demand in the live scenario generator.
+Live sales carry `requested_quantity`; a live line the store cannot fill is a
+`LOST_SALE` with its demand in `unfulfilled_quantity`, as in history.
 
 DCs keep their own stock (`fact_dc_inventory_txn`): an opening stock of
 10-16 days of their stores' expected demand, supplier orders when the position
@@ -471,8 +481,9 @@ ranges live in `generation/calibration.py`.
 
 The stream notebook embeds the shared basket/catalog/quantity code at build
 time. It emits a variable-length receipt-line array with matching item counts,
-promotion products, line discounts, tax, header totals, and payments. Online
-live headers retain their existing no-discount contract. Missing store tax or
+promotion products, line discounts, tax, header totals, and payments. Live
+online orders use history's online promo codes, tenders, declines and
+destination tax. Missing store tax or
 an empty/missing eligible catalog is an error, not a synthetic `$9.99` price.
 
 Live catalog launch eligibility is snapshotted when the stream starts; restart
@@ -482,9 +493,11 @@ hourly, daily and monthly weights in store-local time, the same traffic
 multipliers and operating hours, the same conversion model, and customers from
 the same ticket-weighted local pools (see the
 [live event contract](../streaming/event-contract.md#volume-hours-and-customers)).
-Live inventory, logistics and online fulfillment keep their synthetic
-scheduling until their state machines land; shared basket behavior does not
-imply a persistent live supply-chain simulator.
+Live store stock, trucks, DC stock, incidents and online order lifecycles are
+state machines that continue the history (see the
+[live event contract](../streaming/event-contract.md#store-inventory)); their
+state lives in `ag._stream_state_*`. A new stream incarnation reads store
+stock from the Silver ledger as of its start.
 
 Live `fact_store_ops` rows use the historical lower-case `opened`/`closed`;
 notebook 03 lower-cases rows written by earlier stream versions. Live
@@ -725,7 +738,12 @@ the supported Fabric-native contract.
 - `utility/tests/generation/test_schema_contract.py`
 - `utility/tests/generation/test_engine.py`
 - `utility/tests/generation/test_gold.py`
-- module-specific generation tests
+- `utility/tests/generation/test_gold_notebook_parity.py`
+- `utility/tests/generation/test_business_invariants.py`
+- module-specific generation tests (for example `test_timezones.py`,
+  `test_customers.py`, `test_shelf_prices.py`, `test_baskets.py`,
+  `test_returns.py`, `test_incidents.py`, `test_dc_supply.py`,
+  `test_logistics_history.py`)
 - `utility/tests/test_notebook_build.py`
 - `utility/tests/contracts/test_live_data_contract.py`
 - `python scripts/check_data_contracts.py`

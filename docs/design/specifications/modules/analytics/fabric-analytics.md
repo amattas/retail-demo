@@ -18,21 +18,29 @@ outer fail-fast script; embedded or repeated wrappers are rejected.
 
 ## KQL object inventory
 
-- 18 typed business event tables
+- 22 typed business event tables
 - `unknown_event`
 - `anomaly_alerts` and its run log `anomaly_detection_runs`, written by
   `16-persist-anomaly-alerts` in `streaming-data-load`
 - 3 pricing recommendation/decision tables; `14-ml-dynamic-pricing` appends
   `PENDING` rows to `pricing_recommendation_created`
-- 5 core materialized views
+- 6 core materialized views, including `mv_truck_delay_hourly`
 - 2 pricing decision metric materialized views
 - `fn_pending_recommendations()` for latest cross-event workflow state
+- `fn_rule_thresholds()` with the deployed store type's rule thresholds
+- `fn_active_incidents()`, `fn_incident_impacted_stores()`, and
+  `fn_lane_delays()` over the logistics incident and truck delay tables
 - functions for attribution, truck SLA, anomaly detection, and related queries
 
 Core materialized-view definitions are time-independent; seven-day retention is
-applied as a materialized-view policy. Anomaly functions build explicitly
-bounded hourly series with zero-value defaults, then sort severity through a
-numeric rank while preserving the public result schema.
+applied as a materialized-view policy. Anomaly functions build hourly series
+that start at the first event in the lookback and end at `bin(now(), 1h)`, so
+the open hour is never scored. Counts default to zero; basket and payment-rate
+averages default to null and are filled with `series_fill_linear`. Inventory
+movement is scored per store, and only after `ANOMALY_MIN_ACTIVE_HOURS` (24)
+active hours; rows with a null `store_id` are dropped from every series. The
+functions then sort severity through a numeric rank while preserving the public
+result schema. Detector parameters come from `calibration.py`.
 `fn_new_anomaly_alerts(lookback_hours, persist_hours, closed_end)` keeps only
 closed hourly bins and alert ids not yet in `anomaly_alerts`, so the scheduled
 persistence is idempotent.
@@ -125,7 +133,16 @@ Live-specific behavior and divergences:
 - store operations are written as lower-case `opened`/`closed`, like history,
   and older upper-case rows are normalized once; `promotion_applied.product_ids`
   becomes the historical comma-separated, sorted ID list;
-- picked and shipped events populate `ag.fact_online_order_status`;
+- picked, shipped and delivered events populate `ag.fact_online_order_status`,
+  and each run moves recent live `fact_online_order_lines` with their order
+  (`PICKED`, `SHIPPED`, `DELIVERED`, or `CANCELLED` for zero-total headers);
+- `inventory_updated` rows without a store are DC stock moves and go to
+  `fact_dc_inventory_txn`; lost sales keep their demand in
+  `requested_quantity` and `unfulfilled_quantity`;
+- `logistics_incident_started` inserts one `fact_logistics_incidents` row and
+  its `fact_logistics_incident_stores` rows; `logistics_incident_resolved`
+  sets `resolved_at` once through a Delta `MERGE`;
+- `fact_receipts.local_hour` is derived from `dim_stores.TimeZone`;
 - `fact_online_order_status` is an owned streaming-only Silver contract: its
   exact schema and routes are declared in the Silver notebook, its terminal
   exception is validated from `contracts/retail-demo.json`, and
@@ -145,7 +162,7 @@ Target-table lookup is stubbed; no live Delta `MERGE`, full Spark suite, or
 Fabric execution is proven by this test.
 
 Watermark/replay behavior is fail-closed and contract-tested. The manifest
-declares all 18 emitted paths and derives the physical transform inventory from
+declares all 22 emitted paths and derives the physical transform inventory from
 this notebook. `python scripts/check_data_contracts.py` fails if a route,
 terminal, mapping, key, or named boundary drifts.
 
@@ -171,8 +188,9 @@ created targets in reverse order. Rollback continues after individual restore
 errors and preserves staging when manual recovery is required.
 
 Nine Gold tables have an emitted-event route.
-`dc_inventory_position_current` depends on historical-only
-`fact_dc_inventory_txn` and is therefore part of the named historical boundary.
+`dc_inventory_position_current` is rebuilt in batch from the DC ledger and is
+part of the named historical boundary, although the stream also appends DC
+stock moves to `fact_dc_inventory_txn`.
 The derived attribution path combines five Silver inputs and terminates at
 `fact_marketing_attribution` and `campaign_performance_daily` in the active
 semantic model.
@@ -189,6 +207,25 @@ guaranteed deployable items. They may require manual import and
 binding. Activator is Fabric's event-driven alerting and action service.
 Claims about five-minute schedules or deployed Activator actions are not
 current defaults.
+
+Rule thresholds are calibrated from the generator (`calibration.py`), and
+`utility/tests/generation/test_calibration.py` fails when a rule, dashboard
+tile, anomaly function or TMDL literal drifts from them. Two thresholds depend
+on the store type: the zone-surge arrival count (the entrance arrivals of the
+largest store at the store type's busiest hour, weekday and month in the best
+weather, plus four Poisson standard deviations; 117 per 5 minutes for
+supercenter) and the high-value receipt (10 times the store type's
+`avg_ticket_target`, about one ticket in a thousand). They reach the rules
+through `fn_rule_thresholds()`. The checked-in function carries the reference
+store type's values; `apply_kql.py --environment` writes the deployed store
+type's values (custom layouts and the configured transactions per store-day
+included) as typed `real`/`long` literals and fails unless the function and
+each threshold appear exactly once. Every rule deduplicates on `trace_id`; the
+stockout and URGENT reorder rules raise one alert per store (or DC) and
+window, listing the products, and the incident-stockout rule one per
+incident. The dwell-breach rule keys on the
+departure's `ingestion_time()` through `fn_truck_sla().departure_ingested_at`.
+See `fabric/rules/README.md` for each rule.
 
 ## KPI semantics
 
@@ -212,7 +249,10 @@ rollback execution remains a separate live gate.
 
 `05-maintain-delta-tables.ipynb` maintains every Silver table in
 `schemas.TABLES`, every Gold aggregate, every ML output, and the Silver
-control tables (`_watermarks`, `fact_online_order_status`, `setup_run_log`);
+control tables (`_watermarks`, `_job_locks`, the six `_stream_state_*` tables,
+`fact_online_order_status`, `setup_run_log`). It claims each table's writer
+lock without waiting and skips tables whose lock is held.
+
 `tests/test_maintenance_table_inventory.py` keeps the lists and their ZORDER
 columns equal to those contracts. It skips genuinely absent optional tables,
 including optional ML/streaming state; missing required historical tables
