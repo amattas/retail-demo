@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 import json
 import math
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from functools import reduce
 from pathlib import Path
 from types import FunctionType, SimpleNamespace
@@ -37,10 +37,12 @@ def _notebook(path: Path) -> dict[str, Any]:
 
 
 def _code(path: Path) -> str:
+    # Generated SHARED SOURCE cells (job locks) are tested with their module.
     return "\n".join(
         "".join(cell.get("source", []))
         for cell in _notebook(path)["cells"]
         if cell.get("cell_type") == "code"
+        and not "".join(cell.get("source", [])).startswith("# SHARED SOURCE")
     )
 
 
@@ -111,18 +113,23 @@ def test_demand_uses_dense_rolling_origins_and_recursive_state() -> None:
         "df_evaluation_base, df_evaluation_cohort = "
         "build_dense_daily_calendar(\n"
         "    df_daily_sales,\n"
-        "    source_as_of_date,\n"
+        "    anchor_date,\n"
         "    train_end_date,"
     ) in code
     assert (
         "df_inference_base, df_inference_cohort = "
         "build_dense_daily_calendar(\n"
         "    df_daily_sales,\n"
-        "    source_as_of_date,\n"
-        "    source_as_of_date,"
+        "    anchor_date,\n"
+        "    anchor_date,"
     ) in code
     assert "add_demand_features(df_evaluation_base)" in code
     assert "    df_inference_base,\n    forecast_start_date," in code
+    assert "forecast_start_date = anchor_date + timedelta(days=1)" in code
+
+    last_complete_day = _function(path, "last_complete_day", {"timedelta": timedelta})
+    assert last_complete_day(datetime(2026, 7, 21, 0, 30)) == date(2026, 7, 20)
+    assert last_complete_day(datetime(2026, 7, 21, 23, 59)) == date(2026, 7, 20)
 
     mape = _function(path, "mape_ratio_column")
     mape_source = ast.unparse(ast.parse(_function_source(path, mape.__name__)))

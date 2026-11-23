@@ -83,6 +83,26 @@ current production inference selects its cohort independently. Churn and
 stockout partition on label-availability dates and purge 90-day and three-day
 forward-label horizons, respectively.
 
+### Shared source as-of
+
+Every required producer anchors on the same source as-of time: the latest
+`event_ts` in Silver `fact_receipts`. Each reads only source rows at or before
+it, so the six outputs describe one snapshot of Silver even when the stream
+adds rows between producers.
+
+Demand counts `SALE` receipts only (returns never net units sold) and anchors
+on the last complete day, the day before the as-of date. The partial as-of day
+is not used for training, testing or the inference lags, and forecasts start
+on the as-of date, so `forecast_date - to_date(source_as_of)` runs from 0 to
+`forecast_horizon_days - 1`.
+
+Stockout scores current positions rolled forward to the as-of time. Each
+store/product keeps its last ledger balance (`inventory_as_of` is when that
+balance was recorded), while its demand windows end at the as-of time. A slow
+mover's months-old snapshot is therefore scored on today's demand, not the
+demand around its last ledger change. Ledger rows after the as-of time, such
+as scheduled deliveries, are ignored.
+
 ### Stockout inventory semantics
 
 The inventory ledger retains signed balances; a deficit is not a negative
