@@ -17,7 +17,7 @@ flowchart LR
     end
 
     subgraph Fabric[Microsoft Fabric workspace]
-        SetupNB[setup-01..04]
+        SetupNB[setup-01..11]
         Stream[stream-events]
         Lake[(Lakehouse<br/>Silver ag / Gold au)]
         Event[(Eventhouse<br/>KQL database)]
@@ -59,7 +59,11 @@ historical-load notebook.
 `stream-events` emits all twenty-two of its declared business event types
 to Eventhouse through
 the Spark Kusto connector, which is the Kusto software component for Apache
-Spark. KQL supplies the recent-event query path. Optional
+Spark. It continues the generated history with the same models (volume,
+store-local hours, customers, baskets, prices, payments, logistics incidents)
+and keeps state that spans micro-batches (stock, trucks, open orders, visits)
+in versioned Lakehouse tables, `ag._stream_state_*`. KQL supplies the
+recent-event query path. Optional
 Eventhouse shortcuts and streaming transforms project events into Lakehouse
 Silver and Gold.
 
@@ -81,8 +85,10 @@ directly from OneLake without importing a second copy.
 - Deployment profiles select exact, dependency-checked groups. The destructive
   reset group is excluded from every automatic profile.
 - Dashboard and rule source files are not guaranteed deployable items.
-- The semantic model is Direct Lake and has 42 active tables, including six ML
+- The semantic model is Direct Lake and has 44 active tables, including six ML
   outputs.
+- Lakehouse writers on independent schedules coordinate through lease rows in
+  `ag._job_locks`; see [data flow](data-flow.md#writer-locks).
 - `fact_online_order_status` is a streaming-only Silver output outside the base
   table contract.
 - Prior full-demo setup, ML, Reporting, ontology, agents, task flow, and

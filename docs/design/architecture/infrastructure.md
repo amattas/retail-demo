@@ -55,6 +55,13 @@ open-source Python library for deploying source-controlled Fabric item
 folders) publishes supported workspace items. KQL schema application runs
 separately with the operator identity.
 
+Terraform ignores changes to the Lakehouse `description` and `folder_id` and
+the Eventhouse `folder_id` (`lifecycle.ignore_changes` in
+`deploy/terraform/main.tf`). Later deploy steps own them: `fabric-cicd`
+publishes the manifest description and `workspace_folders` moves each item to
+its type folder. Without this, every Terraform plan reported drift and reset
+both, and the next steps restored them.
+
 ## Current item layout
 
 | Location | Items |
@@ -81,11 +88,11 @@ allowing separate child folders. These managed exceptions are recorded in
 
 | Pipeline | Actual scope | Schedule |
 | --- | --- | --- |
-| `setup-pipeline` | Setup 01-10 (02-05 and 06-08 in parallel) | On demand; mandatory for Reporting profiles |
+| `setup-pipeline` | Setup 01-10 as a dependency graph (02, 04 and 05 after 01; 03 after 04; 06-08 after 03; at most five at once) | On demand; mandatory for Reporting profiles |
 | `historical-data-load` | Retained historical-load notebook | On demand |
 | `streaming-data-load` | Streaming Silver then Gold; anomaly-alert persistence in parallel | Every 30 minutes (UTC) when `schedules.streaming_data_load` is true (default: on only when `stream.start_after_deploy` is true) |
 | `daily-maintenance` | Delta maintenance, demand-forecast and stockout models, then the Operations Agent signal refresh | Daily 00:00 Eastern when `schedules.daily_maintenance` is true (default on) |
-| `ml-required` | Six serialized required producers, then contract validator | On demand; terminal Reporting gate |
+| `ml-required` | Two waves: Gold (`setup-11`), demand forecast, market basket, promotion effectiveness and stockout risk; then segmentation and churn; then the contract validator. Producers and Gold retry once | On demand; terminal Reporting gate |
 | `ml-optional` | Promoted optional outputs | Full-demo post-Reporting |
 | `ml-experimental` | Experimental outputs | Full-demo post-Reporting |
 
@@ -101,6 +108,12 @@ allowing separate child folders. These managed exceptions are recorded in
 - `mssql-python` on Windows/Linux, or Microsoft ODBC Driver 17/18 on macOS,
   for Lakehouse SQL readiness checks
 - Fabric Spark and Spark Kusto connector
+
+Exact versions are pinned in the hash-locked `utility/requirements-deploy.txt`
+(currently `fabric-cicd` 1.4.0, `azure-identity` 1.27.0, `msal` 1.39.0,
+`mssql-python` 1.18.0, `pyodbc` 5.5.0, `azure-kusto-data` 6.0.4, and
+`jsonpath-ng` 1.7.0, which `fabric-cicd` 1.4.0 caps below 1.8) and in
+`deploy/terraform/providers.tf` with its lock file (`microsoft/fabric` 1.15.1).
 
 ## Local deployment state
 

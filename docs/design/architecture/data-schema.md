@@ -48,9 +48,14 @@ model's starts and resolutions; they are sporadic (a few per DC and year).
 - `pricing_recommendation_approved`
 - `pricing_recommendation_rejected`
 
-The KQL scripts define five core and two pricing decision metric materialized
-views. `fn_pending_recommendations()` derives current pending state across the
-recommendation, approval, and rejection event tables.
+The KQL scripts define six core materialized views (including
+`mv_truck_delay_hourly`) and two pricing decision metric views.
+`fn_pending_recommendations()` derives current pending state across the
+recommendation, approval, and rejection event tables. `fn_rule_thresholds()`
+holds the store-type-dependent rule thresholds that the deployment writes for
+the deployed store type, and `fn_active_incidents()`,
+`fn_incident_impacted_stores()`, and `fn_lane_delays()` read the logistics
+incident and truck delay tables.
 
 ## Lakehouse Silver (`ag`)
 
@@ -59,7 +64,7 @@ recommendation, approval, and rejection event tables.
 `dim_geographies`, `dim_stores`, `dim_distribution_centers`, `dim_trucks`,
 `dim_customers`, `dim_products`, `dim_date`.
 
-### Facts (20)
+### Facts (21)
 
 `fact_receipts`, `fact_receipt_lines`, `fact_payments`, `fact_store_ops`,
 `fact_foot_traffic`, `fact_ble_pings`, `fact_customer_zone_changes`,
@@ -78,12 +83,17 @@ time and `fact_receipts.local_hour` keeps the store-local hour.
 - `setup_run_log`
 - streaming-only `ag._watermarks`
 - owned streaming-only output `fact_online_order_status`
+- writer leases `ag._job_locks` (`lock_name`, `owner`, `acquired_at`,
+  `expires_at`)
+- live stream state `ag._stream_state_stores`, `_visits`, `_orders`,
+  `_inventory`, `_logistics`, and `_meta`: versioned rows of
+  (`incarnation`, `batch_id`, `entity_key`, `payload`, `deleted`); see the
+  [live event contract](../specifications/modules/streaming/event-contract.md#stream-state)
 
 `fact_online_order_status` is not part of the base contract or active semantic
 model. The streaming Silver notebook declares its schema and
 PICKED/SHIPPED/DELIVERED routes. The solution manifest validates its named downstream exception, and
-the Delta maintenance inventory includes both this table and the
-`ag._watermarks` control table.
+the Delta maintenance inventory includes this table and the control tables.
 
 ## Lakehouse Gold (`au`)
 
@@ -94,12 +104,12 @@ the Delta maintenance inventory includes both this table and the
 
 ## Semantic model
 
-The Direct Lake model has 43 active tables. Direct Lake is a Power BI
+The Direct Lake model has 44 active tables. Direct Lake is a Power BI
 connection mode that reads Delta/Parquet data from OneLake directly, without a
 separate import copy or DirectQuery round trip:
 
 - 7 dimensions
-- 20 facts
+- 21 facts
 - 10 Gold aggregates
 - 6 ML outputs: `churn_predictions`, `customer_segments`, `demand_forecast`,
   `stockout_risk`, `product_recommendations`, `price_elasticity`
@@ -108,10 +118,10 @@ separate import copy or DirectQuery round trip:
 flowchart LR
     Events[22 declared live event types] --> KQL[Eventhouse tables]
     KQL --> Projection[Optional live projection]
-    Generation[Historical generator] --> Silver[7 dimensions + 20 facts]
+    Generation[Historical generator] --> Silver[7 dimensions + 21 facts]
     Projection --> Silver
     Silver --> Gold[10 aggregates]
-    Silver --> Model[43-table Direct Lake model]
+    Silver --> Model[44-table Direct Lake model]
     Gold --> Model
     ML[6 active ML outputs] --> Model
 ```
