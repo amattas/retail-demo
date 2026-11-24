@@ -582,6 +582,17 @@ spec by the same catalog builder as the preset trees
 department/category name rules preset catalogs rely on. Their brand
 `Category` equals a department name, and branded titles use a brand from the
 product's own department.
+
+A custom layout's `department_weights` are calibrated when its dictionaries are
+built (`retail_setup.customization.calibrate`). Copilot tends to answer with
+revenue-like shares, which, read as basket-line shares, leave a realistic ticket
+target buying about one item. When the ticket target affords fewer than
+`min(basket_lambda, 2)` items, the weights move toward line share
+(`weight * expected_line_value ** -alpha`) by the smallest `alpha` in [0, 1] that
+reaches it, or `alpha = 1` when nothing smaller does. The ticket target and catalog
+are unchanged, the saved spec keeps Copilot's weights, and `profile.json` carries the
+calibrated ones, so batch, stream and estimates all use them. Dictionaries built by
+an older calibration are rebuilt automatically.
 Current derived defaults include:
 
 - `silver_db = ag`
