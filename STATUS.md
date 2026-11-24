@@ -65,8 +65,9 @@ User guides were audited against the code and corrected (notebook counts, the
 `core` profile, setup/Gold pipeline split, ontology name, ML tiers, task-flow
 size, and the Fabric Apps).
 
-Readiness remains `DEGRADED` only by optional live-stream evidence (no stream
-running). Browser sign-in to the three apps has not been exercised.
+Readiness then remained `DEGRADED` only by optional live-stream evidence (no
+stream running); since 2026-11-24 a never-started stream no longer degrades
+readiness. Browser sign-in to the three apps has not been exercised.
 
 ## Optional delivery and readiness repair (2026-10-22)
 

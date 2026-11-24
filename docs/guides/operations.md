@@ -422,9 +422,9 @@ utilization. Do not promise fixed runtimes without a measured profile.
 The required historical, Reporting, ontology, Data Agent, and task-flow paths
 have live deployment evidence. The stream remains intentionally manual. Until
 a bounded `stream-events` run completes, the three optional streaming
-freshness checks remain `UNKNOWN` and overall readiness remains `DEGRADED`.
-This does not mean deployment failed. The console says **Required deployment
-READY** and presents missing initial stream evidence as informational rather
-than `ERROR`. There is no need to redeploy to clear that notice. Run the
+freshness checks (and `freshness.alerts`) remain `UNKNOWN`, but overall
+readiness is `SUCCEEDED`: a stream that has never run is expected after a
+deployment. The console presents the missing stream evidence as an
+informational notice rather than a warning or `ERROR`. There is no need to redeploy to clear that notice. Run the
 optional stream only when live-event functionality is needed; genuine stream
 failures and partial evidence still produce warnings.

@@ -112,8 +112,12 @@ evidence, the console groups them as an informational notice explaining that
 this is expected before `stream-events` is started. A partial stream or a
 network/permission failure is not classified as expected inactivity.
 
-The report still records `UNKNOWN` and overall `DEGRADED`; no evidence is
-invented, marked passed, or silently skipped. Standalone verification retains
+A stream that has never run does not degrade readiness: those checks, and
+`freshness.alerts` when no detection run exists, stay `UNKNOWN` in the report
+but are left out of the overall status, so a fresh deployment reports
+`SUCCEEDED`. No evidence is invented, marked passed, or silently skipped. Once
+any core stream evidence exists, missing or stale stream evidence degrades
+readiness again. Standalone verification retains
 its exit code 3 for optional degradation. The deployment command treats that
 as non-blocking and prints that required deployment is ready, while its
 journal retains `DEGRADED`. Actual optional workload failures remain named
