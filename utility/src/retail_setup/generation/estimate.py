@@ -80,6 +80,69 @@ class CatalogExpectations:
     sku_count: int = 0
 
 
+@dataclass(frozen=True)
+class DepartmentLine:
+    """Expected value of one basket line drawn from a department."""
+
+    # Line value including repeat purchases of the same item.
+    value: float
+    # The taxable part of ``value``.
+    taxable: float
+    # Share of the department's units that go to its most popular product.
+    top_unit_share: float
+
+
+def department_lines(products: list[dict]) -> dict[str, DepartmentLine]:
+    """Generator-faithful expected line value for every department in ``products``."""
+
+    lines: dict[str, DepartmentLine] = {}
+    for department in dict.fromkeys(item["Department"] for item in products):
+        items = [item for item in products if item["Department"] == department]
+        repeat = 0.22 if _CONSUMABLE.search(department.lower()) else 0.04
+        prices = [_EXPECTED_SALE_TO_BASE * float(item["BasePrice"]) for item in items]
+        weights = [price**-_POPULARITY_PRICE_EXPONENT for price in prices]
+        total = sum(weights)
+        value = taxable = 0.0
+        for item, price, weight in zip(items, prices, weights):
+            unit_value = weight / total * price / (1.0 - repeat)
+            # Groceries are untaxed and clothing fully taxed under the
+            # default state rule (generation.baskets.line_tax_cents).
+            grocery = item["Department"] in {"Fresh", "Grocery"}
+            tax_share = 0.0 if grocery and "Candy" not in item["Category"] else 1.0
+            value += unit_value
+            taxable += unit_value * tax_share
+        lines[department] = DepartmentLine(value, taxable, max(weights) / total / (1.0 - repeat))
+    return lines
+
+
+def mean_tax_rate(taxes: list[dict] | dict) -> float:
+    """Average combined sales-tax rate across ``_shared/tax_rates.json`` rows."""
+
+    rows = taxes if isinstance(taxes, list) else next(iter(taxes.values()))
+    return sum(float(row["CombinedRate"]) for row in rows) / len(rows)
+
+
+def affordable_basket(
+    profile: dict,
+    department_weights: dict[str, float],
+    lines: dict[str, DepartmentLine],
+    tax_rate: float,
+) -> float:
+    """Items per basket the ticket target buys when lines follow ``department_weights``.
+
+    The generator shrinks baskets toward ``avg_ticket_target``, so this (capped
+    at ``basket_lambda``) is the expected basket size.
+    """
+
+    weighted = {d: w for d, w in department_weights.items() if d in lines}
+    total_weight = sum(weighted.values())
+    line = sum(w * lines[d].value for d, w in weighted.items()) / total_weight
+    taxable = sum(w * lines[d].taxable for d, w in weighted.items()) / total_weight
+    return float(profile["avg_ticket_target"]) / (
+        (line + taxable * tax_rate) * (1.0 - float(profile["promo_rate"]) * 0.20)
+    )
+
+
 @lru_cache(maxsize=32)
 def _catalog_expectations(
     root: str, store_type: str, brands_per_product: int
@@ -90,38 +153,22 @@ def _catalog_expectations(
         products = json.loads((base / store_type / "products.json").read_text("utf-8"))
         taxes = json.loads((base / "_shared" / "tax_rates.json").read_text("utf-8"))
         products = products if isinstance(products, list) else next(iter(products.values()))
-        taxes = taxes if isinstance(taxes, list) else next(iter(taxes.values()))
-        tax_rate = sum(float(row["CombinedRate"]) for row in taxes) / len(taxes)
+        tax_rate = mean_tax_rate(taxes)
         department_weights = profile["department_weights"]
-        line = taxable = total_weight = top_share = 0.0
-        for department, department_weight in department_weights.items():
-            items = [item for item in products if item["Department"] == department]
-            if not items:
-                continue
-            repeat = 0.22 if _CONSUMABLE.search(department.lower()) else 0.04
-            prices = [_EXPECTED_SALE_TO_BASE * float(item["BasePrice"]) for item in items]
-            weights = [price**-_POPULARITY_PRICE_EXPONENT for price in prices]
-            total = sum(weights)
-            for item, price, weight in zip(items, prices, weights):
-                unit_value = weight / total * price / (1.0 - repeat)
-                # Groceries are untaxed and clothing fully taxed under the
-                # default state rule (generation.baskets.line_tax_cents).
-                grocery = item["Department"] in {"Fresh", "Grocery"}
-                tax_share = 0.0 if grocery and "Candy" not in item["Category"] else 1.0
-                line += department_weight * unit_value
-                taxable += department_weight * unit_value * tax_share
-            total_weight += department_weight
-            # Each base product is split across `brands_per_product` SKUs.
-            top_share = max(
-                top_share,
-                department_weight * max(weights) / total / (1.0 - repeat) / brands_per_product,
-            )
+        lines = department_lines(products)
+        total_weight = sum(w for d, w in department_weights.items() if d in lines)
+        # Each base product is split across `brands_per_product` SKUs.
+        top_share = max(
+            (
+                w * lines[d].top_unit_share / brands_per_product
+                for d, w in department_weights.items()
+                if d in lines
+            ),
+            default=0.0,
+        )
         brands = json.loads((base / store_type / "brands.json").read_text("utf-8"))
         brands = brands if isinstance(brands, list) else next(iter(brands.values()))
-        line, taxable = line / total_weight, taxable / total_weight
-        affordable = float(profile["avg_ticket_target"]) / (
-            (line + taxable * tax_rate) * (1.0 - float(profile["promo_rate"]) * 0.20)
-        )
+        affordable = affordable_basket(profile, department_weights, lines, tax_rate)
         return CatalogExpectations(
             basket_mean=min(affordable, float(profile["basket_lambda"])),
             top_sku_unit_share=top_share / total_weight,

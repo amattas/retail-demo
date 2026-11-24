@@ -269,7 +269,11 @@ around them:
 | `luxury` | 40 | $3,000 | 10-19, 10-20, or 11-19 | boutique | 25% |
 
 A custom layout takes its traffic from its average ticket, its hours from its
-hourly traffic curve, and its online share and zones from its profile.
+hourly traffic curve, and its online share and zones from its profile. If its
+department weights would make most baskets a single big-ticket item (for example,
+appliances weighted like a share of revenue), setup rebalances them toward
+cheaper departments until the average ticket buys about two items, so
+market-basket ML has product pairs to learn from.
 
 Holidays and weather move daily traffic the same way in history and the live
 stream. Each store type follows a US holiday calendar for its kind of store:

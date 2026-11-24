@@ -269,6 +269,8 @@ from its numbers, then adjust them to fit this business):
 Requirements:
 - departments: {MIN_DEPARTMENTS}-{MAX_DEPARTMENTS} departments this business really
   runs, each with a relative basket weight, a sales-tax class, and categories.
+  A basket weight is the department's share of items scanned at checkout, not of
+  revenue: big-ticket departments (appliances, furniture) get small weights.
   Prefer conventional department names (Grocery, Fresh, Pharmacy, Health & Beauty,
   Home & Garden, Electronics, Apparel, Seasonal, ...) when they fit.
 - Subcategory nouns and modifiers are generic product words. nouns x modifiers

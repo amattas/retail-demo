@@ -13,6 +13,7 @@ from typer.testing import CliRunner
 
 from retail_setup.cli.main import app
 from retail_setup.customization import generator, logo
+from retail_setup.customization.calibrate import CALIBRATION_VERSION, MIN_CUSTOM_BASKET_ITEMS
 from retail_setup.customization.spec import draft_problems, slugify
 from retail_setup.customization.store import (
     active_dictionary_root,
@@ -30,6 +31,12 @@ from retail_setup.customization.theme import (
 )
 from retail_setup.dictionaries.catalog import DEFAULT_SEED, build_catalog, catalog_json
 from retail_setup.dictionaries.loader import load_dictionaries
+from retail_setup.generation.estimate import (
+    _catalog_expectations,
+    affordable_basket,
+    department_lines,
+    mean_tax_rate,
+)
 
 PRESETS = ["grocery", "hardware", "luxury", "supercenter"]
 UTILITY = Path(__file__).resolve().parents[1]
@@ -169,6 +176,56 @@ def test_materialize_is_deterministic_and_loadable(tmp_path):
     fresh = next(p for p in dicts.products if p.Department == "Fresh")
     assert (fresh.Taxability, fresh.Refrigerated) == ("NON_TAXABLE", True)
     assert {b.Category for b in dicts.brands} == {"Fresh", "Pantry", "Home Care"}
+    # Cheap departments already afford realistic baskets, so weights are kept.
+    assert dicts.profile.department_weights == spec.profile.department_weights
+
+
+def _big_ticket_spec():
+    """A layout whose department weights read like revenue shares (Home Depot-like)."""
+
+    draft = make_draft().model_dump()
+    departments = draft["departments"]
+    departments[2]["categories"][0]["subcategories"][0].update(price_min=300.0, price_max=1200.0)
+    profile = {**draft["profile"], "basket_lambda": 4.5, "avg_ticket_target": 40.0}
+    return make_spec(profile=profile, departments=departments)
+
+
+def test_big_ticket_department_weights_are_calibrated_to_afford_real_baskets(tmp_path):
+    spec = _big_ticket_spec()
+    root = materialize(spec, tmp_path)
+    products = json.loads((root / spec.store_type / "products.json").read_text())
+    taxes = json.loads((root / "_shared" / "tax_rates.json").read_text())
+    lines = department_lines(products)
+    raw = affordable_basket(
+        spec.profile.model_dump(), spec.profile.department_weights, lines, mean_tax_rate(taxes)
+    )
+    assert raw < 1.1, "the uncalibrated layout would generate single-item baskets"
+
+    weights = load_dictionaries(root, spec.store_type).profile.department_weights
+    expected = _catalog_expectations(str(root), spec.store_type, 1)
+    assert expected.basket_mean == pytest.approx(MIN_CUSTOM_BASKET_ITEMS, rel=1e-3)
+    assert weights["Home Care"] < weights["Fresh"] / 10
+    # The smallest shift that reaches the target keeps the cheap departments' order.
+    assert weights["Fresh"] == pytest.approx(weights["Pantry"], rel=0.5)
+    assert materialize(spec, tmp_path / "again") and custom_file_digests(
+        root, spec.store_type
+    ) == custom_file_digests(tmp_path / "again" / "dictionaries", spec.store_type)
+
+
+def test_calibration_uses_full_line_share_when_the_target_is_unreachable(tmp_path):
+    draft = make_draft().model_dump()
+    for department in draft["departments"]:
+        department["categories"][0]["subcategories"][0].update(price_min=500.0, price_max=900.0)
+    profile = {**draft["profile"], "basket_lambda": 4.5, "avg_ticket_target": 60.0}
+    spec = make_spec(profile=profile, departments=draft["departments"])
+    root = materialize(spec, tmp_path)
+    products = json.loads((root / spec.store_type / "products.json").read_text())
+    lines = department_lines(products)
+
+    weights = load_dictionaries(root, spec.store_type).profile.department_weights
+    inverse = {d: 1.0 / lines[d].value for d in weights}
+    total = sum(inverse.values())
+    assert weights == pytest.approx({d: v / total for d, v in inverse.items()}, abs=1e-6)
 
 
 def test_custom_titles_use_brands_from_their_own_department():
@@ -240,9 +297,28 @@ def test_stale_dictionaries_are_rebuilt_when_the_spec_changes(tmp_path):
         after["custom-northwind-market/profile.json"]
         == before["custom-northwind-market/profile.json"]
     )
-    assert (root / ".spec-sha256").read_text().strip() == make_spec(
-        summary="A grocer that also sells home care goods."
-    ).content_hash()
+    assert (root / ".spec-sha256").read_text().strip() == (
+        make_spec(summary="A grocer that also sells home care goods.").content_hash()
+        + f":calibration-{CALIBRATION_VERSION}"
+    )
+
+
+def test_dictionaries_from_an_older_calibration_are_rebuilt(tmp_path):
+    _write_generation(tmp_path, "dev", "custom-northwind-market")
+    directory = customization_dir(tmp_path, "dev")
+    spec = _big_ticket_spec()
+    save_spec(spec, directory)
+    root = active_dictionary_root(tmp_path, "dev")
+    # Simulate dictionaries saved before calibration existed: raw weights, bare hash.
+    profile_path = root / spec.store_type / "profile.json"
+    stale = json.loads(profile_path.read_text())
+    stale["department_weights"] = spec.profile.department_weights
+    profile_path.write_text(catalog_json(stale), encoding="utf-8")
+    (root / ".spec-sha256").write_text(spec.content_hash() + "\n", encoding="utf-8")
+
+    rebuilt = active_dictionary_root(tmp_path, "dev")
+    weights = load_dictionaries(rebuilt, spec.store_type).profile.department_weights
+    assert weights != spec.profile.department_weights
 
 
 # ----- theme ----------------------------------------------------------------------

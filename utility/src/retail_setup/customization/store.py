@@ -9,7 +9,9 @@ Layout (gitignored, beside the environment's generation config)::
         dictionaries/custom-<slug>/{profile,products,brands}.json
 
 The dictionaries are rebuilt from the spec deterministically, so the spec is the
-only input that matters; :func:`materialize` is idempotent.
+only input that matters; :func:`materialize` is idempotent. Department weights are
+calibrated against the generated catalog (:mod:`retail_setup.customization.calibrate`)
+so the ticket target affords realistic baskets.
 """
 
 from __future__ import annotations
@@ -22,11 +24,16 @@ from pathlib import Path
 import yaml
 
 from retail_setup.config.generation import resolve_generation_config_path
+from retail_setup.customization.calibrate import (
+    CALIBRATION_VERSION,
+    calibrate_department_weights,
+)
 from retail_setup.customization.logo import Logo, restore_logo
 from retail_setup.customization.spec import CUSTOM_PREFIX, CustomizationSpec
 from retail_setup.customization.theme import Theme, derive_theme
 from retail_setup.dictionaries.catalog import DEFAULT_SEED, catalog_json, write_catalog
 from retail_setup.dictionaries.loader import default_dictionary_root, load_dictionaries
+from retail_setup.generation.estimate import mean_tax_rate
 
 SPEC_FILE = "customization.json"
 SPEC_HASH_FILE = ".spec-sha256"
@@ -85,11 +92,23 @@ def materialize(
     type_dir = root / spec.store_type
     write_catalog(spec.catalog_tree, DEFAULT_SEED, type_dir)
     profile = spec.profile.model_dump(mode="json")
+    products = json.loads((type_dir / "products.json").read_text(encoding="utf-8"))
+    taxes = json.loads((root / "_shared" / "tax_rates.json").read_text(encoding="utf-8"))
+    profile["department_weights"] = calibrate_department_weights(
+        profile,
+        products if isinstance(products, list) else next(iter(products.values())),
+        mean_tax_rate(taxes),
+    )
     (type_dir / "profile.json").write_text(catalog_json(profile), encoding="utf-8", newline="\n")
     # Validate exactly what Fabric will load.
     load_dictionaries(root, spec.store_type)
-    (root / SPEC_HASH_FILE).write_text(spec.content_hash() + "\n", encoding="utf-8")
+    (root / SPEC_HASH_FILE).write_text(_marker(spec) + "\n", encoding="utf-8")
     return root
+
+
+def _marker(spec: CustomizationSpec) -> str:
+    # The calibration version rebuilds dictionaries saved by an older calibration.
+    return f"{spec.content_hash()}:calibration-{CALIBRATION_VERSION}"
 
 
 def custom_file_digests(root: Path, store_type: str) -> dict[str, str]:
@@ -140,7 +159,7 @@ def ensure_materialized(spec: CustomizationSpec, directory: Path) -> Path:
     root = directory / "dictionaries"
     marker = root / SPEC_HASH_FILE
     current = marker.read_text(encoding="utf-8").strip() if marker.is_file() else None
-    if current != spec.content_hash():
+    if current != _marker(spec):
         materialize(spec, directory)
     return root
 
