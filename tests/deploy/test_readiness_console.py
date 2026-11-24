@@ -34,7 +34,7 @@ def _report(checks):
 
 
 @pytest.mark.parametrize("structured_reason", [False, True])
-def test_optional_stream_not_started_is_informational_not_an_error(
+def test_stream_not_started_is_informational_and_does_not_degrade(
     capsys, structured_reason
 ):
     checks = [CheckResult("items.required", "inventory", True, True, "PASS", "Ready")]
@@ -56,13 +56,45 @@ def test_optional_stream_not_started_is_informational_not_an_error(
     _print_summary(report, Path("readiness-report.json"))
 
     captured = capsys.readouterr()
-    assert "Required deployment READY" in captured.out
+    assert "Readiness SUCCEEDED" in captured.out
     assert "expected before" in captured.out
-    assert "DEGRADED" in captured.out
+    assert "DEGRADED" not in captured.out
     assert captured.err == ""
     assert report == original
-    assert report["status"] == "DEGRADED"
+    assert report["status"] == "SUCCEEDED"
     assert report["counts"]["unknown"] == 3
+
+
+def _not_observed(name, summary="absent"):
+    return CheckResult(
+        name, "freshness", True, False, "UNKNOWN", summary,
+        evidence={"reason": "not_observed"},
+    )
+
+
+def test_anomaly_detection_without_a_stream_is_expected_not_degraded(capsys):
+    checks = [CheckResult("items.required", "inventory", True, True, "PASS", "Ready")]
+    checks += [_not_observed(name, summary) for name, summary in ABSENT_STREAM.items()]
+    checks.append(_not_observed("freshness.alerts", "no detection run"))
+    report = _report(checks)
+    _print_summary(report, Path("report.json"))
+    output = capsys.readouterr()
+    assert report["status"] == "SUCCEEDED"
+    assert "Optional freshness.alerts" in output.out
+    assert output.err == ""
+
+
+def test_missing_anomaly_runs_degrade_once_the_stream_has_produced(capsys):
+    checks = [CheckResult("items.required", "inventory", True, True, "PASS", "Ready")]
+    checks += [
+        CheckResult(name, "freshness", True, False, "PASS", "Observed")
+        for name in ABSENT_STREAM
+    ]
+    checks.append(_not_observed("freshness.alerts", "no detection run"))
+    report = _report(checks)
+    _print_summary(report, Path("report.json"))
+    assert report["status"] == "DEGRADED"
+    assert "Optional freshness.alerts" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("status", ["FAIL", "UNKNOWN"])
@@ -141,6 +173,7 @@ def test_partial_stream_evidence_remains_a_warning(capsys):
     output = capsys.readouterr()
     assert "Optional freshness.checkpoint" in output.err
     assert "expected before" not in output.out
+    assert aggregate_status(checks) == "DEGRADED"
 
 
 def test_missing_watermark_records_absence_without_changing_unknown_status():

@@ -122,6 +122,9 @@ _UNOBSERVED_STREAM_MESSAGES = {
     "freshness.eventhouse_ingestion": "Eventhouse returned no ingestion evidence",
     "freshness.checkpoint": "Kusto ingestion tags contain no checkpoint stream identity",
 }
+# Optional checks whose evidence exists only after stream-events has produced
+# events; anomaly detection runs in streaming-data-load over streamed events.
+_STREAM_DEPENDENT_CHECKS = frozenset({*_UNOBSERVED_STREAM_MESSAGES, "freshness.alerts"})
 
 _TABLE_RE = re.compile(
     r"(?im)^\s*\.create-merge\s+table\s+([A-Za-z_][A-Za-z0-9_]*)"
@@ -330,12 +333,45 @@ def bound_evidence(value: Any, *, _depth: int = 0) -> Any:
     return str(value)[:_MAX_EVIDENCE_STRING]
 
 
-def aggregate_status(checks: list[CheckResult]) -> OverallStatus:
-    """Apply the required/optional fail-closed status contract."""
+def stream_not_started_ids(records: list[dict[str, Any]]) -> frozenset[str]:
+    """Return optional stream checks that are unknown only because no stream ran yet.
 
+    Absence counts only when every core stream source (watermarks, Eventhouse
+    ingestion and checkpoint tags) is readable and empty. Partial evidence, query
+    errors or stale data mean a stream ran, so those checks still degrade readiness.
+    """
+
+    unobserved = {
+        record["id"]
+        for record in records
+        if record["id"] in _STREAM_DEPENDENT_CHECKS
+        and record["selected"]
+        and not record["required"]
+        and record["status"] == "UNKNOWN"
+        and "error_type" not in record.get("evidence", {})
+        and (
+            record.get("evidence", {}).get("reason") == "not_observed"
+            or record["summary"] == _UNOBSERVED_STREAM_MESSAGES.get(record["id"])
+        )
+    }
+    if not set(_UNOBSERVED_STREAM_MESSAGES) <= unobserved:
+        return frozenset()
+    return frozenset(unobserved)
+
+
+def aggregate_status(checks: list[CheckResult]) -> OverallStatus:
+    """Apply the required/optional fail-closed status contract.
+
+    Stream evidence that is absent because stream-events has never run is
+    expected after a deployment and does not degrade the result.
+    """
+
+    not_started = stream_not_started_ids([check.to_dict() for check in checks])
     required_failure = False
     optional_failure = False
     for check in checks:
+        if check.check_id in not_started:
+            continue
         status = check.status
         if status == "SKIPPED" and check.selected:
             status = "UNKNOWN"
@@ -2455,7 +2491,7 @@ class ReadinessRunner:
         }
         latest_run = signal.get("latest_run")
         if evidence["run_count"] < 1 or not latest_run:
-            raise EvidenceUnknown(
+            raise EvidenceNotObserved(
                 "anomaly_detection_runs has no detection run, so an empty "
                 "anomaly_alerts table is not evidence of health. Run "
                 "streaming-data-load (16-persist-anomaly-alerts) or enable its schedule."
@@ -3535,27 +3571,11 @@ def _print_summary(report: dict[str, Any], path: Path) -> None:
         console.detail(summary)
     else:
         console.info(summary)
-    unobserved_stream = {
-        check["id"]
-        for check in report["checks"]
-        if (
-            check["selected"]
-            and not check["required"]
-            and check["status"] == "UNKNOWN"
-            and check["id"] in _UNOBSERVED_STREAM_MESSAGES
-            and "error_type" not in check.get("evidence", {})
-            and (
-                check.get("evidence", {}).get("reason") == "not_observed"
-                or check["summary"] == _UNOBSERVED_STREAM_MESSAGES[check["id"]]
-            )
-        )
-    }
-    if unobserved_stream != set(_UNOBSERVED_STREAM_MESSAGES):
-        unobserved_stream = set()
+    unobserved_stream = stream_not_started_ids(report["checks"])
     if unobserved_stream:
         console.info(
             "No optional live-stream evidence yet; this is expected before "
-            "stream-events is started. Missing stream evidence does not block deployment."
+            "stream-events is started and does not degrade readiness."
         )
     for check in report["checks"]:
         if check["status"] in {"FAIL", "UNKNOWN"}:

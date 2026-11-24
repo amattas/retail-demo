@@ -2162,6 +2162,7 @@ def test_empty_alert_table_without_detection_runs_is_unknown_not_pass():
     result = _status(runner, runner._alert_freshness)
     assert result.status == "UNKNOWN"
     assert "no detection run" in result.summary
+    assert result.evidence == {"reason": "not_observed"}
 
 
 @pytest.mark.parametrize(
