@@ -751,6 +751,15 @@ def render_parameter_file(
                 "item_type": ["KQLDashboard", "KQLQueryset"],
             }
         )
+    query_service_uri = terraform_outputs.get("kql_query_service_uri")
+    if config.profile.provisions_eventhouse and query_service_uri:
+        parameters["find_replace"].append(
+            {
+                "find_value": "FABRIC_KQL_QUERY_SERVICE_URI",
+                "replace_value": {config.environment: str(query_service_uri)},
+                "item_type": "KQLQueryset",
+            }
+        )
 
     connection_id = config.powerbi.semantic_model_connection_id
     if connection_id and config.profile.selects("asset.semantic-model"):
@@ -929,6 +938,7 @@ def _synthetic_outputs(config: DeployConfig) -> dict[str, str]:
     }
     if config.eventhouse.enabled:
         outputs["kql_database_id"] = "00000000-0000-0000-0000-000000000003"
+        outputs["kql_query_service_uri"] = "https://offline.kusto.fabric.microsoft.com"
     return outputs
 
 

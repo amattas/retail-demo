@@ -48,6 +48,11 @@ output "kql_database_id" {
   description = "Retail KQL Database item ID (the Eventhouse's default database)."
 }
 
+output "kql_query_service_uri" {
+  value       = var.eventhouse_enabled ? fabric_eventhouse.main[0].properties.query_service_uri : null
+  description = "Query endpoint of the Eventhouse and its default KQL Database."
+}
+
 output "kql_database_name" {
   value       = var.eventhouse_enabled ? fabric_eventhouse.main[0].display_name : null
   description = "Retail KQL Database display name (matches the Eventhouse name)."

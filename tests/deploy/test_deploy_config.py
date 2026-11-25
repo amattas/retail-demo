@@ -527,10 +527,21 @@ def test_render_parameter_file_uses_native_pipeline_bindings(
         "lakehouse_name": "retail_lakehouse",
         "eventhouse_query_service_uri": "https://example.kusto.fabric.microsoft.com",
         "kql_database_name": "retail_kql",
+        "kql_database_id": "33333333-3333-3333-3333-333333333333",
+        "kql_query_service_uri": "https://example.kusto.fabric.microsoft.com",
     }
 
     rendered = deploy_config.render_parameter_file(config, terraform_outputs)
 
+    queryset_rules = {
+        entry["find_value"]: entry["replace_value"][ENVIRONMENT]
+        for entry in rendered["find_replace"]
+        if "KQLQueryset" in entry["item_type"]
+    }
+    assert queryset_rules == {
+        "FABRIC_KQL_DATABASE_RESOURCE_ID": "33333333-3333-3333-3333-333333333333",
+        "FABRIC_KQL_QUERY_SERVICE_URI": "https://example.kusto.fabric.microsoft.com",
+    }
     find_values = [entry["find_value"] for entry in rendered["find_replace"]]
     assert any(
         "onelake\\.dfs\\.fabric\\.microsoft\\.com" in value for value in find_values
