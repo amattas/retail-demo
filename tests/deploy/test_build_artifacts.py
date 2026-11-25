@@ -487,16 +487,39 @@ def test_stage_querysets_builds_kqlqueryset_with_tab_per_file(tmp_path: Path) ->
     definition = json.loads((item / "RealTimeQueryset.json").read_text(encoding="utf-8"))
     queryset = definition["queryset"]
     data_source = queryset["dataSources"][0]
-    # clusterUri is left empty for fabric-cicd to resolve from the live KQL DB.
-    assert data_source["clusterUri"] == ""
+    # Both placeholders are rewritten by parameter.yml from Terraform outputs.
+    assert data_source["clusterUri"] == "FABRIC_KQL_QUERY_SERVICE_URI"
     assert data_source["databaseItemName"] == "retail_kql"
-    # databaseItemId carries the placeholder that parameter.yml rewrites.
     assert data_source["databaseItemId"] == "FABRIC_KQL_DATABASE_RESOURCE_ID"
 
     # One tab per source file, sorted by file name, each bound to the data source.
     assert [tab["title"] for tab in queryset["tabs"]] == ["q_receipts", "q_tender_mix"]
     assert all(tab["dataSourceId"] == data_source["id"] for tab in queryset["tabs"])
     assert queryset["tabs"][0]["content"] == "mv_store_sales_minute | take 100"
+
+
+def test_staged_queryset_passes_fabric_cicd_cluster_uri_processing(
+    tmp_path: Path,
+) -> None:
+    """fabric-cicd 1.4 resolves an empty clusterUri from repository KQL databases.
+
+    The KQL database is provisioned by Terraform, so the repository has none; the
+    staged queryset must reach fabric-cicd with clusterUri already set (to the
+    placeholder parameter.yml replaces) or publishing fails.
+    """
+
+    from types import SimpleNamespace
+
+    from fabric_cicd._items._kqlqueryset import replace_cluster_uri
+
+    querysets = tmp_path / "repo" / "fabric" / "querysets"
+    querysets.mkdir(parents=True)
+    (querysets / "q_receipts.kql").write_text("receipt_created | take 1", encoding="utf-8")
+    (item,) = build_artifacts.stage_querysets(tmp_path / "repo", tmp_path / "workspace")
+    contents = (item / "RealTimeQueryset.json").read_text(encoding="utf-8")
+    workspace = SimpleNamespace(repository_items={})
+
+    assert replace_cluster_uri(workspace, SimpleNamespace(contents=contents)) == contents
 
 
 def test_stage_querysets_returns_empty_when_no_sources(tmp_path: Path) -> None:

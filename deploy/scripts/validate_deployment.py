@@ -12,7 +12,7 @@ from deploy.scripts.deploy_config import DEPLOY_ROOT, load_environment
 
 # Staged files keep these markers until fabric-cicd substitutes them at publish
 # time. Each marker needs a find_replace rule for the selected environment.
-KNOWN_PLACEHOLDERS = ("FABRIC_KQL_DATABASE_RESOURCE_ID",)
+KNOWN_PLACEHOLDERS = ("FABRIC_KQL_DATABASE_RESOURCE_ID", "FABRIC_KQL_QUERY_SERVICE_URI")
 
 
 def _resolved_placeholders(parameter_path: Path, environment: str) -> set[str]:

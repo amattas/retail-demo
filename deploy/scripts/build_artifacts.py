@@ -606,10 +606,12 @@ def stage_querysets(
     """Stage `fabric/querysets/*.kql` as one Fabric `.KQLQueryset` item.
 
     Every `.kql` file becomes a tab in a single queryset bound to the Eventhouse
-    KQL database. The data source `clusterUri` is left empty so fabric-cicd fills
-    it from the deployed KQL database (matched by `databaseItemName`), while
-    `databaseItemId` carries the `FABRIC_KQL_DATABASE_RESOURCE_ID` placeholder
-    that `parameter.yml` replaces with the Terraform-provisioned KQL database id.
+    KQL database. `clusterUri` and `databaseItemId` carry the
+    `FABRIC_KQL_QUERY_SERVICE_URI` and `FABRIC_KQL_DATABASE_RESOURCE_ID` placeholders
+    that `parameter.yml` replaces with the Terraform-provisioned Eventhouse query
+    URI and KQL database id. `clusterUri` must not be empty: fabric-cicd 1.4 then
+    resolves it from a KQL database item in the repository by logical ID, and this
+    database is provisioned by Terraform, not published from the repository.
 
     Returns an empty list when no queryset sources exist so the deploy degrades
     gracefully.
@@ -653,7 +655,7 @@ def stage_querysets(
             "dataSources": [
                 {
                     "id": data_source_id,
-                    "clusterUri": "",
+                    "clusterUri": "FABRIC_KQL_QUERY_SERVICE_URI",
                     "type": "Fabric",
                     "databaseItemId": "FABRIC_KQL_DATABASE_RESOURCE_ID",
                     "databaseItemName": kql_database_name,
