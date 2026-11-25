@@ -415,7 +415,7 @@ Fabric. A fork-only commit must be fetched from the repository that owns it.
 
 The wheel includes dictionaries and all twelve notebook resources under
 `retail_setup/resources/`; loaders/rendering can use these outside a checkout.
-`utility/pyproject.toml` pins the build backend to `hatchling==1.27.0`.
+`utility/pyproject.toml` pins the build backend to `hatchling==1.33.0`.
 After generator/template work finishes, rebuild generated notebooks before
 claiming the packaged/rendered artifact set is current.
 

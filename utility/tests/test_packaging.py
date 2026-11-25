@@ -143,9 +143,9 @@ def test_spark_extra_metadata_declares_numpy(built_wheel: Path):
         and requirement.marker.evaluate({"extra": "spark"})
     }
     assert str(spark_requirements["numpy"]) == ">=1.26"
-    assert str(spark_requirements["pyspark"]) == "<4.3,>=3.5.2"
+    assert str(spark_requirements["pyspark"]) == "<4.4,>=3.5.2"
 
 
 def test_hatchling_build_requirement_is_pinned():
     pyproject = tomllib.loads((UTILITY / "pyproject.toml").read_text(encoding="utf-8"))
-    assert pyproject["build-system"]["requires"] == ["hatchling==1.27.0"]
+    assert pyproject["build-system"]["requires"] == ["hatchling==1.33.0"]

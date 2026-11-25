@@ -115,7 +115,7 @@ does not auto-detect the fork. See the setup specification for manifest-last
 publication and failure behavior.
 
 The wheel packages dictionary and notebook runtime assets. Its build backend
-is pinned to `hatchling==1.27.0`; regenerate notebooks after source/template
+is pinned to `hatchling==1.33.0`; regenerate notebooks after source/template
 changes before building a release wheel.
 
 ## Development
