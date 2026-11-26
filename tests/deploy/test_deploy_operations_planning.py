@@ -384,7 +384,7 @@ def test_failed_start_leaves_a_published_agent_stopped_with_a_warning(
     assert json.loads(path.read_text()) == result
 
 
-def test_watchlist_with_no_alertable_case_refuses_activation_and_fails_the_step(
+def test_watchlist_with_no_alertable_case_refuses_activation_as_a_degraded_outcome(
     publication, monkeypatch, tmp_path
 ):
     quiet = {"case_id": ID, "stockout_probability": 0.3, "days_of_inventory": 9.0}
@@ -392,7 +392,7 @@ def test_watchlist_with_no_alertable_case_refuses_activation_and_fails_the_step(
     activate = Mock()
     monkeypatch.setattr(deploy, "activate_operations_agent", activate)
 
-    with pytest.raises(deploy.NativeItemError, match="never alert"):
+    with pytest.raises(deploy.ActivationRefused, match="never alert"):
         deploy.publish(
             repo_root=tmp_path,
             config=config(include_plan=False, activate_agent=True),
@@ -405,6 +405,24 @@ def test_watchlist_with_no_alertable_case_refuses_activation_and_fails_the_step(
     assert report["alertable_signal_count"] == 0
     assert report["operations_agent"]["state"] == "STOPPED"
     assert "never alert" in report["operations_agent"]["activation_refused"]
+
+
+def test_cli_exits_degraded_when_activation_is_refused(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(deploy, "load_environment", lambda *a, **k: config(activate_agent=True))
+    monkeypatch.setattr(deploy, "load_terraform_outputs", lambda *_a: {})
+    monkeypatch.setattr(
+        deploy, "publish", Mock(side_effect=deploy.ActivationRefused("would never alert"))
+    )
+    monkeypatch.setattr(
+        "deploy.scripts.workspace_folders.organize_after_publish", lambda *_a: True
+    )
+
+    code = deploy.main(["--repo-root", str(tmp_path), "--environment", "dev", "--operations-only"])
+
+    assert code == deploy.ACTIVATION_REFUSED_EXIT_CODE == 3
+    output = capsys.readouterr()
+    assert "left stopped" in output.err + output.out
+    assert "--operations-only" in output.err + output.out
 
 
 @pytest.mark.parametrize(

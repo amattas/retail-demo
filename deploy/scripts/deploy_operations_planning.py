@@ -62,6 +62,8 @@ from deploy.scripts.fabric_runtime import decode_definition_parts, paginated_get
 from deploy.scripts.verify_readiness import _connect_lakehouse_sql, write_report_atomic
 
 ROOT = Path(__file__).resolve().parents[2]
+# Exit code of a complete publication whose agent was correctly left stopped.
+ACTIVATION_REFUSED_EXIT_CODE = 3
 UNCOUNTED_ALERTABLE_CASES = (
     "The recorded signals predate alert-rule counting, so it is unknown whether "
     "any case would alert; the agent was left stopped. Rerun the full Operations "
@@ -181,6 +183,10 @@ _RUNNING = (
     "The agent is running on its generated playbook and sends recommendations to "
     "Teams; review the playbook and destination in Fabric. "
 )
+
+
+class ActivationRefused(NativeItemError):
+    """Everything was published, but no current case would make the agent alert."""
 
 
 def _activate_agent(
@@ -512,7 +518,7 @@ def publish(
             report["plan"]["model_binding_warning"] = model_binding_warning
         write_report_atomic(report_path, report)
     if activation_refused:
-        raise NativeItemError(activation_refused)
+        raise ActivationRefused(activation_refused)
     return report
 
 
@@ -617,12 +623,29 @@ def publish_existing_agent(
     activation_refused = _activate_agent(credential, config, workspace_id, report)
     write_report_atomic(report_path, report)
     if activation_refused:
-        raise NativeItemError(activation_refused)
+        raise ActivationRefused(activation_refused)
     return report
 
 
 def _agent_state(report: dict[str, Any]) -> str:
     return "running" if report["operations_agent"]["state"] == "ACTIVE" else "stopped"
+
+
+def _report_refusal(args: argparse.Namespace, refusal: ActivationRefused) -> int:
+    """Finish a complete publication whose agent was correctly left stopped."""
+
+    from deploy.scripts.workspace_folders import organize_after_publish
+
+    if not organize_after_publish(args.repo_root, args.environment):
+        return 1
+    console.warn(f"Operations Agent published but left stopped. {refusal}")
+    console.detail(
+        "Once the stockout or forecast outputs show an at-risk position (for example "
+        "after the live stream has run), republish and start it with: python -m "
+        f"deploy.scripts.deploy_operations_planning --environment {args.environment}"
+        + ("" if args.agent_only else " --operations-only")
+    )
+    return ACTIVATION_REFUSED_EXIT_CODE
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -680,6 +703,8 @@ def main(argv: list[str] | None = None) -> int:
                 config=config,
                 outputs=outputs,
             )
+        except ActivationRefused as exc:
+            return _report_refusal(args, exc)
         except (
             OSError,
             NativeItemError,
@@ -706,6 +731,8 @@ def main(argv: list[str] | None = None) -> int:
             connection_id=args.plan_connection_id,
             acknowledge_plan_billing=args.acknowledge_plan_billing,
         )
+    except ActivationRefused as exc:
+        return _report_refusal(args, exc)
     except (NativeItemError, CapacityResumeError, ValueError) as exc:
         console.error(str(exc))
         return 1

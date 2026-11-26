@@ -4,6 +4,7 @@ import subprocess
 import sys
 import threading
 import time
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -456,6 +457,7 @@ def test_operations_only_plan_skips_planning_prerequisites(profile):
     assert native.cmd[-1] == "--operations-only"
     assert native.required is False
     assert "continues" in native.failure_message
+    assert native.degraded_exit_code == 3
     assert native.description == "Publish stopped Operations Agent"
     started = _deploy_plan(
         "dev",
@@ -2735,6 +2737,30 @@ def test_operator_retry_reruns_a_failed_step(monkeypatch, tmp_path):
     assert commands.count("root") == 2
     assert asked == [("Root failed. What next?", ["Retry", "Skip", "Stop"])]
     assert {step.status for step in journal.steps} == {"SUCCEEDED"}
+
+
+def test_degraded_exit_code_journals_degraded_without_asking_the_operator(monkeypatch, tmp_path):
+    plan, journal, commands, asked = _interactive_plan(monkeypatch, [], {})
+    monkeypatch.setattr(
+        cli.subprocess,
+        "run",
+        lambda command, **_k: (
+            commands.append(command[0])
+            or SimpleNamespace(returncode=3 if command[0] == "root" else 0)
+        ),
+    )
+    plan[0] = replace(
+        plan[0], required=False, degraded_exit_code=3, degraded_reason="agent left stopped"
+    )
+
+    cli._run_plan_plain(tmp_path, "dev", plan, len(plan), yes=False, journal=journal)
+
+    assert asked == []
+    root = _deploy_journal.get_step(journal, "root")
+    assert (root.status, root.exit_code, root.error) == ("DEGRADED", 3, "agent left stopped")
+    # Dependents still run: a degraded outcome is complete, not failed.
+    assert set(commands) == {"root", "child", "grandchild", "independent"}
+    assert {step.status for step in journal.steps if step.step_id != "root"} == {"SUCCEEDED"}
 
 
 def test_retry_survives_a_sibling_finishing_before_the_failure_is_handled(monkeypatch, tmp_path):

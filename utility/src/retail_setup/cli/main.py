@@ -1653,6 +1653,10 @@ class DeployStep:
     process_environment: dict[str, str] = field(default_factory=dict)
     failure_message: str | None = None
     evidence_path: str | None = None
+    # An exit code meaning the step finished but an optional outcome is degraded
+    # (journaled DEGRADED with `degraded_reason`; the operator is not prompted).
+    degraded_exit_code: int | None = None
+    degraded_reason: str | None = None
     depends_on: tuple[str, ...] = ()
     resource: str = "non-spark"
 
@@ -2565,6 +2569,11 @@ def _deploy_plan(
                     "deployment continues. Inspect operations-planning-report.json."
                 ),
                 evidence_path=f"deploy/.generated/{env}/operations-planning-report.json",
+                degraded_exit_code=3,
+                degraded_reason=(
+                    "Operations Agent published but left stopped: no current availability "
+                    "case meets an alert rule. See operations-planning-report.json."
+                ),
             )
         )
     if profile.selects("asset.semantic-model"):
@@ -3339,6 +3348,13 @@ def _run_plan_plain(
                     ended_at=evidence.get("ended_at") if evidence else None,
                     evidence_id=evidence_id,
                 )
+            elif step.degraded_exit_code is not None and return_code == step.degraded_exit_code:
+                _deploy_journal.mark_degraded(
+                    journal,
+                    step.step_id,
+                    exit_code=return_code,
+                    reason=step.degraded_reason,
+                )
             elif (
                 return_code == _PIPELINE_MONITOR_DETACHED_EXIT_CODE
                 and evidence
@@ -3365,6 +3381,13 @@ def _run_plan_plain(
                     evidence_id=evidence_id,
                 )
             _deploy_journal.write(repo_root, journal)
+        if step.degraded_exit_code is not None and return_code == step.degraded_exit_code:
+            typer.echo(
+                f"Step {index}/{total} completed with a non-blocking notice: "
+                f"{step.degraded_reason}",
+                err=True,
+            )
+            return 0
         if return_code != 0:
             typer.echo(
                 f"Deploy failed at step {index}/{total} "
