@@ -320,6 +320,10 @@ year), so readiness does not expect fresh incident rows
   The stream plans incidents exactly as history does
   (`incidents.plan_incidents` with the severe-weather days of the stores'
   geographies), so the same seed opens the same incident IDs on the same days.
+  With the history's last day (`END_DATE`) it also plans the end-of-history
+  DC outage that history leaves open (see the
+  [data contract](../generation/data-contract.md#logistics-incidents)), so
+  the first batch starts it and the stream resolves it at its planned end.
   Each start and resolution is emitted once, in the batch whose window holds
   it (`stream_supply.incident_transitions`); the first batch of an incarnation
   starts the incidents already open. Silver keeps one

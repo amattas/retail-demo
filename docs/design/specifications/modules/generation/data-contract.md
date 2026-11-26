@@ -477,6 +477,23 @@ HOLIDAY_CAPACITY, LANE_DELAY, WEATHER, TRAFFIC); the live stream adds
 `TRUCK_AVAILABILITY` when a load waited for a free truck. Frequencies and
 ranges live in `generation/calibration.py`.
 
+**End-of-history incident.** Every history also ends inside one prolonged
+`DC_OUTAGE` (`incidents.end_of_history_incident`), keyed only on the seed and
+the history's last day. The DC serving the most stores (a stable draw breaks
+ties) stops dispatching between 00:00 and 05:59 DC time two days before the
+last day, for 78-96 hours (`END_OF_HISTORY_OUTAGE_*`; longer than the random
+6-36 hours on purpose, HIGH severity). Its cause is a warehouse system outage
+or a labor shortage. Its ID is the random outage ID with an `-END` suffix, for
+example `INC-OUT-001-20250815-END`. The DC's stores get no loads for the last
+three days, so their fast movers (about two units a day or more) really run
+low: at the as-of, some of them have under three days of cover, and some
+are empty. Slow movers keep at least a case (12 units) on the shelf and stay
+well covered. The incident lands in `fact_logistics_incidents` and
+`fact_logistics_incident_stores` with a NULL `resolved_at`. The live stream
+plans the same outage from `END_DATE`, starts it in its first batch and
+emits `logistics_incident_resolved` at its planned end, 6-54 hours after the
+last local day. Random incidents are unchanged.
+
 ### Historical/live boundary
 
 The stream notebook embeds the shared basket/catalog/quantity code at build

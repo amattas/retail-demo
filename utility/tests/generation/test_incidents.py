@@ -15,6 +15,8 @@ from retail_setup.generation.incidents import (
     IncidentCalendar,
     IncidentNetwork,
     StoreIncidentView,
+    end_of_history_incident,
+    local_instant,
     plan_delivery,
     plan_incidents,
     supplier_group,
@@ -22,6 +24,8 @@ from retail_setup.generation.incidents import (
     traffic_delay_minutes,
 )
 from retail_setup.generation.network import estimated_unload_minutes, unload_minutes
+from retail_setup.generation.stream_events import IncidentPlanner
+from retail_setup.generation.stream_supply import incident_transitions
 
 UTC = timezone.utc
 NETWORK = IncidentNetwork(
@@ -122,6 +126,82 @@ def test_weather_incidents_follow_severe_days_and_the_season() -> None:
             to_local(t, "America/Chicago") for t in (found[0].started_at, found[0].resolved_at)
         ]
         assert local[1] - local[0] == timedelta(days=3)
+
+
+HISTORY_END = date(2025, 8, 17)
+CHICAGO = "America/Chicago"
+
+
+def test_every_history_ends_inside_a_prolonged_outage_at_the_busiest_dc() -> None:
+    outage = end_of_history_incident(5, NETWORK, HISTORY_END)
+    assert outage is not None
+    # DC 1 serves the most stores; the outage stops all of its dispatches.
+    assert outage.incident_id == "INC-OUT-001-20250815-END"
+    assert (outage.incident_type, outage.dc_id, outage.store_id) == ("DC_OUTAGE", 1, None)
+    assert outage.affected_stores == NETWORK.stores_of(1) == (1, 2, 3)
+    assert outage.severity == "HIGH"
+    cause = outage.description.split("(")[1].split(")")[0]
+    assert cause in ("warehouse system outage", "labor shortage")
+    # It starts early (DC local) two days before the last day and is still
+    # open when the last local day closes; it resolves in the live stream.
+    start = to_local(outage.started_at, CHICAGO)
+    assert start.date() == HISTORY_END - timedelta(days=2)
+    low, high = cal.END_OF_HISTORY_OUTAGE_START_MINUTES
+    assert low <= start.hour * 60 + start.minute <= high
+    hours = (outage.resolved_at - outage.started_at) / timedelta(hours=1)
+    assert cal.END_OF_HISTORY_OUTAGE_HOURS[0] <= hours <= cal.END_OF_HISTORY_OUTAGE_HOURS[1]
+    assert f"no dispatches for {hours:.0f}h" in outage.description
+    closes = local_instant(HISTORY_END + timedelta(days=1), 0, CHICAGO)
+    assert outage.active_at(closes - timedelta(seconds=1)) and outage.active_at(closes)
+    # Deterministic in the seed and the last day only.
+    assert end_of_history_incident(5, NETWORK, HISTORY_END) == outage
+    later = end_of_history_incident(5, NETWORK, HISTORY_END + timedelta(days=1))
+    assert later is not None and later.started_at > outage.started_at
+    # Equally busy DCs: a stable draw picks one, and both get picked over time.
+    tied = IncidentNetwork(store_dc={1: 1, 2: 2}, store_zones={1: CHICAGO, 2: CHICAGO})
+    picked = {
+        end_of_history_incident(7, tied, HISTORY_END + timedelta(days=n)).dc_id  # type: ignore[union-attr]
+        for n in range(20)
+    }
+    assert picked == {1, 2}
+    assert end_of_history_incident(5, IncidentNetwork(store_dc={}), HISTORY_END) is None
+
+
+def test_the_end_of_history_outage_leaves_every_other_incident_unchanged() -> None:
+    first = HISTORY_END - timedelta(days=400)
+    base = plan_incidents(5, NETWORK, first, HISTORY_END)
+    anchored = plan_incidents(5, NETWORK, first, HISTORY_END, history_end=HISTORY_END)
+    outage = end_of_history_incident(5, NETWORK, HISTORY_END)
+    assert [i for i in anchored if i != outage] == base
+    assert anchored.count(outage) == 1  # type: ignore[arg-type]
+    assert len({i.incident_id for i in anchored}) == len(anchored)
+    # Only a window holding its start day plans it.
+    day = HISTORY_END - timedelta(days=2)
+    assert outage in plan_incidents(5, NETWORK, day, day, history_end=HISTORY_END)
+    assert outage not in plan_incidents(
+        5, NETWORK, day + timedelta(days=1), HISTORY_END, history_end=HISTORY_END
+    )
+
+
+def test_the_stream_plans_the_same_outage_and_resolves_it_at_its_end() -> None:
+    outage = end_of_history_incident(5, NETWORK, HISTORY_END)
+    assert outage is not None
+    planner = IncidentPlanner(5, NETWORK, lambda first, last: set(), history_end=HISTORY_END)
+    # The stream starts a few hours after history ends.
+    start = local_instant(HISTORY_END + timedelta(days=1), 3 * 60, CHICAGO)
+    start_ms = int(start.timestamp() * 1000)
+    window = planner.window(None, start_ms)
+    assert outage in window
+    started, resolved = incident_transitions(window, None, start_ms)
+    assert outage in started and outage not in resolved
+    # It resolves in the batch whose window holds its end, and only there.
+    end_ms = int(outage.resolved_at.timestamp() * 1000)
+    later = planner.window(end_ms - 60_000, end_ms + 60_000)
+    started, resolved = incident_transitions(later, end_ms - 60_000, end_ms + 60_000)
+    assert outage in resolved and outage not in started
+    # Without the history end the stream would never see it.
+    blind = IncidentPlanner(5, NETWORK, lambda first, last: set())
+    assert outage not in blind.window(None, start_ms)
 
 
 def test_calendar_queries() -> None:

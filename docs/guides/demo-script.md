@@ -31,6 +31,10 @@ Talk track:
 - `stream-events.ipynb` writes twenty-two live event types directly to
   Eventhouse, including sporadic logistics incidents (DC outages, lane delays,
   weather, holiday capacity, supplier short-ships).
+- History always ends inside an open DC outage at the busiest DC. Its stores
+  have had no deliveries for three days, so some fast movers are nearly out:
+  the Operations Agent has real cases to act on, and the live stream resolves
+  the outage shortly after it starts.
 - KQL (Kusto Query Language) answers recent event questions; Lakehouse stores
   durable history and summaries.
 - Power BI uses Direct Lake, which reads Lakehouse data without importing a

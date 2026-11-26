@@ -125,6 +125,19 @@ INCIDENT_HIGH_OUTAGE_HOURS = 24
 INCIDENT_MEDIUM_OUTAGE_HOURS = 12
 INCIDENT_HIGH_SHORT_SHARE = 0.65
 INCIDENT_MEDIUM_SHORT_SHARE = 0.5
+# End-of-history incident (incidents.end_of_history_incident): every history
+# ends inside one prolonged DC_OUTAGE at one DC, so the Operations Agent always
+# has a real, open disruption to act on after setup. It starts this many local
+# days before the history's last day, between the given local minutes of the
+# DC (00:00-05:59, before most delivery slots), and lasts the given hours, so it
+# holds that DC's loads for the last three days and is still open when history
+# ends (it resolves 6-54 hours after the last local day, in the live stream).
+# This deliberately extends DC_OUTAGE_HOURS (6-36): the store policy keeps 4-8
+# days of cover, so only a multi-day hold draws shelves under the agent's
+# three-day cover rule. It is always HIGH severity (outage_severity).
+END_OF_HISTORY_OUTAGE_START_DAYS = 2
+END_OF_HISTORY_OUTAGE_START_MINUTES = (0, 359)
+END_OF_HISTORY_OUTAGE_HOURS = (78, 96)
 # Rules: a late truck alerts on arrival; a lane alerts when its trucks average
 # this delay over the window; an incident alerts when stores it affects report
 # this many stockouts.

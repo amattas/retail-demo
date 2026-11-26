@@ -20,6 +20,15 @@ geography) and the set of stores it affects: every store the DC serves, the
 lane's store, or the geography's stores. Random incidents occur a few times a
 year per DC (``calibration``).
 
+**End of history.** On top of the random plan, every history ends inside one
+prolonged ``DC_OUTAGE`` (:func:`end_of_history_incident`): the DC serving the
+most stores (a stable draw from the seed and the history's last day breaks
+ties) stops dispatching early two days before that day and stays down until
+after history ends. Its stores get no loads for
+the last days, so shelves of their fast movers really run low by the as-of,
+and the Operations Agent finds an open incident to act on. The live stream
+plans the same outage and resolves it at its planned end.
+
 **Delivery timing.** :func:`plan_delivery` turns a store's load into a
 planned and an actual schedule in the store's local time. The plan ships at
 the store's next delivery slot whose arrival day the store is open (no
@@ -42,6 +51,9 @@ from zoneinfo import ZoneInfo
 from retail_setup.generation.calibration import (
     DC_OUTAGE_HOURS,
     DC_OUTAGES_PER_DC_YEAR,
+    END_OF_HISTORY_OUTAGE_HOURS,
+    END_OF_HISTORY_OUTAGE_START_DAYS,
+    END_OF_HISTORY_OUTAGE_START_MINUTES,
     HOLIDAY_CAPACITY_DELAY_MINUTES,
     HOLIDAY_CAPACITY_SHARE,
     INCIDENT_HIGH_DELAY_MINUTES,
@@ -94,6 +106,8 @@ _OUTAGE_CAUSES = (
     "dock equipment failure",
     "labor shortage",
 )
+# Causes that plausibly keep a DC down for days (the end-of-history outage).
+_PROLONGED_OUTAGE_CAUSES = ("warehouse system outage", "labor shortage")
 _LANE_CAUSES = (
     "highway closure",
     "multi-vehicle accident",
@@ -347,12 +361,56 @@ def _weather_incidents(
     return found
 
 
+def end_of_history_incident(
+    seed: int, network: IncidentNetwork, history_end: date
+) -> Incident | None:
+    """The prolonged DC outage every history ends in (None without a DC).
+
+    It depends only on the seed and the history's last day: the DC serving the
+    most stores (a stable draw breaks ties) stops dispatching from early on the
+    day ``END_OF_HISTORY_OUTAGE_START_DAYS`` before ``history_end`` (DC local)
+    for ``END_OF_HISTORY_OUTAGE_HOURS``, so its stores get no loads for the
+    last days of history and the outage is still open when history ends. The
+    live stream plans the same incident and resolves it at its end.
+    """
+    dcs = network.dc_ids()
+    if not dcs:
+        return None
+    dc_id = max(
+        dcs,
+        key=lambda dc: (len(network.stores_of(dc)), stable_int(seed, history_end, dc, "end-dc")),
+    )
+    day = history_end - timedelta(days=END_OF_HISTORY_OUTAGE_START_DAYS)
+    minute = _incident_between(
+        seed, END_OF_HISTORY_OUTAGE_START_MINUTES, dc_id, history_end, "end-outage-minute"
+    )
+    hours = _incident_between(
+        seed, END_OF_HISTORY_OUTAGE_HOURS, dc_id, history_end, "end-outage-hours"
+    )
+    cause = _PROLONGED_OUTAGE_CAUSES[
+        stable_int(seed, dc_id, history_end, "end-outage-cause") % len(_PROLONGED_OUTAGE_CAUSES)
+    ]
+    start = local_instant(day, minute, network.zone_of_dc(dc_id))
+    return Incident(
+        f"{_incident_id('DC_OUTAGE', day, dc_id)}-END",
+        "DC_OUTAGE",
+        dc_id,
+        None,
+        start,
+        start + timedelta(hours=hours),
+        outage_severity(hours),
+        network.stores_of(dc_id),
+        f"DC {dc_id} outage ({cause}): no dispatches for {hours}h",
+    )
+
+
 def plan_incidents(
     seed: int,
     network: IncidentNetwork,
     start: date,
     end: date,
     severe_days: Iterable[tuple[int, date]] = (),
+    history_end: date | None = None,
 ) -> list[Incident]:
     """Every incident that starts between ``start`` and ``end`` (inclusive).
 
@@ -360,6 +418,8 @@ def plan_incidents(
     (``stream_calendar.severe_weather_column``); it must cover the window plus
     ``WEATHER_LOOKAHEAD_DAYS`` after it and the day before it. Each incident
     depends only on the seed and its own day, so overlapping windows agree.
+    With ``history_end`` the plan also holds the end-of-history outage
+    (:func:`end_of_history_incident`) when the window holds its start day.
     """
     if end < start:
         return []
@@ -375,6 +435,11 @@ def plan_incidents(
         for geo in geos:
             found.extend(_weather_incidents(seed, network, geo, day, severe))
         day += timedelta(days=1)
+    if history_end is not None:
+        anchored = end_of_history_incident(seed, network, history_end)
+        anchor_day = history_end - timedelta(days=END_OF_HISTORY_OUTAGE_START_DAYS)
+        if anchored is not None and start <= anchor_day <= end:
+            found.append(anchored)
     return sorted(found, key=lambda incident: (incident.started_at, incident.incident_id))
 
 

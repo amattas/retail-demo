@@ -60,9 +60,17 @@ def test_all_gold_tables(setup):
     for name, df in gold.items():
         assert df.columns == column_names(name), name
         if name == "truck_dwell_daily":
-            # Three days of opening stock never reach a reorder point, so the
-            # window has no deliveries; dwell is covered by a focused test.
-            assert (df.count() > 0) == (tables["fact_truck_moves"].count() > 0)
+            # Three days of opening stock rarely reach a reorder point, and
+            # the end-of-history outage holds any load until after the
+            # cutoff, so the window may have no completed delivery; dwell is
+            # covered by a focused test.
+            cutoff = F.lit(tables["_cutoff"].isoformat(sep=" ")).cast("timestamp")
+            delivered = (
+                tables["fact_truck_moves"]
+                .filter(F.col("status") == "COMPLETED")
+                .filter(F.coalesce("departure_time", "etd") < cutoff)
+            )
+            assert (df.count() > 0) == (delivered.count() > 0)
         else:
             assert df.count() > 0, name
 

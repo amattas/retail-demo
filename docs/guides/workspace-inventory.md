@@ -110,7 +110,9 @@ The source defines these counts:
   and **10 Gold aggregates**.
 - Live events: **22 declared business event types** and **23 KQL event tables**.
   The stream emits all of them; logistics incidents are sporadic (a few a year
-  per DC), so their tables can be empty for weeks.
+  per DC), so their tables can be empty for weeks. The exception is the
+  end-of-history DC outage that every setup ends in: the first stream batch
+  starts it and the stream resolves it within about two days.
   The extra table, `unknown_event`, is a non-emitted operational catch-all.
 - Active Direct Lake semantic model: **44 tables**, comprising the 38
   historical tables and 6 required ML outputs.

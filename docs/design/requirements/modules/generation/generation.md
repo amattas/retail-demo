@@ -32,6 +32,10 @@ arrivals with a reason for every delay; keep DC stock fed by supplier orders
 with lead times, so a DC can run out and short-ship its stores; and deliver
 nothing on a store's closure day. Store reorders shall consolidate into
 capacity-bounded shipments on trucks that are never in two places at once.
+Every history shall end inside one deterministic DC outage, keyed only on the
+seed and the history's last day, that is still open when history ends,
+draws its stores' fast movers under three days of cover through the
+simulation, and is resolved by the live stream at its planned end.
 
 ### REQ-GEN-006 - UTC time with store-local context
 
