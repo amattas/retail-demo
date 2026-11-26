@@ -260,11 +260,17 @@ STREAM_TAX_RULES = (
 
 # History-to-stream handoff: history should end within a day before now. A new
 # stream refuses a gap or overlap unless allow_history_gap is set; a resumed
-# checkpoint only warns (its own downtime is an expected gap).
+# checkpoint only warns (its own downtime is an expected gap). An unrendered
+# run takes the history's last day in store-local time, as history ends it
+# (the end-of-history incident is keyed on it).
 _history = (spark.table(f"{LAKEHOUSE_NAME}.{SILVER_DB}.fact_receipts")
+            .join(DIM_STORES.select(_F.col("ID").alias("store_id"), "TimeZone"),
+                  "store_id", "left")
             .agg(_F.max("event_ts").cast("long").alias("end"),
                  _F.min("event_date").alias("start"),
-                 _F.max("event_date").alias("last")).first())
+                 _F.max(_F.to_date(_F.from_utc_timestamp(
+                     "event_ts", _F.coalesce(_F.col("TimeZone"), _F.lit("UTC"))
+                 ))).alias("last")).first())
 _history_end = _history["end"]
 enforce_history_handoff(
     check_history_handoff(
@@ -369,7 +375,8 @@ STREAM_SUPPLY = SupplyNetwork(
 )
 # Logistics incidents (DC outages, lane delays, weather, holiday capacity,
 # supplier short-ships) follow the same plan as history: the same seed opens
-# the same incidents on the same days.
+# the same incidents on the same days, including the end-of-history DC outage,
+# which history leaves open and the stream resolves at its planned end.
 _incident_network = incident_network(DIM_STORES, DIM_GEOGRAPHIES, _DIM_DCS)
 STREAM_INCIDENTS = IncidentPlanner(
     SEED,
@@ -377,6 +384,7 @@ STREAM_INCIDENTS = IncidentPlanner(
     lambda first, last: severe_weather_days(
         spark, SEED, _incident_network.store_geo.values(), first, last
     ),
+    history_end=_date.fromisoformat(HISTORY_END),
 )
 print(f"supply: {len(_store_dc)} stores on {len(_fleets)} DC fleets "
       f"({sum(len(f) for f in _fleets.values())} trucks); stock seeded as of "
