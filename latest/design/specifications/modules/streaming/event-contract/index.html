@@ -1,0 +1,4558 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for the Microsoft Fabric retail demo.">
+      
+      
+        <meta name="author" content="Retail Demo contributors">
+      
+      
+        <link rel="canonical" href="https://amattas.github.io/retail-demo/latest/design/specifications/modules/streaming/event-contract/">
+      
+      
+      
+        <link rel="prev" href="../../generation/data-contract/">
+      
+      
+        <link rel="next" href="../../analytics/fabric-analytics/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.1.1">
+    
+    
+      
+        <title>Event contract - Microsoft Fabric Retail Demo</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../../../../assets/stylesheets/modern/main.ebb7f775.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../../../../../assets/stylesheets/modern/palette.b60ce83d.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-hidden="true"></label>
+    <div data-md-component="skip">
+      <a href="#__skip" class="md-skip">
+        Skip to content
+      </a>
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../../../.." title="Microsoft Fabric Retail Demo" class="md-header__button md-logo" aria-label="Microsoft Fabric Retail Demo" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18H6v-4h6m9 0v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6m0-10H4v2h16z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+      <span class="md-visually-hidden">Navigation</span>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Microsoft Fabric Retail Demo
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Event contract
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <span class="md-visually-hidden">Search</span>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M216.5 362.5c-66-8-112.5-55.5-112.5-117 0-25 9-52 24-70-6.5-16.5-5.5-51.5 2-66 20-2.5 47 8 63 22.5 19-6 39-9 63.5-9s44.5 3 62.5 8.5c15.5-14 43-24.5 63-22 7 13.5 8 48.5 1.5 65.5 16 19 24.5 44.5 24.5 70.5 0 61.5-46.5 108-113.5 116.5 17 11 28.5 35 28.5 62.5v52c0 15 12.5 23.5 27.5 17.5C441 459.5 512 369 512 257 512 115.5 397 0 255.5 0S0 115.5 0 257c0 111 70.5 203 165.5 237.5 13.5 5 26.5-4 26.5-17.5v-40c-7 3-16 5-24 5-33 0-52.5-18-66.5-51.5-5.5-13.5-11.5-21.5-23-23-6-.5-8-3-8-6 0-6 10-10.5 20-10.5 14.5 0 27 9 40 27.5 10 14.5 20.5 21 33 21s20.5-4.5 32-16c8.5-8.5 15-16 21-21"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../../.." title="Microsoft Fabric Retail Demo" class="md-nav__button md-logo" aria-label="Microsoft Fabric Retail Demo" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18H6v-4h6m9 0v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6m0-10H4v2h16z"/></svg>
+
+    </a>
+    Microsoft Fabric Retail Demo
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/amattas/retail-demo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M216.5 362.5c-66-8-112.5-55.5-112.5-117 0-25 9-52 24-70-6.5-16.5-5.5-51.5 2-66 20-2.5 47 8 63 22.5 19-6 39-9 63.5-9s44.5 3 62.5 8.5c15.5-14 43-24.5 63-22 7 13.5 8 48.5 1.5 65.5 16 19 24.5 44.5 24.5 70.5 0 61.5-46.5 108-113.5 116.5 17 11 28.5 35 28.5 62.5v52c0 15 12.5 23.5 27.5 17.5C441 459.5 512 369 512 257 512 115.5 397 0 255.5 0S0 115.5 0 257c0 111 70.5 203 165.5 237.5 13.5 5 26.5-4 26.5-17.5v-40c-7 3-16 5-24 5-33 0-52.5-18-66.5-51.5-5.5-13.5-11.5-21.5-23-23-6-.5-8-3-8-6 0-6 10-10.5 20-10.5 14.5 0 27 9 40 27.5 10 14.5 20.5 21 33 21s20.5-4.5 32-16c8.5-8.5 15-16 21-21"/></svg>
+  </div>
+  <div class="md-source__repository">
+    amattas/retail-demo
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Home
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../../../guides/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Start here
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_2">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Start here
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Plain-language glossary
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Getting started
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/workspace-inventory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Workspace and profiles
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Explore the demo
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_3">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Explore the demo
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployed walkthrough
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_3_1">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Deployed walkthrough
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/deployed-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/deployed-data-platform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data platform
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/deployed-analytics-ai/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Analytics and AI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/demo-script/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Presenter demo
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/cio-walkthrough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  CIO walkthrough
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/sample-retail-questions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Evaluation questions
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/presenter-journeys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Presenter journeys
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/use-cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Use cases
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deploy and operate
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_4">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Deploy and operate
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployment
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../../guides/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Design Documentation
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_5">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Design Documentation
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../../requirements/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5_2">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Requirements
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/core/demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Core demo
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/traceability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Traceability
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_4" id="__nav_5_2_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Setup
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_4_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5_2_4">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Setup
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/setup/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/setup/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_5" id="__nav_5_2_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployment
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_5_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5_2_5">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Deployment
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/deployment/deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/deployment/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_6" id="__nav_5_2_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Generation
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_6_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5_2_6">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Generation
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/generation/generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/generation/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_7" id="__nav_5_2_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Streaming
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_7_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5_2_7">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Streaming
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/streaming/streaming/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/streaming/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_8" id="__nav_5_2_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Analytics
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_8_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5_2_8">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Analytics
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/analytics/analytics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/analytics/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_9" id="__nav_5_2_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ML and AI
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_9_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5_2_9">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  ML and AI
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/ml-ai/ml-ai/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/ml-ai/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_10" id="__nav_5_2_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Power BI
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_10_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5_2_10">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Power BI
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/power-bi/power-bi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/power-bi/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_11" id="__nav_5_2_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_11_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5_2_11">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Operations
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/operations/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/operations/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_12" id="__nav_5_2_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Security
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_12_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5_2_12">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Security
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/security/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/security/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2_13" id="__nav_5_2_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Documentation
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_2_13_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5_2_13">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Documentation
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/documentation/documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Requirements
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../requirements/modules/documentation/backlog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Backlog
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Specifications
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_5_3">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Specifications
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../core/conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Conventions
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../core/solution-manifest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Solution manifest
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Setup CLI
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../deployment/framework/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deployment framework
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../generation/data-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data contract
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Event contract
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Event contract
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#runtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Runtime
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Runtime">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#history-handoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        History handoff
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#time-and-shared-vocabulary" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Time and shared vocabulary
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#volume-hours-and-customers" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Volume, hours and customers
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#store-inventory" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Store inventory
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trucks" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Trucks
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#online-orders" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Online orders
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stream-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Stream state
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#envelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Envelope
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#business-event-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Business event types
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#eventhouse-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Eventhouse writes
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trigger-catch-up-and-restarts" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Trigger, catch-up and restarts
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checkpoints-and-incarnations" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Checkpoints and incarnations
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#duplicate-and-failure-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Duplicate and failure behavior
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-layer-ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Cross-layer ownership
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#truck-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Truck lifecycle
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#marketing-attribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Marketing attribution
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contract-evidence-and-live-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Contract evidence and live boundary
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../analytics/fabric-analytics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Fabric analytics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml-ai/model-contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ML and AI contracts
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml-ai/decision-experience/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Decision experience
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml-ai/routing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Application routing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../power-bi/semantic-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Semantic model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/runbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Operations runbook
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../operations/connected-twins/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Connected operational twins
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../security/access-control/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Access control
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation/site/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Documentation site
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Architecture
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5_4">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Architecture
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../architecture/infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Infrastructure
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../architecture/data-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data flow
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../architecture/data-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Data schema
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../architecture/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Security boundaries
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../architecture/agentic-application/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Agentic application
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Security
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_5_5">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  Security
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../security/threat-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Threat model
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../security/controls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Controls
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#runtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Runtime
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Runtime">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#history-handoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        History handoff
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#time-and-shared-vocabulary" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Time and shared vocabulary
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#volume-hours-and-customers" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Volume, hours and customers
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#store-inventory" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Store inventory
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trucks" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Trucks
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#online-orders" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Online orders
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stream-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Stream state
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#envelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Envelope
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#business-event-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Business event types
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#eventhouse-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Eventhouse writes
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trigger-catch-up-and-restarts" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Trigger, catch-up and restarts
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checkpoints-and-incarnations" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Checkpoints and incarnations
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#duplicate-and-failure-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Duplicate and failure behavior
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-layer-ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Cross-layer ownership
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#truck-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Truck lifecycle
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#marketing-attribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Marketing attribution
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contract-evidence-and-live-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Contract evidence and live boundary
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../../../../.." class="md-path__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../../../../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Design Documentation
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../../../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Specifications
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                <a id="__skip" tabindex="-1"></a>
+                
+                  
+
+  
+    <a href="https://github.com/amattas/retail-demo/edit/main/docs/design/specifications/modules/streaming/event-contract.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-file-pen" viewBox="0 0 24 24"><path d="M12.659 22H18a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v9.34"/><path d="M14 2v5a1 1 0 0 0 1 1h5M10.378 12.622a1 1 0 0 1 3 3.003L8.36 20.637a2 2 0 0 1-.854.506l-2.867.837a.5.5 0 0 1-.62-.62l.836-2.869a2 2 0 0 1 .506-.853z"/></svg>
+    </a>
+  
+  
+    
+      
+    
+    <a href="https://github.com/amattas/retail-demo/raw/main/docs/design/specifications/modules/streaming/event-contract.md" title="View source of this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-file-code-2" viewBox="0 0 24 24"><path d="M4 12.15V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2h-3.35"/><path d="M14 2v5a1 1 0 0 0 1 1h5M5 16l-3 3 3 3M9 22l3-3-3-3"/></svg>
+    </a>
+  
+
+
+<h1 id="live-event-contract">Live event contract<a class="headerlink" href="#live-event-contract" title="Permanent link">&para;</a></h1>
+<h2 id="runtime">Runtime<a class="headerlink" href="#runtime" title="Permanent link">&para;</a></h2>
+<p><code>stream-events.ipynb</code> is rendered from
+<code>utility/notebooks/templates/driver-05-stream.py</code>. It is an optional,
+long-running Fabric Spark Structured Streaming driver.</p>
+<p>Supported sinks:</p>
+<ul>
+<li><code>eventhouse</code>: direct typed writes through the Spark Kusto connector;</li>
+<li><code>delta</code>: development/validation landing table.</li>
+</ul>
+<p>The current path does not require Kafka, Event Hubs, or a Fabric Eventstream.</p>
+<p>Before emitting events, the driver requires readable, nonempty Silver
+<code>dim_stores</code>, <code>dim_customers</code>, <code>dim_products</code>,
+<code>dim_distribution_centers</code>, and <code>dim_trucks</code>. Product/store attribute reads
+provide prices and tax data. Missing/empty dimensions, a store without a
+<code>tax_rate</code>, or failed attribute reads stop startup rather than substituting
+arbitrary ID ranges or synthetic attribute frames. Complete historical setup
+before starting the stream.</p>
+<p>Foreign keys come only from IDs that exist. The driver numbers each
+dimension's IDs and picks one per row with a seeded hash, through a broadcast
+join, so gaps in the IDs (a custom layout or a filtered publish) are safe.
+Baskets, and therefore inventory, stockout and reorder events, use only
+products whose <code>LaunchDate</code> is on or before the checkpoint's catalog date. A
+dimension with contiguous IDs <code>1..n</code> gets the same IDs as the earlier
+<code>1..count</code> draw.</p>
+<h3 id="history-handoff">History handoff<a class="headerlink" href="#history-handoff" title="Permanent link">&para;</a></h3>
+<p>History ends yesterday in store-local time, so the newest Silver
+<code>fact_receipts.event_ts</code> is normally less than a day before the stream
+starts. At startup the driver compares the two (both UTC):</p>
+<table>
+<thead>
+<tr>
+<th>Condition</th>
+<th>New checkpoint</th>
+<th>Resumed checkpoint</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Gap of one day or less</td>
+<td>Starts</td>
+<td>Starts</td>
+</tr>
+<tr>
+<td>History ends up to 14 hours after the start (store time zones)</td>
+<td>Starts, logs the overlap</td>
+<td>Starts</td>
+</tr>
+<tr>
+<td>Gap over one day, overlap over 14 hours, or no receipts</td>
+<td>Fails</td>
+<td>Warns</td>
+</tr>
+</tbody>
+</table>
+<p>Set the notebook parameter <code>allow_history_gap = True</code> to start a new stream
+anyway. A resumed checkpoint only warns, because its own downtime is an
+expected gap (see the catch-up cap below).</p>
+<h2 id="time-and-shared-vocabulary">Time and shared vocabulary<a class="headerlink" href="#time-and-shared-vocabulary" title="Permanent link">&para;</a></h2>
+<p>Every timestamp the stream writes is UTC; the stream never assumes store-local
+time. Historical Silver uses the same convention (see the
+<a href="../../generation/data-contract/#time-convention">historical data contract</a>), and
+<code>fact_receipts.local_hour</code> gives the store-local hour for both producers.</p>
+<p>Tenders, zones, ID formats, marketing channels and devices, promotions, and the
+decline model come from <code>retail_setup.generation.vocabulary</code>, which the build
+inlines into the notebook, so live values match history: <code>MOBILE_PAY</code>, base-36
+BLE IDs padded to six characters, <code>BEACON_%03d_&lt;zone&gt;</code> and <code>SENSOR_%03d_&lt;zone&gt;</code>
+IDs, upper-case devices, <code>CAMP&lt;yyyyMMdd&gt;&lt;NN&gt;</code> campaign IDs, and padded <code>AdId</code>s.
+Online orders use the same fulfillment mix, online tenders, decline model,
+cancellation and backorder rates, promo codes and stage delays
+(<code>vocabulary.ONLINE_*</code>) as history. No known gap is left; new ones are listed
+in <code>utility/tests/generation/test_vocabulary.py</code>, which fails when a listed gap
+closes, so the list only shrinks.</p>
+<h2 id="volume-hours-and-customers">Volume, hours and customers<a class="headerlink" href="#volume-hours-and-customers" title="Permanent link">&para;</a></h2>
+<p>The live stream reuses the historical models (<code>stream_calendar</code>,
+<code>stream_events</code>), so its volume, time of day and customer mix continue the
+history:</p>
+<ul>
+<li><strong>Rate.</strong> <code>source_rows_per_second = 0</code> (the default) derives the rate-source
+  rate from the store count, the historical <code>transactions_per_store_day</code>
+  (rendered into the notebook), <code>online_orders_per_day</code>, and the marketing
+  volume: the smallest whole rate that covers every lane at its peak. Each row
+  goes to one lane (store visits, online orders, marketing) and is kept with
+  that lane's calendar weight, so a larger explicit rate adds resolution, not
+  volume. <code>volume_scale</code> multiplies every calibrated volume. Inventory and
+  truck events have no lane: they follow from the purchases (below).</li>
+<li><strong>Store visits.</strong> A visit picks a store weighted by <code>daily_traffic_multiplier</code>
+  and is kept with the profile's hourly, daily and monthly weights evaluated in
+  the store's local time (<code>dim_stores.TimeZone</code>, daylight saving included),
+  history's holiday factor for the store type's class and the geography's
+  weather on the local day (<code>stream_calendar</code>). The weight is zero while the
+  store is closed, on Christmas Day and, except for grocers, on Thanksgiving,
+  so no live receipt is outside opening hours. Visits are drawn at
+  <code>transactions_per_store_day / 0.225</code> per store-day and convert with the same
+  store/day/hour conversion as history (about 22%).</li>
+<li><strong>Customers.</strong> As in history (<code>generation/customers.py</code>), about 45% of
+  visits are anonymous. The rest pick a customer from the store's home-customer
+  pool (85%) or another store's, weighted by visit tickets, and keep them only
+  while they are signed up and not churned on the visit's local day; live
+  churn continues from the history's lifecycle (rendered start, end, churn
+  rate and anonymous share). Online orders take the first of four tries that
+  is active that day.</li>
+<li><strong>Visit path.</strong> A visit walks from the store type's entrance zone through
+  one to three of its department zones (<code>profile.zones</code>, upper-cased) in
+  random order, passes <code>CHECKOUT</code> when it buys and leaves through <code>EXIT</code> when
+  the store type has one (<code>vocabulary.visit_zone_path</code>, the path history
+  uses). Each zone has a dwell time in its range and a <code>customer_entered</code>
+  event as the visitor enters it: foot-traffic sensors count zone passages, so
+  the entrance zone counts visitors and checkout counts buyers
+  (<code>customer_count</code> is 1, <code>dwell_time</code> the zone's dwell). Beacons detect the
+  phone of a quarter of visits (<code>BLE_DETECTED_SHARE</code>, buyers and non-buyers):
+  those emit two to five BLE pings per zone and a zone change on arrival. 30%
+  of detected visits carry the customer's <code>dim_customers.BLEId</code>; the rest are
+  <code>ANON-&lt;store&gt;-&lt;n&gt;</code>, as in history. The receipt, lines and promotions are
+  emitted halfway through checkout and the payment after the tender's
+  processing time. A visit that would run past closing time is compressed to
+  end before it.</li>
+<li><strong>Purchases.</strong> Baskets (complementary products and merged repeated SKUs,
+  <code>generation/baskets.py</code>), shelf prices of the incarnation's catalog date
+  (<code>generation/pricing.py</code>, the same price schedule as history), one
+  basket-level promotion priced over the lines the store could fill, the
+  40/30/20/10 tender mix and the 2.5% base decline
+  model are the batch helpers. As in history, a declined first tender is
+  retried on another tender 80% of the time (a <code>DECLINED</code> payment at the
+  purchase, then the <code>APPROVED</code> one; the receipt carries the approved tender);
+  otherwise the sale is voided and the visit leaves without buying. One <code>promotion_applied</code> is emitted per
+  receipt and promo code, so at most one per receipt. Visit and online volume
+  follow history's year-over-year trend (<code>annual_volume_growth</code> from the
+  anchor date).</li>
+<li><strong>Store operations.</strong> <code>store_opened</code> and <code>store_closed</code> (lower-case
+  <code>opened</code>/<code>closed</code>, like history) are emitted exactly at each store's local
+  opening and closing time, one pair per open day (none on the store type's
+  closed holidays). A 24-hour store closes at
+  23:59 and reopens at midnight.</li>
+<li><strong>Marketing.</strong> Background impressions follow the historical campaigns
+  (archetype channels, <code>CAMP</code> IDs on the same campaign windows, flash sales on
+  about one day in seven), cost bands by channel and device, padded <code>AdId</code>s,
+  and a 5% CRM match, at <code>store_count / 86</code> of the archetype volumes.</li>
+</ul>
+<h2 id="store-inventory">Store inventory<a class="headerlink" href="#store-inventory" title="Permanent link">&para;</a></h2>
+<p><code>stream_supply</code> keeps a running on-hand balance per store and product and
+replays, in time order, everything that changes it in a micro-batch:</p>
+<ul>
+<li><strong>Sales.</strong> Every receipt line, and every line of a ship-from-store or BOPIS
+  online order (at order time), takes its quantity from the store:
+  <code>inventory_updated</code> with <code>reason = SALE</code>, <code>source = CUSTOMER_PURCHASE</code> or
+  <code>ONLINE_ORDER</code>, a negative <code>quantity_delta</code> and the demand in
+  <code>requested_quantity</code>. Ship-from-DC lines draw on the DC, which, as in
+  history, is an unconstrained supplier.</li>
+<li><strong>Lost sales.</strong> A line the store cannot fill whole becomes
+  <code>reason = LOST_SALE</code> with <code>quantity_delta = 0</code>, like history's policy: the
+  line is left off its receipt or order (and its totals), and a purchase with no
+  line left emits nothing. Balances never go negative.</li>
+<li><strong>Stockouts.</strong> A sale that takes the balance below
+  <code>calibration.STOCKOUT_QUANTITY_THRESHOLD</code> (to zero) emits
+  <code>stockout_detected</code> with the stock it took (<code>last_known_quantity</code>), once per
+  store, product and UTC day, the crossing <code>fact_stockouts</code> records in history.</li>
+<li><strong>Reorders.</strong> After each sale or lost sale the shared replenishment policy
+  (<code>inventory_policy</code>: smoothed daily demand, reorder point of 4 days, order-up-to
+  target of 8 days, 12-unit case pack, <code>URGENT</code> when the shelf is empty,
+  <code>HIGH</code> below two days of demand) compares the position (on hand plus
+  inbound) with the reorder point and emits <code>reorder_triggered</code>.</li>
+<li><strong>Receipts of stock.</strong> A truck unload adds its units:
+  <code>reason = INBOUND_SHIPMENT</code>, <code>source</code> = the shipment ID.</li>
+<li><strong>DC stock.</strong> Each DC keeps its own stock with the historical DC policy
+  (<code>inventory_policy</code> DC functions): supplier orders at the reorder point,
+  received after the product's 3-7 day lead time (short during a supplier
+  short-ship), truck loads, and ship-from-DC online lines when the order is
+  placed (expedited when the DC lacks units). These moves are
+  <code>inventory_updated</code> events with no <code>store_id</code> and <code>reason</code>
+  <code>INBOUND_SHIPMENT</code>, <code>OUTBOUND_SHIPMENT</code> (<code>requested_quantity</code> is what the
+  load asked for; less moved means a short-ship), <code>ONLINE_SHIPMENT</code> or
+  <code>EXPEDITED_RECEIPT</code>. Silver routes them to <code>fact_dc_inventory_txn</code>. A DC
+  reaching zero is a <code>stockout_detected</code> with no <code>store_id</code>. DC entries start
+  from the latest Silver DC balance as of the incarnation start, else from
+  history's DC opening stock.</li>
+</ul>
+<p>Every inventory, stockout and reorder event carries the store's DC (<code>dc_id</code>),
+assigned as in the historical inventory chain (<code>network.assign_dcs</code>: same
+state, else region, least loaded). A store and product the stream has not touched yet
+starts from its latest Silver <code>fact_store_inventory_txn</code> balance as of the
+incarnation start (never below zero) and the mean daily demand of the 7 days
+before it; one Silver has never seen starts from history's opening stock. The
+seed time is kept in the meta state, so a restart seeds the same way. History's
+shipments that were still on the road when history ended are not carried over;
+the policy reorders that stock.</p>
+<h2 id="trucks">Trucks<a class="headerlink" href="#trucks" title="Permanent link">&para;</a></h2>
+<p>A reorder joins its store's pending load at the DC. Each store takes one
+consolidated delivery a day. The load's schedule comes from
+<code>incidents.plan_delivery</code>, as in history: the store's next delivery slot (the
+minute of the store-local day its delivery route gives it,
+<code>network.plan_routes</code>) whose arrival day the store is open, held to the next
+slot after a DC outage, loaded late under holiday capacity limits. When it is
+due, the next free truck of the DC's fleet (<code>dim_trucks.DCID</code>; pool trucks only
+for a DC with none) loads what the DC has of the pending load for
+<code>TRUCK_LOAD_MINUTES</code>, drives the lane (a stable 1-4 hour draw per DC and
+store), and arrives. <code>planned_arrival_time</code> is the plan of the load's oldest
+reorder; the actual arrival is the planned time plus <code>delay_minutes</code>, and
+<code>delay_reason</code> names the largest cause (<code>DC_OUTAGE</code>, <code>HOLIDAY_CAPACITY</code>,
+<code>LANE_DELAY</code>, <code>WEATHER</code>, <code>TRAFFIC</code>, or <code>TRUCK_AVAILABILITY</code> when the load
+waited for a free truck). <code>SupplyBatch.held_dcs</code> can still hold a DC by hand.
+The unload takes <code>TRUCK_UNLOAD_BASE_MINUTES</code> plus the load at
+<code>TRUCK_UNLOAD_UNITS_PER_MINUTE</code>, scaled by a per-store dock factor and the
+store-local hour (slower 11:00-19:00, quicker 22:00-06:00), plus a 10-minute
+door wait for a truck 30 or more minutes late and a few minutes of noise,
+capped at <code>TRUCK_UNLOAD_MINUTES_MAX</code> (<code>network.unload_minutes</code>,
+shared with history; <code>estimated_unload_duration</code> is the plan, the departure's
+<code>actual_unload_duration</code> the outcome). A typical load unloads inside the
+normal 30-75 minute range; an unusually large one can breach the 90-minute SLA.
+The truck departs when the unload is done, which restocks the store, and drives
+back. A truck carries one shipment at a time, so it is never in two places at
+once, and <code>truck_arrived</code> and <code>truck_departed</code> are emitted only once their time
+has passed.</p>
+<h2 id="online-orders">Online orders<a class="headerlink" href="#online-orders" title="Permanent link">&para;</a></h2>
+<p>Online orders arrive at <code>online_orders_per_day</code> (by default derived so online
+orders are the profile's <code>online_order_share</code> of all orders), shaped by the profile's
+monthly weights, the online holiday factors (Cyber Monday, Black Friday, ...)
+and the online hourly curve (<code>vocabulary.ONLINE_HOURLY_WEIGHTS</code>,
+UTC, peaking in the US evening; history uses the same curve). The customer
+comes from a home-store pool, as in history. Each order has one fulfillment
+mode and node, drawn by the historical mix (60% ship from a DC, 30% ship from
+a store, 10% BOPIS): the customer's home store for ship-from-store and BOPIS,
+the DC that supplies that store for ship-from-DC. Repeated SKUs merge into one
+line. Its lifecycle runs over hours and days:</p>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>online_order_created</code> and one <code>online_order_line_added</code> per line</td>
+<td>order time</td>
+</tr>
+<tr>
+<td><code>payment_processed</code> (<code>order_id</code>, no store)</td>
+<td>after the online tender's processing time</td>
+</tr>
+<tr>
+<td><code>online_order_picked</code></td>
+<td>30-240 minutes later (BOPIS: 4-24 hours, ready for pickup)</td>
+</tr>
+<tr>
+<td><code>online_order_shipped</code></td>
+<td>2-4 hours after picking (backorders: 3-14 days more); never for BOPIS</td>
+</tr>
+<tr>
+<td><code>online_order_delivered</code></td>
+<td>1-3 days after shipping; BOPIS: 1-24 hours after picking, when the customer collects it</td>
+</tr>
+</tbody>
+</table>
+<p>2% of orders are cancelled at once: zero totals, zero line amounts, no payment
+and no fulfillment. 8% of shippable orders are backordered: they wait 3-14 days
+for stock before they ship, then deliver as usual. Payments use
+the online tenders (no cash) and the shared decline model: a declined order is
+retried on another tender (a <code>DECLINED</code> payment a second after the order, then
+the <code>APPROVED</code> one) or voided, which cancels it, as in history. Lines carry history's online promo codes, and
+tax is the fulfilling store's rate for store-fulfilled orders and the
+customer's destination rate (mean store rate of their geography) for DC
+shipments. Orders still in progress live in the order state.</p>
+<h2 id="stream-state">Stream state<a class="headerlink" href="#stream-state" title="Permanent link">&para;</a></h2>
+<p>Events that span micro-batches need state. A visit's and an online order's
+later events are emitted in the batch whose time they fall in, the store hours
+need each store's open/closed state, and stock and trucks carry over between
+batches. The state lives in Lakehouse Delta tables in the Silver schema:</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Key</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_stream_state_stores</code></td>
+<td>store ID</td>
+<td>Open or closed, and when it last changed.</td>
+</tr>
+<tr>
+<td><code>_stream_state_visits</code></td>
+<td>visit (rate row)</td>
+<td>Visits whose last event is still in the future, with their lost-sale lines.</td>
+</tr>
+<tr>
+<td><code>_stream_state_orders</code></td>
+<td>order (rate row)</td>
+<td>Online orders whose last stage is still in the future, with their lost-sale lines.</td>
+</tr>
+<tr>
+<td><code>_stream_state_inventory</code></td>
+<td><code>inv:&lt;store&gt;:&lt;product&gt;</code></td>
+<td>On hand, inbound, smoothed daily demand and the last stockout day of each store and product the stream has touched.</td>
+</tr>
+<tr>
+<td><code>_stream_state_logistics</code></td>
+<td><code>pending:&lt;store&gt;</code>, <code>shipment:&lt;id&gt;</code>, <code>truck:&lt;id&gt;</code></td>
+<td>Loads waiting at the DC, shipments on the road and where each truck is.</td>
+</tr>
+<tr>
+<td><code>_stream_state_meta</code></td>
+<td><code>clock</code>, <code>seed</code></td>
+<td>The time of the last micro-batch, and the inventory seed time.</td>
+</tr>
+</tbody>
+</table>
+<p>Each row also carries the checkpoint <code>incarnation</code> (stream ID and nonce),
+<code>batch_id</code>, the JSON <code>payload</code> and a <code>deleted</code> flag. Micro-batch N reads, per
+entity, the latest version written before N, and writes its changes with
+<code>batch_id = N</code> using a Delta <code>replaceWhere</code> on <code>batch_id &gt;= N</code>. A replay of N
+therefore reads the same state, regenerates the same events, and replaces its
+own versions: nothing is applied twice. Store inventory is read only for the
+store-products a batch touches. Superseded versions are deleted every
+60 batches. A new incarnation has no rows; at startup it seeds each store from
+its last Silver <code>fact_store_ops</code> row (or its hours) as <code>batch_id = -1</code>. Rows of
+an earlier incarnation are ignored and can be deleted.</p>
+<h2 id="envelope">Envelope<a class="headerlink" href="#envelope" title="Permanent link">&para;</a></h2>
+<p>Every event contains:</p>
+<ul>
+<li><code>event_type</code></li>
+<li><code>trace_id</code></li>
+<li><code>ingest_timestamp</code></li>
+<li><code>schema_version</code></li>
+<li><code>source</code></li>
+<li><code>correlation_id</code></li>
+<li><code>partition_key</code></li>
+<li><code>session_id</code></li>
+<li><code>parent_event_id</code></li>
+</ul>
+<p>Payload fields are event-specific and mapped by <code>EVENT_PAYLOADS</code>.</p>
+<h2 id="business-event-types">Business event types<a class="headerlink" href="#business-event-types" title="Permanent link">&para;</a></h2>
+<ol>
+<li><code>receipt_created</code></li>
+<li><code>receipt_line_added</code></li>
+<li><code>payment_processed</code></li>
+<li><code>inventory_updated</code></li>
+<li><code>stockout_detected</code></li>
+<li><code>reorder_triggered</code></li>
+<li><code>customer_entered</code></li>
+<li><code>customer_zone_changed</code></li>
+<li><code>ble_ping_detected</code></li>
+<li><code>truck_arrived</code></li>
+<li><code>truck_departed</code></li>
+<li><code>store_opened</code></li>
+<li><code>store_closed</code></li>
+<li><code>ad_impression</code></li>
+<li><code>promotion_applied</code></li>
+<li><code>online_order_created</code></li>
+<li><code>online_order_picked</code></li>
+<li><code>online_order_shipped</code></li>
+<li><code>online_order_line_added</code></li>
+<li><code>online_order_delivered</code></li>
+<li><code>logistics_incident_started</code></li>
+<li><code>logistics_incident_resolved</code></li>
+</ol>
+<p>The stream emits all twenty-two. Incidents are sporadic (a few per DC and
+year), so readiness does not expect fresh incident rows
+(<code>stream_control.SPORADIC_EVENT_TYPES</code>).</p>
+<ul>
+<li><code>logistics_incident_started</code> carries <code>incident_id</code>, <code>incident_type</code>
+  (<code>DC_OUTAGE</code>, <code>LANE_DELAY</code>, <code>WEATHER</code>, <code>HOLIDAY_CAPACITY</code>,
+  <code>SUPPLIER_SHORT_SHIP</code>), <code>dc_id</code>, <code>store_id</code> (the lane's store of a lane
+  delay, else null), <code>started_at</code>, <code>severity</code>, <code>affected_store_count</code>,
+  <code>description</code>, and <code>affected_store_ids</code> (every affected store).
+  <code>logistics_incident_resolved</code> carries the same identity and <code>resolved_at</code>.
+  The stream plans incidents exactly as history does
+  (<code>incidents.plan_incidents</code> with the severe-weather days of the stores'
+  geographies), so the same seed opens the same incident IDs on the same days.
+  With the history's last day (<code>END_DATE</code>) it also plans the end-of-history
+  DC outage that history leaves open (see the
+  <a href="../../generation/data-contract/#logistics-incidents">data contract</a>), so
+  the first batch starts it and the stream resolves it at its planned end.
+  Each start and resolution is emitted once, in the batch whose window holds
+  it (<code>stream_supply.incident_transitions</code>); the first batch of an incarnation
+  starts the incidents already open. Silver keeps one
+  <code>fact_logistics_incidents</code> row per incident: the start inserts it and the
+  resolution sets <code>resolved_at</code> once (Delta <code>MERGE</code>), and
+  <code>fact_logistics_incident_stores</code> gets one row per affected store. A
+  resolution whose start has aged out of Bronze only updates existing rows.</li>
+<li><code>online_order_line_added</code> carries the order line (<code>line_number</code>,
+  <code>product_id</code>, <code>quantity</code>, prices, <code>promo_code</code>) and its fulfillment node; it
+  lands in <code>fact_online_order_lines</code> with status <code>PENDING</code>. Each Silver run
+  then moves recent live lines with their order: <code>PICKED</code>, <code>SHIPPED</code>,
+  <code>DELIVERED</code> (with the stage timestamps), or <code>CANCELLED</code> when the order's
+  header has zero totals.</li>
+<li><code>online_order_delivered</code> adds a <code>DELIVERED</code> row to the streaming-only
+  <code>fact_online_order_status</code> table, like picked and shipped.</li>
+<li><code>inventory_updated.requested_quantity</code> is the customer's demand of a <code>SALE</code>
+  or <code>LOST_SALE</code> (0 for stock receipts). Silver writes it to
+  <code>requested_quantity</code> and, for a lost sale, to <code>unfulfilled_quantity</code>. The KQL
+  script restates the table with <code>.alter table</code> so the column sits before the
+  envelope, as the positional writes need.</li>
+<li>A live store stockout keeps <code>DCID</code> NULL in Silver <code>fact_stockouts</code>, as history
+  does; the event's <code>dc_id</code> names the store's DC.</li>
+</ul>
+<p>KQL defines an additional <code>unknown_event</code> catch-all table. It is not a
+generated business event. The current notebook rejects unmapped
+event types before committing the micro-batch checkpoint. The catch-all is an
+operational queued-ingestion boundary, not an active direct-writer DLQ.
+Here DLQ means dead-letter queue: a place to preserve messages that could not
+be processed.</p>
+<h2 id="eventhouse-writes">Eventhouse writes<a class="headerlink" href="#eventhouse-writes" title="Permanent link">&para;</a></h2>
+<p>Each micro-batch is generated inside <code>foreachBatch</code>: the notebook reads the
+state as of the previous batch, builds the batch's events, writes them, and
+only then commits the new state. For the Eventhouse sink, the notebook:</p>
+<ol>
+<li>Persists the batch.</li>
+<li>Finds present mapped event types.</li>
+<li>Resolves one notebook runtime token.</li>
+<li>Maps JSON to typed envelope/payload columns.</li>
+<li>Writes event types concurrently to their same-named KQL tables, one
+   coalesced partition (one blob, one extent, one tag) per table.</li>
+<li>Uses <code>FailIfNotExist</code>.</li>
+<li>Sets <code>flushImmediately=true</code>.</li>
+<li>Unpersists the batch.</li>
+</ol>
+<p>Each table write retries transient errors (throttling, HTTP 401/408/429/5xx,
+timeouts, dropped connections, an expired token) up to five attempts with
+exponential backoff (2, 4, 8, 16 seconds) and a fresh token. Permanent errors,
+such as a missing table or a type mismatch, are not retried.</p>
+<p>If <code>kusto_uri</code> is blank, the notebook resolves the KQL database
+<code>queryServiceUri</code> by display name in the current workspace.</p>
+<p>The event tables carry an <code>extent_tags_retention</code> policy that drops
+<code>ingest-by:</code> tags after seven days. They set no streaming-ingestion or
+ingestion-batching policy: the connector's transactional writes are queued
+ingestion with <code>flushImmediately</code>, which bypasses batching, and nothing streams
+into these tables. Eventhouses created by earlier versions keep those policies;
+they are inert. The <code>unknown_event</code> catch-all keeps both for queued ingestion.</p>
+<h2 id="trigger-catch-up-and-restarts">Trigger, catch-up and restarts<a class="headerlink" href="#trigger-catch-up-and-restarts" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>source_rows_per_second</code></td>
+<td><code>0</code></td>
+<td><code>0</code> derives the rate from the store count and historical volume; a larger value adds resolution, not volume.</td>
+</tr>
+<tr>
+<td><code>volume_scale</code></td>
+<td><code>1.0</code></td>
+<td>Multiplies every calibrated live volume.</td>
+</tr>
+<tr>
+<td><code>run_seconds</code></td>
+<td><code>0</code></td>
+<td><code>0</code> runs until cancelled; a positive value is a bounded (smoke) run.</td>
+</tr>
+<tr>
+<td><code>trigger_seconds</code></td>
+<td><code>60</code></td>
+<td>Live micro-batch interval. Bounded runs use at most 10 seconds.</td>
+</tr>
+<tr>
+<td><code>max_lag_seconds</code></td>
+<td><code>600</code></td>
+<td>After a stop, rate rows older than this behind the batch time are dropped.</td>
+</tr>
+<tr>
+<td><code>max_restarts</code></td>
+<td><code>5</code></td>
+<td>Supervised restarts of a failed live query.</td>
+</tr>
+<tr>
+<td><code>allow_history_gap</code></td>
+<td><code>False</code></td>
+<td>Start a new stream despite a history gap or overlap.</td>
+</tr>
+</tbody>
+</table>
+<p>Spark's <code>rate</code> source emits every second of downtime in the next micro-batch;
+a 12-hour stop used to produce about a million events in one batch. The driver
+keeps only rows within <code>max_lag_seconds</code> of the batch time, so a resumed stream
+continues from about now and leaves a gap for the downtime. The batch time
+comes from Spark's offset log, so a replayed batch keeps exactly the same rows.
+The newer <code>rate-micro-batch</code> source was not used: its timestamps advance per
+batch, not with the clock, so after a stop every event would stay backdated.</p>
+<p>A live query that fails with a transient error restarts from its checkpoint
+after 30, 60, 120 ... seconds (at most 10 minutes), up to <code>max_restarts</code> times.
+The count resets after an hour of healthy running. A permanent failure, or one
+beyond the budget, ends the notebook with the error.</p>
+<h2 id="checkpoints-and-incarnations">Checkpoints and incarnations<a class="headerlink" href="#checkpoints-and-incarnations" title="Permanent link">&para;</a></h2>
+<p>Checkpoints live under <code>Files/setup/stream/checkpoint</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_metadata/stream_id</code></td>
+<td>The logical stream ID, shared by every sink checkpoint.</td>
+</tr>
+<tr>
+<td><code>eventhouse-live/</code>, <code>delta-live/</code></td>
+<td>Spark checkpoint of an unbounded run.</td>
+</tr>
+<tr>
+<td><code>eventhouse-smoke/</code>, <code>delta-smoke/</code></td>
+<td>Spark checkpoint of a bounded run, so smoke tests never share offsets with the live stream.</td>
+</tr>
+<tr>
+<td><code>_metadata/&lt;checkpoint&gt;.json</code></td>
+<td>The checkpoint's incarnation record: an 8-hex nonce and the catalog date.</td>
+</tr>
+</tbody>
+</table>
+<p>Earlier versions used <code>eventhouse/</code> and <code>delta/</code>; they are no longer read and
+can be deleted.</p>
+<p>The incarnation nonce is part of every ingest tag
+(<code>retail-demo:&lt;stream_id&gt;:&lt;incarnation&gt;:&lt;event_type&gt;:&lt;batch_id&gt;</code>), trace ID,
+and business ID (<code>RCP-&lt;stream_id&gt;-&lt;incarnation&gt;-&lt;n&gt;</code>). Spark restarts batch IDs
+at 0 when its checkpoint is deleted. Without the nonce, those batches would
+reuse tags Kusto still holds, and the connector would silently skip the writes.</p>
+<p>At startup the driver compares the record with the Spark offsets and commits
+logs:</p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No record, no Spark log</td>
+<td>New incarnation; the record is written just before the query starts.</td>
+</tr>
+<tr>
+<td>Record and offsets, last batch committed</td>
+<td>Resume; the catalog date moves to today, so new launches are sold.</td>
+</tr>
+<tr>
+<td>Record and offsets, last batch not committed</td>
+<td>Resume; the pending batch replays with the recorded catalog date, so it regenerates the same baskets, IDs, and tags.</td>
+</tr>
+<tr>
+<td>Record without offsets</td>
+<td>Refused: the Spark checkpoint was reset or never ran a batch.</td>
+</tr>
+<tr>
+<td>Offsets without a record, commits past the offsets, or a record for another stream</td>
+<td>Refused.</td>
+</tr>
+</tbody>
+</table>
+<p>The error names the files to delete. To start a new incarnation, delete the
+Spark checkpoint folder and its record together. To start a new stream ID,
+delete the whole checkpoint root.</p>
+<h2 id="duplicate-and-failure-behavior">Duplicate and failure behavior<a class="headerlink" href="#duplicate-and-failure-behavior" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Generated business IDs and <code>trace_id</code> include the persisted stream ID and
+  the checkpoint incarnation.</li>
+<li>Eventhouse writes use the connector's transactional mode, deterministic
+  request IDs, duplicate-blob protection, and matching ingest-by/check tags for
+  each stream, incarnation, event type, and Spark micro-batch.</li>
+<li>Unmapped event types and any required table-write failure (after retries)
+  raise from <code>foreachBatch</code>, so Spark does not commit that batch's checkpoint.</li>
+<li>A replayed batch rebuilds the same rows, catalog, state, and tags, so tables
+  that already succeeded are skipped and the rest are written once. The state
+  write replaces the batch's own versions.</li>
+<li>Silver transforms remove exact duplicate candidates, reject conflicting rows
+  with the same identity, and use Delta <code>MERGE</code> before advancing watermarks.</li>
+<li>Gold tables are rebuilt with overwrite semantics from duplicate-safe Silver
+  inputs, so reruns do not accumulate aggregate rows.</li>
+</ul>
+<p>These controls make expected retries idempotent and are covered by injected
+failure/replay contracts. <code>tests/test_streaming_dedup_contract.py</code> executes the
+actual <code>foreachBatch</code> sink function with mocked connector operations,
+including partial table-write, transient-retry, unmapped-event, and credential
+failures. <code>utility/tests/generation/test_stream_control.py</code> covers the backlog
+cap, retries, supervised restarts, incarnation records over a temporary
+directory, the history handoff, and ID sampling. These tests do not establish
+live Spark/Kusto transactional behavior. The readiness adapter checks live
+ingestion and checkpoint tags. The remaining
+<a href="../../../../requirements/modules/operations/backlog/#imp-013">IMP-013</a> evidence
+includes a recent bounded run of the intentionally manual stream and live
+execution of the bounded receipt/inventory/sales reconciliation query.</p>
+<h2 id="cross-layer-ownership">Cross-layer ownership<a class="headerlink" href="#cross-layer-ownership" title="Permanent link">&para;</a></h2>
+<p>The exact KQL table shape is in <code>01-create-tables.kql</code>. JSON ingestion mappings
+in <code>02-create-ingestion-mappings.kql</code> support queued raw-JSON ingestion but are
+not used by the direct typed live path.</p>
+<p>Silver mappings are separately implemented in
+<code>fabric/lakehouse/03-streaming-to-silver.ipynb</code>. Their current divergence from
+the historical contract is documented in
+<a href="../../analytics/fabric-analytics/">Fabric analytics</a>.</p>
+<p><code>contracts/retail-demo.json</code> declares one stable path ID per emitted event and
+one derived attribution path. It stores keys, UTC event-time semantics,
+targets, terminals, and named exceptions, but never copies physical field or
+type inventories. <code>python scripts/check_data_contracts.py</code> derives those
+inventories from the driver, KQL, <code>schemas.py</code>, notebooks, and active TMDL.</p>
+<h2 id="truck-lifecycle">Truck lifecycle<a class="headerlink" href="#truck-lifecycle" title="Permanent link">&para;</a></h2>
+<p><code>truck_arrived</code> and <code>truck_departed</code> share <code>truck_id</code>, <code>dc_id</code>, <code>store_id</code>, and
+<code>shipment_id</code>. The departure is emitted when the unload completes, after the
+arrival and never ahead of the stream clock; the dwell follows the load-size
+and dock model under <a href="#trucks">Trucks</a>. Its parameters come from
+<code>utility/src/retail_setup/generation/calibration.py</code>, the same module the rules,
+anomaly functions, and semantic model are checked against.</p>
+<p><code>truck_arrived</code> also carries <code>planned_arrival_time</code>, <code>delay_minutes</code>,
+<code>delay_reason</code> and <code>load_units</code> (see <a href="#trucks">Trucks</a>). Silver copies them to
+<code>fact_truck_moves</code>. The KQL script restates the table with <code>.alter table</code> so an
+existing Eventhouse takes the declared column order, which the positional
+Spark Kusto writes rely on.</p>
+<p>Silver joins the two event tables on all four lifecycle keys and writes one
+completed <code>fact_truck_moves</code> row. Eventhouse and Gold expose dwell in minutes
+with <code>STORE_&lt;id&gt;</code> / <code>DC_&lt;id&gt;</code> site labels.</p>
+<p><code>tests/test_truck_dwell_contract.py</code> verifies the generator, rendered stream
+notebook, KQL table/function contract, Silver join, Gold aggregation, queryset,
+dashboard template, and 90-minute rule. A live Fabric smoke run remains the
+deployment verification gate.</p>
+<h2 id="marketing-attribution">Marketing attribution<a class="headerlink" href="#marketing-attribution" title="Permanent link">&para;</a></h2>
+<p>Approved store and online purchases with a customer are selected for a
+journey at the rate that makes the attributed net revenue about
+<code>attribution.TARGET_ROAS</code> (4x) the live impression spend
+(<code>attribution.live_journey_rate</code>, from the lane volumes, identified buyers and
+the pre-tax ticket), as history converts impressions. A journey
+(<code>attribution.with_journey_plan</code>) has one journey ID and one to three
+<code>ad_impression</code> touches 1 minute to 7 days before the purchase, each on an
+archetype drawn by impression volume, in the campaign window of its own time,
+with a creative from the campaign's pool, a CPM cost, a device and a
+CRM-matched <code>customer_id</code> exactly like background impressions; their impression
+IDs have the background format. The purchase carries the last touch's
+<code>campaign_id</code> and <code>impression_id</code>. The existing envelope
+<code>correlation_id</code> carries <code>attribution_journey_id</code> through impressions,
+receipt/order creation, promotion, payment, and online status events.</p>
+<p>Touches arrive with the purchase: their <code>ingest_timestamp</code> is the purchase
+time, and the payload's <code>impression_time</code> says when they were shown
+(background impressions have both equal). Notebook 03 dates <code>fact_marketing</code>
+rows by <code>impression_time</code> but tracks its watermark and replay window on
+<code>ingest_timestamp</code>, the arrival time, so touches are never older than the
+replay window and are not left to the daily deep reconciliation. Kusto's
+<code>ingestion_time()</code> is not visible through the OneLake shortcut notebook 03
+reads; <code>ingest_timestamp</code> stays deterministic from the rate-source time, so
+replays are identical, and is within one trigger interval of it. KQL
+<code>fn_marketing_attribution()</code> and <code>fn_campaign_performance()</code> use
+<code>coalesce(impression_time, ingest_timestamp)</code> as the touch time.</p>
+<p>The contract is deterministic last-touch within an inclusive seven-day window,
+ordered by touch timestamp and impression ID. Silver writes one
+<code>fact_marketing_attribution</code> row after purchase, promotion, and approved
+payment reconcile; attributed rows additionally require a valid selected
+touch, while purchases without a journey are marked
+<code>UNATTRIBUTED_NO_JOURNEY</code>.</p>
+<p>Money remains integer cents:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>gross_subtotal_cents - discount_cents = net_subtotal_cents
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>net_subtotal_cents + tax_cents = total_cents
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>approved payment_cents = total_cents
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>attributed_revenue_cents = net_subtotal_cents
+</span></code></pre></div>
+<p>Eventhouse exposes reconciliation diagnostics through
+<code>fn_marketing_attribution()</code>. Consumer-facing <code>fn_attribution()</code> and
+<code>fn_attribution_window()</code> return only reconciled <code>ATTRIBUTED</code> purchases after
+future and out-of-window touches are removed and the latest valid touch is
+selected. <code>fn_campaign_performance()</code> uses that reconciled set. Its spend is
+the cost of impressions shown in the window; the cost of the impressions
+behind the window's conversions, shown up to seven days earlier, is reported
+separately as <code>converted_spend_cents</code>. Gold publishes
+<code>campaign_performance_daily</code>, and the Direct Lake model exposes both the audit
+fact and campaign KPIs. Contract tests cover batch determinism, live
+payload/KQL mappings, Silver/Gold wiring, semantic measures, and all cent
+equations. A live Fabric smoke run remains the deployment verification gate.</p>
+<h2 id="contract-evidence-and-live-boundary">Contract evidence and live boundary<a class="headerlink" href="#contract-evidence-and-live-boundary" title="Permanent link">&para;</a></h2>
+<p>Eight fixture scenarios cover all 22 declared types plus nullable and
+unknown-event variants. The parameterized matrix validates the nine-field
+envelope, KQL DDL/mappings, UTC values, business/dedupe keys, Silver/Gold
+routes, and either an active semantic terminal or the named streaming-only
+exception.</p>
+<p>Repository acceptance for <code>IMP-005</code> is complete. A live Fabric staging run
+through Eventhouse, the optional Silver/Gold projection, and Direct Lake
+remains required external evidence. The static check does not prove
+tenant-level execution.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../../generation/data-contract/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Data contract">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Data contract
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../analytics/fabric-analytics/" class="md-footer__link md-footer__link--next" aria-label="Next: Fabric analytics">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Fabric analytics
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 Retail Demo contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog" role="status" aria-atomic="true">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      
+      
+        
+        
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../../../..","features":["content.action.edit","content.action.view","content.code.copy","content.tooltips","navigation.footer","navigation.indexes","navigation.instant","navigation.path","navigation.top","navigation.tracking","search.highlight"],"redirect":null,"search":"../../../../../assets/javascripts/workers/search.719e0d91.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"default":"latest","provider":"mike"}}</script>
+    
+    
+      <script src="../../../../../assets/javascripts/bundle.3cb411a8.min.js"></script>
+      
+    
+  </body>
+</html>
