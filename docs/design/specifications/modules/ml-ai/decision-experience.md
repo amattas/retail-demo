@@ -76,6 +76,21 @@ as seven-day risk. The Plan's additive `Next 7 Days` measures slice forecast
 dates rather than filtering horizon metadata: the demand model defaults to
 fourteen days. Existing full-horizon measures remain unchanged.
 
+After every fresh setup the agent has an open disruption to act on. Each
+generated history ends inside the end-of-history DC outage (see the
+[data contract](../generation/data-contract.md#logistics-incidents)): the DC
+serving the most stores has dispatched nothing for the last days of history,
+and the outage is still open at the risk snapshot. The store policy keeps
+four to eight days of cover, so outside an incident no position falls under
+three days. The outage really draws those stores' fast movers down through
+the simulation, and some reach `days_of_inventory < 3` or zero stock. Their
+signals carry the outage as `active_incident_id`, `active_incident_type`
+(`DC_OUTAGE`) and `active_incident_cause`. Slow movers keep at least a case
+on the shelf, so a layout that sells almost nothing fast (a small luxury
+network, or the Plan's fixed product cohort when those products sell slowly)
+can still have no alertable case. The live stream resolves the outage at its
+planned end, 6 to 54 hours after history ends.
+
 `fabric/operations/01-availability-tables.kql` owns
 `ops_availability_signals` and `ops_case_actions`. These are selected-pack
 tables, not the optional retail event stream. Seeding them must not satisfy

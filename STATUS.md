@@ -43,6 +43,24 @@ replaced the `time` that `dc_supply.py` and `gold_rules.py` import from
 broke setup-08's inventory worker. It now imports
 `time as _time` (#460).
 
+## End-of-history incident (2026-11-25, not live)
+
+A full-demo deploy of a custom hardware layout (3 stores, 18 months) left the
+Operations Agent stopped: no `au.stockout_risk` position met an agent rule
+(minimum `days_of_inventory` 3.5), because the store policy never drops
+below about three days of cover outside an incident. Every history now ends
+inside one deterministic, still-open `DC_OUTAGE` at the DC serving the most
+stores (`incidents.end_of_history_incident`, 78-96 hours from early two days
+before the last day). The outage really starves its stores' fast movers, so
+some positions fall under three days of cover. The live stream plans the
+same outage and resolves it. See the
+[data contract](docs/design/specifications/modules/generation/data-contract.md#logistics-incidents).
+In small local histories (`test_end_of_history_incident.py`) the outage
+leaves 38 (grocery), 17 (hardware), 141 (supercenter, two DCs; 2 elsewhere),
+2 (luxury) and 4 (slow custom-like hardware) positions under three days of
+cover at its stores. Slow layouts depend on a few SKUs selling about two
+units a day. Pending: a live setup re-run and agent activation.
+
 ## Ontology agent, Fabric Apps, and guides (2026-10-23)
 
 The ontology Data Agent never queried data. TMDL ontology partitions now carry
