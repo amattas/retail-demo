@@ -50,8 +50,13 @@ agent alert rule (`stockout_probability >= 0.7` or `days_of_inventory < 3`)
 rank first, then the positions closest to one. Nothing is relabeled; when no
 position is at risk, the agent has nothing to alert on, so activation is
 refused: the report records `activation_refused` and
-`alertable_signal_count: 0`, the agent stays stopped, and the step fails. When
-the native Plan
+`alertable_signal_count: 0`, and the agent stays stopped. Everything else is
+published, so the publisher exits 3 and the deploy journals the step `DEGRADED`
+without prompting; rerun the publication with `--operations-only` once the
+stockout or forecast outputs show an at-risk position. Slow-moving catalogs
+(for example home improvement, where a SKU reorders at a 12-unit case floor)
+often have no such position until logistics incidents or the live stream draw
+stock down. When the native Plan
 is selected, the watchlist stays inside the Plan's locked cohort (store IDs 1-5,
 product IDs 1-20) so every case can be reviewed there. The scenario takes
 current `au.stockout_risk`, keeps positions with a complete seven-day forecast
