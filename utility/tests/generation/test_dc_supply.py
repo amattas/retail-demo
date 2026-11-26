@@ -11,7 +11,14 @@ from retail_setup.generation.dc_supply import (
     delivery_timing,
     simulate_dc_sku,
 )
-from retail_setup.generation.incidents import DcIncidentView, StoreIncidentView, supplier_group
+from retail_setup.generation.incidents import (
+    DcIncidentView,
+    IncidentCalendar,
+    IncidentNetwork,
+    StoreIncidentView,
+    end_of_history_incident,
+    supplier_group,
+)
 from retail_setup.generation.inventory_policy import Demand, dc_lead_days
 
 START = date(2025, 3, 3)
@@ -166,3 +173,58 @@ def test_delivery_timing_is_shared_by_every_sku_of_a_load() -> None:
 
 def test_the_dc_simulation_is_deterministic() -> None:
     assert _run(40, online=2) == _run(40, online=2)
+
+
+def _cover_at_close(events, end: date) -> dict[int, float]:
+    """Days of cover per store at the last close, as notebook 12 computes it.
+
+    The last ledger balance over the trailing 30-day sales velocity.
+    """
+    closing = datetime.combine(end, datetime.max.time())
+    balances: dict[int, tuple[datetime, int]] = {}
+    sold: dict[int, int] = {}
+    for event in events:
+        if event.store_id is None or event.kind in ("SHIPMENT", "REORDER"):
+            continue
+        if event.event_ts <= closing:
+            if event.store_id not in balances or event.event_ts >= balances[event.store_id][0]:
+                balances[event.store_id] = (event.event_ts, event.balance)
+            if event.kind == "SALE" and event.event_ts.date() > end - timedelta(days=30):
+                sold[event.store_id] = sold.get(event.store_id, 0) - event.quantity
+    return {store: balance / (sold[store] / 30) for store, (_, balance) in balances.items()}
+
+
+def test_the_end_of_history_outage_draws_fast_movers_under_three_days_of_cover() -> None:
+    """The agent's cover rule (days_of_inventory < 3) has real positions to flag."""
+    days, end = 45, START + timedelta(days=44)
+    network = IncidentNetwork(
+        store_dc={store: 1 for store in STORES}, store_zones={s: "UTC" for s in STORES}
+    )
+    outage = end_of_history_incident(SEED, network, end)
+    assert outage is not None
+    view = IncidentCalendar([outage]).store_view(1, 1, "UTC")
+    # A fast mover: 6 units a day per store (reorder point 24, so ~4 days of
+    # cover at a reorder), across products whose opening stocks differ.
+    rows = _rows(days, units=6)
+    baseline, disrupted = [], []
+    for product in range(20, 30):
+        for covers, lanes in ((baseline, _lanes(prior=6.0)), (disrupted, _lanes(view, 6.0))):
+            events = simulate_dc_sku(
+                rows,
+                dc_id=1,
+                product_id=product,
+                lanes=lanes,
+                start_date=START,
+                end_date=end,
+                seed=SEED,
+            )
+            covers.extend(_cover_at_close(list(events), end).values())
+    print(
+        f"STAT cover at close: baseline min={min(baseline):.2f}, "
+        f"outage under 3 days {sum(c < 3 for c in disrupted)}/{len(disrupted)}"
+    )
+    # Undisturbed, the policy never leaves a fast mover under three days at a
+    # close; three days without loads leave many of them there (those that
+    # were near their reorder point when the outage began).
+    assert min(baseline) >= 3
+    assert sum(cover < 3 for cover in disrupted) >= len(disrupted) // 4

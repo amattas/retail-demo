@@ -243,7 +243,9 @@ class IncidentPlanner:
 
     Incidents of each day come from ``incidents.plan_incidents`` with the
     severe-weather days of the network's geographies, which ``severe_days``
-    computes (``network.severe_weather_days``) in cached blocks.
+    computes (``network.severe_weather_days``) in cached blocks. With the
+    history's last day (``history_end``) the plan holds the end-of-history
+    outage, so the stream sees it open and resolves it at its planned end.
     """
 
     def __init__(
@@ -251,9 +253,11 @@ class IncidentPlanner:
         seed: int,
         network: IncidentNetwork,
         severe_days: Callable[[date, date], set[tuple[int, date]]],
+        history_end: date | None = None,
     ) -> None:
         self.seed = seed
         self.network = network
+        self.history_end = history_end
         self._severe_days = severe_days
         self._severe: dict[int, set[tuple[int, date]]] = {}
         self._days: dict[date, list[Incident]] = {}
@@ -272,7 +276,9 @@ class IncidentPlanner:
             severe: set[tuple[int, date]] = set()
             for offset in range(-1, WEATHER_LOOKAHEAD_DAYS + 1):
                 severe |= self._severe_block(day + timedelta(days=offset))
-            self._days[day] = plan_incidents(self.seed, self.network, day, day, severe)
+            self._days[day] = plan_incidents(
+                self.seed, self.network, day, day, severe, history_end=self.history_end
+            )
         return self._days[day]
 
     def window(self, previous_ms: int | None, clock_ms: int) -> tuple[Incident, ...]:

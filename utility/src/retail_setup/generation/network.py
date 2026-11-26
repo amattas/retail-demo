@@ -345,7 +345,11 @@ def severe_weather_days(
 def network_incidents(
     spark: SparkSession, seed: int, network: IncidentNetwork, start: date, end: date
 ) -> list[Incident]:
-    """Incidents that can be open between ``start`` and ``end`` (planned from earlier days)."""
+    """Incidents that can be open in the history ``start``..``end`` (planned from earlier days).
+
+    ``end`` is the history's last day, so the plan includes the end-of-history
+    outage (``incidents.end_of_history_incident``).
+    """
     first = start - timedelta(days=INCIDENT_LOOKBACK_DAYS)
     severe = severe_weather_days(
         spark,
@@ -356,6 +360,6 @@ def network_incidents(
     )
     return [
         incident
-        for incident in plan_incidents(seed, network, first, end, severe)
+        for incident in plan_incidents(seed, network, first, end, severe, history_end=end)
         if incident.resolved_at.date() >= start
     ]
